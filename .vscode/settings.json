@@ -1,7 +1,6 @@
 {
-  "protobuf.externalLinter.enabled": true,
-  "protobuf.externalLinter.linter": "buf",
-  "protobuf.externalLinter.bufPath": "/usr/local/bin/buf",
-  "protobuf.buf.path": "/usr/local/bin/buf",
-  "protobuf.protoc.path": "/opt/homebrew/bin/protoc"
+  "editor.formatOnSave": true,
+  "rust-analyzer.check.command": "clippy",
+  "rust-analyzer.check.allTargets": true,
+  "rust-analyzer.check.extraArgs": ["--all-features"]
 }
