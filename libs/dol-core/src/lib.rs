@@ -13,6 +13,8 @@
 //! - **`dol-ir`** — Statement enum, all IR types, Backend trait, output types
 //! - **`dol-builder`** — Composable builder API (GetBuilder, InsertBuilder, etc.)
 
+#![deny(unsafe_code)]
+
 /// Expression engine — composable, backend-agnostic expression AST.
 pub use dol_expr as expr;
 

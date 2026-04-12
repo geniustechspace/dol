@@ -3,6 +3,8 @@
 //! `DolConfig` is the single entry-point for configuring all DOL backends
 //! (SQL, key-value, object storage) and their dialects from one file.
 //!
+
+#![deny(unsafe_code)]
 //! # Enterprise multi-instance support
 //!
 //! Each backend supports:

@@ -17,7 +17,7 @@ pub enum NullsPosition {
 }
 
 /// An ORDER BY element using `Expr`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct OrderByExpr {
     pub expr: Expr,
     pub direction: Direction,

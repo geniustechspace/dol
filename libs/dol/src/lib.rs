@@ -3,6 +3,8 @@
 //! A universal, storage-agnostic query and schema language for Rust.
 //!
 //! ## Overview
+
+#![deny(unsafe_code)]
 //!
 //! DOL provides a type-safe, composable way to build queries and schema definitions
 //! that can target multiple storage backends: SQL databases, key-value stores,

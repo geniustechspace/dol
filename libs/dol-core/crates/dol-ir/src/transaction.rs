@@ -1,7 +1,7 @@
 //! Transaction IR — canonical representation of transaction operations.
 
 /// Transaction operations.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TransactionIR {
     Begin,
     Commit,

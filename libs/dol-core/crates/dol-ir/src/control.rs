@@ -3,7 +3,7 @@
 use dol_expr::Expr;
 
 /// Grant privileges on a resource to a role.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct GrantIR {
     pub privilege: Privilege,
     pub on_target: String,
@@ -11,7 +11,7 @@ pub struct GrantIR {
 }
 
 /// Revoke privileges on a resource from a role.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RevokeIR {
     pub privilege: Privilege,
     pub on_target: String,
@@ -33,7 +33,7 @@ pub enum Privilege {
 }
 
 /// Define a policy for declarative access control.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DefinePolicyIR {
     pub name: String,
     pub on_model: String,

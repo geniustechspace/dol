@@ -2,6 +2,8 @@
 //!
 //! Renders DOL IR into storage operation descriptors.
 
+#![deny(unsafe_code)]
+
 use dol_core::ir::{Backend, BackendError, RenderedOutput, Statement, StorageOp, StorageOutput};
 
 /// Backend that renders storage IR statements into [`StorageOutput`] descriptors.

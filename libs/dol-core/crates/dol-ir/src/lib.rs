@@ -6,6 +6,8 @@
 //! Also defines the `Backend` trait, output types, and error types shared
 //! across all backend implementations.
 
+#![deny(unsafe_code)]
+
 pub mod control;
 pub mod definition;
 pub mod mutation;
@@ -26,7 +28,7 @@ pub use storage::{
 pub use transaction::TransactionIR;
 
 /// A reference to a model (table/collection/bucket), with optional alias.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModelRef {
     pub name: String,
     pub namespace: Option<String>,
@@ -34,7 +36,7 @@ pub struct ModelRef {
 }
 
 /// Top-level DOL statement — the universal dispatch enum.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     // Definition
     DefineModel(DefineModelIR),
@@ -80,14 +82,14 @@ pub enum Statement {
 // ---------------------------------------------------------------------------
 
 /// SQL output (text + parameter count).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SqlOutput {
     pub sql: String,
     pub param_count: usize,
 }
 
 /// A key-value operation descriptor.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KvOutput {
     /// The operation to perform.
     pub operation: KvOp,
@@ -110,7 +112,7 @@ pub enum KvOp {
 }
 
 /// An object storage operation descriptor.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StorageOutput {
     /// The operation to perform.
     pub operation: StorageOp,
@@ -140,7 +142,7 @@ pub enum StorageOp {
 }
 
 /// The rendered output of a backend.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum RenderedOutput {
     /// SQL text + parameter count.
     Sql(SqlOutput),
@@ -151,7 +153,7 @@ pub enum RenderedOutput {
 }
 
 /// Backend rendering errors.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BackendError {
     /// This backend does not support this statement kind.
     Unsupported(String),
@@ -352,7 +354,10 @@ mod tests {
     fn statement_clone() {
         let stmt = Statement::Transaction(TransactionIR::Commit);
         let cloned = stmt.clone();
-        assert!(matches!(cloned, Statement::Transaction(TransactionIR::Commit)));
+        assert!(matches!(
+            cloned,
+            Statement::Transaction(TransactionIR::Commit)
+        ));
     }
 
     #[test]
@@ -690,8 +695,7 @@ mod tests {
 
     #[test]
     fn field_def_generated_virtual() {
-        let f =
-            FieldDef::new("age_group", FieldType::Text).generated_virtual("age_bucket(age)");
+        let f = FieldDef::new("age_group", FieldType::Text).generated_virtual("age_bucket(age)");
         assert!(f.generated.is_some());
         let (kind, expr) = f.generated.unwrap();
         assert!(matches!(kind, dol_model::GeneratedKind::Virtual));
@@ -844,10 +848,7 @@ mod tests {
         assert_eq!(LockMode::ForUpdate, LockMode::ForUpdate);
         assert_eq!(LockMode::ForShare, LockMode::ForShare);
         assert_eq!(LockMode::ForUpdateNoWait, LockMode::ForUpdateNoWait);
-        assert_eq!(
-            LockMode::ForUpdateSkipLocked,
-            LockMode::ForUpdateSkipLocked
-        );
+        assert_eq!(LockMode::ForUpdateSkipLocked, LockMode::ForUpdateSkipLocked);
         assert_eq!(LockMode::ForShareNoWait, LockMode::ForShareNoWait);
         assert_eq!(LockMode::ForShareSkipLocked, LockMode::ForShareSkipLocked);
     }
@@ -1090,8 +1091,7 @@ mod tests {
 
     #[test]
     fn alter_action_add_constraint() {
-        let action =
-            AlterAction::AddConstraint(dol_model::ModelConstraint::Check("age > 0"));
+        let action = AlterAction::AddConstraint(dol_model::ModelConstraint::Check("age > 0"));
         assert!(matches!(action, AlterAction::AddConstraint(_)));
     }
 

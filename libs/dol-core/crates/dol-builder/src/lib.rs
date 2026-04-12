@@ -9,6 +9,8 @@
 //!
 //! For SQL rendering, import the extension traits from `dol-sql`.
 
+#![deny(unsafe_code)]
+
 pub mod control;
 pub mod definition;
 pub mod mutation;
@@ -107,7 +109,7 @@ impl ModelBuilderExt for Model {
 mod tests {
     use super::*;
     use control::Privilege;
-    use dol_expr::{col, param, raw_expr, Direction, Expr, NullsPosition, OrderByExpr};
+    use dol_expr::{Direction, Expr, NullsPosition, OrderByExpr, col, param, raw_expr};
     use dol_ir::definition::{AlterAction, FieldDef, IndexMethod};
     use dol_ir::storage::ObjectSource;
     use dol_ir::transaction::TransactionIR;
@@ -236,10 +238,7 @@ mod tests {
 
     #[test]
     fn get_where_exists() {
-        let ir = TEST_MODEL
-            .get()
-            .where_exists("SELECT 1 FROM posts")
-            .build();
+        let ir = TEST_MODEL.get().where_exists("SELECT 1 FROM posts").build();
         assert_eq!(ir.filters.len(), 1);
         assert!(
             matches!(&ir.filters[0], Expr::Exists { subquery, negated } if subquery == "SELECT 1 FROM posts" && !negated)
@@ -252,9 +251,7 @@ mod tests {
             .get()
             .where_not_exists("SELECT 1 FROM bans")
             .build();
-        assert!(
-            matches!(&ir.filters[0], Expr::Exists { negated, .. } if *negated)
-        );
+        assert!(matches!(&ir.filters[0], Expr::Exists { negated, .. } if *negated));
     }
 
     #[test]
@@ -264,9 +261,7 @@ mod tests {
             .where_in_subquery("id", "SELECT user_id FROM admins")
             .build();
         assert_eq!(ir.filters.len(), 1);
-        assert!(
-            matches!(&ir.filters[0], Expr::InSubquery { negated, .. } if !negated)
-        );
+        assert!(matches!(&ir.filters[0], Expr::InSubquery { negated, .. } if !negated));
     }
 
     #[test]
@@ -275,9 +270,7 @@ mod tests {
             .get()
             .where_not_in_subquery("id", "SELECT user_id FROM banned")
             .build();
-        assert!(
-            matches!(&ir.filters[0], Expr::InSubquery { negated, .. } if *negated)
-        );
+        assert!(matches!(&ir.filters[0], Expr::InSubquery { negated, .. } if *negated));
     }
 
     #[test]
@@ -301,7 +294,10 @@ mod tests {
         assert_eq!(ir.joins[0].join_type, JoinType::Inner);
         assert_eq!(ir.joins[0].target.name, "posts");
         assert!(ir.joins[0].target.alias.is_none());
-        assert_eq!(ir.joins[0].on_conditions, vec![("id".to_string(), "user_id".to_string())]);
+        assert_eq!(
+            ir.joins[0].on_conditions,
+            vec![("id".to_string(), "user_id".to_string())]
+        );
     }
 
     #[test]
@@ -438,7 +434,12 @@ mod tests {
 
     #[test]
     fn get_param_count_basic() {
-        let count = TEST_MODEL.get().where_eq("id").offset().limit().param_count();
+        let count = TEST_MODEL
+            .get()
+            .where_eq("id")
+            .offset()
+            .limit()
+            .param_count();
         // 1 (where_eq) + 1 (offset) + 1 (limit) = 3
         assert_eq!(count, 3);
     }
@@ -480,7 +481,10 @@ mod tests {
     fn insert_all_columns() {
         let ir = TEST_MODEL.insert().all_columns().build();
         assert_eq!(ir.target.name, "users");
-        assert_eq!(ir.fields, vec!["id", "email", "name", "status", "created_at"]);
+        assert_eq!(
+            ir.fields,
+            vec!["id", "email", "name", "status", "created_at"]
+        );
         assert_eq!(ir.row_count, 1);
         assert!(ir.returning.is_empty());
     }
@@ -586,7 +590,10 @@ mod tests {
 
     #[test]
     fn update_set_literal() {
-        let ir = TEST_MODEL.update().set_literal("status", "'inactive'").build();
+        let ir = TEST_MODEL
+            .update()
+            .set_literal("status", "'inactive'")
+            .build();
         assert_eq!(ir.assignments[0].0, "status");
         assert!(matches!(&ir.assignments[0].1, Expr::Raw(s) if s == "'inactive'"));
     }
@@ -600,7 +607,10 @@ mod tests {
 
     #[test]
     fn update_set_expr() {
-        let ir = TEST_MODEL.update().set_expr("name", raw_expr("UPPER(name)")).build();
+        let ir = TEST_MODEL
+            .update()
+            .set_expr("name", raw_expr("UPPER(name)"))
+            .build();
         assert_eq!(ir.assignments[0].0, "name");
         assert!(matches!(&ir.assignments[0].1, Expr::Raw(s) if s == "UPPER(name)"));
     }
@@ -871,7 +881,9 @@ mod tests {
             .add_column(Field::new("bio", FieldType::Text).nullable())
             .build();
         assert_eq!(ir.actions.len(), 1);
-        assert!(matches!(&ir.actions[0], AlterAction::AddField(f) if f.name == "bio" && f.nullable));
+        assert!(
+            matches!(&ir.actions[0], AlterAction::AddField(f) if f.name == "bio" && f.nullable)
+        );
     }
 
     #[test]
@@ -882,10 +894,7 @@ mod tests {
 
     #[test]
     fn alter_rename_field() {
-        let ir = TEST_MODEL
-            .alter()
-            .rename_field("name", "full_name")
-            .build();
+        let ir = TEST_MODEL.alter().rename_field("name", "full_name").build();
         assert!(
             matches!(&ir.actions[0], AlterAction::RenameField { from, to } if from == "name" && to == "full_name")
         );
@@ -949,9 +958,7 @@ mod tests {
             .alter()
             .drop_constraint("users_email_key")
             .build();
-        assert!(
-            matches!(&ir.actions[0], AlterAction::DropConstraint(n) if n == "users_email_key")
-        );
+        assert!(matches!(&ir.actions[0], AlterAction::DropConstraint(n) if n == "users_email_key"));
     }
 
     #[test]
@@ -1085,7 +1092,9 @@ mod tests {
 
     #[test]
     fn define_model_with_namespace() {
-        let ir = DefineModelBuilder::new("logs").namespace("analytics").build();
+        let ir = DefineModelBuilder::new("logs")
+            .namespace("analytics")
+            .build();
         assert_eq!(ir.namespace.as_deref(), Some("analytics"));
     }
 
@@ -1517,7 +1526,12 @@ mod tests {
         )
         .with_namespace("auth");
 
-        let ir = NS_MODEL.upsert().columns(&["id"]).on_conflict(&["id"]).do_nothing().build();
+        let ir = NS_MODEL
+            .upsert()
+            .columns(&["id"])
+            .on_conflict(&["id"])
+            .do_nothing()
+            .build();
         assert_eq!(ir.target.namespace.as_deref(), Some("auth"));
     }
 

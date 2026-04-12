@@ -24,6 +24,8 @@
 //! let expr = field("age").gt(lit(18)) & field("status").eq(lit("active"));
 //! ```
 
+#![deny(unsafe_code)]
+
 pub mod func;
 mod literal;
 mod ops;
@@ -56,7 +58,7 @@ use std::ops as std_ops;
 /// // Field access for nested data: profile.address.city
 /// let expr = field("profile").access("address").access("city");
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     // ── Identifiers ──
     /// A field/column reference: `field_name`.
@@ -651,8 +653,8 @@ mod tests {
 
     #[test]
     fn test_lit_float() {
-        match lit(3.14_f64) {
-            Expr::Literal(Literal::Float(v)) => assert!((v - 3.14).abs() < f64::EPSILON),
+        match lit(2.5_f64) {
+            Expr::Literal(Literal::Float(v)) => assert!((v - 2.5).abs() < f64::EPSILON),
             other => panic!("expected Literal::Float, got {other:?}"),
         }
     }
@@ -679,7 +681,9 @@ mod tests {
             .when(field("x").gt(lit(0)), lit("positive"))
             .else_(lit("non-positive"))
             .end();
-        assert!(matches!(expr, Expr::Case { whens, else_expr } if whens.len() == 1 && else_expr.is_some()));
+        assert!(
+            matches!(expr, Expr::Case { whens, else_expr } if whens.len() == 1 && else_expr.is_some())
+        );
     }
 
     #[test]
@@ -737,13 +741,25 @@ mod tests {
     #[test]
     fn test_like() {
         let e = field("name").like(lit("%foo%"));
-        assert!(matches!(e, Expr::BinaryOp { op: BinOp::Like, .. }));
+        assert!(matches!(
+            e,
+            Expr::BinaryOp {
+                op: BinOp::Like,
+                ..
+            }
+        ));
     }
 
     #[test]
     fn test_ilike() {
         let e = field("name").ilike(lit("%foo%"));
-        assert!(matches!(e, Expr::BinaryOp { op: BinOp::ILike, .. }));
+        assert!(matches!(
+            e,
+            Expr::BinaryOp {
+                op: BinOp::ILike,
+                ..
+            }
+        ));
     }
 
     // ── 4. Null checks ──
@@ -837,7 +853,13 @@ mod tests {
     #[test]
     fn test_concat() {
         let e = field("first").concat(field("last"));
-        assert!(matches!(e, Expr::BinaryOp { op: BinOp::Concat, .. }));
+        assert!(matches!(
+            e,
+            Expr::BinaryOp {
+                op: BinOp::Concat,
+                ..
+            }
+        ));
     }
 
     // ── 9. Ordering ──
@@ -913,7 +935,13 @@ mod tests {
     #[test]
     fn test_not() {
         let e = !field("active");
-        assert!(matches!(e, Expr::UnaryOp { op: UnaryOp::Not, .. }));
+        assert!(matches!(
+            e,
+            Expr::UnaryOp {
+                op: UnaryOp::Not,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -949,7 +977,13 @@ mod tests {
     #[test]
     fn test_neg() {
         let e = -field("a");
-        assert!(matches!(e, Expr::UnaryOp { op: UnaryOp::Neg, .. }));
+        assert!(matches!(
+            e,
+            Expr::UnaryOp {
+                op: UnaryOp::Neg,
+                ..
+            }
+        ));
     }
 
     // ── 12. From impls ──
@@ -1196,7 +1230,10 @@ mod tests {
             .over()
             .partition_by(vec![field("dept"), field("team")])
             .order_by(vec![field("hire_date").asc()])
-            .rows_between(FrameBound::UnboundedPreceding, FrameBound::UnboundedFollowing)
+            .rows_between(
+                FrameBound::UnboundedPreceding,
+                FrameBound::UnboundedFollowing,
+            )
             .build();
         match e {
             Expr::Window {

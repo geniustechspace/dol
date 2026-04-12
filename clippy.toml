@@ -1,0 +1,4 @@
+# DOL Clippy Configuration
+# See: https://doc.rust-lang.org/clippy/configuration.html
+
+msrv = "1.85"

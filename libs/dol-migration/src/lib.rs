@@ -13,6 +13,8 @@
 //! - **Bidirectional**: Every migration defines both `up()` (forward) and
 //!   `down()` (rollback) steps.
 //!
+
+#![deny(unsafe_code)]
 //! # Architecture
 //!
 //! ```text

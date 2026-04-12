@@ -12,6 +12,8 @@
 //!
 //! A **FieldType** is the backend-agnostic logical type (SQL: column type).
 
+#![deny(unsafe_code)]
+
 pub mod constraint;
 pub mod field;
 pub mod field_type;
@@ -131,11 +133,14 @@ mod tests {
 
     static NS_MODEL: Model = Model::new("users", BASIC_FIELDS).with_namespace("public");
 
-    static CONSTRAINED_MODEL: Model = Model::new("orders", &[
-        Field::new("id", FieldType::Serial).primary_key(),
-        Field::new("user_id", FieldType::Uuid),
-        Field::new("product", FieldType::Text),
-    ])
+    static CONSTRAINED_MODEL: Model = Model::new(
+        "orders",
+        &[
+            Field::new("id", FieldType::Serial).primary_key(),
+            Field::new("user_id", FieldType::Uuid),
+            Field::new("product", FieldType::Text),
+        ],
+    )
     .with_constraints(&[
         ModelConstraint::Unique(&["user_id", "product"]),
         ModelConstraint::Check("user_id IS NOT NULL"),
@@ -376,8 +381,7 @@ mod tests {
 
     #[test]
     fn field_generated_virtual() {
-        let f = Field::new("full_name", FieldType::Text)
-            .generated_virtual("first || ' ' || last");
+        let f = Field::new("full_name", FieldType::Text).generated_virtual("first || ' ' || last");
         assert_eq!(
             f.generated,
             Some((GeneratedKind::Virtual, "first || ' ' || last")),
@@ -477,9 +481,7 @@ mod tests {
     #[test]
     fn generated_kind_debug_clone_copy() {
         let stored = GeneratedKind::Stored;
-        let cloned = stored.clone();
         let copied = stored; // Copy
-        assert_eq!(stored, cloned);
         assert_eq!(stored, copied);
         // Debug
         assert_eq!(format!("{:?}", GeneratedKind::Stored), "Stored");
