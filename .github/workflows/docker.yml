@@ -117,4 +117,4 @@ jobs:
           build-args: |
             APP_BIN=edge-oidc
           build-args: |
-            RUST_VERSION=1.93
+            RUST_VERSION=1.94

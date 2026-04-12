@@ -13,7 +13,7 @@ pub enum DialectConfigError {
     Io(std::io::Error),
     Json(serde_json::Error),
     Toml(toml_crate::de::Error),
-    Yaml(serde_yaml::Error),
+    Yaml(serde_yml::Error),
     UnsupportedFormat(String),
 }
 
@@ -61,8 +61,8 @@ impl From<toml_crate::de::Error> for DialectConfigError {
     }
 }
 
-impl From<serde_yaml::Error> for DialectConfigError {
-    fn from(e: serde_yaml::Error) -> Self {
+impl From<serde_yml::Error> for DialectConfigError {
+    fn from(e: serde_yml::Error) -> Self {
         Self::Yaml(e)
     }
 }
@@ -79,8 +79,8 @@ impl Dialect {
     }
 
     /// Deserialize a `Dialect` from a YAML string.
-    pub fn from_yaml_str(yaml: &str) -> Result<Self, serde_yaml::Error> {
-        serde_yaml::from_str(yaml)
+    pub fn from_yaml_str(yaml: &str) -> Result<Self, serde_yml::Error> {
+        serde_yml::from_str(yaml)
     }
 
     /// Load a `Dialect` from a file, auto-detecting format by extension.
