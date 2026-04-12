@@ -136,6 +136,9 @@ pub use dol_core::builder::{ModelBuilderExt, ModelDefineExt};
 // Re-export the ToSql extension trait so builders have .to_sql() in scope.
 pub use dol_sql::ext::ToSql;
 
+// Re-export the TryToSql extension trait for fallible SQL rendering.
+pub use dol_sql::ext::TryToSql;
+
 // Re-export TransactionSqlExt so TransactionBuilder::to_sql() works.
 pub use dol_sql::ext::TransactionSqlExt;
 

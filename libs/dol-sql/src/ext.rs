@@ -1,8 +1,14 @@
-//! Extension traits that add `.to_sql()` rendering to DOL builders.
+//! Extension traits that add `.to_sql()` and `.try_to_sql()` rendering to DOL builders.
 //!
 //! These traits bridge `dol-builder` (which produces IR) with `dol-sql`
 //! (which renders IR to SQL strings), keeping the dependency arrow from
 //! `dol-sql` → `dol-builder` rather than the reverse.
+//!
+//! # Error handling
+//!
+//! - [`TryToSql`] returns `Result<String, BackendError>` for fallible rendering.
+//! - [`ToSql`] is a convenience wrapper that falls back to an error placeholder
+//!   instead of panicking.
 
 use crate::dialect::{self, Dialect};
 use crate::render;
@@ -17,96 +23,114 @@ use dol_core::builder::mutation::{
 use dol_core::builder::query::GetBuilder;
 use dol_core::builder::transaction::TransactionBuilder;
 use dol_core::expr::{Expr, OrderByExpr};
+use dol_core::ir::BackendError;
 use dol_core::ir::OffsetLimit;
 use dol_core::ir::query::SetOpKind;
 use dol_core::ir::transaction::TransactionIR;
 
 // ===========================================================================
-// ToSql — generic SQL rendering trait
+// TryToSql — fallible SQL rendering trait
+// ===========================================================================
+
+/// Extension trait adding fallible `.try_to_sql()` to DOL builders.
+///
+/// Returns `Result<String, BackendError>` instead of panicking on render errors.
+pub trait TryToSql {
+    /// Render to a SQL string, returning an error on failure.
+    /// Pass `None` for the global default dialect.
+    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError>;
+}
+
+// ===========================================================================
+// ToSql — convenience (infallible) SQL rendering trait
 // ===========================================================================
 
 /// Extension trait adding `.to_sql()` to DOL builders.
+///
+/// This is a convenience wrapper around [`TryToSql`]. On rendering failure,
+/// it returns an error placeholder string (`"/* SQL render error: ... */"`)
+/// instead of panicking.
+///
+/// For production code that needs to handle errors, prefer [`TryToSql`].
 pub trait ToSql {
     /// Render to a SQL string. Pass `None` for the global default dialect.
     fn to_sql(&self, dialect: Option<&Dialect>) -> String;
 }
 
+/// Blanket implementation: any type implementing `TryToSql` also gets `ToSql`.
+impl<T: TryToSql> ToSql for T {
+    fn to_sql(&self, dialect: Option<&Dialect>) -> String {
+        match self.try_to_sql(dialect) {
+            Ok(sql) => sql,
+            Err(e) => format!("/* SQL render error: {} */", e),
+        }
+    }
+}
+
 // ── GetBuilder ──────────────────────────────────────────────────────────
 
-impl ToSql for GetBuilder<'_> {
-    fn to_sql(&self, dialect: Option<&Dialect>) -> String {
+impl TryToSql for GetBuilder<'_> {
+    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.clone().build();
-        render::render_query_ir(&ir, dialect)
-            .expect("Query rendering should not fail")
-            .sql
+        render::render_query_ir(&ir, dialect).map(|o| o.sql)
     }
 }
 
 // ── InsertBuilder ───────────────────────────────────────────────────────
 
-impl ToSql for InsertBuilder<'_> {
-    fn to_sql(&self, dialect: Option<&Dialect>) -> String {
+impl TryToSql for InsertBuilder<'_> {
+    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_insert_ir(&ir, dialect)
-            .expect("Insert rendering should not fail")
-            .sql
+        render::render_insert_ir(&ir, dialect).map(|o| o.sql)
     }
 }
 
 // ── InsertSelectBuilder ─────────────────────────────────────────────────
 
-impl ToSql for InsertSelectBuilder<'_> {
-    fn to_sql(&self, dialect: Option<&Dialect>) -> String {
+impl TryToSql for InsertSelectBuilder<'_> {
+    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_insert_select_ir(&ir, dialect)
-            .expect("InsertSelect rendering should not fail")
-            .sql
+        render::render_insert_select_ir(&ir, dialect).map(|o| o.sql)
     }
 }
 
 // ── UpdateBuilder ───────────────────────────────────────────────────────
 
-impl ToSql for UpdateBuilder<'_> {
-    fn to_sql(&self, dialect: Option<&Dialect>) -> String {
+impl TryToSql for UpdateBuilder<'_> {
+    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_update_ir(&ir, dialect)
-            .expect("Update rendering should not fail")
-            .sql
+        render::render_update_ir(&ir, dialect).map(|o| o.sql)
     }
 }
 
 // ── RemoveBuilder ───────────────────────────────────────────────────────
 
-impl ToSql for RemoveBuilder<'_> {
-    fn to_sql(&self, dialect: Option<&Dialect>) -> String {
+impl TryToSql for RemoveBuilder<'_> {
+    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_remove_ir(&ir, dialect)
-            .expect("Remove rendering should not fail")
-            .sql
+        render::render_remove_ir(&ir, dialect).map(|o| o.sql)
     }
 }
 
 // ── UpsertBuilder ───────────────────────────────────────────────────────
 
-impl ToSql for UpsertBuilder<'_> {
-    fn to_sql(&self, dialect: Option<&Dialect>) -> String {
+impl TryToSql for UpsertBuilder<'_> {
+    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_upsert_ir(&ir, dialect)
-            .expect("Upsert rendering should not fail")
-            .sql
+        render::render_upsert_ir(&ir, dialect).map(|o| o.sql)
     }
 }
 
 // ── CreateFromMeta ──────────────────────────────────────────────────────
 
-impl ToSql for CreateFromMeta<'_> {
-    fn to_sql(&self, dialect: Option<&Dialect>) -> String {
+impl TryToSql for CreateFromMeta<'_> {
+    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let model = self.get_model();
         let mut sql = String::from("CREATE TABLE ");
@@ -141,91 +165,77 @@ impl ToSql for CreateFromMeta<'_> {
 
         sql.push_str(&parts.join(",\n"));
         sql.push_str("\n)");
-        sql
+        Ok(sql)
     }
 }
 
 // ── DefineModelBuilder ──────────────────────────────────────────────────
 
-impl ToSql for DefineModelBuilder {
-    fn to_sql(&self, dialect: Option<&Dialect>) -> String {
+impl TryToSql for DefineModelBuilder {
+    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_define_model_ir(&ir, dialect)
-            .expect("DefineModel rendering should not fail")
-            .sql
+        render::render_define_model_ir(&ir, dialect).map(|o| o.sql)
     }
 }
 
 // ── AlterModelBuilder ───────────────────────────────────────────────────
 
-impl ToSql for AlterModelBuilder<'_> {
-    fn to_sql(&self, dialect: Option<&Dialect>) -> String {
+impl TryToSql for AlterModelBuilder<'_> {
+    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_alter_model_ir(&ir, dialect)
-            .expect("AlterModel rendering should not fail")
-            .sql
+        render::render_alter_model_ir(&ir, dialect).map(|o| o.sql)
     }
 }
 
 // ── DropModelBuilder ────────────────────────────────────────────────────
 
-impl ToSql for DropModelBuilder<'_> {
-    fn to_sql(&self, dialect: Option<&Dialect>) -> String {
+impl TryToSql for DropModelBuilder<'_> {
+    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_drop_model_ir(&ir, dialect)
-            .expect("DropModel rendering should not fail")
-            .sql
+        render::render_drop_model_ir(&ir, dialect).map(|o| o.sql)
     }
 }
 
 // ── DefineIndexBuilder ──────────────────────────────────────────────────
 
-impl ToSql for DefineIndexBuilder {
-    fn to_sql(&self, dialect: Option<&Dialect>) -> String {
+impl TryToSql for DefineIndexBuilder {
+    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_define_index_ir(&ir, dialect)
-            .expect("DefineIndex rendering should not fail")
-            .sql
+        render::render_define_index_ir(&ir, dialect).map(|o| o.sql)
     }
 }
 
 // ── DropIndexBuilder ────────────────────────────────────────────────────
 
-impl ToSql for DropIndexBuilder {
-    fn to_sql(&self, dialect: Option<&Dialect>) -> String {
+impl TryToSql for DropIndexBuilder {
+    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_drop_index_ir(&ir, dialect)
-            .expect("DropIndex rendering should not fail")
-            .sql
+        render::render_drop_index_ir(&ir, dialect).map(|o| o.sql)
     }
 }
 
 // ── GrantBuilder ────────────────────────────────────────────────────────
 
-impl ToSql for GrantBuilder {
-    fn to_sql(&self, dialect: Option<&Dialect>) -> String {
+impl TryToSql for GrantBuilder {
+    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let _dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_grant_ir(&ir)
-            .expect("Grant rendering should not fail")
-            .sql
+        render::render_grant_ir(&ir).map(|o| o.sql)
     }
 }
 
 // ── RevokeBuilder ───────────────────────────────────────────────────────
 
-impl ToSql for RevokeBuilder {
-    fn to_sql(&self, dialect: Option<&Dialect>) -> String {
+impl TryToSql for RevokeBuilder {
+    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let _dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_revoke_ir(&ir)
-            .expect("Revoke rendering should not fail")
-            .sql
+        render::render_revoke_ir(&ir).map(|o| o.sql)
     }
 }
 
@@ -235,15 +245,22 @@ impl ToSql for RevokeBuilder {
 
 /// Extension trait adding `.to_sql()` to [`TransactionBuilder`].
 pub trait TransactionSqlExt {
+    /// Try to render a TransactionIR to SQL, returning an error on failure.
+    fn try_to_sql(ir: &TransactionIR) -> Result<String, BackendError>;
     /// Render a TransactionIR to SQL.
     fn to_sql(ir: &TransactionIR) -> String;
 }
 
 impl TransactionSqlExt for TransactionBuilder {
+    fn try_to_sql(ir: &TransactionIR) -> Result<String, BackendError> {
+        render::render_transaction_ir(ir).map(|o| o.sql)
+    }
+
     fn to_sql(ir: &TransactionIR) -> String {
-        render::render_transaction_ir(ir)
-            .expect("Transaction rendering should not fail")
-            .sql
+        match Self::try_to_sql(ir) {
+            Ok(sql) => sql,
+            Err(e) => format!("/* SQL render error: {} */", e),
+        }
     }
 }
 
@@ -324,8 +341,8 @@ impl CompoundSelectBuilder {
     }
 }
 
-impl ToSql for CompoundSelectBuilder {
-    fn to_sql(&self, dialect: Option<&Dialect>) -> String {
+impl TryToSql for CompoundSelectBuilder {
+    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let mut counter = dialect.param_counter();
         let mut sql = self.base.clone();
@@ -369,7 +386,7 @@ impl ToSql for CompoundSelectBuilder {
             ));
         }
 
-        sql
+        Ok(sql)
     }
 }
 
