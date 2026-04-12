@@ -108,7 +108,7 @@ pub enum ConfigError {
     /// TOML deserialization error.
     Toml(toml_crate::de::Error),
     /// YAML deserialization error.
-    Yaml(serde_yml::Error),
+    Yaml(serde_norway::Error),
     /// Unrecognized file extension.
     UnsupportedFormat(String),
 }
@@ -157,8 +157,8 @@ impl From<toml_crate::de::Error> for ConfigError {
     }
 }
 
-impl From<serde_yml::Error> for ConfigError {
-    fn from(e: serde_yml::Error) -> Self {
+impl From<serde_norway::Error> for ConfigError {
+    fn from(e: serde_norway::Error) -> Self {
         Self::Yaml(e)
     }
 }
@@ -179,8 +179,8 @@ impl DolConfig {
     }
 
     /// Deserialize from a YAML string.
-    pub fn from_yaml_str(yaml: &str) -> Result<Self, serde_yml::Error> {
-        serde_yml::from_str(yaml)
+    pub fn from_yaml_str(yaml: &str) -> Result<Self, serde_norway::Error> {
+        serde_norway::from_str(yaml)
     }
 
     /// Load from a file, auto-detecting format by extension.
@@ -365,7 +365,7 @@ storage:
     region: us-east-1
 "#;
 
-        let cfg: DolConfig = serde_yml::from_str(yaml_str).unwrap();
+        let cfg: DolConfig = serde_norway::from_str(yaml_str).unwrap();
         assert!(cfg.sql.is_some());
         assert!(cfg.kv.is_some());
         assert!(cfg.storage.is_some());
