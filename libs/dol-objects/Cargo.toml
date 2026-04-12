@@ -6,7 +6,6 @@ publish = false
 description = "DOL object storage backend — renders IR into storage operation descriptors."
 
 [dependencies]
-dol-ir = { workspace = true }
+dol-core = { workspace = true }
 
 [dev-dependencies]
-dol-builder = { workspace = true }

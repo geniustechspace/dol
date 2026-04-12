@@ -6,6 +6,6 @@ publish = false
 description = "DOL builder API — composable method-chain builders that produce IR."
 
 [dependencies]
-dol-expr = { workspace = true }
-dol-model = { workspace = true }
-dol-ir = { workspace = true }
+dol-expr = { path = "../dol-expr" }
+dol-model = { path = "../dol-model" }
+dol-ir = { path = "../dol-ir" }

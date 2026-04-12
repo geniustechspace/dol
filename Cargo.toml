@@ -1,39 +1,37 @@
-[package]
-name = "dol"
-version.workspace = true
-edition.workspace = true
+# ── Workspace ──────────────────────────────────────────────────────────────────
+
+[workspace]
+resolver = "2"
+members = [
+    "libs/dol",
+    "libs/dol-core",
+    "libs/dol-core/crates/dol-expr",
+    "libs/dol-core/crates/dol-model",
+    "libs/dol-core/crates/dol-ir",
+    "libs/dol-core/crates/dol-builder",
+    "libs/dol-sql",
+    "libs/dol-kv",
+    "libs/dol-objects",
+    "libs/dol-migration",
+    "libs/dol-config",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
 publish = false
-description = "DOL — Data Operating Language. A universal, storage-agnostic query and schema language."
 
-[dependencies]
-# Core language (expressions, models, IR, builders, Backend trait)
-dol-core = { path = "crates/dol-core" }
+[workspace.dependencies]
+# Serialisation
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+toml_crate = { package = "toml", version = "0.8" }
 
-# Also import sub-crates directly for re-export convenience
-dol-expr = { path = "crates/dol-core/crates/dol-expr" }
-dol-model = { path = "crates/dol-core/crates/dol-model" }
-dol-ir = { path = "crates/dol-core/crates/dol-ir" }
-dol-builder = { path = "crates/dol-core/crates/dol-builder" }
-
-# Engine crates
-dol-sql = { path = "crates/dol-sql" }
-dol-kv = { path = "crates/dol-kv" }
-dol-objects = { path = "crates/dol-objects" }
-
-# Tooling crates (feature-gated)
-dol-migration = { path = "crates/dol-migration", optional = true }
-dol-config = { path = "crates/dol-config", optional = true }
-
-# Direct dependencies needed by features
-serde = { workspace = true, optional = true }
-
-[features]
-default = ["serde"]
-serde = ["dep:serde", "dol-sql/serde"]
-config = ["dep:dol-config", "dol-sql/config"]
-migration = ["dep:dol-migration"]
-migration-config = ["migration", "config", "dol-migration/config"]
-full = ["config", "migration", "migration-config"]
-
-[dev-dependencies]
-toml_crate = { workspace = true }
+# Internal crates
+dol-core = { path = "libs/dol-core" }
+dol-sql = { path = "libs/dol-sql" }
+dol-kv = { path = "libs/dol-kv" }
+dol-objects = { path = "libs/dol-objects" }
+dol-migration = { path = "libs/dol-migration" }
+dol-config = { path = "libs/dol-config" }

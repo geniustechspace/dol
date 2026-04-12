@@ -6,11 +6,8 @@ publish = false
 description = "DOL migration system — type-safe schema migrations across all storage backends."
 
 [dependencies]
-dol-expr = { workspace = true }
-dol-model = { workspace = true }
-dol-ir = { workspace = true }
+dol-core = { workspace = true }
 dol-sql = { workspace = true }
-dol-builder = { workspace = true }
 dol-config = { workspace = true, optional = true }
 
 [dev-dependencies]

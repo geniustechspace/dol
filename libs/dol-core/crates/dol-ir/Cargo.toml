@@ -6,5 +6,5 @@ publish = false
 description = "DOL intermediate representation — backend-agnostic AST and Backend trait."
 
 [dependencies]
-dol-expr = { workspace = true }
-dol-model = { workspace = true }
+dol-expr = { path = "../dol-expr" }
+dol-model = { path = "../dol-model" }

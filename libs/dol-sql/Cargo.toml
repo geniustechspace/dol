@@ -6,10 +6,7 @@ publish = false
 description = "DOL SQL backend — dialect-aware SQL rendering."
 
 [dependencies]
-dol-expr = { workspace = true }
-dol-model = { workspace = true }
-dol-ir = { workspace = true }
-dol-builder = { workspace = true }
+dol-core = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 toml_crate = { workspace = true, optional = true }

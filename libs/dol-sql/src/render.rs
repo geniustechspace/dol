@@ -6,14 +6,14 @@ use super::dialect::{
     ArrayLiteralStyle, ConcatStyle, Dialect, JsonAccessStyle, PaginationStyle, ParamCounter,
     ReturningStyle,
 };
-use dol_expr::window::{FrameBound, FrameKind, WindowFrame};
-use dol_expr::{BinOp, Direction, Expr, Literal, NullsPosition, OrderByExpr, UnaryOp};
-use dol_ir::BackendError;
-use dol_ir::SqlOutput;
-use dol_ir::*;
-use dol_model::Field;
-use dol_model::FieldType;
-use dol_model::constraint::{FkAction, GeneratedKind, ModelConstraint};
+use dol_core::expr::window::{FrameBound, FrameKind, WindowFrame};
+use dol_core::expr::{BinOp, Direction, Expr, Literal, NullsPosition, OrderByExpr, UnaryOp};
+use dol_core::ir::BackendError;
+use dol_core::ir::SqlOutput;
+use dol_core::ir::*;
+use dol_core::model::Field;
+use dol_core::model::FieldType;
+use dol_core::model::constraint::{FkAction, GeneratedKind, ModelConstraint};
 
 // ===========================================================================
 // Expr rendering (the core recursive renderer)
@@ -495,7 +495,7 @@ pub fn render_field_def(field: &Field, dialect: &Dialect) -> String {
 }
 
 /// Renders a field definition from an owned FieldDef (IR).
-pub fn render_field_def_ir(fd: &dol_ir::definition::FieldDef, dialect: &Dialect) -> String {
+pub fn render_field_def_ir(fd: &dol_core::ir::definition::FieldDef, dialect: &Dialect) -> String {
     let type_str = dialect.type_map.resolve(&fd.field_type);
     let mut def = format!("{} {}", fd.name, type_str);
 

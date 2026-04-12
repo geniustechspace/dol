@@ -1,0 +1,45 @@
+name: Protobuf Lint & Breaking Change Detection
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "proto/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "proto/**"
+
+jobs:
+  buf:
+    name: Buf Lint & Breaking Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history is required for buf breaking change detection against
+          # the base branch of a pull request.
+          fetch-depth: 0
+
+      - name: Set up Buf
+        uses: bufbuild/buf-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # The directory containing buf.yaml (proto files live under proto/)
+          input: proto
+          # Lint all proto files under proto/
+          lint: true
+          # Detect breaking changes against the target branch on PRs,
+          # or against the previous commit on pushes to main.
+          breaking: true
+          breaking_against: |
+            ${{
+              github.event_name == 'pull_request'
+                && format('https://github.com/{0}.git#branch={1}#subdir=proto', github.repository, github.base_ref)
+                || format('https://github.com/{0}.git#tag={1}#subdir=proto', github.repository, github.event.before)
+            }}
+          # Push schema to the Buf Schema Registry when running on main.
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}

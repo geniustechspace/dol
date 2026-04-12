@@ -6,7 +6,6 @@ publish = false
 description = "DOL key-value backend — renders IR into KV operation descriptors."
 
 [dependencies]
-dol-ir = { workspace = true }
+dol-core = { workspace = true }
 
 [dev-dependencies]
-dol-builder = { workspace = true }
