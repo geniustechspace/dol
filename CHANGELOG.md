@@ -15,8 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CHANGELOG.md` for tracking changes
 - `justfile` for developer task automation
 - `rustfmt.toml` and `clippy.toml` for consistent code style enforcement
-- GitHub issue and pull request templates
+- GitHub issue templates
 - Feature matrix CI testing (default, config, migration, full)
+- `#![deny(unsafe_code)]` lint attribute on all crates
 - `PartialEq` / `Eq` derives on core IR types for improved testability
 - `rust-version = "1.85"` MSRV declaration in workspace `Cargo.toml`
 

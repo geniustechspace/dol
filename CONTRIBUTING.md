@@ -38,8 +38,7 @@ cargo deny check
 - **Formatting:** Enforced by `rustfmt` — run `cargo fmt --all` before committing.
 - **Linting:** Clippy with `-D warnings` — fix all warnings.
 - **Documentation:** All public items should have doc comments (`///`).
-  Crates enforce `#![warn(missing_docs)]`.
-- **Unsafe code:** Forbidden — crates enforce `#![deny(unsafe_code)]`.
+- **Unsafe code:** Do not introduce `unsafe` code — crates enforce `#![deny(unsafe_code)]`.
 
 ## Testing
 

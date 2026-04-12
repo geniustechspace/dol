@@ -57,12 +57,23 @@ pub trait ToSql {
     fn to_sql(&self, dialect: Option<&Dialect>) -> String;
 }
 
+/// Sanitize an error message for embedding inside a SQL block comment.
+///
+/// Replaces `*/` sequences so the comment cannot be terminated early,
+/// which would otherwise risk turning the remainder into executable SQL.
+fn sanitize_for_sql_comment(msg: &str) -> String {
+    msg.replace("*/", "* /")
+}
+
 /// Blanket implementation: any type implementing `TryToSql` also gets `ToSql`.
 impl<T: TryToSql> ToSql for T {
     fn to_sql(&self, dialect: Option<&Dialect>) -> String {
         match self.try_to_sql(dialect) {
             Ok(sql) => sql,
-            Err(e) => format!("/* SQL render error: {} */", e),
+            Err(e) => format!(
+                "/* SQL render error: {} */",
+                sanitize_for_sql_comment(&e.to_string())
+            ),
         }
     }
 }
@@ -259,7 +270,10 @@ impl TransactionSqlExt for TransactionBuilder {
     fn to_sql(ir: &TransactionIR) -> String {
         match Self::try_to_sql(ir) {
             Ok(sql) => sql,
-            Err(e) => format!("/* SQL render error: {} */", e),
+            Err(e) => format!(
+                "/* SQL render error: {} */",
+                sanitize_for_sql_comment(&e.to_string())
+            ),
         }
     }
 }
