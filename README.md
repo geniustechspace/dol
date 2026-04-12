@@ -41,7 +41,7 @@ let ms = query.to_sql(Some(&Dialect::mssql()));
 
 DOL follows a three-layer pipeline inspired by SQLAlchemy's Core/Engine separation:
 
-```
+```markdown
  Builders       →       IR        →      Backends
  (human API)        (neutral AST)       (rendering)
 ─────────────────────────────────────────────────────
