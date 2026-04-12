@@ -1,0 +1,79 @@
+{
+  "_comment": "SQLite 3.35+ dialect — default for DOL",
+  "_usage": "let dialect = Dialect::from_json_str(include_str!(\"dialect_sqlite.json\")).unwrap();",
+
+  "name": "sqlite",
+
+  "param_style": { "style": "Positional" },
+  "quote_style": "DoubleQuote",
+  "pagination": "LimitOffset",
+  "upsert_style": "OnConflict",
+  "returning_style": "Returning",
+
+  "bool_true": "1",
+  "bool_false": "0",
+  "concat_style": "PipeOperator",
+  "json_access": "JsonExtractFunction",
+  "array_literal_style": "JsonArrayFunction",
+  "store_kind": "Sql",
+
+  "type_map": {
+    "mappings": {
+      "Uuid": "TEXT",
+      "Text": "TEXT",
+      "Integer": "INTEGER",
+      "Boolean": "INTEGER",
+      "Timestamptz": "TEXT",
+      "Jsonb": "TEXT",
+      "TextArray": "TEXT",
+      "SmallInt": "INTEGER",
+      "BigInt": "INTEGER",
+      "Real": "REAL",
+      "DoublePrecision": "REAL",
+      "Numeric": "REAL",
+      "Bytea": "BLOB",
+      "Date": "TEXT",
+      "Time": "TEXT",
+      "Interval": "TEXT",
+      "Serial": "INTEGER",
+      "BigSerial": "INTEGER",
+      "Inet": "TEXT"
+    }
+  },
+
+  "locking": {
+    "for_update": false,
+    "for_share": false,
+    "skip_locked": false,
+    "nowait": false,
+    "use_table_hint": false
+  },
+
+  "ddl": {
+    "create_if_not_exists": true,
+    "drop_if_exists": true,
+    "index_concurrently": false,
+    "enum_style": "CheckConstraint",
+    "auto_increment_style": "Autoincrement",
+    "alter_add_column": true,
+    "alter_drop_column": true,
+    "alter_rename_column": true,
+    "alter_modify_column": false,
+    "alter_rename_table": true,
+    "transactional_ddl": true,
+    "drop_cascade": false
+  },
+
+  "features": {
+    "distinct_on": false,
+    "ilike": false,
+    "array_any": false,
+    "nulls_ordering": true,
+    "anonymous_blocks": false,
+    "schemas": false,
+    "cte": true,
+    "window_functions": true,
+    "lateral_join": false,
+    "on_conflict": true
+  }
+}

@@ -1,0 +1,12 @@
+[package]
+name = "dol-kv"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "DOL key-value backend — renders IR into KV operation descriptors."
+
+[dependencies]
+dol-ir = { path = "../dol-core/crates/dol-ir" }
+
+[dev-dependencies]
+dol-builder = { path = "../dol-core/crates/dol-builder" }

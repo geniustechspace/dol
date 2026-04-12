@@ -1,0 +1,21 @@
+[package]
+name = "dol-migration"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "DOL migration system — type-safe schema migrations across all storage backends."
+
+[dependencies]
+dol-expr = { path = "../dol-core/crates/dol-expr" }
+dol-model = { path = "../dol-core/crates/dol-model" }
+dol-ir = { path = "../dol-core/crates/dol-ir" }
+dol-sql = { path = "../dol-sql" }
+dol-builder = { path = "../dol-core/crates/dol-builder" }
+dol-config = { path = "../dol-config", optional = true }
+
+[dev-dependencies]
+toml_crate = { workspace = true }
+
+[features]
+default = []
+config = ["dep:dol-config"]

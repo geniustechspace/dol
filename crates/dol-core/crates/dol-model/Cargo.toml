@@ -1,0 +1,8 @@
+[package]
+name = "dol-model"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "DOL schema language — Model, Field, FieldType, and constraints."
+
+[dependencies]

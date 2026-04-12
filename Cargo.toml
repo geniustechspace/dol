@@ -1,0 +1,39 @@
+[package]
+name = "dol"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "DOL — Data Operating Language. A universal, storage-agnostic query and schema language."
+
+[dependencies]
+# Core language (expressions, models, IR, builders, Backend trait)
+dol-core = { path = "crates/dol-core" }
+
+# Also import sub-crates directly for re-export convenience
+dol-expr = { path = "crates/dol-core/crates/dol-expr" }
+dol-model = { path = "crates/dol-core/crates/dol-model" }
+dol-ir = { path = "crates/dol-core/crates/dol-ir" }
+dol-builder = { path = "crates/dol-core/crates/dol-builder" }
+
+# Engine crates
+dol-sql = { path = "crates/dol-sql" }
+dol-kv = { path = "crates/dol-kv" }
+dol-objects = { path = "crates/dol-objects" }
+
+# Tooling crates (feature-gated)
+dol-migration = { path = "crates/dol-migration", optional = true }
+dol-config = { path = "crates/dol-config", optional = true }
+
+# Direct dependencies needed by features
+serde = { workspace = true, optional = true }
+
+[features]
+default = ["serde"]
+serde = ["dep:serde", "dol-sql/serde"]
+config = ["dep:dol-config", "dol-sql/config"]
+migration = ["dep:dol-migration"]
+migration-config = ["migration", "config", "dol-migration/config"]
+full = ["config", "migration", "migration-config"]
+
+[dev-dependencies]
+toml_crate = { workspace = true }

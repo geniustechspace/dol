@@ -1,0 +1,10 @@
+[package]
+name = "dol-ir"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "DOL intermediate representation — backend-agnostic AST and Backend trait."
+
+[dependencies]
+dol-expr = { path = "../dol-expr" }
+dol-model = { path = "../dol-model" }

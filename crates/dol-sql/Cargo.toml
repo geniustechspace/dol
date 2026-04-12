@@ -1,0 +1,21 @@
+[package]
+name = "dol-sql"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "DOL SQL backend — dialect-aware SQL rendering."
+
+[dependencies]
+dol-expr = { path = "../dol-core/crates/dol-expr" }
+dol-model = { path = "../dol-core/crates/dol-model" }
+dol-ir = { path = "../dol-core/crates/dol-ir" }
+dol-builder = { path = "../dol-core/crates/dol-builder" }
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+toml_crate = { workspace = true, optional = true }
+serde_yaml = { workspace = true, optional = true }
+
+[features]
+default = ["serde"]
+serde = ["dep:serde"]
+config = ["serde", "dep:serde_json", "dep:toml_crate", "dep:serde_yaml"]

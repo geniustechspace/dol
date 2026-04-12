@@ -1,0 +1,13 @@
+[package]
+name = "dol-config"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "DOL unified configuration — SQL, KV, and storage backend config from files."
+
+[dependencies]
+dol-sql = { path = "../dol-sql" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml_crate = { workspace = true }
+serde_yaml = { workspace = true }

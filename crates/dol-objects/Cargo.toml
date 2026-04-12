@@ -1,0 +1,12 @@
+[package]
+name = "dol-objects"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "DOL object storage backend — renders IR into storage operation descriptors."
+
+[dependencies]
+dol-ir = { path = "../dol-core/crates/dol-ir" }
+
+[dev-dependencies]
+dol-builder = { path = "../dol-core/crates/dol-builder" }

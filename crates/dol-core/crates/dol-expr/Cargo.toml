@@ -1,0 +1,8 @@
+[package]
+name = "dol-expr"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "DOL expression engine — composable, backend-agnostic expression AST."
+
+[dependencies]

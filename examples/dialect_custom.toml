@@ -1,0 +1,135 @@
+# Custom dialect configuration template for DOL
+#
+# This template shows every configurable field with comments.
+# Copy and modify to define your own database dialect.
+#
+# Usage in Rust:
+#   let dialect = Dialect::from_toml_str(include_str!("dialect_custom.toml")).unwrap();
+#   let sql = model.get().all_columns().where_eq("id").to_sql(Some(&dialect));
+
+name = "my_custom_db"
+
+# --- Bind parameter placeholder style ---
+# Numbered:     $1, $2, $3          (PostgreSQL, CockroachDB)
+# Positional:   ?, ?, ?             (MySQL, SQLite)
+# NamedNumbered: @p1, @p2, @p3     (SQL Server)
+# ColonNumbered: :1, :2, :3        (Oracle)
+[param_style]
+style = "Numbered"
+prefix = "$"
+
+# --- Identifier quoting ---
+# DoubleQuote:  "column_name"       (PostgreSQL, Oracle, ANSI SQL)
+# Backtick:     `column_name`       (MySQL)
+# Bracket:      [column_name]       (SQL Server)
+# None:         column_name         (no quoting)
+quote_style = "DoubleQuote"
+
+# --- Pagination style ---
+# LimitOffset:  LIMIT n OFFSET m    (PostgreSQL, MySQL, SQLite)
+# OffsetFetch:  OFFSET m ROWS FETCH NEXT n ROWS ONLY  (SQL Server, Oracle 12c+)
+# Rownum:       WHERE ROWNUM <= n   (Legacy Oracle)
+pagination = "LimitOffset"
+
+# --- Upsert style ---
+# OnConflict:     INSERT ... ON CONFLICT   (PostgreSQL, SQLite)
+# OnDuplicateKey: INSERT ... ON DUPLICATE KEY UPDATE  (MySQL)
+# Merge:          MERGE INTO ...           (SQL Server, Oracle)
+# Unsupported:    no upsert support
+upsert_style = "OnConflict"
+
+# --- RETURNING clause style ---
+# Returning:       RETURNING col1, col2         (PostgreSQL, SQLite 3.35+)
+# OutputInserted:  OUTPUT INSERTED.col          (SQL Server)
+# ReturningInto:   RETURNING col INTO var       (Oracle PL/SQL)
+# Unsupported:     no RETURNING support
+returning_style = "Returning"
+
+# --- Boolean literals ---
+bool_true = "TRUE"
+bool_false = "FALSE"
+
+# --- String concatenation style ---
+# PipeOperator:   a || b             (PostgreSQL, SQLite, Oracle)
+# ConcatFunction: CONCAT(a, b)       (MySQL)
+# PlusOperator:   a + b              (SQL Server)
+concat_style = "PipeOperator"
+
+# --- JSON/nested field access style ---
+# ArrowOperator:       col->>'field'                  (PostgreSQL)
+# JsonExtractFunction: json_extract(col, '$.field')   (MySQL, SQLite)
+# JsonValueFunction:   JSON_VALUE(col, '$.field')     (SQL Server)
+# Unsupported:         no JSON field access
+json_access = "ArrowOperator"
+
+# --- Array literal rendering style ---
+# ArrayKeyword:     ARRAY[1, 2, 3]      (PostgreSQL)
+# JsonArrayFunction: JSON_ARRAY(1, 2, 3) (MySQL, SQLite)
+# Unsupported:       no native array literals
+array_literal_style = "ArrayKeyword"
+
+# --- Store kind (extension point) ---
+# Sql, Document, ColumnFamily, KeyValue, Graph
+store_kind = "Sql"
+
+# --- Type mappings ---
+# Map DOL's LogicalType variants to physical SQL type strings.
+[type_map.mappings]
+Uuid = "UUID"
+Text = "TEXT"
+Integer = "INTEGER"
+Boolean = "BOOLEAN"
+Timestamptz = "TIMESTAMPTZ"
+Jsonb = "JSONB"
+TextArray = "TEXT[]"
+SmallInt = "SMALLINT"
+BigInt = "BIGINT"
+Real = "REAL"
+DoublePrecision = "DOUBLE PRECISION"
+Numeric = "NUMERIC"
+Bytea = "BYTEA"
+Date = "DATE"
+Time = "TIME"
+Interval = "INTERVAL"
+Serial = "SERIAL"
+BigSerial = "BIGSERIAL"
+Inet = "INET"
+
+# --- Row-level locking capabilities ---
+[locking]
+for_update = true        # SELECT ... FOR UPDATE
+for_share = true         # SELECT ... FOR SHARE
+skip_locked = true       # ... SKIP LOCKED
+nowait = true            # ... NOWAIT
+use_table_hint = false   # Table hints (SQL Server WITH (UPDLOCK))
+
+# --- DDL capabilities ---
+[ddl]
+create_if_not_exists = true
+drop_if_exists = true
+index_concurrently = true
+# EnumStyle: CreateType (PG), InlineEnum (MySQL), CheckConstraint (SQLite/MSSQL)
+enum_style = "CreateType"
+# AutoIncrementStyle: SerialType (PG), AutoIncrement (MySQL), Identity (MSSQL),
+#                     GeneratedIdentity (Oracle), Autoincrement (SQLite)
+auto_increment_style = "SerialType"
+alter_add_column = true
+alter_drop_column = true
+alter_rename_column = true
+alter_modify_column = true
+alter_rename_table = true
+transactional_ddl = true
+drop_cascade = true
+
+# --- Feature flags for optional SQL constructs ---
+[features]
+distinct_on = true         # DISTINCT ON (col) — PostgreSQL only
+ilike = true               # Case-insensitive LIKE
+array_any = true           # = ANY($1) for array params
+nulls_ordering = true      # NULLS FIRST / NULLS LAST
+anonymous_blocks = true    # DO $$ ... END $$
+schemas = true             # Schema-qualified names
+cte = true                 # Common Table Expressions (WITH)
+window_functions = true    # OVER (PARTITION BY ...)
+lateral_join = true        # LATERAL joins / CROSS APPLY
+on_conflict = true         # ON CONFLICT clause
