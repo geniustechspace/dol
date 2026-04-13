@@ -584,6 +584,18 @@ pub fn render_model_constraint(constraint: &ModelConstraint) -> String {
 /// Render a QueryIR to SQL.
 pub fn render_query_ir(ir: &QueryIR, dialect: &Dialect) -> Result<SqlOutput, BackendError> {
     let mut counter = ParamCounter::new(&dialect.param_style);
+    render_query_ir_with_counter(ir, dialect, &mut counter)
+}
+
+/// Render a QueryIR to SQL using an existing `ParamCounter`.
+///
+/// This allows compound queries to share a single counter so parameter
+/// numbers are globally unique across all sub-queries.
+pub(crate) fn render_query_ir_with_counter(
+    ir: &QueryIR,
+    dialect: &Dialect,
+    counter: &mut ParamCounter,
+) -> Result<SqlOutput, BackendError> {
     let mut sql = String::new();
 
     // SELECT
@@ -603,7 +615,7 @@ pub fn render_query_ir(ir: &QueryIR, dialect: &Dialect) -> Result<SqlOutput, Bac
         let projs: Vec<_> = ir
             .projections
             .iter()
-            .map(|e| render_expr(e, &mut counter, dialect))
+            .map(|e| render_expr(e, counter, dialect))
             .collect();
         sql.push_str(&projs.join(", "));
     }
@@ -634,14 +646,14 @@ pub fn render_query_ir(ir: &QueryIR, dialect: &Dialect) -> Result<SqlOutput, Bac
     }
 
     // WHERE
-    sql.push_str(&render_filters(&ir.filters, &mut counter, dialect));
+    sql.push_str(&render_filters(&ir.filters, counter, dialect));
 
     // GROUP BY
     if !ir.group_by.is_empty() {
         let groups: Vec<_> = ir
             .group_by
             .iter()
-            .map(|e| render_expr(e, &mut counter, dialect))
+            .map(|e| render_expr(e, counter, dialect))
             .collect();
         sql.push_str(&format!(" GROUP BY {}", groups.join(", ")));
     }
@@ -651,21 +663,16 @@ pub fn render_query_ir(ir: &QueryIR, dialect: &Dialect) -> Result<SqlOutput, Bac
         let havings: Vec<_> = ir
             .having
             .iter()
-            .map(|e| render_expr(e, &mut counter, dialect))
+            .map(|e| render_expr(e, counter, dialect))
             .collect();
         sql.push_str(&format!(" HAVING {}", havings.join(" AND ")));
     }
 
     // ORDER BY
-    sql.push_str(&render_order_by_exprs(&ir.order_by, &mut counter, dialect));
+    sql.push_str(&render_order_by_exprs(&ir.order_by, counter, dialect));
 
     // OFFSET / LIMIT
-    sql.push_str(&render_pagination(
-        &ir.offset,
-        &ir.limit,
-        &mut counter,
-        dialect,
-    ));
+    sql.push_str(&render_pagination(&ir.offset, &ir.limit, counter, dialect));
 
     // Locking
     if let Some(ref lock) = ir.lock_mode {
@@ -1084,19 +1091,18 @@ pub fn render_transaction_ir(ir: &TransactionIR) -> Result<SqlOutput, BackendErr
 // ===========================================================================
 
 /// Render a compound query (UNION, INTERSECT, EXCEPT) to SQL.
+///
+/// All sub-queries are rendered with a single shared `ParamCounter` so that
+/// bind-parameter numbers are globally unique across the entire compound
+/// statement (e.g. Postgres `$1, $2, …`).
 pub fn render_compound_query_ir(
     ir: &CompoundQueryIR,
     dialect: &Dialect,
 ) -> Result<SqlOutput, BackendError> {
-    let base = render_query_ir(&ir.base, dialect)?;
     let mut counter = dialect.param_counter();
-    // Advance counter past base params
-    for _ in 0..base.param_count {
-        counter.next();
-    }
+    let base = render_query_ir_with_counter(&ir.base, dialect, &mut counter)?;
 
     let mut sql = base.sql;
-    let mut total_params = base.param_count;
 
     for (kind, query_ir) in &ir.operations {
         let kind_str = match kind {
@@ -1107,12 +1113,8 @@ pub fn render_compound_query_ir(
             SetOpKind::Except => "EXCEPT",
             SetOpKind::ExceptAll => "EXCEPT ALL",
         };
-        let part = render_query_ir(query_ir, dialect)?;
+        let part = render_query_ir_with_counter(query_ir, dialect, &mut counter)?;
         sql.push_str(&format!(" {} {}", kind_str, part.sql));
-        total_params += part.param_count;
-        for _ in 0..part.param_count {
-            counter.next();
-        }
     }
 
     if !ir.order_by.is_empty() {
@@ -1126,12 +1128,11 @@ pub fn render_compound_query_ir(
             &mut counter,
             dialect,
         ));
-        total_params = counter.count();
     }
 
     Ok(SqlOutput {
         sql,
-        param_count: total_params,
+        param_count: counter.count(),
     })
 }
 

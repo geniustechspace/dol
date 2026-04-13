@@ -29,7 +29,7 @@ pub enum FrameKind {
 }
 
 /// Builder for window function specifications: `func OVER (...)`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct WindowBuilder {
     func: Expr,
     partition_by: Vec<Expr>,
@@ -91,7 +91,7 @@ impl WindowBuilder {
 }
 
 /// Builder for CASE WHEN ... THEN ... ELSE ... END expressions.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CaseBuilder {
     whens: Vec<(Expr, Expr)>,
     else_expr: Option<Expr>,

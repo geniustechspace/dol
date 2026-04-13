@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
 
 env:
   CARGO_TERM_COLOR: always
@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: "1.94"
           components: rustfmt
@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: "1.94"
           components: clippy
@@ -60,7 +60,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: "1.94"
 
@@ -77,37 +77,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: idp
-          POSTGRES_PASSWORD: idp
-          POSTGRES_DB: idp_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    env:
-      DATABASE_URL: postgres://idp:idp@localhost:5432/idp_test
-      REDIS_URL: redis://localhost:6379
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: "1.94"
 
@@ -116,8 +90,36 @@ jobs:
         with:
           shared-key: test
 
-      - name: Run tests
+      - name: Run tests (all features)
         run: cargo test --workspace --all-features
+
+  test-features:
+    name: Feature Matrix
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        features:
+          - "" # default features only
+          - "--features config" # default features + config
+          - "--features migration" # default features + migration
+          - "--features full" # default features + full
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: "1.94"
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: feature-matrix
+
+      - name: Run tests (${{ matrix.features || 'default' }})
+        run: cargo test -p dol ${{ matrix.features }}
 
   deny:
     name: Cargo Deny (Security Audit)
@@ -128,7 +130,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: "1.94"
 

@@ -2,6 +2,8 @@
 //!
 //! Renders DOL IR into key-value operation descriptors.
 
+#![deny(unsafe_code)]
+
 use dol_core::ir::{Backend, BackendError, KvOp, KvOutput, RenderedOutput, Statement};
 
 /// Backend that renders storage IR statements into [`KvOutput`] descriptors.

@@ -1459,12 +1459,12 @@ fn set_op_union() {
         .get()
         .columns(&["id", "email"])
         .where_eq("tenant_id")
-        .to_sql(Some(&pg()));
+        .build();
     let q2 = USERS
         .get()
         .columns(&["id", "email"])
         .where_eq_literal("status", raw_expr("'active'"))
-        .to_sql(Some(&pg()));
+        .build();
     let sql = CompoundSelectBuilder::new(q1).union(q2).to_sql(Some(&pg()));
     assert!(sql.contains("UNION"));
     assert!(sql.contains("SELECT id, email FROM users WHERE tenant_id = $1"));
@@ -1472,12 +1472,8 @@ fn set_op_union() {
 
 #[test]
 fn set_op_union_all() {
-    let q1 = SETTINGS.get().all_columns().to_sql(Some(&pg()));
-    let q2 = SETTINGS
-        .get()
-        .all_columns()
-        .where_eq("tenant_id")
-        .to_sql(Some(&pg()));
+    let q1 = SETTINGS.get().all_columns().build();
+    let q2 = SETTINGS.get().all_columns().where_eq("tenant_id").build();
     let sql = CompoundSelectBuilder::new(q1)
         .union_all(q2)
         .to_sql(Some(&pg()));
@@ -1486,17 +1482,13 @@ fn set_op_union_all() {
 
 #[test]
 fn set_op_intersect_except() {
-    let q1 = USERS.get().columns(&["id"]).to_sql(Some(&pg()));
-    let q2 = USERS
-        .get()
-        .columns(&["id"])
-        .where_eq("tenant_id")
-        .to_sql(Some(&pg()));
+    let q1 = USERS.get().columns(&["id"]).build();
+    let q2 = USERS.get().columns(&["id"]).where_eq("tenant_id").build();
     let q3 = USERS
         .get()
         .columns(&["id"])
         .where_eq_literal("status", raw_expr("'disabled'"))
-        .to_sql(Some(&pg()));
+        .build();
     let sql = CompoundSelectBuilder::new(q1)
         .intersect(q2)
         .except(q3)
@@ -1507,12 +1499,8 @@ fn set_op_intersect_except() {
 
 #[test]
 fn set_op_with_order_and_limit() {
-    let q1 = USERS.get().columns(&["id"]).to_sql(Some(&pg()));
-    let q2 = USERS
-        .get()
-        .columns(&["id"])
-        .where_eq("tenant_id")
-        .to_sql(Some(&pg()));
+    let q1 = USERS.get().columns(&["id"]).build();
+    let q2 = USERS.get().columns(&["id"]).where_eq("tenant_id").build();
     let sql = CompoundSelectBuilder::new(q1)
         .union_all(q2)
         .order_by(vec![col("id").asc()])

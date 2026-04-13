@@ -3,6 +3,8 @@
 //! A universal, storage-agnostic query and schema language for Rust.
 //!
 //! ## Overview
+
+#![deny(unsafe_code)]
 //!
 //! DOL provides a type-safe, composable way to build queries and schema definitions
 //! that can target multiple storage backends: SQL databases, key-value stores,
@@ -135,6 +137,9 @@ pub use dol_core::builder::{ModelBuilderExt, ModelDefineExt};
 
 // Re-export the ToSql extension trait so builders have .to_sql() in scope.
 pub use dol_sql::ext::ToSql;
+
+// Re-export the TryToSql extension trait for fallible SQL rendering.
+pub use dol_sql::ext::TryToSql;
 
 // Re-export TransactionSqlExt so TransactionBuilder::to_sql() works.
 pub use dol_sql::ext::TransactionSqlExt;

@@ -4,7 +4,7 @@ use super::ModelRef;
 use dol_expr::{Expr, OrderByExpr};
 
 /// How to retrieve data from a source.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct QueryIR {
     pub source: ModelRef,
     pub projections: Vec<Expr>,
@@ -21,7 +21,7 @@ pub struct QueryIR {
 }
 
 /// Offset/Limit can be either a bind parameter or a literal value.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum OffsetLimit {
     /// A bind parameter placeholder ($N).
     Param,
@@ -30,7 +30,7 @@ pub enum OffsetLimit {
 }
 
 /// A JOIN clause in a query.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct JoinIR {
     pub join_type: JoinType,
     pub target: ModelRef,
@@ -70,7 +70,7 @@ pub enum SetOpKind {
 }
 
 /// A compound query (set operations: UNION, INTERSECT, EXCEPT).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CompoundQueryIR {
     pub base: Box<QueryIR>,
     pub operations: Vec<(SetOpKind, QueryIR)>,

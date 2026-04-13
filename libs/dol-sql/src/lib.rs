@@ -3,6 +3,8 @@
 //! Dialect-aware SQL rendering engine for DOL. Renders DOL IR into SQL strings
 //! targeting PostgreSQL, MySQL, SQLite, MSSQL, Oracle, CockroachDB, and more.
 
+#![deny(unsafe_code)]
+
 pub mod dialect;
 pub mod ext;
 pub mod render;
