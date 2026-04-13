@@ -686,8 +686,14 @@ mod tests {
         // Base uses $1, part uses $2, OFFSET/LIMIT use $3/$4
         assert!(sql.contains("tenant_id = $1"), "base param: {sql}");
         assert!(sql.contains("status = $2"), "part param: {sql}");
-        assert!(sql.contains("OFFSET $3"), "expected OFFSET $3 in output: {sql}");
-        assert!(sql.contains("LIMIT $4"), "expected LIMIT $4 in output: {sql}");
+        assert!(
+            sql.contains("OFFSET $3"),
+            "expected OFFSET $3 in output: {sql}"
+        );
+        assert!(
+            sql.contains("LIMIT $4"),
+            "expected LIMIT $4 in output: {sql}"
+        );
     }
 
     #[test]
