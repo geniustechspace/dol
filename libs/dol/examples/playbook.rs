@@ -1072,12 +1072,12 @@ fn main() {
         .get()
         .columns(&["id", "email"])
         .where_eq("status")
-        .to_sql(Some(&pg));
+        .build();
     let q2 = USERS
         .get()
         .columns(&["id", "email"])
         .where_eq("tenant_id")
-        .to_sql(Some(&pg));
+        .build();
 
     // 6a. UNION
     let sql = CompoundSelectBuilder::new(q1.clone())

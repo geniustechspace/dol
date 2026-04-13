@@ -25,7 +25,7 @@ use dol_core::builder::transaction::TransactionBuilder;
 use dol_core::expr::{Expr, OrderByExpr};
 use dol_core::ir::BackendError;
 use dol_core::ir::OffsetLimit;
-use dol_core::ir::query::SetOpKind;
+use dol_core::ir::query::{CompoundQueryIR, QueryIR, SetOpKind};
 use dol_core::ir::transaction::TransactionIR;
 
 // ===========================================================================
@@ -255,18 +255,15 @@ impl TryToSql for RevokeBuilder {
 // ===========================================================================
 
 /// Extension trait adding `.to_sql()` to [`TransactionBuilder`].
+///
+/// Provides default implementations so that downstream implementations
+/// are not broken by the addition of new methods.
 pub trait TransactionSqlExt {
     /// Try to render a TransactionIR to SQL, returning an error on failure.
-    fn try_to_sql(ir: &TransactionIR) -> Result<String, BackendError>;
-    /// Render a TransactionIR to SQL.
-    fn to_sql(ir: &TransactionIR) -> String;
-}
-
-impl TransactionSqlExt for TransactionBuilder {
     fn try_to_sql(ir: &TransactionIR) -> Result<String, BackendError> {
         render::render_transaction_ir(ir).map(|o| o.sql)
     }
-
+    /// Render a TransactionIR to SQL.
     fn to_sql(ir: &TransactionIR) -> String {
         match Self::try_to_sql(ir) {
             Ok(sql) => sql,
@@ -278,36 +275,33 @@ impl TransactionSqlExt for TransactionBuilder {
     }
 }
 
+impl TransactionSqlExt for TransactionBuilder {}
+
 // ===========================================================================
 // CompoundSelectBuilder — compound queries (moved from dol-builder)
 // ===========================================================================
 
 /// A compound SELECT composed of multiple queries joined by set operations.
 ///
-/// Each sub-query is stored as a pre-rendered SQL string alongside its
-/// bind-parameter count so that ORDER BY / pagination parameters are numbered
-/// correctly for dialects with numbered placeholders (e.g. Postgres `$N`).
+/// Stores `QueryIR` objects and renders the entire compound query in a single
+/// pass with a shared `ParamCounter`, ensuring bind-parameter numbers are
+/// globally unique (e.g. Postgres `$1, $2, …`) and all parts use the same
+/// dialect.
 #[derive(Debug, Clone)]
 #[must_use = "builders do nothing until .to_sql() is called"]
 pub struct CompoundSelectBuilder {
-    base: String,
-    base_param_count: usize,
-    parts: Vec<(SetOpKind, String, usize)>,
+    base: QueryIR,
+    parts: Vec<(SetOpKind, QueryIR)>,
     order_by: Vec<OrderByExpr>,
     has_offset: bool,
     has_limit: bool,
 }
 
 impl CompoundSelectBuilder {
-    /// Create from a pre-rendered SQL string.
-    ///
-    /// If the base query contains bind parameters (e.g. `$1`, `$2`), use
-    /// [`Self::new_with_param_count`] instead so that subsequent ORDER BY /
-    /// pagination placeholders are numbered correctly.
-    pub fn new(base_sql: String) -> Self {
+    /// Create from a `QueryIR`.
+    pub fn new(base: QueryIR) -> Self {
         Self {
-            base: base_sql,
-            base_param_count: 0,
+            base,
             parts: Vec::new(),
             order_by: Vec::new(),
             has_offset: false,
@@ -315,86 +309,38 @@ impl CompoundSelectBuilder {
         }
     }
 
-    /// Create from a pre-rendered SQL string, recording its parameter count.
-    pub fn new_with_param_count(base_sql: String, param_count: usize) -> Self {
-        Self {
-            base: base_sql,
-            base_param_count: param_count,
-            parts: Vec::new(),
-            order_by: Vec::new(),
-            has_offset: false,
-            has_limit: false,
-        }
-    }
-
-    pub fn union(mut self, query: String) -> Self {
-        self.parts.push((SetOpKind::Union, query, 0));
+    pub fn union(mut self, query: QueryIR) -> Self {
+        self.parts.push((SetOpKind::Union, query));
         self
     }
 
-    pub fn union_with_params(mut self, query: String, param_count: usize) -> Self {
-        self.parts.push((SetOpKind::Union, query, param_count));
+    pub fn union_all(mut self, query: QueryIR) -> Self {
+        self.parts.push((SetOpKind::UnionAll, query));
         self
     }
 
-    pub fn union_all(mut self, query: String) -> Self {
-        self.parts.push((SetOpKind::UnionAll, query, 0));
+    pub fn intersect(mut self, query: QueryIR) -> Self {
+        self.parts.push((SetOpKind::Intersect, query));
         self
     }
 
-    pub fn union_all_with_params(mut self, query: String, param_count: usize) -> Self {
-        self.parts.push((SetOpKind::UnionAll, query, param_count));
+    pub fn intersect_all(mut self, query: QueryIR) -> Self {
+        self.parts.push((SetOpKind::IntersectAll, query));
         self
     }
 
-    pub fn intersect(mut self, query: String) -> Self {
-        self.parts.push((SetOpKind::Intersect, query, 0));
+    pub fn except(mut self, query: QueryIR) -> Self {
+        self.parts.push((SetOpKind::Except, query));
         self
     }
 
-    pub fn intersect_with_params(mut self, query: String, param_count: usize) -> Self {
-        self.parts.push((SetOpKind::Intersect, query, param_count));
+    pub fn except_all(mut self, query: QueryIR) -> Self {
+        self.parts.push((SetOpKind::ExceptAll, query));
         self
     }
 
-    pub fn intersect_all(mut self, query: String) -> Self {
-        self.parts.push((SetOpKind::IntersectAll, query, 0));
-        self
-    }
-
-    pub fn intersect_all_with_params(mut self, query: String, param_count: usize) -> Self {
-        self.parts
-            .push((SetOpKind::IntersectAll, query, param_count));
-        self
-    }
-
-    pub fn except(mut self, query: String) -> Self {
-        self.parts.push((SetOpKind::Except, query, 0));
-        self
-    }
-
-    pub fn except_with_params(mut self, query: String, param_count: usize) -> Self {
-        self.parts.push((SetOpKind::Except, query, param_count));
-        self
-    }
-
-    pub fn except_all(mut self, query: String) -> Self {
-        self.parts.push((SetOpKind::ExceptAll, query, 0));
-        self
-    }
-
-    pub fn except_all_with_params(mut self, query: String, param_count: usize) -> Self {
-        self.parts.push((SetOpKind::ExceptAll, query, param_count));
-        self
-    }
-
-    pub fn op(mut self, kind: SetOpKind, query: String) -> Self {
-        self.parts.push((kind, query, 0));
-        self
-    }
-
-    pub fn op_with_params(mut self, kind: SetOpKind, query: String, param_count: usize) -> Self {
-        self.parts.push((kind, query, param_count));
+    pub fn op(mut self, kind: SetOpKind, query: QueryIR) -> Self {
+        self.parts.push((kind, query));
         self
     }
 
@@ -417,59 +363,24 @@ impl CompoundSelectBuilder {
 impl TryToSql for CompoundSelectBuilder {
     fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
-        let mut counter = dialect.param_counter();
 
-        // Advance the counter past all parameters already present in the
-        // pre-rendered sub-queries so ORDER BY / pagination placeholders
-        // don't reuse numbers from the base or parts.
-        let existing_params =
-            self.base_param_count + self.parts.iter().map(|(_, _, c)| c).sum::<usize>();
-        for _ in 0..existing_params {
-            counter.next();
-        }
-
-        let mut sql = self.base.clone();
-
-        for (kind, query, _) in &self.parts {
-            let kind_str = match kind {
-                SetOpKind::Union => "UNION",
-                SetOpKind::UnionAll => "UNION ALL",
-                SetOpKind::Intersect => "INTERSECT",
-                SetOpKind::IntersectAll => "INTERSECT ALL",
-                SetOpKind::Except => "EXCEPT",
-                SetOpKind::ExceptAll => "EXCEPT ALL",
-            };
-            sql.push_str(&format!(" {} {}", kind_str, query));
-        }
-
-        if !self.order_by.is_empty() {
-            sql.push_str(&render::render_order_by_exprs(
-                &self.order_by,
-                &mut counter,
-                dialect,
-            ));
-        }
-
-        if self.has_offset || self.has_limit {
-            let offset_ol = if self.has_offset {
+        let compound_ir = CompoundQueryIR {
+            base: Box::new(self.base.clone()),
+            operations: self.parts.clone(),
+            order_by: self.order_by.clone(),
+            offset: if self.has_offset {
                 Some(OffsetLimit::Param)
             } else {
                 None
-            };
-            let limit_ol = if self.has_limit {
+            },
+            limit: if self.has_limit {
                 Some(OffsetLimit::Param)
             } else {
                 None
-            };
-            sql.push_str(&render::render_pagination(
-                &offset_ol,
-                &limit_ol,
-                &mut counter,
-                dialect,
-            ));
-        }
+            },
+        };
 
-        Ok(sql)
+        render::render_compound_query_ir(&compound_ir, dialect).map(|o| o.sql)
     }
 }
 
@@ -493,49 +404,21 @@ pub trait GetBuilderSqlExt {
     fn as_scalar_with(&self, dialect: &Dialect) -> Expr;
 }
 
-/// Helper: render a `GetBuilder` and return both the SQL string and param count.
-fn render_get_builder(builder: &GetBuilder<'_>) -> (String, usize) {
-    let dialect = dialect::default_dialect();
-    let ir = builder.clone().build();
-    match render::render_query_ir(&ir, dialect) {
-        Ok(output) => (output.sql, output.param_count),
-        Err(e) => (
-            format!(
-                "/* SQL render error: {} */",
-                sanitize_for_sql_comment(&e.to_string())
-            ),
-            0,
-        ),
-    }
-}
-
 impl GetBuilderSqlExt for GetBuilder<'_> {
     fn union(self, other: GetBuilder<'_>) -> CompoundSelectBuilder {
-        let (base, base_params) = render_get_builder(&self);
-        let (rhs, rhs_params) = render_get_builder(&other);
-        CompoundSelectBuilder::new_with_param_count(base, base_params)
-            .union_with_params(rhs, rhs_params)
+        CompoundSelectBuilder::new(self.clone().build()).union(other.clone().build())
     }
 
     fn union_all(self, other: GetBuilder<'_>) -> CompoundSelectBuilder {
-        let (base, base_params) = render_get_builder(&self);
-        let (rhs, rhs_params) = render_get_builder(&other);
-        CompoundSelectBuilder::new_with_param_count(base, base_params)
-            .union_all_with_params(rhs, rhs_params)
+        CompoundSelectBuilder::new(self.clone().build()).union_all(other.clone().build())
     }
 
     fn intersect(self, other: GetBuilder<'_>) -> CompoundSelectBuilder {
-        let (base, base_params) = render_get_builder(&self);
-        let (rhs, rhs_params) = render_get_builder(&other);
-        CompoundSelectBuilder::new_with_param_count(base, base_params)
-            .intersect_with_params(rhs, rhs_params)
+        CompoundSelectBuilder::new(self.clone().build()).intersect(other.clone().build())
     }
 
     fn except(self, other: GetBuilder<'_>) -> CompoundSelectBuilder {
-        let (base, base_params) = render_get_builder(&self);
-        let (rhs, rhs_params) = render_get_builder(&other);
-        CompoundSelectBuilder::new_with_param_count(base, base_params)
-            .except_with_params(rhs, rhs_params)
+        CompoundSelectBuilder::new(self.clone().build()).except(other.clone().build())
     }
 
     fn as_scalar(&self) -> Expr {
@@ -786,31 +669,34 @@ mod tests {
     // -- CompoundSelectBuilder param numbering --
 
     #[test]
-    fn compound_select_params_advance_past_subqueries() {
-        // Two sub-queries each with 1 WHERE param (total 2 existing params).
-        // OFFSET/LIMIT params should continue numbering after existing params.
-        let base = "SELECT id FROM users WHERE tenant_id = $1";
-        let part = "SELECT id FROM users WHERE status = $2";
-        let sql = CompoundSelectBuilder::new_with_param_count(base.to_string(), 1)
-            .union_with_params(part.to_string(), 1)
+    fn compound_select_params_globally_unique() {
+        // Two sub-queries each with a WHERE param. The compound builder
+        // renders them with a shared counter so params are globally unique.
+        let base_ir = TEST_MODEL
+            .get()
+            .columns(&["id"])
+            .where_eq("tenant_id")
+            .build();
+        let part_ir = TEST_MODEL.get().columns(&["id"]).where_eq("status").build();
+        let sql = CompoundSelectBuilder::new(base_ir)
+            .union(part_ir)
             .limit()
             .offset()
             .to_sql(Some(&pg()));
-        // Original params $1 and $2 remain in the sub-queries
-        assert!(sql.contains("tenant_id = $1"), "base param preserved");
-        assert!(sql.contains("status = $2"), "part param preserved");
-        // New params for OFFSET/LIMIT continue at $3, $4 (not $1, $2)
-        assert!(sql.contains("$3"), "expected $3 in output, got: {sql}");
-        assert!(sql.contains("$4"), "expected $4 in output, got: {sql}");
+        // Base uses $1, part uses $2, OFFSET/LIMIT use $3/$4
+        assert!(sql.contains("tenant_id = $1"), "base param: {sql}");
+        assert!(sql.contains("status = $2"), "part param: {sql}");
+        assert!(sql.contains("$3"), "expected $3 in output: {sql}");
+        assert!(sql.contains("$4"), "expected $4 in output: {sql}");
     }
 
     #[test]
-    fn compound_select_zero_params_starts_at_one() {
-        // When no param counts are provided (legacy API), counter starts at 1.
-        let base = "SELECT id FROM users";
-        let part = "SELECT id FROM archive";
-        let sql = CompoundSelectBuilder::new(base.to_string())
-            .union(part.to_string())
+    fn compound_select_no_params_starts_at_one() {
+        // Sub-queries with no WHERE params → LIMIT gets $1.
+        let base_ir = TEST_MODEL.get().columns(&["id"]).build();
+        let part_ir = TEST_MODEL.get().columns(&["id"]).build();
+        let sql = CompoundSelectBuilder::new(base_ir)
+            .union(part_ir)
             .limit()
             .to_sql(Some(&pg()));
         assert!(sql.contains("LIMIT $1"), "expected LIMIT $1, got: {sql}");
