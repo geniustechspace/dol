@@ -288,7 +288,7 @@ impl TransactionSqlExt for TransactionBuilder {}
 /// globally unique (e.g. Postgres `$1, $2, …`) and all parts use the same
 /// dialect.
 #[derive(Debug, Clone)]
-#[must_use = "builders do nothing until .to_sql() is called"]
+#[must_use = "builders do nothing until rendered via .to_sql() or .try_to_sql()"]
 pub struct CompoundSelectBuilder {
     base: QueryIR,
     parts: Vec<(SetOpKind, QueryIR)>,
@@ -406,19 +406,19 @@ pub trait GetBuilderSqlExt {
 
 impl GetBuilderSqlExt for GetBuilder<'_> {
     fn union(self, other: GetBuilder<'_>) -> CompoundSelectBuilder {
-        CompoundSelectBuilder::new(self.clone().build()).union(other.clone().build())
+        CompoundSelectBuilder::new(self.build()).union(other.build())
     }
 
     fn union_all(self, other: GetBuilder<'_>) -> CompoundSelectBuilder {
-        CompoundSelectBuilder::new(self.clone().build()).union_all(other.clone().build())
+        CompoundSelectBuilder::new(self.build()).union_all(other.build())
     }
 
     fn intersect(self, other: GetBuilder<'_>) -> CompoundSelectBuilder {
-        CompoundSelectBuilder::new(self.clone().build()).intersect(other.clone().build())
+        CompoundSelectBuilder::new(self.build()).intersect(other.build())
     }
 
     fn except(self, other: GetBuilder<'_>) -> CompoundSelectBuilder {
-        CompoundSelectBuilder::new(self.clone().build()).except(other.clone().build())
+        CompoundSelectBuilder::new(self.build()).except(other.build())
     }
 
     fn as_scalar(&self) -> Expr {

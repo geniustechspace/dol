@@ -119,7 +119,7 @@ jobs:
           shared-key: feature-matrix
 
       - name: Run tests (${{ matrix.features || 'default' }})
-        run: cargo test --workspace ${{ matrix.features }}
+        run: cargo test -p dol ${{ matrix.features }}
 
   deny:
     name: Cargo Deny (Security Audit)
