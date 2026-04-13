@@ -7,9 +7,11 @@ get started.
 
 1. **Fork** the repository and clone your fork.
 2. Create a **feature branch** from `main`:
-   ```bash
-   git checkout -b feat/my-feature
-   ```
+
+    ```bash
+    git checkout -b feat/my-feature
+    ```
+
 3. Make your changes, ensuring they follow the project conventions.
 4. Run the full CI checks locally (see below).
 5. Open a **Pull Request** against `main`.
@@ -51,7 +53,7 @@ cargo deny check
 
 Use conventional commit messages:
 
-```
+```markdown
 feat: add CTE support to GetBuilder
 fix: handle empty field list in InsertBuilder
 docs: improve Model API documentation
@@ -68,18 +70,18 @@ refactor: simplify dialect type resolution
 
 ## Crate Architecture
 
-```
+```markdown
 dol-core/
-  ├── dol-expr     — Expression AST (leaf, no deps)
-  ├── dol-model    — Model/Field/FieldType (leaf, no deps)
-  ├── dol-ir       — IR + Backend trait (depends on expr, model)
-  └── dol-builder  — Builder API (depends on expr, model, ir)
-dol-sql            — SQL rendering + dialect system
-dol-kv             — Key-value backend
-dol-objects        — Object storage backend
-dol-migration      — Migration system
-dol-config         — Unified configuration
-dol                — Umbrella crate (re-exports everything)
+├── dol-expr — Expression AST (leaf, no deps)
+├── dol-model — Model/Field/FieldType (leaf, no deps)
+├── dol-ir — IR + Backend trait (depends on expr, model)
+└── dol-builder — Builder API (depends on expr, model, ir)
+dol-sql — SQL rendering + dialect system
+dol-kv — Key-value backend
+dol-objects — Object storage backend
+dol-migration — Migration system
+dol-config — Unified configuration
+dol — Umbrella crate (re-exports everything)
 ```
 
 When adding a new feature, place it in the lowest appropriate crate to minimize

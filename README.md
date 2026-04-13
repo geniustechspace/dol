@@ -42,14 +42,14 @@ let ms = query.to_sql(Some(&Dialect::mssql()));
 DOL follows a three-layer pipeline inspired by SQLAlchemy's Core/Engine separation:
 
 ```markdown
- Builders       →       IR        →      Backends
- (human API)        (neutral AST)       (rendering)
+Builders → IR → Backends
+(human API) (neutral AST) (rendering)
 ─────────────────────────────────────────────────────
- Model.get()         Statement::       SqlBackend
- Model.insert()        Query           KvBackend
- Model.upsert()        Insert          ObjectStorageBackend
- Model.alter()         DefineModel     (your own)
- ...                   ...
+Model.get() Statement:: SqlBackend
+Model.insert() Query KvBackend
+Model.upsert() Insert ObjectStorageBackend
+Model.alter() DefineModel (your own)
+... ...
 ```
 
 **Layer 1 — Builders** provide a fluent, method-chain API for constructing operations.
@@ -64,24 +64,24 @@ Custom engine authors only need `dol-core` to implement the `Backend` trait.
 
 ## Workspace Structure
 
-| Crate | Description |
-|---|---|
-| [`dol`](libs/dol) | Umbrella crate — re-exports everything under ergonomic paths |
-| [`dol-core`](libs/dol-core) | Language layer: expressions, models, IR, builders, `Backend` trait |
-| [`dol-sql`](libs/dol-sql) | SQL backend — dialect-aware rendering for 7 databases |
-| [`dol-kv`](libs/dol-kv) | Key-value backend — renders IR into KV operation descriptors |
-| [`dol-objects`](libs/dol-objects) | Object storage backend — renders IR into S3-style operations |
-| [`dol-migration`](libs/dol-migration) | Type-safe schema migrations across all backends |
-| [`dol-config`](libs/dol-config) | Unified multi-backend configuration from TOML/YAML/JSON files |
+| Crate                                 | Description                                                        |
+| ------------------------------------- | ------------------------------------------------------------------ |
+| [`dol`](libs/dol)                     | Umbrella crate — re-exports everything under ergonomic paths       |
+| [`dol-core`](libs/dol-core)           | Language layer: expressions, models, IR, builders, `Backend` trait |
+| [`dol-sql`](libs/dol-sql)             | SQL backend — dialect-aware rendering for 7 databases              |
+| [`dol-kv`](libs/dol-kv)               | Key-value backend — renders IR into KV operation descriptors       |
+| [`dol-objects`](libs/dol-objects)     | Object storage backend — renders IR into S3-style operations       |
+| [`dol-migration`](libs/dol-migration) | Type-safe schema migrations across all backends                    |
+| [`dol-config`](libs/dol-config)       | Unified multi-backend configuration from TOML/YAML/JSON files      |
 
 Internal sub-crates (managed by `dol-core`, not intended for direct use):
 
-| Crate | Role |
-|---|---|
-| `dol-expr` | Composable expression AST — operators, functions, window expressions |
-| `dol-model` | Schema language — `Model`, `Field`, `FieldType`, constraints |
-| `dol-ir` | Intermediate representation — `Statement` enum and `Backend` trait |
-| `dol-builder` | Method-chain builders that produce IR |
+| Crate         | Role                                                                 |
+| ------------- | -------------------------------------------------------------------- |
+| `dol-expr`    | Composable expression AST — operators, functions, window expressions |
+| `dol-model`   | Schema language — `Model`, `Field`, `FieldType`, constraints         |
+| `dol-ir`      | Intermediate representation — `Statement` enum and `Backend` trait   |
+| `dol-builder` | Method-chain builders that produce IR                                |
 
 ## Getting Started
 
@@ -101,13 +101,13 @@ dol = { version = "0.1", features = ["full"] }  # everything
 
 ### Feature Flags
 
-| Feature | Description |
-|---|---|
-| `serde` (default) | Serde support for dialect types |
-| `config` | File-based configuration (`DolConfig` from TOML/YAML/JSON) |
-| `migration` | Type-safe schema migration system |
-| `migration-config` | Migration + config integration |
-| `full` | All of the above |
+| Feature            | Description                                                |
+| ------------------ | ---------------------------------------------------------- |
+| `serde` (default)  | Serde support for dialect types                            |
+| `config`           | File-based configuration (`DolConfig` from TOML/YAML/JSON) |
+| `migration`        | Type-safe schema migration system                          |
+| `migration-config` | Migration + config integration                             |
+| `full`             | All of the above                                           |
 
 ## Usage
 
@@ -132,6 +132,7 @@ static POSTS: Model = Model::new("posts", &[
 Fields are **NOT NULL by default** — call `.nullable()` to opt in.
 
 DOL uses `Model` as a universal term:
+
 - SQL → table
 - Document store → collection
 - Object store → bucket schema
@@ -295,15 +296,15 @@ let union_sql = active.union(admins).to_sql(Some(&Dialect::postgres()));
 
 DOL ships with 7 built-in dialect presets:
 
-| Dialect | Constructor | Param Style | Quoting | Upsert | RETURNING |
-|---|---|---|---|---|---|
-| PostgreSQL 12+ | `Dialect::postgres()` | `$1, $2` | `"double"` | `ON CONFLICT` | `RETURNING` |
-| MySQL 8+ | `Dialect::mysql()` | `?` | `` `backtick` `` | `ON DUPLICATE KEY` | — |
-| MariaDB 10.5+ | `Dialect::mariadb()` | `?` | `` `backtick` `` | `ON DUPLICATE KEY` | `RETURNING` |
-| SQLite 3.35+ | `Dialect::sqlite()` | `?` | `"double"` | `ON CONFLICT` | `RETURNING` |
-| SQL Server 2016+ | `Dialect::mssql()` | `@p1, @p2` | `[bracket]` | `MERGE` | `OUTPUT INSERTED` |
-| Oracle 12c+ | `Dialect::oracle()` | `:1, :2` | `"double"` | `MERGE` | `RETURNING INTO` |
-| CockroachDB | `Dialect::cockroachdb()` | `$1, $2` | `"double"` | `ON CONFLICT` | `RETURNING` |
+| Dialect          | Constructor              | Param Style | Quoting          | Upsert             | RETURNING         |
+| ---------------- | ------------------------ | ----------- | ---------------- | ------------------ | ----------------- |
+| PostgreSQL 12+   | `Dialect::postgres()`    | `$1, $2`    | `"double"`       | `ON CONFLICT`      | `RETURNING`       |
+| MySQL 8+         | `Dialect::mysql()`       | `?`         | `` `backtick` `` | `ON DUPLICATE KEY` | —                 |
+| MariaDB 10.5+    | `Dialect::mariadb()`     | `?`         | `` `backtick` `` | `ON DUPLICATE KEY` | `RETURNING`       |
+| SQLite 3.35+     | `Dialect::sqlite()`      | `?`         | `"double"`       | `ON CONFLICT`      | `RETURNING`       |
+| SQL Server 2016+ | `Dialect::mssql()`       | `@p1, @p2`  | `[bracket]`      | `MERGE`            | `OUTPUT INSERTED` |
+| Oracle 12c+      | `Dialect::oracle()`      | `:1, :2`    | `"double"`       | `MERGE`            | `RETURNING INTO`  |
+| CockroachDB      | `Dialect::cockroachdb()` | `$1, $2`    | `"double"`       | `ON CONFLICT`      | `RETURNING`       |
 
 Each dialect configures: parameter style, identifier quoting, logical-to-physical type
 mappings, pagination strategy, upsert syntax, RETURNING clause support, DDL capabilities
