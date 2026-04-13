@@ -12,7 +12,7 @@ If you discover a security vulnerability in DOL, please report it responsibly.
 
 **Do NOT open a public issue.**
 
-Instead, please email the maintainers at: **security@geniustechspace.com**
+Instead, please email the maintainers at: **<security@geniustechspace.com>**
 
 Or use [GitHub's private vulnerability reporting](https://github.com/geniustechspace/dol/security/advisories/new).
 

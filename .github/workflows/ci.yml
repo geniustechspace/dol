@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
 
 env:
   CARGO_TERM_COLOR: always
@@ -101,10 +101,10 @@ jobs:
     strategy:
       matrix:
         features:
-          - ""                        # default features only
-          - "--features config"       # default features + config
-          - "--features migration"    # default features + migration
-          - "--features full"         # default features + full
+          - "" # default features only
+          - "--features config" # default features + config
+          - "--features migration" # default features + migration
+          - "--features full" # default features + full
     steps:
       - uses: actions/checkout@v4
 
