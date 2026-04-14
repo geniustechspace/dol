@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 
 /// How bind parameters are formatted in SQL.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "style", content = "prefix")]
 pub enum ParamStyle {
     /// PostgreSQL: `$1, $2, $3`

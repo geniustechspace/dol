@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Which row-level locking clauses the dialect supports.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LockingCapabilities {
     /// Supports `FOR UPDATE`.
     pub for_update: bool,

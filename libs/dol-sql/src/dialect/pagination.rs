@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 
 /// How a dialect implements result-set pagination.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PaginationStyle {
     /// `LIMIT n OFFSET m` (PostgreSQL, MySQL, SQLite, MariaDB, CockroachDB).
     #[default]

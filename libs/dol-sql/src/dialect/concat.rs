@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 
 /// How a dialect concatenates strings.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ConcatStyle {
     /// `a || b` (PostgreSQL, SQLite, Oracle, CockroachDB).
     #[default]

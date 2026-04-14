@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Feature flags indicating which SQL constructs a dialect supports.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DialectFeatures {
     /// Supports `SELECT DISTINCT ON (cols)` (PostgreSQL-specific).
     pub distinct_on: bool,

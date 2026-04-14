@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 
 /// How a dialect implements INSERT-or-UPDATE (upsert) semantics.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum UpsertStyle {
     /// `INSERT ... ON CONFLICT (cols) DO UPDATE SET ...` (PostgreSQL, SQLite, CockroachDB).
     #[default]

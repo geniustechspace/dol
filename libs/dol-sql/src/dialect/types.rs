@@ -9,7 +9,7 @@ use dol_core::model::FieldType;
 /// `FieldType::Custom` has no mapping — it passes through as-is.
 /// Capability types (`Url`, `ResourceId`, `Version`, `Etag`, `Mime`) and composite
 /// aliases (`Object`, `Blob`, `Path`) are mapped to their underlying logical types.
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum LogicalType {
     Uuid,
     Text,
@@ -78,7 +78,7 @@ impl LogicalType {
 }
 
 /// Maps logical types to physical SQL type strings for a specific dialect.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TypeMap {
     mappings: HashMap<LogicalType, String>,
 }

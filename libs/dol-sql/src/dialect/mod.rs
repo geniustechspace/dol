@@ -50,7 +50,7 @@ pub use types::{LogicalType, TypeMap};
 pub use upsert::UpsertStyle;
 
 /// How nested field / JSON access is rendered in SQL.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum JsonAccessStyle {
     /// `->>` operator (PostgreSQL, CockroachDB).
     ArrowOperator,
@@ -64,7 +64,7 @@ pub enum JsonAccessStyle {
 }
 
 /// How array literals are rendered in SQL.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ArrayLiteralStyle {
     /// `ARRAY[1, 2, 3]` (PostgreSQL, CockroachDB).
     ArrayKeyword,
@@ -76,7 +76,7 @@ pub enum ArrayLiteralStyle {
 }
 
 /// Extension point for future non-SQL store kinds.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum StoreKind {
     /// Relational SQL database (default).
     #[default]
@@ -95,7 +95,7 @@ pub enum StoreKind {
 ///
 /// This is a **data struct**, not a trait — it can be deserialized from config files
 /// (JSON, TOML, YAML) or constructed programmatically via preset methods.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Dialect {
     /// Human-readable dialect name (e.g. "postgresql", "mysql").
     pub name: String,

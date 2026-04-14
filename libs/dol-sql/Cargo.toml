@@ -14,5 +14,5 @@ serde_norway = { workspace = true, optional = true }
 
 [features]
 default = ["serde"]
-serde = ["dep:serde"]
+serde = ["dep:serde", "dol-core/serde"]
 config = ["serde", "dep:serde_json", "dep:toml_crate", "dep:serde_norway"]

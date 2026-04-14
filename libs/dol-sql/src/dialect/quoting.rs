@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 
 /// How identifiers (table names, column names) are quoted.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum QuoteStyle {
     /// PostgreSQL / Oracle / ANSI SQL: `"identifier"`
     DoubleQuote,

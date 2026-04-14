@@ -10,3 +10,7 @@ dol-expr = { path = "crates/dol-expr" }
 dol-model = { path = "crates/dol-model" }
 dol-ir = { path = "crates/dol-ir" }
 dol-builder = { path = "crates/dol-builder" }
+
+[features]
+default = []
+serde = ["dol-expr/serde", "dol-model/serde", "dol-ir/serde"]

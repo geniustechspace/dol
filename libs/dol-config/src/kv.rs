@@ -3,7 +3,7 @@
 /// Covers Redis, etcd, DynamoDB, Memcached and other KV providers.
 /// All provider-specific knobs are exposed via `extra` so that callers are
 /// never locked out of their store's features.
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::sql::{PoolConfig, TlsConfig};
 
@@ -12,7 +12,7 @@ use super::sql::{PoolConfig, TlsConfig};
 // ---------------------------------------------------------------------------
 
 /// Supported key-value store providers.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum KvProvider {
     /// Redis / Valkey.
     #[default]
@@ -37,7 +37,7 @@ pub enum KvProvider {
 // ---------------------------------------------------------------------------
 
 /// A single key-value store instance configuration.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KvInstanceConfig {
     /// Human-readable name for this instance (used in logs / metrics).
     #[serde(default)]
@@ -60,7 +60,7 @@ pub struct KvInstanceConfig {
 // ---------------------------------------------------------------------------
 
 /// Redis / Valkey specific configuration knobs.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct RedisConfig {
     /// Database number (0-15).
     #[serde(default)]
@@ -80,7 +80,7 @@ pub struct RedisConfig {
 }
 
 /// Redis Sentinel failover configuration.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RedisSentinelConfig {
     /// Sentinel master name.
     pub master_name: String,
@@ -100,7 +100,7 @@ pub struct RedisSentinelConfig {
 /// - **Replicas**: add `replicas` for read scaling.
 /// - **Named instances**: use `instances` for isolated workloads
 ///   (sessions, cache, rate-limiting, etc.).
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KvConfig {
     /// Which KV provider to use.
     #[serde(default)]

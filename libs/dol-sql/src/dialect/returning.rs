@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 
 /// How a dialect returns rows affected by INSERT/UPDATE/DELETE.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ReturningStyle {
     /// `RETURNING col1, col2` (PostgreSQL, SQLite 3.35+, CockroachDB).
     #[default]
