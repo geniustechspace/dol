@@ -9,10 +9,12 @@ description = "DOL migration system — type-safe schema migrations across all s
 dol-core = { workspace = true }
 dol-sql = { workspace = true }
 dol-config = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
 
 [dev-dependencies]
 toml_crate = { workspace = true }
 
 [features]
 default = []
+serde = ["dep:serde", "dol-core/serde"]
 config = ["dep:dol-config"]

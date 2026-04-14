@@ -9,6 +9,7 @@ use super::{Migration, MigrationError, MigrationStep};
 
 /// The direction of a migration plan.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum MigrationDirection {
     /// Apply migrations forward (run `up()` steps).
     Forward,
@@ -18,6 +19,7 @@ pub enum MigrationDirection {
 
 /// The target state for a migration plan.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum MigrationTarget {
     /// Apply all pending migrations (migrate to latest).
     Latest,
@@ -35,6 +37,7 @@ pub enum MigrationTarget {
 
 /// A step in a migration plan, annotated with direction and version metadata.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PlannedStep {
     /// The migration version this step belongs to.
     pub version: String,
@@ -59,6 +62,7 @@ pub struct PlannedStep {
 /// - Rendered to SQL/KV/Storage output via [`MigrationRunner::render_plan`]
 /// - Applied by iterating over steps and executing against a backend
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct MigrationPlan {
     planned_steps: Vec<PlannedStep>,
 }

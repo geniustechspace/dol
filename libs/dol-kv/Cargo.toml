@@ -8,4 +8,8 @@ description = "DOL key-value backend — renders IR into KV operation descriptor
 [dependencies]
 dol-core = { workspace = true }
 
+[features]
+default = []
+serde = ["dol-core/serde"]
+
 [dev-dependencies]

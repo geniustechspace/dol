@@ -76,6 +76,7 @@ dependencies = [
  "dol-config",
  "dol-core",
  "dol-sql",
+ "serde",
  "toml",
 ]
 

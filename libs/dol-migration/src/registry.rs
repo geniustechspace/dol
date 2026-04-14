@@ -38,6 +38,7 @@ pub static MIGRATION_HISTORY: Model = Model::new(
 
 /// A record of a migration that has been applied.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AppliedMigration {
     /// The migration version.
     pub version: String,
@@ -101,6 +102,7 @@ pub trait MigrationRegistry {
 /// assert!(registry.applied().unwrap().is_empty());
 /// ```
 #[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InMemoryRegistry {
     applied: Vec<AppliedMigration>,
 }
