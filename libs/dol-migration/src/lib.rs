@@ -74,6 +74,7 @@
 //! assert!(rendered[0].steps[0].sql().unwrap().contains("CREATE TABLE"));
 //! ```
 
+pub mod migrations;
 pub mod plan;
 pub mod registry;
 pub mod runner;
