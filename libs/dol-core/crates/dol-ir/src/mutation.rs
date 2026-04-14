@@ -5,6 +5,7 @@ use dol_expr::Expr;
 
 /// Insert new records into a model.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InsertIR {
     pub target: ModelRef,
     pub fields: Vec<String>,
@@ -14,6 +15,7 @@ pub struct InsertIR {
 
 /// Insert from a subquery: `INSERT INTO ... SELECT ...`
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InsertSelectIR {
     pub target: ModelRef,
     pub fields: Vec<String>,
@@ -23,6 +25,7 @@ pub struct InsertSelectIR {
 
 /// Update existing records in a model.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UpdateIR {
     pub target: ModelRef,
     pub assignments: Vec<(String, Expr)>,
@@ -32,6 +35,7 @@ pub struct UpdateIR {
 
 /// Remove records from a model.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RemoveIR {
     pub target: ModelRef,
     pub filters: Vec<Expr>,
@@ -40,6 +44,7 @@ pub struct RemoveIR {
 
 /// Upsert (insert or update on conflict).
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UpsertIR {
     pub target: ModelRef,
     pub fields: Vec<String>,

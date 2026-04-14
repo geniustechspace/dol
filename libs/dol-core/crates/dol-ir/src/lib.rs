@@ -29,6 +29,7 @@ pub use transaction::TransactionIR;
 
 /// A reference to a model (table/collection/bucket), with optional alias.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ModelRef {
     pub name: String,
     pub namespace: Option<String>,
@@ -37,6 +38,7 @@ pub struct ModelRef {
 
 /// Top-level DOL statement — the universal dispatch enum.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum Statement {
     // Definition
     DefineModel(DefineModelIR),
@@ -83,6 +85,7 @@ pub enum Statement {
 
 /// SQL output (text + parameter count).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SqlOutput {
     pub sql: String,
     pub param_count: usize,
@@ -90,6 +93,7 @@ pub struct SqlOutput {
 
 /// A key-value operation descriptor.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct KvOutput {
     /// The operation to perform.
     pub operation: KvOp,
@@ -101,6 +105,7 @@ pub struct KvOutput {
 
 /// Key-value operation kinds.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum KvOp {
     Get,
     Put,
@@ -113,6 +118,7 @@ pub enum KvOp {
 
 /// An object storage operation descriptor.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StorageOutput {
     /// The operation to perform.
     pub operation: StorageOp,
@@ -120,6 +126,7 @@ pub struct StorageOutput {
 
 /// Object storage operation kinds.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum StorageOp {
     PutObject {
         bucket: String,
@@ -143,6 +150,7 @@ pub enum StorageOp {
 
 /// The rendered output of a backend.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RenderedOutput {
     /// SQL text + parameter count.
     Sql(SqlOutput),
@@ -154,6 +162,7 @@ pub enum RenderedOutput {
 
 /// Backend rendering errors.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum BackendError {
     /// This backend does not support this statement kind.
     Unsupported(String),

@@ -8,3 +8,8 @@ description = "DOL intermediate representation — backend-agnostic AST and Back
 [dependencies]
 dol-expr = { path = "../dol-expr" }
 dol-model = { path = "../dol-model" }
+serde = { workspace = true, optional = true }
+
+[features]
+default = []
+serde = ["dep:serde", "dol-expr/serde", "dol-model/serde"]

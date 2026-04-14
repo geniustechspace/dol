@@ -5,6 +5,7 @@ use dol_expr::{Expr, OrderByExpr};
 
 /// How to retrieve data from a source.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct QueryIR {
     pub source: ModelRef,
     pub projections: Vec<Expr>,
@@ -22,6 +23,7 @@ pub struct QueryIR {
 
 /// Offset/Limit can be either a bind parameter or a literal value.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum OffsetLimit {
     /// A bind parameter placeholder ($N).
     Param,
@@ -31,6 +33,7 @@ pub enum OffsetLimit {
 
 /// A JOIN clause in a query.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct JoinIR {
     pub join_type: JoinType,
     pub target: ModelRef,
@@ -39,6 +42,7 @@ pub struct JoinIR {
 
 /// The type of join.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum JoinType {
     Inner,
     Left,
@@ -49,6 +53,7 @@ pub enum JoinType {
 
 /// Lock mode for SELECT ... FOR UPDATE / FOR SHARE.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum LockMode {
     ForUpdate,
     ForShare,
@@ -60,6 +65,7 @@ pub enum LockMode {
 
 /// Set operation kind for compound queries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SetOpKind {
     Union,
     UnionAll,
@@ -71,6 +77,7 @@ pub enum SetOpKind {
 
 /// A compound query (set operations: UNION, INTERSECT, EXCEPT).
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CompoundQueryIR {
     pub base: Box<QueryIR>,
     pub operations: Vec<(SetOpKind, QueryIR)>,

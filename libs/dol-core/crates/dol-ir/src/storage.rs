@@ -4,6 +4,7 @@ use dol_expr::Expr;
 
 /// Put (upload/write) an object into a bucket/store.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PutObjectIR {
     pub key: String,
     pub source: ObjectSource,
@@ -14,6 +15,7 @@ pub struct PutObjectIR {
 
 /// Source of data for a storage operation.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ObjectSource {
     /// From a file path.
     FromPath(String),
@@ -25,6 +27,7 @@ pub enum ObjectSource {
 
 /// Get (download/read) an object from a bucket/store.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GetObjectIR {
     pub key: String,
     pub bucket: String,
@@ -32,6 +35,7 @@ pub struct GetObjectIR {
 
 /// List objects in a bucket/store.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ListObjectsIR {
     pub bucket: String,
     pub prefix: Option<String>,
@@ -41,6 +45,7 @@ pub struct ListObjectsIR {
 
 /// Read a file from the filesystem.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ReadFileIR {
     pub path: String,
     pub encoding: Option<String>,
@@ -48,6 +53,7 @@ pub struct ReadFileIR {
 
 /// Write content to a file.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WriteFileIR {
     pub path: String,
     pub source: ObjectSource,
@@ -56,6 +62,7 @@ pub struct WriteFileIR {
 
 /// Move/rename a file.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MoveFileIR {
     pub from: String,
     pub to: String,

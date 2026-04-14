@@ -4,6 +4,7 @@ use dol_expr::Expr;
 
 /// Grant privileges on a resource to a role.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GrantIR {
     pub privilege: Privilege,
     pub on_target: String,
@@ -12,6 +13,7 @@ pub struct GrantIR {
 
 /// Revoke privileges on a resource from a role.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RevokeIR {
     pub privilege: Privilege,
     pub on_target: String,
@@ -20,6 +22,7 @@ pub struct RevokeIR {
 
 /// Privilege types that can be granted or revoked.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Privilege {
     Select,
     Insert,
@@ -34,6 +37,7 @@ pub enum Privilege {
 
 /// Define a policy for declarative access control.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DefinePolicyIR {
     pub name: String,
     pub on_model: String,
@@ -46,6 +50,7 @@ pub struct DefinePolicyIR {
 
 /// Policy action scope.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PolicyAction {
     Read,
     Write,
