@@ -19,7 +19,7 @@
 /// // Set the global default (one-shot, typically at startup)
 /// // dol_sql::dialect::set_default_dialect(pg);
 /// ```
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 
 pub mod concat;

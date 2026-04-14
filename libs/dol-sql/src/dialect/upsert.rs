@@ -1,5 +1,5 @@
 /// Upsert styles for different SQL dialects.
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// How a dialect implements INSERT-or-UPDATE (upsert) semantics.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]

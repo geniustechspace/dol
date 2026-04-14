@@ -1,5 +1,5 @@
 /// Identifier quoting styles for different SQL dialects.
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// How identifiers (table names, column names) are quoted.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]

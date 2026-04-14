@@ -1,5 +1,5 @@
 /// String concatenation styles for different SQL dialects.
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// How a dialect concatenates strings.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]

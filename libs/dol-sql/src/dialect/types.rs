@@ -1,5 +1,5 @@
 /// Logical-to-physical type mapping for SQL dialects.
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use dol_core::model::FieldType;

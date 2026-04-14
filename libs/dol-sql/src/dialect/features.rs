@@ -1,5 +1,5 @@
 /// Dialect feature flags for SQL constructs that vary by database.
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// Feature flags indicating which SQL constructs a dialect supports.
 #[derive(Debug, Clone, Deserialize)]

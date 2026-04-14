@@ -1,5 +1,5 @@
 /// RETURNING clause styles for different SQL dialects.
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// How a dialect returns rows affected by INSERT/UPDATE/DELETE.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]

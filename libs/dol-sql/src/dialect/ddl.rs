@@ -1,5 +1,5 @@
 /// DDL capabilities and styles for different SQL dialects.
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// How a dialect handles enum types.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]

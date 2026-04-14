@@ -1,5 +1,5 @@
 /// Bind parameter styles and counter for dialect-aware SQL rendering.
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// How bind parameters are formatted in SQL.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

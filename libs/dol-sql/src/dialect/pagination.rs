@@ -1,5 +1,5 @@
 /// Pagination styles for different SQL dialects.
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// How a dialect implements result-set pagination.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]

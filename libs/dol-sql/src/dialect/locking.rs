@@ -1,5 +1,5 @@
 /// Row-level locking capabilities per SQL dialect.
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// Which row-level locking clauses the dialect supports.
 #[derive(Debug, Clone, Deserialize)]
