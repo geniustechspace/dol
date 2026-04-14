@@ -81,6 +81,9 @@ dependencies = [
 [[package]]
 name = "dol-model"
 version = "0.1.0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "dol-objects"

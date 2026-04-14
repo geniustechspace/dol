@@ -22,6 +22,7 @@ use super::field_type::FieldType;
 /// - `collation(name)` — overrides the collation for this field
 /// - `generated_stored(expr)` / `generated_virtual(expr)` — computed columns
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Field {
     pub name: &'static str,
     pub field_type: FieldType,
