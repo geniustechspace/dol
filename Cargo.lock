@@ -49,6 +49,9 @@ dependencies = [
 [[package]]
 name = "dol-expr"
 version = "0.1.0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "dol-ir"

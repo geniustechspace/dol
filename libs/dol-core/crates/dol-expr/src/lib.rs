@@ -59,6 +59,7 @@ use std::ops as std_ops;
 /// let expr = field("profile").access("address").access("city");
 /// ```
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Expr {
     // ── Identifiers ──
     /// A field/column reference: `field_name`.

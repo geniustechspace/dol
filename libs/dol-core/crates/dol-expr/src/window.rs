@@ -5,6 +5,7 @@ use super::order::OrderByExpr;
 
 /// Window frame bound for ROWS/RANGE BETWEEN.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FrameBound {
     UnboundedPreceding,
     Preceding(u32),
@@ -15,6 +16,7 @@ pub enum FrameBound {
 
 /// A window frame specification: `ROWS/RANGE BETWEEN start AND end`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WindowFrame {
     pub kind: FrameKind,
     pub start: FrameBound,
@@ -23,6 +25,7 @@ pub struct WindowFrame {
 
 /// Frame kind for window specifications.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FrameKind {
     Rows,
     Range,
@@ -30,6 +33,7 @@ pub enum FrameKind {
 
 /// Builder for window function specifications: `func OVER (...)`.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WindowBuilder {
     func: Expr,
     partition_by: Vec<Expr>,
@@ -92,6 +96,7 @@ impl WindowBuilder {
 
 /// Builder for CASE WHEN ... THEN ... ELSE ... END expressions.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CaseBuilder {
     whens: Vec<(Expr, Expr)>,
     else_expr: Option<Expr>,
