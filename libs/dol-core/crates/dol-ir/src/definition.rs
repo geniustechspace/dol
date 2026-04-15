@@ -6,6 +6,7 @@ use dol_model::constraint::{FkAction, GeneratedKind, ModelConstraint};
 
 /// Define (create) a new model.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct DefineModelIR {
     pub name: String,
     pub namespace: Option<String>,
@@ -16,6 +17,7 @@ pub struct DefineModelIR {
 
 /// An owned field definition for use in IR and builders (not `'static`).
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct FieldDef {
     pub name: String,
     pub field_type: FieldType,
@@ -117,6 +119,7 @@ impl FieldDef {
 
 /// An owned foreign key reference (not `'static`).
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OwnedForeignKeyRef {
     pub table: String,
     pub column: String,
@@ -147,6 +150,7 @@ impl OwnedForeignKeyRef {
 
 /// Alter an existing model.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct AlterModelIR {
     pub target: ModelRef,
     pub actions: Vec<AlterAction>,
@@ -154,6 +158,7 @@ pub struct AlterModelIR {
 
 /// A single alter action within an ALTER MODEL statement.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum AlterAction {
     AddField(FieldDef),
     DropField(String),
@@ -170,6 +175,7 @@ pub enum AlterAction {
 
 /// Drop (remove) a model.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DropModelIR {
     pub target: ModelRef,
     pub if_exists: bool,
@@ -178,6 +184,7 @@ pub struct DropModelIR {
 
 /// Define (create) an index.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DefineIndexIR {
     pub name: String,
     pub target: ModelRef,
@@ -191,6 +198,7 @@ pub struct DefineIndexIR {
 
 /// Index method (B-tree, Hash, GIN, GiST, etc.).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum IndexMethod {
     BTree,
     Hash,
@@ -202,6 +210,7 @@ pub enum IndexMethod {
 
 /// Drop an index.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DropIndexIR {
     pub name: String,
     pub if_exists: bool,
@@ -211,6 +220,7 @@ pub struct DropIndexIR {
 
 /// Define a custom type (e.g., enum).
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DefineTypeIR {
     pub name: String,
     pub namespace: Option<String>,
@@ -219,6 +229,7 @@ pub struct DefineTypeIR {
 
 /// Drop a custom type.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DropTypeIR {
     pub name: String,
     pub if_exists: bool,

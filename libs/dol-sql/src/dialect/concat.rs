@@ -1,8 +1,8 @@
-/// String concatenation styles for different SQL dialects.
-use serde::Deserialize;
+//! String concatenation styles for different SQL dialects.
 
 /// How a dialect concatenates strings.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ConcatStyle {
     /// `a || b` (PostgreSQL, SQLite, Oracle, CockroachDB).
     #[default]

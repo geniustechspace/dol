@@ -49,6 +49,9 @@ dependencies = [
 [[package]]
 name = "dol-expr"
 version = "0.1.0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "dol-ir"
@@ -56,6 +59,7 @@ version = "0.1.0"
 dependencies = [
  "dol-expr",
  "dol-model",
+ "serde",
 ]
 
 [[package]]
@@ -72,12 +76,16 @@ dependencies = [
  "dol-config",
  "dol-core",
  "dol-sql",
+ "serde",
  "toml",
 ]
 
 [[package]]
 name = "dol-model"
 version = "0.1.0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "dol-objects"

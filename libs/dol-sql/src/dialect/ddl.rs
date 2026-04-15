@@ -1,8 +1,8 @@
-/// DDL capabilities and styles for different SQL dialects.
-use serde::Deserialize;
+//! DDL capabilities and styles for different SQL dialects.
 
 /// How a dialect handles enum types.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum EnumStyle {
     /// `CREATE TYPE name AS ENUM ('a', 'b')` (PostgreSQL, CockroachDB).
     #[default]
@@ -14,7 +14,8 @@ pub enum EnumStyle {
 }
 
 /// How a dialect handles auto-incrementing primary keys.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum AutoIncrementStyle {
     /// `SERIAL` / `BIGSERIAL` pseudo-types (PostgreSQL).
     #[default]
@@ -30,7 +31,8 @@ pub enum AutoIncrementStyle {
 }
 
 /// DDL capabilities that differ across dialects.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DdlCapabilities {
     /// Supports `CREATE TABLE IF NOT EXISTS`.
     pub create_if_not_exists: bool,

@@ -23,11 +23,12 @@ serde = { workspace = true, optional = true }
 
 [features]
 default = ["serde"]
-serde = ["dep:serde", "dol-sql/serde"]
+serde = ["dep:serde", "dol-sql/serde", "dol-kv/serde", "dol-objects/serde"]
 config = ["dep:dol-config", "dol-sql/config"]
 migration = ["dep:dol-migration"]
+migration-serde = ["migration", "serde", "dol-migration/serde"]
 migration-config = ["migration", "config", "dol-migration/config"]
-full = ["config", "migration", "migration-config"]
+full = ["config", "migration", "migration-config", "migration-serde"]
 
 [dev-dependencies]
 toml_crate = { workspace = true }

@@ -74,6 +74,7 @@
 //! assert!(rendered[0].steps[0].sql().unwrap().contains("CREATE TABLE"));
 //! ```
 
+pub mod migrations;
 pub mod plan;
 pub mod registry;
 pub mod runner;
@@ -164,6 +165,7 @@ pub trait Migration: Send + Sync {
 /// - **KV**: Key-value namespace and key-pattern operations via [`KvMigrationOp`]
 /// - **Storage**: Object storage bucket and prefix operations via [`StorageMigrationOp`]
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum MigrationStep {
     /// A DOL IR statement (SQL DDL, DML, indexes, grants, transactions, etc.).
     Sql(ir::Statement),
@@ -334,6 +336,7 @@ impl MigrationStep {
 /// These operations model structural changes to key-value stores that have
 /// no direct equivalent in the DOL IR statement system.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum KvMigrationOp {
     /// Create a new key namespace (prefix).
     ///
@@ -412,6 +415,7 @@ impl fmt::Display for KvMigrationOp {
 /// These operations model structural changes to object/blob storage that have
 /// no direct equivalent in the DOL IR statement system.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum StorageMigrationOp {
     /// Create a new bucket / container.
     CreateBucket {
@@ -520,6 +524,7 @@ impl fmt::Display for StorageMigrationOp {
 
 /// Errors that can occur during migration operations.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum MigrationError {
     /// Duplicate migration version detected.
     DuplicateVersion(String),

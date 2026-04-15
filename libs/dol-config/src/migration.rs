@@ -2,7 +2,7 @@
 ///
 /// This config lives at the top level of `DolConfig` (not nested under `sql`)
 /// so that it applies to all backends uniformly.
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
 // Backend enablement
@@ -12,7 +12,7 @@ use serde::Deserialize;
 ///
 /// When `auto_detect` is true, the runner inspects registered migrations and
 /// only produces output for backends that have steps (SQL, KV, Storage).
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BackendFilter {
     /// Include SQL migration steps.
     #[serde(default = "default_true")]
@@ -49,7 +49,7 @@ impl Default for BackendFilter {
 ///
 /// Only relevant for SQL backends. KV and Storage migrations are typically
 /// idempotent and do not require external locking.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LockStrategy {
     /// No locking — suitable for single-instance deployments.
@@ -82,7 +82,7 @@ pub enum LockStrategy {
 /// kv = true
 /// storage = true
 /// ```
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnifiedMigrationConfig {
     /// Run pending migrations automatically on startup.
     #[serde(default)]

@@ -16,6 +16,7 @@ use std::fmt;
 /// The `Display` impl uses PostgreSQL names as defaults.
 /// For dialect-specific physical type names, use the dialect `TypeMap::resolve`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum FieldType {
     // ── Core scalar ──
     Text,

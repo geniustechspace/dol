@@ -4,7 +4,7 @@
 /// Google Cloud Storage, Azure Blob, and local filesystem.
 /// Provider-specific settings are exposed via dedicated sub-structs and
 /// an `extra` catch-all so callers are never limited.
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::sql::TlsConfig;
 
@@ -13,7 +13,7 @@ use super::sql::TlsConfig;
 // ---------------------------------------------------------------------------
 
 /// Supported object / blob storage providers.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum StorageProvider {
     /// AWS S3 or any S3-compatible store (MinIO, DigitalOcean Spaces, etc.).
     #[default]
@@ -38,7 +38,7 @@ pub enum StorageProvider {
 // ---------------------------------------------------------------------------
 
 /// A single object storage instance configuration.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StorageInstanceConfig {
     /// Human-readable name for this instance (used in logs / metrics).
     #[serde(default)]
@@ -71,7 +71,7 @@ pub struct StorageInstanceConfig {
 // ---------------------------------------------------------------------------
 
 /// AWS S3 specific configuration knobs.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct S3Config {
     /// Access key ID (leave empty to use environment / instance profile).
     #[serde(default)]
@@ -107,7 +107,7 @@ pub struct S3Config {
 // ---------------------------------------------------------------------------
 
 /// Google Cloud Storage specific configuration knobs.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct GcsConfig {
     /// Path to a service account JSON key file.
     #[serde(default)]
@@ -123,7 +123,7 @@ pub struct GcsConfig {
 // ---------------------------------------------------------------------------
 
 /// Azure Blob Storage specific configuration knobs.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AzureBlobConfig {
     /// Azure storage account name.
     #[serde(default)]
@@ -147,7 +147,7 @@ pub struct AzureBlobConfig {
 // ---------------------------------------------------------------------------
 
 /// Local filesystem storage configuration (development / testing).
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct LocalStorageConfig {
     /// Base directory for stored objects.
     #[serde(default)]
@@ -165,7 +165,7 @@ pub struct LocalStorageConfig {
 /// - **Replicas**: add `replicas` for geo-redundancy or read scaling.
 /// - **Named instances**: use `instances` for isolated workloads
 ///   (uploads, documents, backups, etc.).
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StorageConfig {
     /// Which storage provider to use.
     #[serde(default)]

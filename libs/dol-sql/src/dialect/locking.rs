@@ -1,8 +1,8 @@
-/// Row-level locking capabilities per SQL dialect.
-use serde::Deserialize;
+//! Row-level locking capabilities per SQL dialect.
 
 /// Which row-level locking clauses the dialect supports.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct LockingCapabilities {
     /// Supports `FOR UPDATE`.
     pub for_update: bool,

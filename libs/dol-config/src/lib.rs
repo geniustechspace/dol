@@ -65,7 +65,7 @@ pub use storage::{
     StorageProvider,
 };
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::fs;
 
@@ -77,7 +77,7 @@ use std::fs;
 ///
 /// Every section is optional so you can configure only the backends your
 /// application actually uses.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DolConfig {
     /// SQL database backend configuration.
     #[serde(default)]

@@ -19,6 +19,7 @@ use dol_sql::render;
 /// - **KV**: A key-value operation descriptor
 /// - **Storage**: An object storage operation descriptor
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RenderedStep {
     /// A rendered SQL statement.
     Sql {
@@ -84,6 +85,7 @@ impl RenderedStep {
 
 /// All rendered steps for a single planned migration, annotated with metadata.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RenderedMigration {
     /// The migration version.
     pub version: String,
@@ -448,6 +450,7 @@ impl Default for MigrationRunner {
 
 /// Status of a single migration.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MigrationStatus {
     /// The migration version.
     pub version: String,
@@ -461,6 +464,7 @@ pub struct MigrationStatus {
 
 /// Whether a migration has been applied or is pending.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum MigrationState {
     /// The migration has been applied.
     Applied,

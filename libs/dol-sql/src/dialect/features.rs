@@ -1,8 +1,8 @@
-/// Dialect feature flags for SQL constructs that vary by database.
-use serde::Deserialize;
+//! Dialect feature flags for SQL constructs that vary by database.
 
 /// Feature flags indicating which SQL constructs a dialect supports.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DialectFeatures {
     /// Supports `SELECT DISTINCT ON (cols)` (PostgreSQL-specific).
     pub distinct_on: bool,

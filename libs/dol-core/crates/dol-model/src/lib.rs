@@ -42,6 +42,7 @@ use field::Field as F;
 /// ]);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Model {
     pub name: &'static str,
     pub namespace: Option<&'static str>,

@@ -4,6 +4,7 @@ use std::fmt;
 
 /// Action to take when a referenced record is deleted or updated.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FkAction {
     NoAction,
     Cascade,
@@ -26,6 +27,7 @@ impl fmt::Display for FkAction {
 
 /// How a generated (computed) column is defined.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum GeneratedKind {
     /// `GENERATED ALWAYS AS (expr) STORED` — materialized on write.
     Stored,
@@ -35,6 +37,7 @@ pub enum GeneratedKind {
 
 /// An inline foreign key reference on a single field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ForeignKeyRef {
     pub table: &'static str,
     pub column: &'static str,
@@ -65,6 +68,7 @@ impl ForeignKeyRef {
 
 /// A model-level constraint (composite UNIQUE, multi-field FK, CHECK, composite PK).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum ModelConstraint {
     /// `UNIQUE (field1, field2, ...)`
     Unique(&'static [&'static str]),

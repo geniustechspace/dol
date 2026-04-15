@@ -2,7 +2,7 @@
 ///
 /// Exposes all connection pool, TLS, migration, and query logging options so that
 /// callers never lose access to the underlying driver capabilities.
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use dol_sql::dialect::Dialect;
 
@@ -14,7 +14,7 @@ use dol_sql::dialect::Dialect;
 ///
 /// These map directly to the options exposed by pool managers such as sqlx,
 /// deadpool, bb8, or r2d2.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PoolConfig {
     /// Maximum number of connections in the pool.
     #[serde(default = "default_max_connections")]
@@ -70,7 +70,7 @@ impl Default for PoolConfig {
 // ---------------------------------------------------------------------------
 
 /// TLS / SSL configuration for database connections.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TlsConfig {
     /// Whether to require TLS.
     #[serde(default)]
@@ -98,7 +98,7 @@ pub struct TlsConfig {
 // ---------------------------------------------------------------------------
 
 /// Automatic migration configuration.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MigrationConfig {
     /// Run migrations automatically on startup.
     #[serde(default)]
@@ -127,7 +127,7 @@ impl Default for MigrationConfig {
 // ---------------------------------------------------------------------------
 
 /// Query logging and slow-query diagnostics.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueryLoggingConfig {
     /// Log every SQL query.
     #[serde(default)]
@@ -164,7 +164,7 @@ impl Default for QueryLoggingConfig {
 ///
 /// Captures everything needed to open a connection to one database node:
 /// connection URL, pool sizing, optional TLS, and an optional name for logging.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SqlInstanceConfig {
     /// Human-readable name for this instance (used in logs / metrics).
     #[serde(default)]
@@ -196,7 +196,7 @@ pub struct SqlInstanceConfig {
 ///
 /// The `dialect` field can be a preset name (`"postgresql"`, `"mysql"`, …) or
 /// an inline `Dialect` value loaded from config.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SqlConfig {
     /// Which SQL dialect to use.
     ///
@@ -234,7 +234,7 @@ fn default_dialect_name() -> DialectRef {
 }
 
 /// A reference to a `Dialect` — either a preset name or an inline definition.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum DialectRef {
     /// A preset name such as `"postgresql"` or `"sqlite"`.

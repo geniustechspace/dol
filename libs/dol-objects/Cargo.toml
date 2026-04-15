@@ -8,4 +8,8 @@ description = "DOL object storage backend — renders IR into storage operation 
 [dependencies]
 dol-core = { workspace = true }
 
+[features]
+default = []
+serde = ["dol-core/serde"]
+
 [dev-dependencies]

@@ -16,7 +16,7 @@ use dol_sql::ext::ToSql;
 /// is used as a schema reference.
 ///
 /// Columns:
-/// - `version` (TEXT, PK): Unique migration version identifier.
+/// - `version` (VARCHAR(255), PK): Unique migration version identifier.
 /// - `description` (TEXT): Human-readable description.
 /// - `checksum` (TEXT): Hash of the migration steps for tamper detection.
 /// - `applied_at` (TIMESTAMP): When the migration was applied.
@@ -24,10 +24,10 @@ use dol_sql::ext::ToSql;
 pub static MIGRATION_HISTORY: Model = Model::new(
     "_dol_migrations",
     &[
-        Field::new("version", FieldType::Text).primary_key(),
+        Field::new("version", FieldType::Varchar(Some(255))).primary_key(),
         Field::new("description", FieldType::Text),
         Field::new("checksum", FieldType::Text),
-        Field::new("applied_at", FieldType::Timestamp).default("NOW()"),
+        Field::new("applied_at", FieldType::Timestamp).default("CURRENT_TIMESTAMP"),
         Field::new("execution_time_ms", FieldType::BigInt).default("0"),
     ],
 );
@@ -38,6 +38,7 @@ pub static MIGRATION_HISTORY: Model = Model::new(
 
 /// A record of a migration that has been applied.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AppliedMigration {
     /// The migration version.
     pub version: String,
@@ -101,6 +102,7 @@ pub trait MigrationRegistry {
 /// assert!(registry.applied().unwrap().is_empty());
 /// ```
 #[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InMemoryRegistry {
     applied: Vec<AppliedMigration>,
 }
@@ -284,7 +286,7 @@ mod tests {
 
         let create_sql = create_history_table_sql(Some(&pg));
         assert!(create_sql.contains("CREATE TABLE IF NOT EXISTS _dol_migrations"));
-        assert!(create_sql.contains("version TEXT NOT NULL"));
+        assert!(create_sql.contains("version VARCHAR(255) NOT NULL"));
         assert!(create_sql.contains("checksum TEXT NOT NULL"));
 
         let insert_sql = insert_applied_sql(Some(&pg));
