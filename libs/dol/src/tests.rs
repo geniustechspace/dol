@@ -115,8 +115,8 @@ fn model_qualified_name_without_namespace() {
 fn select_all_with_where() {
     let sql = USERS
         .get()
-        .where_eq("tenant_id")
-        .where_eq("id")
+        .filter(field("tenant_id").eq(param()))
+        .filter(field("id").eq(param()))
         .render(Some(&pg()))
         .unwrap();
     assert_eq!(
@@ -130,7 +130,7 @@ fn select_all_with_where() {
 fn select_with_pagination() {
     let sql = USERS
         .get()
-        .where_eq("tenant_id")
+        .filter(field("tenant_id").eq(param()))
         .order_by_desc("created_at")
         .offset()
         .limit()
@@ -147,8 +147,8 @@ fn select_with_pagination() {
 fn select_with_ilike() {
     let sql = USERS
         .get()
-        .where_eq("tenant_id")
-        .where_ilike("email")
+        .filter(field("tenant_id").eq(param()))
+        .filter(field("email").ilike(param()))
         .order_by_desc("created_at")
         .offset()
         .limit()
@@ -166,8 +166,8 @@ fn select_with_ilike() {
 fn select_specific_columns() {
     let sql = USERS
         .get()
-        .columns(&["id", "email"])
-        .where_eq("tenant_id")
+        .fields(&["id", "email"])
+        .filter(field("tenant_id").eq(param()))
         .render(Some(&pg()))
         .unwrap();
     assert_eq!(sql, "SELECT id, email FROM users WHERE tenant_id = $1");
@@ -190,8 +190,8 @@ fn select_no_where() {
 fn select_with_literal_where() {
     let sql = USERS
         .get()
-        .where_eq_literal("status", raw_expr("'active'"))
-        .where_eq("tenant_id")
+        .filter(field("status").eq(raw_expr("'active'")))
+        .filter(field("tenant_id").eq(param()))
         .render(Some(&pg()))
         .unwrap();
     assert_eq!(
@@ -205,8 +205,8 @@ fn select_with_literal_where() {
 fn select_count_all() {
     let sql = USERS
         .get()
-        .count_all_as("total")
-        .where_eq("tenant_id")
+        .field(Expr::CountStar.alias("total"))
+        .filter(field("tenant_id").eq(param()))
         .render(Some(&pg()))
         .unwrap();
     assert_eq!(
@@ -219,7 +219,7 @@ fn select_count_all() {
 fn select_aggregate_sum() {
     let sql = SETTINGS
         .get()
-        .select_item(func::sum(field("max_users")).alias("total_users"))
+        .field(func::sum(field("max_users")).alias("total_users"))
         .render(Some(&pg()))
         .unwrap();
     assert_eq!(
@@ -232,8 +232,8 @@ fn select_aggregate_sum() {
 fn select_group_by_having() {
     let sql = USERS
         .get()
-        .columns(&["tenant_id"])
-        .count_all_as("cnt")
+        .fields(&["tenant_id"])
+        .field(Expr::CountStar.alias("cnt"))
         .group_by(&["tenant_id"])
         .having(raw_expr("COUNT(*) > 10"))
         .render(Some(&pg()))
@@ -246,7 +246,7 @@ fn select_group_by_having() {
 fn select_distinct() {
     let sql = USERS
         .get()
-        .columns(&["tenant_id"])
+        .fields(&["tenant_id"])
         .distinct()
         .render(Some(&pg()))
         .unwrap();
@@ -269,7 +269,7 @@ fn select_distinct_on() {
 fn select_for_update() {
     let sql = USERS
         .get()
-        .where_eq("id")
+        .filter(field("id").eq(param()))
         .for_update()
         .render(Some(&pg()))
         .unwrap();
@@ -280,7 +280,7 @@ fn select_for_update() {
 fn select_for_update_skip_locked() {
     let sql = USERS
         .get()
-        .where_eq("id")
+        .filter(field("id").eq(param()))
         .lock(LockMode::ForUpdateSkipLocked)
         .render(Some(&pg()))
         .unwrap();
@@ -291,8 +291,8 @@ fn select_for_update_skip_locked() {
 fn select_column_alias() {
     let sql = USERS
         .get()
-        .column_as("email", "user_email")
-        .where_eq("id")
+        .field(field("email").alias("user_email"))
+        .filter(field("id").eq(param()))
         .render(Some(&pg()))
         .unwrap();
     assert_eq!(sql, "SELECT email AS user_email FROM users WHERE id = $1");
@@ -302,8 +302,8 @@ fn select_column_alias() {
 fn select_raw_column() {
     let sql = USERS
         .get()
-        .raw_column("COALESCE(display_name, email) AS name")
-        .where_eq("id")
+        .field(raw_expr("COALESCE(display_name, email) AS name"))
+        .filter(field("id").eq(param()))
         .render(Some(&pg()))
         .unwrap();
     assert_eq!(
@@ -316,7 +316,7 @@ fn select_raw_column() {
 fn select_or_predicate() {
     let sql = USERS
         .get()
-        .where_eq("tenant_id")
+        .filter(field("tenant_id").eq(param()))
         .filter(
             field("status").eq(raw_expr("'active'")) | field("status").eq(raw_expr("'pending'")),
         )
@@ -329,7 +329,7 @@ fn select_or_predicate() {
 fn select_exists_subquery() {
     let sql = USERS
         .get()
-        .where_exists("SELECT 1 FROM sessions WHERE sessions.user_id = users.id")
+        .filter(Expr::Exists { subquery: "SELECT 1 FROM sessions WHERE sessions.user_id = users.id".to_string(), negated: false })
         .render(Some(&pg()))
         .unwrap();
     assert!(
@@ -341,10 +341,7 @@ fn select_exists_subquery() {
 fn select_in_subquery() {
     let sql = USERS
         .get()
-        .where_in_subquery(
-            "tenant_id",
-            "SELECT id FROM tenants WHERE status = 'active'",
-        )
+        .filter(Expr::InSubquery { expr: Box::new(field("tenant_id")), subquery: "SELECT id FROM tenants WHERE status = 'active'".to_string(), negated: false })
         .render(Some(&pg()))
         .unwrap();
     assert!(sql.contains("WHERE tenant_id IN (SELECT id FROM tenants WHERE status = 'active')"));
@@ -354,8 +351,8 @@ fn select_in_subquery() {
 fn select_where_raw() {
     let sql = USERS
         .get()
-        .where_eq("tenant_id")
-        .where_raw("created_at > NOW() - INTERVAL '30 days'")
+        .filter(field("tenant_id").eq(param()))
+        .filter(raw_expr("created_at > NOW() - INTERVAL '30 days'"))
         .render(Some(&pg()))
         .unwrap();
     assert!(sql.contains("AND created_at > NOW() - INTERVAL '30 days'"));
@@ -375,8 +372,8 @@ fn select_order_by_nulls() {
 fn select_param_count() {
     let q = USERS
         .get()
-        .where_eq("tenant_id")
-        .where_eq("status")
+        .filter(field("tenant_id").eq(param()))
+        .filter(field("status").eq(param()))
         .offset()
         .limit();
     assert_eq!(q.param_count(), 4);
@@ -386,7 +383,7 @@ fn select_param_count() {
 fn select_inner_join() {
     let sql = USERS
         .get()
-        .columns(&["u.id", "u.email", "t.slug"])
+        .fields(&["u.id", "u.email", "t.slug"])
         .alias("u")
         .inner_join(&TENANTS, &[("u.tenant_id", "t.id")])
         .render(Some(&pg()))
@@ -399,7 +396,7 @@ fn select_inner_join() {
 fn select_left_join() {
     let sql = USERS
         .get()
-        .columns(&["u.id", "s.max_users"])
+        .fields(&["u.id", "s.max_users"])
         .alias("u")
         .left_join(&SETTINGS, &[("u.tenant_id", "s.tenant_id")])
         .render(Some(&pg()))
@@ -412,7 +409,7 @@ fn select_left_join() {
 fn select_multiple_joins() {
     let sql = USERS
         .get()
-        .columns(&["u.id", "t.slug", "s.max_users"])
+        .fields(&["u.id", "t.slug", "s.max_users"])
         .alias("u")
         .inner_join(&TENANTS, &[("u.tenant_id", "t.id")])
         .left_join(&SETTINGS, &[("t.id", "s.tenant_id")])
@@ -430,8 +427,8 @@ fn select_multiple_joins() {
 fn select_filter_produces_same_as_where_eq() {
     let sql_legacy = USERS
         .get()
-        .where_eq("tenant_id")
-        .where_eq("id")
+        .filter(field("tenant_id").eq(param()))
+        .filter(field("id").eq(param()))
         .render(Some(&pg()))
         .unwrap();
     let sql_expr = USERS
@@ -476,7 +473,7 @@ fn delete_filter_api() {
 fn select_filter_or_group() {
     let sql = USERS
         .get()
-        .where_eq("tenant_id")
+        .filter(field("tenant_id").eq(param()))
         .filter(
             field("status").eq(raw_expr("'active'")) | field("status").eq(raw_expr("'pending'")),
         )
@@ -503,7 +500,7 @@ fn insert_defaults() {
 fn insert_specific_columns() {
     let sql = USERS
         .insert()
-        .columns(&["id", "tenant_id", "email"])
+        .fields(&["id", "tenant_id", "email"])
         .render(Some(&pg()))
         .unwrap();
     assert_eq!(
@@ -542,7 +539,7 @@ fn insert_batch_param_count() {
 fn insert_select() {
     let sql = SETTINGS
         .insert_select()
-        .columns(&["tenant_id", "max_users", "mfa_required"])
+        .fields(&["tenant_id", "max_users", "mfa_required"])
         .from_select("SELECT id, 100, true FROM tenants WHERE plan = 'enterprise'")
         .render(Some(&pg()))
         .unwrap();
@@ -557,7 +554,7 @@ fn insert_select() {
 fn insert_select_with_returning() {
     let sql = SETTINGS
         .insert_select()
-        .columns(&["tenant_id", "max_users", "mfa_required"])
+        .fields(&["tenant_id", "max_users", "mfa_required"])
         .from_select("SELECT id, 50, false FROM tenants")
         .returning(&["tenant_id"])
         .render(Some(&pg()))
@@ -577,8 +574,8 @@ fn update_basic() {
         .set("display_name")
         .set("status")
         .set("updated_at")
-        .where_eq("tenant_id")
-        .where_eq("id")
+        .filter(field("tenant_id").eq(param()))
+        .filter(field("id").eq(param()))
         .render(Some(&pg()))
         .unwrap();
     assert_eq!(
@@ -600,8 +597,8 @@ fn update_with_version_increment() {
         .set("updated_at")
         .set("updated_by")
         .set_increment("version")
-        .where_eq("id")
-        .where_eq("version")
+        .filter(field("id").eq(param()))
+        .filter(field("version").eq(param()))
         .render(Some(&pg()))
         .unwrap();
     // DOL set_increment uses a bind param: version = version + $N
@@ -614,8 +611,8 @@ fn update_with_literal_set_and_returning() {
     let sql = USERS
         .update()
         .set_literal("status", "'revoked'")
-        .where_eq("id")
-        .where_eq_literal("status", "'active'")
+        .filter(field("id").eq(param()))
+        .filter(field("status").eq(raw_expr("'active'")))
         .returning_all()
         .render(Some(&pg()))
         .unwrap();
@@ -629,8 +626,8 @@ fn update_with_raw_where() {
     let sql = USERS
         .update()
         .set_literal("status", "'archived'")
-        .where_eq("tenant_id")
-        .where_raw("updated_at < NOW() - INTERVAL '1 year'")
+        .filter(field("tenant_id").eq(param()))
+        .filter(raw_expr("updated_at < NOW() - INTERVAL '1 year'"))
         .render(Some(&pg()))
         .unwrap();
     assert!(sql.contains("WHERE tenant_id = $1 AND updated_at < NOW() - INTERVAL '1 year'"));
@@ -643,7 +640,7 @@ fn update_param_count() {
         .set("email")
         .set("display_name")
         .set_increment("version")
-        .where_eq("id");
+        .filter(field("id").eq(param()));
     assert_eq!(q.param_count(), 4); // 2 set params + 1 increment param + 1 where param
 }
 
@@ -653,7 +650,7 @@ fn update_param_count() {
 
 #[test]
 fn delete_basic() {
-    let sql = USERS.remove().where_eq("id").render(Some(&pg())).unwrap();
+    let sql = USERS.remove().filter(field("id").eq(param())).render(Some(&pg())).unwrap();
     assert_eq!(sql, "DELETE FROM users WHERE id = $1");
 }
 
@@ -661,7 +658,7 @@ fn delete_basic() {
 fn delete_with_returning() {
     let sql = USERS
         .remove()
-        .where_eq("id")
+        .filter(field("id").eq(param()))
         .returning_all()
         .render(Some(&pg()))
         .unwrap();
@@ -672,8 +669,8 @@ fn delete_with_returning() {
 fn delete_with_raw_where() {
     let sql = USERS
         .remove()
-        .where_eq("tenant_id")
-        .where_raw("created_at < NOW() - INTERVAL '90 days'")
+        .filter(field("tenant_id").eq(param()))
+        .filter(raw_expr("created_at < NOW() - INTERVAL '90 days'"))
         .render(Some(&pg()))
         .unwrap();
     assert!(sql.contains("WHERE tenant_id = $1 AND created_at < NOW() - INTERVAL '90 days'"));
@@ -681,7 +678,7 @@ fn delete_with_raw_where() {
 
 #[test]
 fn delete_param_count() {
-    let q = USERS.remove().where_eq("tenant_id").where_eq("id");
+    let q = USERS.remove().filter(field("tenant_id").eq(param())).filter(field("id").eq(param()));
     assert_eq!(q.param_count(), 2);
 }
 
@@ -751,7 +748,7 @@ fn upsert_with_conflict_where() {
         .upsert()
         .on_conflict(&["tenant_id"])
         .do_update(&["max_users"])
-        .conflict_where_eq("mfa_required")
+        .conflict_filter(field("mfa_required").eq(param()))
         .render(Some(&pg()))
         .unwrap();
     assert!(sql.contains("DO UPDATE SET max_users = EXCLUDED.max_users WHERE mfa_required = $4"));
@@ -763,7 +760,7 @@ fn upsert_param_count() {
         .upsert()
         .on_conflict(&["tenant_id"])
         .do_update(&["max_users"])
-        .conflict_where_eq("mfa_required");
+        .conflict_filter(field("mfa_required").eq(param()));
     assert_eq!(q.param_count(), 4); // 3 insert cols + 1 conflict where
 }
 
@@ -1525,13 +1522,13 @@ fn window_rank_with_frame() {
 fn set_op_union() {
     let q1 = USERS
         .get()
-        .columns(&["id", "email"])
-        .where_eq("tenant_id")
+        .fields(&["id", "email"])
+        .filter(field("tenant_id").eq(param()))
         .build();
     let q2 = USERS
         .get()
-        .columns(&["id", "email"])
-        .where_eq_literal("status", raw_expr("'active'"))
+        .fields(&["id", "email"])
+        .filter(field("status").eq(raw_expr("'active'")))
         .build();
     let sql = CompoundSelectBuilder::new(q1)
         .union(q2)
@@ -1544,7 +1541,7 @@ fn set_op_union() {
 #[test]
 fn set_op_union_all() {
     let q1 = SETTINGS.get().build();
-    let q2 = SETTINGS.get().where_eq("tenant_id").build();
+    let q2 = SETTINGS.get().filter(field("tenant_id").eq(param())).build();
     let sql = CompoundSelectBuilder::new(q1)
         .union_all(q2)
         .render(Some(&pg()))
@@ -1554,12 +1551,12 @@ fn set_op_union_all() {
 
 #[test]
 fn set_op_intersect_except() {
-    let q1 = USERS.get().columns(&["id"]).build();
-    let q2 = USERS.get().columns(&["id"]).where_eq("tenant_id").build();
+    let q1 = USERS.get().fields(&["id"]).build();
+    let q2 = USERS.get().fields(&["id"]).filter(field("tenant_id").eq(param())).build();
     let q3 = USERS
         .get()
-        .columns(&["id"])
-        .where_eq_literal("status", raw_expr("'disabled'"))
+        .fields(&["id"])
+        .filter(field("status").eq(raw_expr("'disabled'")))
         .build();
     let sql = CompoundSelectBuilder::new(q1)
         .intersect(q2)
@@ -1572,8 +1569,8 @@ fn set_op_intersect_except() {
 
 #[test]
 fn set_op_with_order_and_limit() {
-    let q1 = USERS.get().columns(&["id"]).build();
-    let q2 = USERS.get().columns(&["id"]).where_eq("tenant_id").build();
+    let q1 = USERS.get().fields(&["id"]).build();
+    let q2 = USERS.get().fields(&["id"]).filter(field("tenant_id").eq(param())).build();
     let sql = CompoundSelectBuilder::new(q1)
         .union_all(q2)
         .order_by(vec![field("id").asc()])
@@ -1593,7 +1590,7 @@ fn set_op_with_order_and_limit() {
 fn subquery_as_scalar() {
     let sub = SETTINGS
         .get()
-        .select_item(func::sum(field("max_users")).alias("total"))
+        .field(func::sum(field("max_users")).alias("total"))
         .render(Some(&pg()))
         .unwrap();
     let sql = USERS
@@ -1628,8 +1625,8 @@ fn dialect_mysql_select_with_where() {
     let mysql = Dialect::mysql();
     let sql = USERS
         .get()
-        .where_eq("tenant_id")
-        .where_eq("id")
+        .filter(field("tenant_id").eq(param()))
+        .filter(field("id").eq(param()))
         .render(Some(&mysql))
         .unwrap();
     assert_eq!(
@@ -1643,8 +1640,8 @@ fn dialect_mssql_select_with_where() {
     let mssql = Dialect::mssql();
     let sql = USERS
         .get()
-        .columns(&["id", "email"])
-        .where_eq("id")
+        .fields(&["id", "email"])
+        .filter(field("id").eq(param()))
         .render(Some(&mssql))
         .unwrap();
     assert_eq!(sql, "SELECT id, email FROM users WHERE id = @p1");
@@ -1655,8 +1652,8 @@ fn dialect_oracle_select_with_where() {
     let oracle = Dialect::oracle();
     let sql = USERS
         .get()
-        .columns(&["id"])
-        .where_eq("tenant_id")
+        .fields(&["id"])
+        .filter(field("tenant_id").eq(param()))
         .render(Some(&oracle))
         .unwrap();
     assert_eq!(sql, "SELECT id FROM users WHERE tenant_id = :1");
@@ -1698,7 +1695,7 @@ fn dialect_mysql_update() {
     let sql = USERS
         .update()
         .set("email")
-        .where_eq("id")
+        .filter(field("id").eq(param()))
         .render(Some(&mysql))
         .unwrap();
     assert_eq!(sql, "UPDATE users SET email = ? WHERE id = ?");
@@ -1710,7 +1707,7 @@ fn dialect_mssql_update() {
     let sql = USERS
         .update()
         .set("email")
-        .where_eq("id")
+        .filter(field("id").eq(param()))
         .render(Some(&mssql))
         .unwrap();
     assert_eq!(sql, "UPDATE users SET email = @p1 WHERE id = @p2");
@@ -1719,7 +1716,7 @@ fn dialect_mssql_update() {
 #[test]
 fn dialect_mysql_delete() {
     let mysql = Dialect::mysql();
-    let sql = USERS.remove().where_eq("id").render(Some(&mysql)).unwrap();
+    let sql = USERS.remove().filter(field("id").eq(param())).render(Some(&mysql)).unwrap();
     assert_eq!(sql, "DELETE FROM users WHERE id = ?");
 }
 
@@ -1728,7 +1725,7 @@ fn dialect_pg_returning() {
     let pg = Dialect::postgres();
     let sql = USERS
         .remove()
-        .where_eq("id")
+        .filter(field("id").eq(param()))
         .returning(&["id"])
         .render(Some(&pg))
         .unwrap();
@@ -1740,7 +1737,7 @@ fn dialect_mysql_returning_unsupported() {
     let mysql = Dialect::mysql();
     let sql = USERS
         .remove()
-        .where_eq("id")
+        .filter(field("id").eq(param()))
         .returning(&["id"])
         .render(Some(&mysql))
         .unwrap();
@@ -1832,8 +1829,8 @@ fn dialect_sqlite_select() {
     let sqlite = Dialect::sqlite();
     let sql = USERS
         .get()
-        .columns(&["id", "email"])
-        .where_eq("id")
+        .fields(&["id", "email"])
+        .filter(field("id").eq(param()))
         .render(Some(&sqlite))
         .unwrap();
     assert_eq!(sql, "SELECT id, email FROM users WHERE id = ?");
@@ -1879,7 +1876,7 @@ fn dialect_create_table_sqlite_types() {
 #[test]
 fn dialect_cockroachdb_is_pg_compatible() {
     let crdb = Dialect::cockroachdb();
-    let sql = USERS.get().where_eq("id").render(Some(&crdb)).unwrap();
+    let sql = USERS.get().filter(field("id").eq(param())).render(Some(&crdb)).unwrap();
     assert!(sql.contains("WHERE id = $1"));
 }
 
@@ -1980,7 +1977,7 @@ fn dialect_oracle_pagination() {
     let oracle = Dialect::oracle();
     let sql = USERS
         .get()
-        .columns(&["id"])
+        .fields(&["id"])
         .order_by_asc("id")
         .offset()
         .limit()
@@ -2010,8 +2007,8 @@ fn dialect_mysql_ilike_fallback() {
     let mysql = Dialect::mysql();
     let sql = USERS
         .get()
-        .where_eq("tenant_id")
-        .where_ilike("email")
+        .filter(field("tenant_id").eq(param()))
+        .filter(field("email").ilike(param()))
         .render(Some(&mysql))
         .unwrap();
     assert!(sql.contains("LOWER(email) LIKE LOWER(?)"));
@@ -2059,8 +2056,8 @@ mod config_tests {
 
         let sql = USERS
             .get()
-            .columns(&["id"])
-            .where_eq("id")
+            .fields(&["id"])
+            .filter(field("id").eq(param()))
             .render(Some(&d))
             .unwrap();
         assert_eq!(sql, "SELECT id FROM users WHERE id = $1");
@@ -2214,8 +2211,8 @@ concat_style: PipeOperator
 
         let sql = USERS
             .get()
-            .columns(&["id"])
-            .where_eq("id")
+            .fields(&["id"])
+            .filter(field("id").eq(param()))
             .render(Some(&d))
             .unwrap();
         assert_eq!(sql, "SELECT id FROM users WHERE id = ?");
