@@ -1121,27 +1121,27 @@ fn main() {
     // ========================================================================
     println!("\n--- 7. Transactions ---");
 
-    let sql = TransactionBuilder::to_sql(&TransactionBuilder::begin());
+    let sql = TransactionBuilder::to_sql(&TransactionBuilder::begin(), None);
     assert_eq!(sql, "BEGIN");
     println!("  BEGIN: {}", sql);
 
-    let sql = TransactionBuilder::to_sql(&TransactionBuilder::commit());
+    let sql = TransactionBuilder::to_sql(&TransactionBuilder::commit(), None);
     assert_eq!(sql, "COMMIT");
     println!("  COMMIT: {}", sql);
 
-    let sql = TransactionBuilder::to_sql(&TransactionBuilder::rollback());
+    let sql = TransactionBuilder::to_sql(&TransactionBuilder::rollback(), None);
     assert_eq!(sql, "ROLLBACK");
     println!("  ROLLBACK: {}", sql);
 
-    let sql = TransactionBuilder::to_sql(&TransactionBuilder::savepoint("sp1"));
+    let sql = TransactionBuilder::to_sql(&TransactionBuilder::savepoint("sp1"), None);
     assert_eq!(sql, "SAVEPOINT sp1");
     println!("  SAVEPOINT: {}", sql);
 
-    let sql = TransactionBuilder::to_sql(&TransactionBuilder::release_savepoint("sp1"));
+    let sql = TransactionBuilder::to_sql(&TransactionBuilder::release_savepoint("sp1"), None);
     assert_eq!(sql, "RELEASE SAVEPOINT sp1");
     println!("  RELEASE: {}", sql);
 
-    let sql = TransactionBuilder::to_sql(&TransactionBuilder::rollback_to_savepoint("sp1"));
+    let sql = TransactionBuilder::to_sql(&TransactionBuilder::rollback_to_savepoint("sp1"), None);
     assert_eq!(sql, "ROLLBACK TO SAVEPOINT sp1");
     println!("  ROLLBACK TO: {}", sql);
 

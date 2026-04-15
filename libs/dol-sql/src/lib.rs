@@ -114,7 +114,22 @@ impl SqlBackend {
 
     /// Render a TransactionIR to SQL.
     pub fn render_transaction(&self, ir: &TransactionIR) -> Result<SqlOutput, BackendError> {
-        render::render_transaction_ir(ir)
+        render::render_transaction_ir(ir, &self.dialect)
+    }
+
+    /// Render a DefineTypeIR to SQL.
+    pub fn render_define_type(&self, ir: &DefineTypeIR) -> Result<SqlOutput, BackendError> {
+        render::render_define_type_ir(ir, &self.dialect)
+    }
+
+    /// Render a DropTypeIR to SQL.
+    pub fn render_drop_type(&self, ir: &DropTypeIR) -> Result<SqlOutput, BackendError> {
+        render::render_drop_type_ir(ir, &self.dialect)
+    }
+
+    /// Render a DefinePolicyIR to SQL.
+    pub fn render_define_policy(&self, ir: &DefinePolicyIR) -> Result<SqlOutput, BackendError> {
+        render::render_define_policy_ir(ir, &self.dialect)
     }
 }
 
@@ -135,22 +150,10 @@ impl Backend for SqlBackend {
             Statement::Grant(ir) => self.render_grant(ir)?,
             Statement::Revoke(ir) => self.render_revoke(ir)?,
             Statement::Transaction(ir) => self.render_transaction(ir)?,
-            Statement::DefineType(_) => {
-                return Err(BackendError::Unsupported(
-                    "DefineType not yet implemented".into(),
-                ));
-            }
-            Statement::DropType(_) => {
-                return Err(BackendError::Unsupported(
-                    "DropType not yet implemented".into(),
-                ));
-            }
+            Statement::DefineType(ir) => self.render_define_type(ir)?,
+            Statement::DropType(ir) => self.render_drop_type(ir)?,
             Statement::Compound(ir) => self.render_compound(ir)?,
-            Statement::DefinePolicy(_) => {
-                return Err(BackendError::Unsupported(
-                    "DefinePolicy not yet implemented".into(),
-                ));
-            }
+            Statement::DefinePolicy(ir) => self.render_define_policy(ir)?,
             Statement::PutObject(_)
             | Statement::GetObject(_)
             | Statement::ListObjects(_)

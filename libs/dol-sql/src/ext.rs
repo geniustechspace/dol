@@ -12,10 +12,10 @@
 
 use crate::dialect::{self, Dialect};
 use crate::render;
-use dol_core::builder::control::{GrantBuilder, RevokeBuilder};
+use dol_core::builder::control::{DefinePolicyBuilder, GrantBuilder, RevokeBuilder};
 use dol_core::builder::definition::{
-    AlterEntityBuilder, CreateFromMeta, DefineEntityBuilder, DefineIndexBuilder, DropEntityBuilder,
-    DropIndexBuilder,
+    AlterEntityBuilder, CreateFromMeta, DefineEntityBuilder, DefineIndexBuilder, DefineTypeBuilder,
+    DropEntityBuilder, DropIndexBuilder, DropTypeBuilder,
 };
 use dol_core::builder::mutation::{
     InsertBuilder, InsertSelectBuilder, RemoveBuilder, UpdateBuilder, UpsertBuilder,
@@ -250,6 +250,36 @@ impl TryToSql for RevokeBuilder {
     }
 }
 
+// ── DefineTypeBuilder ──────────────────────────────────────────────────
+
+impl TryToSql for DefineTypeBuilder {
+    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+        let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
+        let ir = self.build();
+        render::render_define_type_ir(&ir, dialect).map(|o| o.sql)
+    }
+}
+
+// ── DropTypeBuilder ────────────────────────────────────────────────────
+
+impl TryToSql for DropTypeBuilder {
+    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+        let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
+        let ir = self.build();
+        render::render_drop_type_ir(&ir, dialect).map(|o| o.sql)
+    }
+}
+
+// ── DefinePolicyBuilder ────────────────────────────────────────────────
+
+impl TryToSql for DefinePolicyBuilder {
+    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+        let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
+        let ir = self.build();
+        render::render_define_policy_ir(&ir, dialect).map(|o| o.sql)
+    }
+}
+
 // ===========================================================================
 // TransactionBuilder SQL extension
 // ===========================================================================
@@ -260,12 +290,16 @@ impl TryToSql for RevokeBuilder {
 /// are not broken by the addition of new methods.
 pub trait TransactionSqlExt {
     /// Try to render a TransactionIR to SQL, returning an error on failure.
-    fn try_to_sql(ir: &TransactionIR) -> Result<String, BackendError> {
-        render::render_transaction_ir(ir).map(|o| o.sql)
+    fn try_to_sql(ir: &TransactionIR, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+        let d = match dialect {
+            Some(d) => d,
+            None => dialect::default_dialect(),
+        };
+        render::render_transaction_ir(ir, d).map(|o| o.sql)
     }
     /// Render a TransactionIR to SQL.
-    fn to_sql(ir: &TransactionIR) -> String {
-        match Self::try_to_sql(ir) {
+    fn to_sql(ir: &TransactionIR, dialect: Option<&Dialect>) -> String {
+        match Self::try_to_sql(ir, dialect) {
             Ok(sql) => sql,
             Err(e) => format!(
                 "/* SQL render error: {} */",
@@ -706,5 +740,167 @@ mod tests {
             .limit()
             .to_sql(Some(&pg()));
         assert!(sql.contains("LIMIT $1"), "expected LIMIT $1, got: {sql}");
+    }
+
+    // -- DefineTypeBuilder --
+
+    #[test]
+    fn define_type_postgres() {
+        use dol_core::builder::DefineTypeBuilder;
+        let sql = DefineTypeBuilder::new("order_status")
+            .variant("pending")
+            .variant("shipped")
+            .variant("delivered")
+            .to_sql(Some(&pg()));
+        assert_eq!(
+            sql,
+            "CREATE TYPE order_status AS ENUM ('pending', 'shipped', 'delivered')"
+        );
+    }
+
+    #[test]
+    fn define_type_mysql_is_comment() {
+        use dol_core::builder::DefineTypeBuilder;
+        let sql = DefineTypeBuilder::new("order_status")
+            .variant("pending")
+            .variant("shipped")
+            .to_sql(Some(&Dialect::mysql()));
+        assert!(
+            sql.starts_with("--"),
+            "MySQL type should be a comment: {sql}"
+        );
+        assert!(sql.contains("ENUM"), "Should mention ENUM: {sql}");
+    }
+
+    #[test]
+    fn define_type_sqlite_is_comment() {
+        use dol_core::builder::DefineTypeBuilder;
+        let sql = DefineTypeBuilder::new("order_status")
+            .variant("pending")
+            .to_sql(Some(&Dialect::sqlite()));
+        assert!(
+            sql.starts_with("--"),
+            "SQLite type should be a comment: {sql}"
+        );
+        assert!(sql.contains("CHECK"), "Should mention CHECK: {sql}");
+    }
+
+    #[test]
+    fn define_type_with_namespace() {
+        use dol_core::builder::DefineTypeBuilder;
+        let sql = DefineTypeBuilder::new("order_status")
+            .namespace("public")
+            .variant("pending")
+            .variant("shipped")
+            .to_sql(Some(&pg()));
+        assert!(
+            sql.contains("public.order_status"),
+            "Expected qualified name: {sql}"
+        );
+    }
+
+    #[test]
+    fn define_type_variants_batch() {
+        use dol_core::builder::DefineTypeBuilder;
+        let sql = DefineTypeBuilder::new("color")
+            .variants(&["red", "green", "blue"])
+            .to_sql(Some(&pg()));
+        assert_eq!(sql, "CREATE TYPE color AS ENUM ('red', 'green', 'blue')");
+    }
+
+    // -- DropTypeBuilder --
+
+    #[test]
+    fn drop_type_postgres() {
+        use dol_core::builder::DropTypeBuilder;
+        let sql = DropTypeBuilder::new("order_status")
+            .if_exists()
+            .to_sql(Some(&pg()));
+        assert_eq!(sql, "DROP TYPE IF EXISTS order_status");
+    }
+
+    #[test]
+    fn drop_type_without_if_exists() {
+        use dol_core::builder::DropTypeBuilder;
+        let sql = DropTypeBuilder::new("order_status").to_sql(Some(&pg()));
+        assert_eq!(sql, "DROP TYPE order_status");
+    }
+
+    #[test]
+    fn drop_type_mysql_is_comment() {
+        use dol_core::builder::DropTypeBuilder;
+        let sql = DropTypeBuilder::new("order_status").to_sql(Some(&Dialect::mysql()));
+        assert!(
+            sql.starts_with("--"),
+            "MySQL drop type should be a comment: {sql}"
+        );
+    }
+
+    // -- DefinePolicyBuilder --
+
+    #[test]
+    fn define_policy_postgres() {
+        use dol_core::builder::DefinePolicyBuilder;
+        use dol_core::expr::{field, param};
+        use dol_core::ir::control::PolicyAction;
+
+        let sql = DefinePolicyBuilder::new("tenant_isolation")
+            .on("orders")
+            .for_action(PolicyAction::All)
+            .using(field("tenant_id").eq(param()))
+            .check(field("tenant_id").eq(param()))
+            .to_sql(Some(&pg()));
+        assert!(
+            sql.contains("CREATE POLICY tenant_isolation ON orders FOR ALL"),
+            "{sql}"
+        );
+        assert!(sql.contains("USING (tenant_id = $1)"), "{sql}");
+        assert!(sql.contains("WITH CHECK (tenant_id = $2)"), "{sql}");
+    }
+
+    #[test]
+    fn define_policy_read_only() {
+        use dol_core::builder::DefinePolicyBuilder;
+        use dol_core::expr::{field, lit};
+        use dol_core::ir::control::PolicyAction;
+
+        let sql = DefinePolicyBuilder::new("public_read")
+            .on("posts")
+            .for_action(PolicyAction::Read)
+            .using(field("published").eq(lit(true)))
+            .to_sql(Some(&pg()));
+        assert!(sql.contains("FOR SELECT"), "{sql}");
+        assert!(sql.contains("USING (published = TRUE)"), "{sql}");
+        assert!(
+            !sql.contains("WITH CHECK"),
+            "Read-only policy should not have WITH CHECK: {sql}"
+        );
+    }
+
+    #[test]
+    fn define_policy_no_expressions() {
+        use dol_core::builder::DefinePolicyBuilder;
+        use dol_core::ir::control::PolicyAction;
+
+        let sql = DefinePolicyBuilder::new("allow_all")
+            .on("logs")
+            .for_action(PolicyAction::All)
+            .to_sql(Some(&pg()));
+        assert_eq!(sql, "CREATE POLICY allow_all ON logs FOR ALL");
+    }
+
+    // -- Transaction block --
+
+    #[test]
+    fn transaction_block_postgres() {
+        use dol_core::builder::transaction::TransactionBuilder;
+
+        let insert_ir = TEST_MODEL.insert().columns(&["id", "email"]).build();
+        let stmts = vec![dol_core::ir::Statement::Insert(insert_ir)];
+        let ir = TransactionBuilder::block(stmts);
+        let sql = TransactionBuilder::to_sql(&ir, Some(&pg()));
+        assert!(sql.starts_with("BEGIN"), "Should start with BEGIN: {sql}");
+        assert!(sql.contains("INSERT INTO"), "Should contain INSERT: {sql}");
+        assert!(sql.ends_with("COMMIT"), "Should end with COMMIT: {sql}");
     }
 }

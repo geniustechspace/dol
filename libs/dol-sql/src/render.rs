@@ -1177,20 +1177,139 @@ fn render_privilege(p: &Privilege) -> String {
 }
 
 /// Render a TransactionIR to SQL.
-pub fn render_transaction_ir(ir: &TransactionIR) -> Result<SqlOutput, BackendError> {
-    let sql = match ir {
-        TransactionIR::Begin => "BEGIN".to_string(),
-        TransactionIR::Commit => "COMMIT".to_string(),
-        TransactionIR::Rollback => "ROLLBACK".to_string(),
-        TransactionIR::Savepoint(name) => format!("SAVEPOINT {}", name),
-        TransactionIR::ReleaseSavepoint(name) => format!("RELEASE SAVEPOINT {}", name),
-        TransactionIR::RollbackToSavepoint(name) => format!("ROLLBACK TO SAVEPOINT {}", name),
-        TransactionIR::Block(_) => {
-            return Err(BackendError::Unsupported(
-                "transaction blocks not yet implemented in SQL backend".into(),
-            ));
+pub fn render_transaction_ir(
+    ir: &TransactionIR,
+    dialect: &Dialect,
+) -> Result<SqlOutput, BackendError> {
+    match ir {
+        TransactionIR::Begin => Ok(SqlOutput {
+            sql: "BEGIN".to_string(),
+            param_count: 0,
+        }),
+        TransactionIR::Commit => Ok(SqlOutput {
+            sql: "COMMIT".to_string(),
+            param_count: 0,
+        }),
+        TransactionIR::Rollback => Ok(SqlOutput {
+            sql: "ROLLBACK".to_string(),
+            param_count: 0,
+        }),
+        TransactionIR::Savepoint(name) => Ok(SqlOutput {
+            sql: format!("SAVEPOINT {}", name),
+            param_count: 0,
+        }),
+        TransactionIR::ReleaseSavepoint(name) => Ok(SqlOutput {
+            sql: format!("RELEASE SAVEPOINT {}", name),
+            param_count: 0,
+        }),
+        TransactionIR::RollbackToSavepoint(name) => Ok(SqlOutput {
+            sql: format!("ROLLBACK TO SAVEPOINT {}", name),
+            param_count: 0,
+        }),
+        TransactionIR::Block(stmts) => render_transaction_block(stmts, dialect),
+    }
+}
+
+/// Render a transaction block: `BEGIN; stmt1; stmt2; ...; COMMIT`.
+///
+/// Each inner statement is rendered using the full SQL backend, and the block
+/// is wrapped in `BEGIN` / `COMMIT`.
+fn render_transaction_block(
+    stmts: &[Statement],
+    dialect: &Dialect,
+) -> Result<SqlOutput, BackendError> {
+    let backend = crate::SqlBackend::new(dialect.clone());
+    let mut parts = Vec::with_capacity(stmts.len() + 2);
+    let mut total_params = 0;
+
+    parts.push("BEGIN".to_string());
+
+    for stmt in stmts {
+        let output = backend.render(stmt)?;
+        match output {
+            RenderedOutput::Sql(sql_out) => {
+                total_params += sql_out.param_count;
+                parts.push(sql_out.sql);
+            }
+            _ => {
+                return Err(BackendError::RenderError(
+                    "transaction block contains non-SQL statement".into(),
+                ));
+            }
+        }
+    }
+
+    parts.push("COMMIT".to_string());
+
+    Ok(SqlOutput {
+        sql: parts.join(";\n"),
+        param_count: total_params,
+    })
+}
+
+// ===========================================================================
+// DefineType rendering (CREATE TYPE ... AS ENUM)
+// ===========================================================================
+
+/// Render a [`DefineTypeIR`] to SQL.
+///
+/// Dialect-aware:
+/// - **PostgreSQL / CockroachDB** (`EnumStyle::CreateType`):
+///   `CREATE TYPE name AS ENUM ('a', 'b', 'c')`
+/// - **MySQL / MariaDB** (`EnumStyle::InlineEnum`):
+///   Not a standalone statement — returns an informational comment.
+///   (Inline ENUMs are rendered at the column level in CREATE TABLE.)
+/// - **SQLite / MSSQL / Oracle** (`EnumStyle::CheckConstraint`):
+///   Not a standalone statement — returns an informational comment.
+///   (CHECK constraints are rendered at the column level in CREATE TABLE.)
+pub fn render_define_type_ir(
+    ir: &DefineTypeIR,
+    dialect: &Dialect,
+) -> Result<SqlOutput, BackendError> {
+    use super::dialect::ddl::EnumStyle;
+
+    let qualified_name = if let Some(ref ns) = ir.namespace {
+        format!("{}.{}", ns, ir.name)
+    } else {
+        ir.name.clone()
+    };
+
+    let sql = match dialect.ddl.enum_style {
+        EnumStyle::CreateType => {
+            let variants: Vec<String> = ir.variants.iter().map(|v| format!("'{}'", v)).collect();
+            format!(
+                "CREATE TYPE {} AS ENUM ({})",
+                qualified_name,
+                variants.join(", ")
+            )
+        }
+        EnumStyle::InlineEnum => {
+            // MySQL inline ENUMs are part of column definitions, not standalone.
+            // Return a comment so callers know this is intentionally a no-op.
+            format!(
+                "-- type {} is rendered inline as ENUM({}) in column definitions",
+                qualified_name,
+                ir.variants
+                    .iter()
+                    .map(|v| format!("'{}'", v))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        }
+        EnumStyle::CheckConstraint => {
+            // SQLite/MSSQL/Oracle use CHECK constraints instead of types.
+            format!(
+                "-- type {} is enforced via CHECK (col IN ({})) in column definitions",
+                qualified_name,
+                ir.variants
+                    .iter()
+                    .map(|v| format!("'{}'", v))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
         }
     };
+
     Ok(SqlOutput {
         sql,
         param_count: 0,
@@ -1198,8 +1317,85 @@ pub fn render_transaction_ir(ir: &TransactionIR) -> Result<SqlOutput, BackendErr
 }
 
 // ===========================================================================
-// Compound query rendering
+// DropType rendering (DROP TYPE)
 // ===========================================================================
+
+/// Render a [`DropTypeIR`] to SQL.
+///
+/// Only meaningful for dialects with `EnumStyle::CreateType` (PostgreSQL,
+/// CockroachDB). For other dialects, returns a comment.
+pub fn render_drop_type_ir(ir: &DropTypeIR, dialect: &Dialect) -> Result<SqlOutput, BackendError> {
+    use super::dialect::ddl::EnumStyle;
+
+    let sql = match dialect.ddl.enum_style {
+        EnumStyle::CreateType => {
+            let mut s = String::from("DROP TYPE ");
+            if ir.if_exists {
+                s.push_str("IF EXISTS ");
+            }
+            s.push_str(&ir.name);
+            s
+        }
+        _ => {
+            // Inline enums / check constraints don't have a separate type to drop.
+            format!(
+                "-- type {} does not exist as a standalone object in this dialect",
+                ir.name
+            )
+        }
+    };
+
+    Ok(SqlOutput {
+        sql,
+        param_count: 0,
+    })
+}
+
+// ===========================================================================
+// DefinePolicy rendering (CREATE POLICY ... ON ... FOR ... USING ... WITH CHECK)
+// ===========================================================================
+
+/// Render a [`DefinePolicyIR`] to SQL.
+///
+/// Produces PostgreSQL-style row-level security policy:
+/// ```sql
+/// CREATE POLICY name ON table
+///   FOR ALL
+///   USING (tenant_id = $1)
+///   WITH CHECK (tenant_id = $1)
+/// ```
+pub fn render_define_policy_ir(
+    ir: &DefinePolicyIR,
+    dialect: &Dialect,
+) -> Result<SqlOutput, BackendError> {
+    let mut counter = dialect.param_counter();
+
+    let action_str = match ir.action {
+        dol_core::ir::control::PolicyAction::Read => "SELECT",
+        dol_core::ir::control::PolicyAction::Write => "ALL",
+        dol_core::ir::control::PolicyAction::All => "ALL",
+    };
+
+    let mut sql = format!(
+        "CREATE POLICY {} ON {} FOR {}",
+        ir.name, ir.on_model, action_str
+    );
+
+    if let Some(ref expr) = ir.using_expr {
+        let rendered = render_expr(expr, &mut counter, dialect);
+        sql.push_str(&format!(" USING ({})", rendered));
+    }
+
+    if let Some(ref expr) = ir.check_expr {
+        let rendered = render_expr(expr, &mut counter, dialect);
+        sql.push_str(&format!(" WITH CHECK ({})", rendered));
+    }
+
+    Ok(SqlOutput {
+        sql,
+        param_count: counter.count(),
+    })
+}
 
 /// Render a compound query (UNION, INTERSECT, EXCEPT) to SQL.
 ///

@@ -18,10 +18,10 @@ pub mod query;
 pub mod storage;
 pub mod transaction;
 
-pub use control::{GrantBuilder, RevokeBuilder};
+pub use control::{DefinePolicyBuilder, GrantBuilder, RevokeBuilder};
 pub use definition::{
-    AlterEntityBuilder, DefineEntityBuilder, DefineIndexBuilder, DropEntityBuilder,
-    DropIndexBuilder, EntityDefineExt,
+    AlterEntityBuilder, DefineEntityBuilder, DefineIndexBuilder, DefineTypeBuilder,
+    DropEntityBuilder, DropIndexBuilder, DropTypeBuilder, EntityDefineExt,
 };
 pub use mutation::{
     InsertBuilder, InsertSelectBuilder, RemoveBuilder, UpdateBuilder, UpsertBuilder,

@@ -1127,15 +1127,15 @@ fn grant_all() {
 #[test]
 fn transaction_begin_commit_rollback() {
     assert_eq!(
-        TransactionBuilder::to_sql(&TransactionBuilder::begin()),
+        TransactionBuilder::to_sql(&TransactionBuilder::begin(), None),
         "BEGIN"
     );
     assert_eq!(
-        TransactionBuilder::to_sql(&TransactionBuilder::commit()),
+        TransactionBuilder::to_sql(&TransactionBuilder::commit(), None),
         "COMMIT"
     );
     assert_eq!(
-        TransactionBuilder::to_sql(&TransactionBuilder::rollback()),
+        TransactionBuilder::to_sql(&TransactionBuilder::rollback(), None),
         "ROLLBACK"
     );
 }
@@ -1143,13 +1143,19 @@ fn transaction_begin_commit_rollback() {
 #[test]
 fn transaction_savepoint() {
     let ir = TransactionBuilder::savepoint("sp1");
-    assert_eq!(TransactionBuilder::to_sql(&ir), "SAVEPOINT sp1");
+    assert_eq!(TransactionBuilder::to_sql(&ir, None), "SAVEPOINT sp1");
 
     let ir = TransactionBuilder::release_savepoint("sp1");
-    assert_eq!(TransactionBuilder::to_sql(&ir), "RELEASE SAVEPOINT sp1");
+    assert_eq!(
+        TransactionBuilder::to_sql(&ir, None),
+        "RELEASE SAVEPOINT sp1"
+    );
 
     let ir = TransactionBuilder::rollback_to_savepoint("sp1");
-    assert_eq!(TransactionBuilder::to_sql(&ir), "ROLLBACK TO SAVEPOINT sp1");
+    assert_eq!(
+        TransactionBuilder::to_sql(&ir, None),
+        "ROLLBACK TO SAVEPOINT sp1"
+    );
 }
 
 // ===========================================================================

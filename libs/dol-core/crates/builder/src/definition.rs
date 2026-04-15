@@ -1,4 +1,4 @@
-//! Definition builders — CREATE, ALTER, DROP for models and indexes.
+//! Definition builders — CREATE, ALTER, DROP for models, indexes, and types.
 //!
 //! - [`CreateFromMeta`]: builds a `DefineEntityIR` from static [`Model`] metadata.
 //! - [`DefineEntityBuilder`]: builds a CREATE TABLE from owned [`FieldDef`]s (runtime-defined).
@@ -6,6 +6,8 @@
 //! - [`DropEntityBuilder`]: builds DROP TABLE from a Model reference.
 //! - [`DefineIndexBuilder`]: builds CREATE INDEX.
 //! - [`DropIndexBuilder`]: builds DROP INDEX.
+//! - [`DefineTypeBuilder`]: builds CREATE TYPE (enum types).
+//! - [`DropTypeBuilder`]: builds DROP TYPE.
 //!
 //! For SQL rendering, import the extension traits from `dol-sql`.
 
@@ -13,8 +15,8 @@ use dol_entity::constraint::EntityConstraint;
 use dol_entity::{Entity, Field, FieldType};
 use dol_ir::EntityRef;
 use dol_ir::definition::{
-    AlterAction, AlterEntityIR, DefineEntityIR, DefineIndexIR, DropEntityIR, DropIndexIR, FieldDef,
-    IndexMethod, OwnedForeignKeyRef,
+    AlterAction, AlterEntityIR, DefineEntityIR, DefineIndexIR, DefineTypeIR, DropEntityIR,
+    DropIndexIR, DropTypeIR, FieldDef, IndexMethod, OwnedForeignKeyRef,
 };
 
 // ---------------------------------------------------------------------------
@@ -517,5 +519,107 @@ pub trait EntityDefineExt {
 impl EntityDefineExt for Entity {
     fn define(name: &str) -> DefineEntityBuilder {
         DefineEntityBuilder::new(name)
+    }
+}
+
+// ===========================================================================
+// DefineTypeBuilder — CREATE TYPE (enum)
+// ===========================================================================
+
+/// Builds a `CREATE TYPE` statement for custom enum types.
+///
+/// ```rust
+/// use dol_builder::definition::DefineTypeBuilder;
+///
+/// let ir = DefineTypeBuilder::new("order_status")
+///     .variant("pending")
+///     .variant("shipped")
+///     .variant("delivered")
+///     .build();
+/// ```
+#[derive(Debug, Clone)]
+#[must_use = "builders do nothing until .build() is called"]
+pub struct DefineTypeBuilder {
+    name: String,
+    namespace: Option<String>,
+    variants: Vec<String>,
+}
+
+impl DefineTypeBuilder {
+    pub fn new(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            namespace: None,
+            variants: Vec::new(),
+        }
+    }
+
+    /// Set the namespace (schema) for this type.
+    pub fn namespace(mut self, ns: &str) -> Self {
+        self.namespace = Some(ns.to_string());
+        self
+    }
+
+    /// Add a single enum variant.
+    pub fn variant(mut self, name: &str) -> Self {
+        self.variants.push(name.to_string());
+        self
+    }
+
+    /// Add multiple enum variants at once.
+    pub fn variants(mut self, names: &[&str]) -> Self {
+        self.variants.extend(names.iter().map(|s| s.to_string()));
+        self
+    }
+
+    /// Build the canonical [`DefineTypeIR`].
+    pub fn build(&self) -> DefineTypeIR {
+        DefineTypeIR {
+            name: self.name.clone(),
+            namespace: self.namespace.clone(),
+            variants: self.variants.clone(),
+        }
+    }
+}
+
+// ===========================================================================
+// DropTypeBuilder — DROP TYPE
+// ===========================================================================
+
+/// Builds a `DROP TYPE` statement.
+///
+/// ```rust
+/// use dol_builder::definition::DropTypeBuilder;
+///
+/// let ir = DropTypeBuilder::new("order_status")
+///     .if_exists()
+///     .build();
+/// ```
+#[derive(Debug, Clone)]
+#[must_use = "builders do nothing until .build() is called"]
+pub struct DropTypeBuilder {
+    name: String,
+    if_exists: bool,
+}
+
+impl DropTypeBuilder {
+    pub fn new(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            if_exists: false,
+        }
+    }
+
+    pub fn if_exists(mut self) -> Self {
+        self.if_exists = true;
+        self
+    }
+
+    /// Build the canonical [`DropTypeIR`].
+    pub fn build(&self) -> DropTypeIR {
+        DropTypeIR {
+            name: self.name.clone(),
+            if_exists: self.if_exists,
+        }
     }
 }

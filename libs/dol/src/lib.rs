@@ -138,6 +138,12 @@ pub use dol_config::{BackendFilter, LockStrategy, UnifiedMigrationConfig};
 // Re-export builder extension traits so users can call model.get(), etc.
 pub use dol_core::builder::{EntityBuilderExt, EntityDefineExt};
 
+/// Backward-compatible alias for [`EntityDefineExt`].
+pub use dol_core::builder::EntityDefineExt as ModelDefineExt;
+
+// Re-export commonly used builders at the top level for ergonomic access.
+pub use dol_core::builder::{DefinePolicyBuilder, DefineTypeBuilder, DropTypeBuilder};
+
 // Re-export Query for backend-neutral entry point.
 pub use dol_core::query::Query;
 
