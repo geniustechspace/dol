@@ -6,7 +6,7 @@
 //! For SQL rendering, import the `Render` extension trait from `dol-sql`.
 
 use dol_entity::Entity;
-use dol_expr::{Expr, field, param};
+use dol_expr::{Expr, field, raw_expr};
 use dol_ir::{EntityRef, InsertIR, InsertSelectIR, RemoveIR, UpdateIR, UpsertIR};
 
 use super::query::count_single_expr_params;
