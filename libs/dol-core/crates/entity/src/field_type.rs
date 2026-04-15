@@ -115,3 +115,105 @@ impl fmt::Display for FieldType {
         }
     }
 }
+
+// ── Serde round-trip support ──────────────────────────────────────────────
+//
+// `FieldType` uses `&'static str` for the `Custom` variant so that it stays
+// `Copy` and works in `const`/`static` contexts.  serde's derive macro can
+// only *serialize* a `&'static str`, not deserialize into one.
+//
+// We solve this with a mirror enum (`FieldTypeDe`) that uses `String` for
+// the `Custom` payload and `Box::leak` to promote the string to `'static`.
+// The leak is negligible in practice: custom type names are a small,
+// bounded set (e.g. "CITEXT", "MONEY") typically loaded once at startup.
+
+#[cfg(feature = "serde")]
+mod serde_support {
+    use super::FieldType;
+
+    /// Mirror enum used only for deserialization.
+    #[derive(serde::Deserialize)]
+    enum FieldTypeDe {
+        Text,
+        Char(u32),
+        Varchar(Option<u32>),
+        Int,
+        SmallInt,
+        BigInt,
+        Float,
+        Double,
+        Decimal,
+        Bool,
+        Uuid,
+        Bytes,
+        Timestamp,
+        Date,
+        Time,
+        Duration,
+        Json,
+        Inet,
+        Object,
+        TextArray,
+        Blob,
+        Path,
+        Url,
+        ResourceId,
+        Version,
+        Etag,
+        Mime,
+        Serial,
+        BigSerial,
+        Custom(String),
+    }
+
+    impl From<FieldTypeDe> for FieldType {
+        fn from(de: FieldTypeDe) -> Self {
+            match de {
+                FieldTypeDe::Text => Self::Text,
+                FieldTypeDe::Char(n) => Self::Char(n),
+                FieldTypeDe::Varchar(n) => Self::Varchar(n),
+                FieldTypeDe::Int => Self::Int,
+                FieldTypeDe::SmallInt => Self::SmallInt,
+                FieldTypeDe::BigInt => Self::BigInt,
+                FieldTypeDe::Float => Self::Float,
+                FieldTypeDe::Double => Self::Double,
+                FieldTypeDe::Decimal => Self::Decimal,
+                FieldTypeDe::Bool => Self::Bool,
+                FieldTypeDe::Uuid => Self::Uuid,
+                FieldTypeDe::Bytes => Self::Bytes,
+                FieldTypeDe::Timestamp => Self::Timestamp,
+                FieldTypeDe::Date => Self::Date,
+                FieldTypeDe::Time => Self::Time,
+                FieldTypeDe::Duration => Self::Duration,
+                FieldTypeDe::Json => Self::Json,
+                FieldTypeDe::Inet => Self::Inet,
+                FieldTypeDe::Object => Self::Object,
+                FieldTypeDe::TextArray => Self::TextArray,
+                FieldTypeDe::Blob => Self::Blob,
+                FieldTypeDe::Path => Self::Path,
+                FieldTypeDe::Url => Self::Url,
+                FieldTypeDe::ResourceId => Self::ResourceId,
+                FieldTypeDe::Version => Self::Version,
+                FieldTypeDe::Etag => Self::Etag,
+                FieldTypeDe::Mime => Self::Mime,
+                FieldTypeDe::Serial => Self::Serial,
+                FieldTypeDe::BigSerial => Self::BigSerial,
+                FieldTypeDe::Custom(s) => {
+                    // Promote the owned string to &'static str.
+                    // This leaks the allocation, which is acceptable because custom
+                    // type names are a small, bounded set loaded at startup.
+                    Self::Custom(Box::leak(s.into_boxed_str()))
+                }
+            }
+        }
+    }
+
+    impl<'de> serde::Deserialize<'de> for FieldType {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            FieldTypeDe::deserialize(deserializer).map(Into::into)
+        }
+    }
+}

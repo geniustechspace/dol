@@ -17,7 +17,7 @@ pub struct DefineEntityIR {
 
 /// An owned field definition for use in IR and builders (not `'static`).
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FieldDef {
     pub name: String,
     pub field_type: FieldType,
