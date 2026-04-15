@@ -3,7 +3,7 @@
 //! `GetBuilder` borrows a `&Model` and provides chainable methods to compose
 //! a SELECT query. Call `.build()` to produce a [`QueryIR`].
 //!
-//! For SQL rendering, import the `ToSql` extension trait from `dol-sql`.
+//! For SQL rendering, import the `Render` extension trait from `dol-sql`.
 
 use dol_entity::Entity;
 use dol_expr::{Direction, Expr, NullsPosition, OrderByExpr, col, param, raw_expr};
@@ -85,6 +85,11 @@ impl<'a> GetBuilder<'a> {
                 .push(Expr::Identifier(field.name.to_string()));
         }
         self
+    }
+
+    /// Alias for [`all_columns`](Self::all_columns).
+    pub fn all_fields(self) -> Self {
+        self.all_columns()
     }
 
     /// Select a list of named columns.

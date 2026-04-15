@@ -26,8 +26,8 @@
 
 use dol::CompoundSelectBuilder;
 use dol::EntityBuilderExt;
-use dol::ToSql;
-use dol::TransactionSqlExt;
+use dol::Render;
+use dol::TransactionRender;
 use dol::backend::sql::dialect::Dialect;
 use dol::builder::control::{GrantBuilder, Privilege, RevokeBuilder};
 use dol::builder::definition::{DefineEntityBuilder, DefineIndexBuilder, DropIndexBuilder};
@@ -244,7 +244,7 @@ fn main() {
     println!("\n--- 2. SELECT Queries ---");
 
     // 2a. Simple SELECT all columns
-    let sql = USERS.get().all_columns().to_sql(Some(&pg));
+    let sql = USERS.get().all_columns().render(Some(&pg)).unwrap();
     println!("  [PG] Select all: {}", sql);
     assert!(sql.contains("SELECT"));
     assert!(sql.contains("FROM users"));
@@ -255,7 +255,7 @@ fn main() {
         .columns(&["id", "email", "status"])
         .where_eq("tenant_id")
         .where_eq("status")
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Filtered: {}", sql);
     assert!(sql.contains("$1"));
     assert!(sql.contains("$2"));
@@ -266,7 +266,7 @@ fn main() {
         .all_columns()
         .where_eq("tenant_id")
         .filter(field("status").eq(lit("active")) | field("status").eq(lit("pending")))
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] OR filter: {}", sql);
 
     // 2d. LIKE / ILIKE patterns
@@ -274,7 +274,7 @@ fn main() {
         .get()
         .all_columns()
         .where_ilike("email")
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] ILIKE: {}", sql);
     assert!(sql.contains("ILIKE"));
 
@@ -283,7 +283,7 @@ fn main() {
         .get()
         .all_columns()
         .filter(field("profile").is_not_null())
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] IS NOT NULL: {}", sql);
 
     // 2f. BETWEEN range
@@ -291,7 +291,7 @@ fn main() {
         .get()
         .all_columns()
         .filter(field("login_count").between(lit(10), lit(100)))
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] BETWEEN: {}", sql);
 
     // 2g. IN list
@@ -299,7 +299,7 @@ fn main() {
         .get()
         .all_columns()
         .filter(field("status").in_list(vec![lit("active"), lit("pending"), lit("suspended")]))
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] IN list: {}", sql);
 
     // 2h. IN subquery
@@ -310,7 +310,7 @@ fn main() {
             "tenant_id",
             "SELECT id FROM tenants WHERE status = 'active'",
         )
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] IN subquery: {}", sql);
 
     // 2i. NOT IN subquery (via filter)
@@ -319,7 +319,7 @@ fn main() {
         .get()
         .all_columns()
         .filter(field("id").not_in_subquery(subquery))
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] NOT IN subquery: {}", sql);
 
     // 2j. EXISTS subquery
@@ -327,7 +327,7 @@ fn main() {
         .get()
         .all_columns()
         .where_exists("SELECT 1 FROM sessions WHERE sessions.user_id = users.id")
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] EXISTS: {}", sql);
 
     // 2k. NOT EXISTS subquery
@@ -335,7 +335,7 @@ fn main() {
         .get()
         .all_columns()
         .where_not_exists("SELECT 1 FROM banned WHERE banned.user_id = users.id")
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] NOT EXISTS: {}", sql);
 
     // 2l. Scalar subquery in projection
@@ -348,7 +348,7 @@ fn main() {
             )
             .alias("session_count"),
         )
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Scalar subquery: {}", sql);
 
     // 2m. Ordering with NULLS FIRST/LAST
@@ -356,7 +356,7 @@ fn main() {
         .get()
         .all_columns()
         .order_by_expr(field("display_name").asc_nulls_last())
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] ORDER BY NULLS LAST: {}", sql);
 
     // 2n. ORDER BY with Direction enum
@@ -368,7 +368,7 @@ fn main() {
             Direction::Asc,
             Some(dol::expr::NullsPosition::Last),
         )
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] ORDER BY (Direction): {}", sql);
 
     // 2o. Pagination (LIMIT + OFFSET)
@@ -378,7 +378,7 @@ fn main() {
         .order_by_asc("email")
         .limit()
         .offset()
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Pagination: {}", sql);
 
     // 2p. DISTINCT
@@ -386,7 +386,7 @@ fn main() {
         .get()
         .columns(&["tenant_id"])
         .distinct()
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] DISTINCT: {}", sql);
 
     // 2q. DISTINCT ON (PostgreSQL only)
@@ -396,7 +396,7 @@ fn main() {
         .distinct_on(&["tenant_id"])
         .order_by_asc("tenant_id")
         .order_by_desc("created_at")
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] DISTINCT ON: {}", sql);
 
     // 2r. GROUP BY + HAVING
@@ -406,35 +406,35 @@ fn main() {
         .count_all_as("cnt")
         .group_by(&["tenant_id"])
         .having(raw_expr("COUNT(*) > 10"))
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] GROUP BY HAVING: {}", sql);
 
     // 2s. Aggregate functions
     let sql = SETTINGS
         .get()
         .select_item(func::sum(col("max_users")).alias("total_users"))
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] SUM: {}", sql);
 
     let sql = USERS
         .get()
         .count_all_as("total")
         .where_eq("tenant_id")
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] COUNT: {}", sql);
 
     // 2t. Column aliases and raw expressions
     let sql = USERS
         .get()
         .column_as("email", "user_email")
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Column alias: {}", sql);
 
     let sql = USERS
         .get()
         .raw_column("COALESCE(display_name, email) AS name")
         .where_eq("id")
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Raw column: {}", sql);
 
     // 2u. INNER JOIN
@@ -443,7 +443,7 @@ fn main() {
         .all_columns()
         .inner_join(&TENANTS, &[("tenant_id", "id")])
         .where_eq("tenant_id")
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] INNER JOIN: {}", sql);
 
     // 2v. LEFT JOIN
@@ -451,7 +451,7 @@ fn main() {
         .get()
         .all_columns()
         .left_join(&SESSIONS, &[("id", "user_id")])
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] LEFT JOIN: {}", sql);
 
     // 2w. Multiple JOINs
@@ -461,7 +461,7 @@ fn main() {
         .inner_join(&TENANTS, &[("tenant_id", "id")])
         .left_join(&SESSIONS, &[("id", "user_id")])
         .where_eq("tenant_id")
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Multi JOIN: {}", sql);
 
     // 2x. FOR UPDATE (pessimistic locking)
@@ -470,7 +470,7 @@ fn main() {
         .all_columns()
         .where_eq("id")
         .lock(LockMode::ForUpdate)
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] FOR UPDATE: {}", sql);
     assert!(sql.contains("FOR UPDATE"));
 
@@ -481,7 +481,7 @@ fn main() {
         .where_eq("status")
         .lock(LockMode::ForUpdateSkipLocked)
         .limit()
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] SKIP LOCKED: {}", sql);
 
     // 2z. Window functions — ROW_NUMBER
@@ -496,7 +496,7 @@ fn main() {
                 .build()
                 .alias("row_num"),
         )
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] ROW_NUMBER: {}", sql);
 
     // 2aa. Window functions — RANK with frame
@@ -513,7 +513,7 @@ fn main() {
                 .build()
                 .alias("login_rank"),
         )
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] RANK + frame: {}", sql);
 
     // 2ab. Table alias
@@ -522,7 +522,7 @@ fn main() {
         .alias("u")
         .all_columns()
         .where_eq("id")
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Table alias: {}", sql);
 
     // 2ac. Param count tracking
@@ -549,7 +549,7 @@ fn main() {
         .insert()
         .all_columns()
         .returning_all()
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Insert all: {}", sql);
     assert!(sql.contains("INSERT INTO users"));
     assert!(sql.contains("RETURNING *"));
@@ -559,7 +559,7 @@ fn main() {
         .insert()
         .columns(&["id", "email", "tenant_id", "display_name"])
         .returning(&["id", "email"])
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Insert specific: {}", sql);
 
     // 3c. Batch INSERT (multiple rows)
@@ -567,7 +567,7 @@ fn main() {
         .insert()
         .columns(&["id", "email", "tenant_id"])
         .rows(3)
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Batch insert: {}", sql);
     // 3 rows × 3 cols = 9 params
     assert!(sql.contains("$9"));
@@ -585,13 +585,13 @@ fn main() {
         .get()
         .columns(&["id", "email"])
         .where_eq("tenant_id")
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     let sql = USERS
         .insert_select()
         .columns(&["id", "email"])
         .from_select(&source_query)
         .returning_all()
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Insert select: {}", sql);
 
     // 3f. UPDATE with set() (single column)
@@ -600,7 +600,7 @@ fn main() {
         .set("display_name")
         .set("updated_at")
         .where_eq("id")
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Update: {}", sql);
 
     // 3g. UPDATE with set_columns() (multiple columns)
@@ -608,7 +608,7 @@ fn main() {
         .update()
         .set_columns(&["display_name", "status", "updated_at"])
         .where_eq("id")
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Update set_columns: {}", sql);
 
     // 3h. UPDATE with literal SET
@@ -618,7 +618,7 @@ fn main() {
         .set_literal("updated_at", "NOW()")
         .where_eq("id")
         .returning_all()
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Update literal + returning: {}", sql);
 
     // 3i. UPDATE with version increment (optimistic locking)
@@ -629,7 +629,7 @@ fn main() {
         .where_eq("id")
         .where_eq("version")
         .returning_all()
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Optimistic lock: {}", sql);
     assert!(sql.contains("version = version + $"));
 
@@ -638,7 +638,7 @@ fn main() {
         .update()
         .set_expr("login_count", col("login_count") + lit(1))
         .where_eq("id")
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Update set_expr: {}", sql);
 
     // 3k. UPDATE with raw WHERE
@@ -646,7 +646,7 @@ fn main() {
         .update()
         .set("status")
         .where_raw("created_at < NOW() - INTERVAL '30 days'")
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Update raw WHERE: {}", sql);
 
     // 3l. UPDATE with expression filter
@@ -654,7 +654,7 @@ fn main() {
         .update()
         .set("status")
         .filter(field("login_count").gt(lit(0)))
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Update filter: {}", sql);
 
     // 3m. DELETE with WHERE
@@ -662,21 +662,21 @@ fn main() {
         .remove()
         .where_eq("id")
         .returning_all()
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Delete: {}", sql);
 
     // 3n. DELETE with expression filter
     let sql = USERS
         .remove()
         .filter(field("status").eq(lit("deleted")))
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Delete filter: {}", sql);
 
     // 3o. DELETE with raw WHERE
     let sql = USERS
         .remove()
         .where_raw("created_at < NOW() - INTERVAL '90 days'")
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Delete raw: {}", sql);
 
     // 3p. DELETE param count
@@ -691,7 +691,7 @@ fn main() {
         .on_conflict(&["email"])
         .do_update(&["display_name", "status", "updated_at"])
         .returning_all()
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Upsert: {}", sql);
     assert!(sql.contains("ON CONFLICT"));
     assert!(sql.contains("DO UPDATE SET"));
@@ -702,7 +702,7 @@ fn main() {
         .all_columns()
         .on_conflict(&["email"])
         .do_nothing()
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Upsert do nothing: {}", sql);
     assert!(sql.contains("DO NOTHING"));
 
@@ -712,7 +712,7 @@ fn main() {
         .all_columns()
         .on_conflict_constraint("users_email_key")
         .do_update(&["display_name"])
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Upsert on constraint: {}", sql);
 
     // 3t. UPSERT with conflict filter
@@ -722,7 +722,7 @@ fn main() {
         .on_conflict(&["email"])
         .conflict_filter(field("status").ne(lit("deleted")))
         .do_update(&["display_name"])
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Upsert conflict filter: {}", sql);
 
     // ========================================================================
@@ -731,12 +731,12 @@ fn main() {
     println!("\n--- 4. DDL ---");
 
     // 4a. CREATE TABLE from static model metadata
-    let sql = USERS.create().to_sql(Some(&pg));
+    let sql = USERS.create().render(Some(&pg)).unwrap();
     println!("  [PG] Create table: {}...", &sql[..sql.len().min(100)]);
     assert!(sql.contains("CREATE TABLE users"));
 
     // 4b. CREATE TABLE IF NOT EXISTS
-    let sql = USERS.create().if_not_exists().to_sql(Some(&pg));
+    let sql = USERS.create().if_not_exists().render(Some(&pg)).unwrap();
     assert!(sql.contains("IF NOT EXISTS"));
     println!(
         "  [PG] Create if not exists: {}...",
@@ -744,17 +744,17 @@ fn main() {
     );
 
     // 4c. CREATE TABLE with constraints (FK, CHECK, composite)
-    let sql = AUDIT_LOG.create().to_sql(Some(&pg));
+    let sql = AUDIT_LOG.create().render(Some(&pg)).unwrap();
     assert!(sql.contains("REFERENCES"));
     println!("  [PG] Create with FK: {}...", &sql[..sql.len().min(100)]);
 
     // 4d. CREATE TABLE with namespace
-    let sql = AUDIT_LOG.create().to_sql(Some(&pg));
+    let sql = AUDIT_LOG.create().render(Some(&pg)).unwrap();
     assert!(sql.contains("audit.audit_log"));
     println!("  [PG] Namespace: {}...", &sql[..sql.len().min(100)]);
 
     // 4e. CREATE TABLE with composite PK
-    let sql = ORDER_ITEMS.create().to_sql(Some(&pg));
+    let sql = ORDER_ITEMS.create().render(Some(&pg)).unwrap();
     assert!(sql.contains("PRIMARY KEY (order_id, product_id)"));
     println!("  [PG] Composite PK: {}...", &sql[..sql.len().min(100)]);
 
@@ -764,67 +764,67 @@ fn main() {
         .field(dol::FieldDef::new("name", FieldType::Text))
         .field(dol::FieldDef::new("value", FieldType::Decimal).nullable())
         .if_not_exists()
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Dynamic define: {}", sql);
 
     // 4g. ALTER TABLE — add column (takes a Field)
     let sql = USERS
         .alter()
         .add_column(Field::new("phone", FieldType::Text).nullable())
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Alter add: {}", sql);
     assert!(sql.contains("ADD COLUMN"));
 
     // 4h. ALTER TABLE — drop column
-    let sql = USERS.alter().drop_field("profile").to_sql(Some(&pg));
+    let sql = USERS.alter().drop_field("profile").render(Some(&pg)).unwrap();
     println!("  [PG] Alter drop: {}", sql);
 
     // 4i. ALTER TABLE — rename column
     let sql = USERS
         .alter()
         .rename_field("display_name", "full_name")
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Alter rename col: {}", sql);
 
     // 4j. ALTER TABLE — change column type
     let sql = USERS
         .alter()
         .alter_column_type("login_count", FieldType::BigInt)
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Alter column type: {}", sql);
 
     // 4k. ALTER TABLE — set/drop default
     let sql = USERS
         .alter()
         .set_default("status", "'inactive'")
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Set default: {}", sql);
 
-    let sql = USERS.alter().drop_default("status").to_sql(Some(&pg));
+    let sql = USERS.alter().drop_default("status").render(Some(&pg)).unwrap();
     println!("  [PG] Drop default: {}", sql);
 
     // 4l. ALTER TABLE — set/drop NOT NULL
-    let sql = USERS.alter().set_not_null("profile").to_sql(Some(&pg));
+    let sql = USERS.alter().set_not_null("profile").render(Some(&pg)).unwrap();
     println!("  [PG] Set NOT NULL: {}", sql);
 
-    let sql = USERS.alter().drop_not_null("email").to_sql(Some(&pg));
+    let sql = USERS.alter().drop_not_null("email").render(Some(&pg)).unwrap();
     println!("  [PG] Drop NOT NULL: {}", sql);
 
     // 4m. ALTER TABLE — rename table
-    let sql = USERS.alter().rename_model("app_users").to_sql(Some(&pg));
+    let sql = USERS.alter().rename_model("app_users").render(Some(&pg)).unwrap();
     println!("  [PG] Rename table: {}", sql);
 
     // 4n. ALTER TABLE — add/drop constraint
     let sql = USERS
         .alter()
         .add_constraint(EntityConstraint::Unique(&["email", "tenant_id"]))
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Add constraint: {}", sql);
 
     let sql = USERS
         .alter()
         .drop_constraint("users_email_key")
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Drop constraint: {}", sql);
 
     // 4o. ALTER TABLE — multiple actions
@@ -833,15 +833,15 @@ fn main() {
         .add_column(Field::new("phone", FieldType::Text).nullable())
         .drop_field("profile")
         .set_not_null("display_name")
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Multi alter: {}", sql);
 
     // 4p. DROP TABLE
-    let sql = USERS.drop_entity().to_sql(Some(&pg));
+    let sql = USERS.drop_entity().render(Some(&pg)).unwrap();
     println!("  [PG] Drop table: {}", sql);
 
     // 4q. DROP TABLE IF EXISTS CASCADE
-    let sql = USERS.drop_entity().if_exists().cascade().to_sql(Some(&pg));
+    let sql = USERS.drop_entity().if_exists().cascade().render(Some(&pg)).unwrap();
     assert!(sql.contains("IF EXISTS"));
     assert!(sql.contains("CASCADE"));
     println!("  [PG] Drop if exists cascade: {}", sql);
@@ -850,7 +850,7 @@ fn main() {
     let sql = DefineIndexBuilder::new("idx_users_email")
         .on("users")
         .columns(&["email"])
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Create index: {}", sql);
 
     // 4s. CREATE UNIQUE INDEX IF NOT EXISTS
@@ -859,7 +859,7 @@ fn main() {
         .columns(&["tenant_id", "email"])
         .unique()
         .if_not_exists()
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Unique index: {}", sql);
 
     // 4t. CREATE INDEX with method and WHERE (partial index)
@@ -868,7 +868,7 @@ fn main() {
         .columns(&["email"])
         .method(dol::ir::definition::IndexMethod::Hash)
         .where_clause("status = 'active'")
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Partial index: {}", sql);
 
     // 4u. CREATE INDEX CONCURRENTLY
@@ -876,14 +876,14 @@ fn main() {
         .on("users")
         .columns(&["email"])
         .concurrently()
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     assert!(sql.contains("CONCURRENTLY"));
     println!("  [PG] Concurrent index: {}", sql);
 
     // 4v. DROP INDEX
     let sql = DropIndexBuilder::new("idx_users_email")
         .if_exists()
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Drop index: {}", sql);
 
     // ========================================================================
@@ -1082,28 +1082,28 @@ fn main() {
     // 6a. UNION
     let sql = CompoundSelectBuilder::new(q1.clone())
         .union(q2.clone())
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     assert!(sql.contains("UNION"));
     println!("  [PG] UNION: {}", sql);
 
     // 6b. UNION ALL
     let sql = CompoundSelectBuilder::new(q1.clone())
         .union_all(q2.clone())
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     assert!(sql.contains("UNION ALL"));
     println!("  [PG] UNION ALL: {}", sql);
 
     // 6c. INTERSECT
     let sql = CompoundSelectBuilder::new(q1.clone())
         .intersect(q2.clone())
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     assert!(sql.contains("INTERSECT"));
     println!("  [PG] INTERSECT: {}", sql);
 
     // 6d. EXCEPT
     let sql = CompoundSelectBuilder::new(q1.clone())
         .except(q2.clone())
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     assert!(sql.contains("EXCEPT"));
     println!("  [PG] EXCEPT: {}", sql);
 
@@ -1113,7 +1113,7 @@ fn main() {
         .order_by(vec![field("email").asc()])
         .limit()
         .offset()
-        .to_sql(Some(&pg));
+        .render(Some(&pg)).unwrap();
     println!("  [PG] Compound + order/limit: {}", sql);
 
     // ========================================================================
@@ -1121,27 +1121,27 @@ fn main() {
     // ========================================================================
     println!("\n--- 7. Transactions ---");
 
-    let sql = TransactionBuilder::to_sql(&TransactionBuilder::begin(), None);
+    let sql = TransactionBuilder::render(&TransactionBuilder::begin(), None).unwrap();
     assert_eq!(sql, "BEGIN");
     println!("  BEGIN: {}", sql);
 
-    let sql = TransactionBuilder::to_sql(&TransactionBuilder::commit(), None);
+    let sql = TransactionBuilder::render(&TransactionBuilder::commit(), None).unwrap();
     assert_eq!(sql, "COMMIT");
     println!("  COMMIT: {}", sql);
 
-    let sql = TransactionBuilder::to_sql(&TransactionBuilder::rollback(), None);
+    let sql = TransactionBuilder::render(&TransactionBuilder::rollback(), None).unwrap();
     assert_eq!(sql, "ROLLBACK");
     println!("  ROLLBACK: {}", sql);
 
-    let sql = TransactionBuilder::to_sql(&TransactionBuilder::savepoint("sp1"), None);
+    let sql = TransactionBuilder::render(&TransactionBuilder::savepoint("sp1"), None).unwrap();
     assert_eq!(sql, "SAVEPOINT sp1");
     println!("  SAVEPOINT: {}", sql);
 
-    let sql = TransactionBuilder::to_sql(&TransactionBuilder::release_savepoint("sp1"), None);
+    let sql = TransactionBuilder::render(&TransactionBuilder::release_savepoint("sp1"), None).unwrap();
     assert_eq!(sql, "RELEASE SAVEPOINT sp1");
     println!("  RELEASE: {}", sql);
 
-    let sql = TransactionBuilder::to_sql(&TransactionBuilder::rollback_to_savepoint("sp1"), None);
+    let sql = TransactionBuilder::render(&TransactionBuilder::rollback_to_savepoint("sp1"), None).unwrap();
     assert_eq!(sql, "ROLLBACK TO SAVEPOINT sp1");
     println!("  ROLLBACK TO: {}", sql);
 
@@ -1153,38 +1153,38 @@ fn main() {
     let sql = GrantBuilder::new(Privilege::Select)
         .on("users")
         .to("app_reader")
-        .to_sql(None);
+        .render(None).unwrap();
     assert_eq!(sql, "GRANT SELECT ON users TO app_reader");
     println!("  {}", sql);
 
     let sql = GrantBuilder::new(Privilege::Insert)
         .on("users")
         .to("app_writer")
-        .to_sql(None);
+        .render(None).unwrap();
     println!("  {}", sql);
 
     let sql = GrantBuilder::new(Privilege::Update)
         .on("users")
         .to("app_writer")
-        .to_sql(None);
+        .render(None).unwrap();
     println!("  {}", sql);
 
     let sql = GrantBuilder::new(Privilege::Delete)
         .on("users")
         .to("app_admin")
-        .to_sql(None);
+        .render(None).unwrap();
     println!("  {}", sql);
 
     let sql = GrantBuilder::new(Privilege::All)
         .on("users")
         .to("superadmin")
-        .to_sql(None);
+        .render(None).unwrap();
     println!("  {}", sql);
 
     let sql = RevokeBuilder::new(Privilege::Insert)
         .on("users")
         .from("readonly_role")
-        .to_sql(None);
+        .render(None).unwrap();
     assert_eq!(sql, "REVOKE INSERT ON users FROM readonly_role");
     println!("  {}", sql);
 
@@ -1213,7 +1213,7 @@ fn main() {
             .get()
             .columns(&["id", "email"])
             .where_eq("id")
-            .to_sql(Some(d));
+            .render(Some(d)).unwrap();
         println!("    [{}] {}", name, sql);
     }
 
@@ -1229,7 +1229,7 @@ fn main() {
             .insert()
             .columns(&["id", "email"])
             .returning_all()
-            .to_sql(Some(d));
+            .render(Some(d)).unwrap();
         println!("    [{}] {}", name, sql);
     }
 
@@ -1245,7 +1245,7 @@ fn main() {
             .columns(&["id", "email", "display_name"])
             .on_conflict(&["email"])
             .do_update(&["display_name"])
-            .to_sql(Some(d));
+            .render(Some(d)).unwrap();
         println!("    [{}] {}", name, sql);
     }
 
@@ -1264,7 +1264,7 @@ fn main() {
             .order_by_asc("email")
             .limit()
             .offset()
-            .to_sql(Some(d));
+            .render(Some(d)).unwrap();
         println!("    [{}] {}", name, sql);
     }
 
@@ -1275,7 +1275,7 @@ fn main() {
         ("MySQL      ", &mysql),
         ("SQLite     ", &sqlite),
     ] {
-        let sql = PRODUCTS.create().to_sql(Some(d));
+        let sql = PRODUCTS.create().render(Some(d)).unwrap();
         println!("    [{}] {}...", name, &sql[..sql.len().min(120)]);
     }
 
@@ -1290,7 +1290,7 @@ fn main() {
             .get()
             .all_columns()
             .filter(field("is_active").eq(lit(true)))
-            .to_sql(Some(d));
+            .render(Some(d)).unwrap();
         println!("    [{}] {}", name, sql);
     }
 
@@ -2085,28 +2085,28 @@ mod tests {
 
         for d in &dialects {
             // SELECT
-            let sql = USERS.get().all_columns().where_eq("id").to_sql(Some(d));
+            let sql = USERS.get().all_columns().where_eq("id").render(Some(d)).unwrap();
             assert!(sql.contains("SELECT"), "{}: missing SELECT", d.name);
             assert!(sql.contains("FROM users"), "{}: missing FROM", d.name);
 
             // INSERT
-            let sql = USERS.insert().all_columns().to_sql(Some(d));
+            let sql = USERS.insert().all_columns().render(Some(d)).unwrap();
             assert!(sql.contains("INSERT INTO"), "{}: missing INSERT", d.name);
 
             // UPDATE
-            let sql = USERS.update().set("email").where_eq("id").to_sql(Some(d));
+            let sql = USERS.update().set("email").where_eq("id").render(Some(d)).unwrap();
             assert!(sql.contains("UPDATE users"), "{}: missing UPDATE", d.name);
 
             // DELETE
-            let sql = USERS.remove().where_eq("id").to_sql(Some(d));
+            let sql = USERS.remove().where_eq("id").render(Some(d)).unwrap();
             assert!(sql.contains("DELETE FROM"), "{}: missing DELETE", d.name);
 
             // CREATE TABLE
-            let sql = USERS.create().to_sql(Some(d));
+            let sql = USERS.create().render(Some(d)).unwrap();
             assert!(sql.contains("CREATE TABLE"), "{}: missing CREATE", d.name);
 
             // DROP TABLE
-            let sql = USERS.drop_entity().to_sql(Some(d));
+            let sql = USERS.drop_entity().render(Some(d)).unwrap();
             assert!(sql.contains("DROP TABLE"), "{}: missing DROP", d.name);
         }
     }

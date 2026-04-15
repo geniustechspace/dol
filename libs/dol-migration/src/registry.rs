@@ -3,7 +3,7 @@
 use super::MigrationError;
 use dol_core::builder::EntityBuilderExt;
 use dol_core::model::{Entity, Field, FieldType};
-use dol_sql::ext::ToSql;
+use dol_sql::ext::Render;
 
 // ===========================================================================
 // Migration history model — the DOL model for tracking applied migrations
@@ -164,7 +164,7 @@ impl MigrationRegistry for InMemoryRegistry {
 /// assert!(sql.contains("CREATE TABLE IF NOT EXISTS _dol_migrations"));
 /// ```
 pub fn create_history_table_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> String {
-    MIGRATION_HISTORY.create().if_not_exists().to_sql(dialect)
+    MIGRATION_HISTORY.create().if_not_exists().render(dialect).unwrap()
 }
 
 /// Generate an INSERT SQL for recording an applied migration.
@@ -183,7 +183,8 @@ pub fn insert_applied_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> String
     MIGRATION_HISTORY
         .insert()
         .columns(&["version", "description", "checksum"])
-        .to_sql(dialect)
+        .render(dialect)
+        .unwrap()
 }
 
 /// Generate a DELETE SQL for removing a migration record (on rollback).
@@ -202,7 +203,8 @@ pub fn delete_reverted_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> Strin
     MIGRATION_HISTORY
         .remove()
         .where_eq("version")
-        .to_sql(dialect)
+        .render(dialect)
+        .unwrap()
 }
 
 /// Generate a SELECT SQL for fetching all applied migrations.
@@ -216,7 +218,7 @@ pub fn delete_reverted_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> Strin
 /// assert!(sql.contains("_dol_migrations"));
 /// ```
 pub fn select_applied_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> String {
-    MIGRATION_HISTORY.get().all_columns().to_sql(dialect)
+    MIGRATION_HISTORY.get().all_columns().render(dialect).unwrap()
 }
 
 #[cfg(test)]

@@ -39,7 +39,7 @@
 //! use dol::model::{Entity, Field, FieldType};
 //! use dol::backend::sql::dialect::Dialect;
 //! use dol::builder::EntityBuilderExt;
-//! use dol::ToSql;
+//! use dol::Render;
 //!
 //! // Define a static model (zero-cost, const-compatible)
 //! static USERS: Entity = Entity::new("users", &[
@@ -52,13 +52,13 @@
 //! let pg_sql = USERS.get()
 //!     .all_columns()
 //!     .where_eq("id")
-//!     .to_sql(Some(&Dialect::postgres()));
+//!     .render(Some(&Dialect::postgres())).unwrap();
 //! assert!(pg_sql.contains("$1"));
 //!
 //! let sqlite_sql = USERS.get()
 //!     .all_columns()
 //!     .where_eq("id")
-//!     .to_sql(None);  // Uses default (SQLite)
+//!     .render(None).unwrap();  // Uses default (SQLite)
 //! assert!(sqlite_sql.contains("?"));
 //! ```
 //!
@@ -147,14 +147,11 @@ pub use dol_core::builder::{DefinePolicyBuilder, DefineTypeBuilder, DropTypeBuil
 // Re-export Query for backend-neutral entry point.
 pub use dol_core::query::Query;
 
-// Re-export the ToSql extension trait so builders have .to_sql() in scope.
-pub use dol_sql::ext::ToSql;
+// Re-export the Render extension trait so builders have .render() in scope.
+pub use dol_sql::ext::Render;
 
-// Re-export the TryToSql extension trait for fallible SQL rendering.
-pub use dol_sql::ext::TryToSql;
-
-// Re-export TransactionSqlExt so TransactionBuilder::to_sql() works.
-pub use dol_sql::ext::TransactionSqlExt;
+// Re-export TransactionRender so TransactionBuilder::render() works.
+pub use dol_sql::ext::TransactionRender;
 
 // Re-export CompoundSelectBuilder (moved from dol-builder to dol-sql).
 pub use dol_sql::ext::CompoundSelectBuilder;

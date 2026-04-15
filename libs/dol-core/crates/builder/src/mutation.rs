@@ -3,7 +3,7 @@
 //! Each builder borrows a `&Model` and provides chainable configuration
 //! and a `.build()` method to produce the canonical IR.
 //!
-//! For SQL rendering, import the `ToSql` extension trait from `dol-sql`.
+//! For SQL rendering, import the `Render` extension trait from `dol-sql`.
 
 use dol_entity::Entity;
 use dol_expr::{Expr, col, param, raw_expr};
@@ -52,6 +52,11 @@ impl<'a> InsertBuilder<'a> {
     pub fn all_columns(mut self) -> Self {
         self.fields = self.model.field_names().map(|s| s.to_string()).collect();
         self
+    }
+
+    /// Alias for [`all_columns`](Self::all_columns).
+    pub fn all_fields(self) -> Self {
+        self.all_columns()
     }
 
     /// Specify which columns to insert.
@@ -380,6 +385,11 @@ impl<'a> UpsertBuilder<'a> {
     pub fn all_columns(mut self) -> Self {
         self.fields = self.model.field_names().map(|s| s.to_string()).collect();
         self
+    }
+
+    /// Alias for [`all_columns`](Self::all_columns).
+    pub fn all_fields(self) -> Self {
+        self.all_columns()
     }
 
     /// Specify which columns to insert.

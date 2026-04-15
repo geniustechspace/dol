@@ -1,14 +1,8 @@
-//! Extension traits that add `.to_sql()` and `.try_to_sql()` rendering to DOL builders.
+//! Extension trait that adds `.render()` to DOL builders for SQL rendering.
 //!
-//! These traits bridge `dol-builder` (which produces IR) with `dol-sql`
+//! The [`Render`] trait bridges `dol-builder` (which produces IR) with `dol-sql`
 //! (which renders IR to SQL strings), keeping the dependency arrow from
 //! `dol-sql` → `dol-builder` rather than the reverse.
-//!
-//! # Error handling
-//!
-//! - [`TryToSql`] returns `Result<String, BackendError>` for fallible rendering.
-//! - [`ToSql`] is a convenience wrapper that falls back to an error placeholder
-//!   instead of panicking.
 
 use crate::dialect::{self, Dialect};
 use crate::render;
@@ -29,59 +23,24 @@ use dol_core::ir::query::{CompoundQueryIR, QueryIR, SetOpKind};
 use dol_core::ir::transaction::TransactionIR;
 
 // ===========================================================================
-// TryToSql — fallible SQL rendering trait
+// Render — fallible SQL rendering trait
 // ===========================================================================
 
-/// Extension trait adding fallible `.try_to_sql()` to DOL builders.
+/// Extension trait that renders DOL builders to SQL strings.
 ///
-/// Returns `Result<String, BackendError>` instead of panicking on render errors.
-pub trait TryToSql {
-    /// Render to a SQL string, returning an error on failure.
+/// Bridges `dol-builder` (which produces IR) with `dol-sql`
+/// (which renders IR to SQL), keeping the dependency arrow from
+/// `dol-sql` → `dol-builder`.
+pub trait Render {
+    /// Render to a SQL string for the given dialect.
     /// Pass `None` for the global default dialect.
-    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError>;
-}
-
-// ===========================================================================
-// ToSql — convenience (infallible) SQL rendering trait
-// ===========================================================================
-
-/// Extension trait adding `.to_sql()` to DOL builders.
-///
-/// This is a convenience wrapper around [`TryToSql`]. On rendering failure,
-/// it returns an error placeholder string (`"/* SQL render error: ... */"`)
-/// instead of panicking.
-///
-/// For production code that needs to handle errors, prefer [`TryToSql`].
-pub trait ToSql {
-    /// Render to a SQL string. Pass `None` for the global default dialect.
-    fn to_sql(&self, dialect: Option<&Dialect>) -> String;
-}
-
-/// Sanitize an error message for embedding inside a SQL block comment.
-///
-/// Replaces `*/` sequences so the comment cannot be terminated early,
-/// which would otherwise risk turning the remainder into executable SQL.
-fn sanitize_for_sql_comment(msg: &str) -> String {
-    msg.replace("*/", "* /")
-}
-
-/// Blanket implementation: any type implementing `TryToSql` also gets `ToSql`.
-impl<T: TryToSql> ToSql for T {
-    fn to_sql(&self, dialect: Option<&Dialect>) -> String {
-        match self.try_to_sql(dialect) {
-            Ok(sql) => sql,
-            Err(e) => format!(
-                "/* SQL render error: {} */",
-                sanitize_for_sql_comment(&e.to_string())
-            ),
-        }
-    }
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError>;
 }
 
 // ── GetBuilder ──────────────────────────────────────────────────────────
 
-impl TryToSql for GetBuilder<'_> {
-    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+impl Render for GetBuilder<'_> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.clone().build();
         render::render_query_ir(&ir, dialect).map(|o| o.sql)
@@ -90,8 +49,8 @@ impl TryToSql for GetBuilder<'_> {
 
 // ── InsertBuilder ───────────────────────────────────────────────────────
 
-impl TryToSql for InsertBuilder<'_> {
-    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+impl Render for InsertBuilder<'_> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_insert_ir(&ir, dialect).map(|o| o.sql)
@@ -100,8 +59,8 @@ impl TryToSql for InsertBuilder<'_> {
 
 // ── InsertSelectBuilder ─────────────────────────────────────────────────
 
-impl TryToSql for InsertSelectBuilder<'_> {
-    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+impl Render for InsertSelectBuilder<'_> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_insert_select_ir(&ir, dialect).map(|o| o.sql)
@@ -110,8 +69,8 @@ impl TryToSql for InsertSelectBuilder<'_> {
 
 // ── UpdateBuilder ───────────────────────────────────────────────────────
 
-impl TryToSql for UpdateBuilder<'_> {
-    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+impl Render for UpdateBuilder<'_> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_update_ir(&ir, dialect).map(|o| o.sql)
@@ -120,8 +79,8 @@ impl TryToSql for UpdateBuilder<'_> {
 
 // ── RemoveBuilder ───────────────────────────────────────────────────────
 
-impl TryToSql for RemoveBuilder<'_> {
-    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+impl Render for RemoveBuilder<'_> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_remove_ir(&ir, dialect).map(|o| o.sql)
@@ -130,8 +89,8 @@ impl TryToSql for RemoveBuilder<'_> {
 
 // ── UpsertBuilder ───────────────────────────────────────────────────────
 
-impl TryToSql for UpsertBuilder<'_> {
-    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+impl Render for UpsertBuilder<'_> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_upsert_ir(&ir, dialect).map(|o| o.sql)
@@ -140,8 +99,8 @@ impl TryToSql for UpsertBuilder<'_> {
 
 // ── CreateFromMeta ──────────────────────────────────────────────────────
 
-impl TryToSql for CreateFromMeta<'_> {
-    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+impl Render for CreateFromMeta<'_> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let model = self.get_entity();
         let mut sql = String::from("CREATE TABLE ");
@@ -182,8 +141,8 @@ impl TryToSql for CreateFromMeta<'_> {
 
 // ── DefineEntityBuilder ──────────────────────────────────────────────────
 
-impl TryToSql for DefineEntityBuilder {
-    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+impl Render for DefineEntityBuilder {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_define_entity_ir(&ir, dialect).map(|o| o.sql)
@@ -192,8 +151,8 @@ impl TryToSql for DefineEntityBuilder {
 
 // ── AlterEntityBuilder ───────────────────────────────────────────────────
 
-impl TryToSql for AlterEntityBuilder<'_> {
-    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+impl Render for AlterEntityBuilder<'_> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_alter_entity_ir(&ir, dialect).map(|o| o.sql)
@@ -202,8 +161,8 @@ impl TryToSql for AlterEntityBuilder<'_> {
 
 // ── DropEntityBuilder ────────────────────────────────────────────────────
 
-impl TryToSql for DropEntityBuilder<'_> {
-    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+impl Render for DropEntityBuilder<'_> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_drop_entity_ir(&ir, dialect).map(|o| o.sql)
@@ -212,8 +171,8 @@ impl TryToSql for DropEntityBuilder<'_> {
 
 // ── DefineIndexBuilder ──────────────────────────────────────────────────
 
-impl TryToSql for DefineIndexBuilder {
-    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+impl Render for DefineIndexBuilder {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_define_index_ir(&ir, dialect).map(|o| o.sql)
@@ -222,8 +181,8 @@ impl TryToSql for DefineIndexBuilder {
 
 // ── DropIndexBuilder ────────────────────────────────────────────────────
 
-impl TryToSql for DropIndexBuilder {
-    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+impl Render for DropIndexBuilder {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_drop_index_ir(&ir, dialect).map(|o| o.sql)
@@ -232,8 +191,8 @@ impl TryToSql for DropIndexBuilder {
 
 // ── GrantBuilder ────────────────────────────────────────────────────────
 
-impl TryToSql for GrantBuilder {
-    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+impl Render for GrantBuilder {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let _dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_grant_ir(&ir).map(|o| o.sql)
@@ -242,8 +201,8 @@ impl TryToSql for GrantBuilder {
 
 // ── RevokeBuilder ───────────────────────────────────────────────────────
 
-impl TryToSql for RevokeBuilder {
-    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+impl Render for RevokeBuilder {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let _dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_revoke_ir(&ir).map(|o| o.sql)
@@ -252,8 +211,8 @@ impl TryToSql for RevokeBuilder {
 
 // ── DefineTypeBuilder ──────────────────────────────────────────────────
 
-impl TryToSql for DefineTypeBuilder {
-    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+impl Render for DefineTypeBuilder {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_define_type_ir(&ir, dialect).map(|o| o.sql)
@@ -262,8 +221,8 @@ impl TryToSql for DefineTypeBuilder {
 
 // ── DropTypeBuilder ────────────────────────────────────────────────────
 
-impl TryToSql for DropTypeBuilder {
-    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+impl Render for DropTypeBuilder {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_drop_type_ir(&ir, dialect).map(|o| o.sql)
@@ -272,8 +231,8 @@ impl TryToSql for DropTypeBuilder {
 
 // ── DefinePolicyBuilder ────────────────────────────────────────────────
 
-impl TryToSql for DefinePolicyBuilder {
-    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+impl Render for DefinePolicyBuilder {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_define_policy_ir(&ir, dialect).map(|o| o.sql)
@@ -281,35 +240,27 @@ impl TryToSql for DefinePolicyBuilder {
 }
 
 // ===========================================================================
-// TransactionBuilder SQL extension
+// TransactionBuilder SQL rendering
 // ===========================================================================
 
-/// Extension trait adding `.to_sql()` to [`TransactionBuilder`].
+/// SQL rendering for transaction control statements.
 ///
-/// Provides default implementations so that downstream implementations
-/// are not broken by the addition of new methods.
-pub trait TransactionSqlExt {
-    /// Try to render a TransactionIR to SQL, returning an error on failure.
-    fn try_to_sql(ir: &TransactionIR, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+/// Unlike other builders, `TransactionBuilder` produces `TransactionIR` directly
+/// (not `self`), so rendering uses associated functions rather than `&self` methods.
+pub trait TransactionRender {
+    /// Render a TransactionIR to SQL for the given dialect.
+    fn render(ir: &TransactionIR, dialect: Option<&Dialect>) -> Result<String, BackendError>;
+}
+
+impl TransactionRender for TransactionBuilder {
+    fn render(ir: &TransactionIR, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let d = match dialect {
             Some(d) => d,
             None => dialect::default_dialect(),
         };
         render::render_transaction_ir(ir, d).map(|o| o.sql)
     }
-    /// Render a TransactionIR to SQL.
-    fn to_sql(ir: &TransactionIR, dialect: Option<&Dialect>) -> String {
-        match Self::try_to_sql(ir, dialect) {
-            Ok(sql) => sql,
-            Err(e) => format!(
-                "/* SQL render error: {} */",
-                sanitize_for_sql_comment(&e.to_string())
-            ),
-        }
-    }
 }
-
-impl TransactionSqlExt for TransactionBuilder {}
 
 // ===========================================================================
 // CompoundSelectBuilder — compound queries (moved from dol-builder)
@@ -322,7 +273,7 @@ impl TransactionSqlExt for TransactionBuilder {}
 /// globally unique (e.g. Postgres `$1, $2, …`) and all parts use the same
 /// dialect.
 #[derive(Debug, Clone)]
-#[must_use = "builders do nothing until rendered via .to_sql() or .try_to_sql()"]
+#[must_use = "builders do nothing until rendered via .render()"]
 pub struct CompoundSelectBuilder {
     base: QueryIR,
     parts: Vec<(SetOpKind, QueryIR)>,
@@ -394,8 +345,8 @@ impl CompoundSelectBuilder {
     }
 }
 
-impl TryToSql for CompoundSelectBuilder {
-    fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+impl Render for CompoundSelectBuilder {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
 
         let compound_ir = CompoundQueryIR {
@@ -456,11 +407,11 @@ impl GetBuilderSqlExt for GetBuilder<'_> {
     }
 
     fn as_scalar(&self) -> Expr {
-        Expr::Subquery(ToSql::to_sql(self, None))
+        Expr::Subquery(Render::render(self, None).unwrap_or_default())
     }
 
     fn as_scalar_with(&self, dialect: &Dialect) -> Expr {
-        Expr::Subquery(ToSql::to_sql(self, Some(dialect)))
+        Expr::Subquery(Render::render(self, Some(dialect)).unwrap_or_default())
     }
 }
 
@@ -500,11 +451,12 @@ mod tests {
     fn get_builder_to_sql() {
         let sql = TEST_MODEL
             .get()
-            .all_columns()
+            .all_fields()
             .where_eq("status")
             .order_by_desc("email")
             .limit()
-            .to_sql(Some(&pg()));
+            .render(Some(&pg()))
+            .unwrap();
         assert!(sql.contains("SELECT"));
         assert!(sql.contains("FROM users"));
     }
@@ -512,8 +464,12 @@ mod tests {
     // -- InsertBuilder --
 
     #[test]
-    fn insert_all_columns() {
-        let sql = TEST_MODEL.insert().all_columns().to_sql(Some(&pg()));
+    fn insert_all_fields() {
+        let sql = TEST_MODEL
+            .insert()
+            .all_fields()
+            .render(Some(&pg()))
+            .unwrap();
         assert!(sql.contains("INSERT INTO users (id, tenant_id, email, status, created_at)"));
         assert!(sql.contains("VALUES ($1, $2, $3, $4, $5)"));
     }
@@ -523,7 +479,8 @@ mod tests {
         let sql = TEST_MODEL
             .insert()
             .columns(&["id", "email"])
-            .to_sql(Some(&pg()));
+            .render(Some(&pg()))
+            .unwrap();
         assert!(sql.contains("(id, email)"));
         assert!(sql.contains("($1, $2)"));
     }
@@ -534,7 +491,8 @@ mod tests {
             .insert()
             .columns(&["id", "email"])
             .rows(3)
-            .to_sql(Some(&pg()));
+            .render(Some(&pg()))
+            .unwrap();
         assert!(sql.contains("($1, $2), ($3, $4), ($5, $6)"));
     }
 
@@ -544,13 +502,18 @@ mod tests {
             .insert()
             .columns(&["id"])
             .returning_all()
-            .to_sql(None);
+            .render(None)
+            .unwrap();
         assert!(sql.contains("RETURNING *"));
     }
 
     #[test]
     fn insert_with_namespace() {
-        let sql = NS_MODEL.insert().columns(&["id"]).to_sql(None);
+        let sql = NS_MODEL
+            .insert()
+            .columns(&["id"])
+            .render(None)
+            .unwrap();
         assert!(sql.contains("INSERT INTO auth.users"));
     }
 
@@ -563,7 +526,8 @@ mod tests {
             .set("email")
             .set("status")
             .where_eq("id")
-            .to_sql(Some(&pg()));
+            .render(Some(&pg()))
+            .unwrap();
         assert!(sql.contains("UPDATE users SET"));
         assert!(sql.contains("email = $1"));
         assert!(sql.contains("status = $2"));
@@ -574,7 +538,11 @@ mod tests {
 
     #[test]
     fn remove_basic() {
-        let sql = TEST_MODEL.remove().where_eq("id").to_sql(Some(&pg()));
+        let sql = TEST_MODEL
+            .remove()
+            .where_eq("id")
+            .render(Some(&pg()))
+            .unwrap();
         assert!(sql.contains("DELETE FROM users"));
         assert!(sql.contains("WHERE id = $1"));
     }
@@ -588,7 +556,8 @@ mod tests {
             .columns(&["id", "email", "status"])
             .on_conflict(&["id"])
             .do_update(&["email", "status"])
-            .to_sql(Some(&pg()));
+            .render(Some(&pg()))
+            .unwrap();
         assert!(sql.contains("INSERT INTO users (id, email, status)"));
         assert!(sql.contains("ON CONFLICT (id)"));
         assert!(sql.contains("DO UPDATE SET"));
@@ -598,7 +567,7 @@ mod tests {
 
     #[test]
     fn create_from_meta_basic() {
-        let sql = TEST_MODEL.create().to_sql(Some(&pg()));
+        let sql = TEST_MODEL.create().render(Some(&pg())).unwrap();
         assert!(sql.starts_with("CREATE TABLE users ("));
         assert!(sql.contains("id UUID NOT NULL"));
         assert!(sql.contains("email TEXT NOT NULL UNIQUE"));
@@ -608,7 +577,11 @@ mod tests {
 
     #[test]
     fn create_from_meta_if_not_exists() {
-        let sql = TEST_MODEL.create().if_not_exists().to_sql(None);
+        let sql = TEST_MODEL
+            .create()
+            .if_not_exists()
+            .render(None)
+            .unwrap();
         assert!(sql.starts_with("CREATE TABLE IF NOT EXISTS users ("));
     }
 
@@ -621,7 +594,8 @@ mod tests {
             .field(FieldDef::new("id", FieldType::Uuid).primary_key())
             .field(FieldDef::new("user_id", FieldType::Uuid))
             .if_not_exists()
-            .to_sql(Some(&pg()));
+            .render(Some(&pg()))
+            .unwrap();
         assert!(sql.starts_with("CREATE TABLE IF NOT EXISTS sessions ("));
         assert!(sql.contains("id UUID NOT NULL"));
     }
@@ -634,7 +608,8 @@ mod tests {
             .alter()
             .add_field(FieldDef::new("phone", FieldType::Text).nullable())
             .drop_field("legacy")
-            .to_sql(Some(&pg()));
+            .render(Some(&pg()))
+            .unwrap();
         assert!(sql.contains("ADD COLUMN phone TEXT"));
         assert!(sql.contains("DROP COLUMN legacy"));
     }
@@ -643,13 +618,18 @@ mod tests {
 
     #[test]
     fn drop_model_basic() {
-        let sql = TEST_MODEL.drop_entity().to_sql(None);
+        let sql = TEST_MODEL.drop_entity().render(None).unwrap();
         assert_eq!(sql, "DROP TABLE users");
     }
 
     #[test]
     fn drop_model_if_exists_cascade() {
-        let sql = TEST_MODEL.drop_entity().if_exists().cascade().to_sql(None);
+        let sql = TEST_MODEL
+            .drop_entity()
+            .if_exists()
+            .cascade()
+            .render(None)
+            .unwrap();
         assert_eq!(sql, "DROP TABLE IF EXISTS users CASCADE");
     }
 
@@ -662,7 +642,8 @@ mod tests {
             .on("users")
             .columns(&["tenant_id", "email"])
             .unique()
-            .to_sql(None);
+            .render(None)
+            .unwrap();
         assert!(sql.contains("CREATE UNIQUE INDEX"));
         assert!(sql.contains("ON users"));
     }
@@ -672,7 +653,9 @@ mod tests {
     #[test]
     fn drop_index_basic() {
         use dol_core::builder::DropIndexBuilder;
-        let sql = DropIndexBuilder::new("idx_users_email").to_sql(None);
+        let sql = DropIndexBuilder::new("idx_users_email")
+            .render(None)
+            .unwrap();
         assert_eq!(sql, "DROP INDEX idx_users_email");
     }
 
@@ -684,7 +667,8 @@ mod tests {
         let sql = GrantBuilder::new(Privilege::Select)
             .on("users")
             .to("app_reader")
-            .to_sql(None);
+            .render(None)
+            .unwrap();
         assert_eq!(sql, "GRANT SELECT ON users TO app_reader");
     }
 
@@ -696,7 +680,8 @@ mod tests {
         let sql = RevokeBuilder::new(Privilege::Insert)
             .on("users")
             .from("app_reader")
-            .to_sql(None);
+            .render(None)
+            .unwrap();
         assert_eq!(sql, "REVOKE INSERT ON users FROM app_reader");
     }
 
@@ -716,7 +701,8 @@ mod tests {
             .union(part_ir)
             .limit()
             .offset()
-            .to_sql(Some(&pg()));
+            .render(Some(&pg()))
+            .unwrap();
         // Base uses $1, part uses $2, OFFSET/LIMIT use $3/$4
         assert!(sql.contains("tenant_id = $1"), "base param: {sql}");
         assert!(sql.contains("status = $2"), "part param: {sql}");
@@ -738,7 +724,8 @@ mod tests {
         let sql = CompoundSelectBuilder::new(base_ir)
             .union(part_ir)
             .limit()
-            .to_sql(Some(&pg()));
+            .render(Some(&pg()))
+            .unwrap();
         assert!(sql.contains("LIMIT $1"), "expected LIMIT $1, got: {sql}");
     }
 
@@ -751,7 +738,8 @@ mod tests {
             .variant("pending")
             .variant("shipped")
             .variant("delivered")
-            .to_sql(Some(&pg()));
+            .render(Some(&pg()))
+            .unwrap();
         assert_eq!(
             sql,
             "CREATE TYPE order_status AS ENUM ('pending', 'shipped', 'delivered')"
@@ -764,7 +752,8 @@ mod tests {
         let sql = DefineTypeBuilder::new("order_status")
             .variant("pending")
             .variant("shipped")
-            .to_sql(Some(&Dialect::mysql()));
+            .render(Some(&Dialect::mysql()))
+            .unwrap();
         assert!(
             sql.starts_with("--"),
             "MySQL type should be a comment: {sql}"
@@ -777,7 +766,8 @@ mod tests {
         use dol_core::builder::DefineTypeBuilder;
         let sql = DefineTypeBuilder::new("order_status")
             .variant("pending")
-            .to_sql(Some(&Dialect::sqlite()));
+            .render(Some(&Dialect::sqlite()))
+            .unwrap();
         assert!(
             sql.starts_with("--"),
             "SQLite type should be a comment: {sql}"
@@ -792,7 +782,8 @@ mod tests {
             .namespace("public")
             .variant("pending")
             .variant("shipped")
-            .to_sql(Some(&pg()));
+            .render(Some(&pg()))
+            .unwrap();
         assert!(
             sql.contains("public.order_status"),
             "Expected qualified name: {sql}"
@@ -804,7 +795,8 @@ mod tests {
         use dol_core::builder::DefineTypeBuilder;
         let sql = DefineTypeBuilder::new("color")
             .variants(&["red", "green", "blue"])
-            .to_sql(Some(&pg()));
+            .render(Some(&pg()))
+            .unwrap();
         assert_eq!(sql, "CREATE TYPE color AS ENUM ('red', 'green', 'blue')");
     }
 
@@ -815,21 +807,26 @@ mod tests {
         use dol_core::builder::DropTypeBuilder;
         let sql = DropTypeBuilder::new("order_status")
             .if_exists()
-            .to_sql(Some(&pg()));
+            .render(Some(&pg()))
+            .unwrap();
         assert_eq!(sql, "DROP TYPE IF EXISTS order_status");
     }
 
     #[test]
     fn drop_type_without_if_exists() {
         use dol_core::builder::DropTypeBuilder;
-        let sql = DropTypeBuilder::new("order_status").to_sql(Some(&pg()));
+        let sql = DropTypeBuilder::new("order_status")
+            .render(Some(&pg()))
+            .unwrap();
         assert_eq!(sql, "DROP TYPE order_status");
     }
 
     #[test]
     fn drop_type_mysql_is_comment() {
         use dol_core::builder::DropTypeBuilder;
-        let sql = DropTypeBuilder::new("order_status").to_sql(Some(&Dialect::mysql()));
+        let sql = DropTypeBuilder::new("order_status")
+            .render(Some(&Dialect::mysql()))
+            .unwrap();
         assert!(
             sql.starts_with("--"),
             "MySQL drop type should be a comment: {sql}"
@@ -849,7 +846,8 @@ mod tests {
             .for_action(PolicyAction::All)
             .using(field("tenant_id").eq(param()))
             .check(field("tenant_id").eq(param()))
-            .to_sql(Some(&pg()));
+            .render(Some(&pg()))
+            .unwrap();
         assert!(
             sql.contains("CREATE POLICY tenant_isolation ON orders FOR ALL"),
             "{sql}"
@@ -868,7 +866,8 @@ mod tests {
             .on("posts")
             .for_action(PolicyAction::Read)
             .using(field("published").eq(lit(true)))
-            .to_sql(Some(&pg()));
+            .render(Some(&pg()))
+            .unwrap();
         assert!(sql.contains("FOR SELECT"), "{sql}");
         assert!(sql.contains("USING (published = TRUE)"), "{sql}");
         assert!(
@@ -885,7 +884,8 @@ mod tests {
         let sql = DefinePolicyBuilder::new("allow_all")
             .on("logs")
             .for_action(PolicyAction::All)
-            .to_sql(Some(&pg()));
+            .render(Some(&pg()))
+            .unwrap();
         assert_eq!(sql, "CREATE POLICY allow_all ON logs FOR ALL");
     }
 
@@ -898,7 +898,7 @@ mod tests {
         let insert_ir = TEST_MODEL.insert().columns(&["id", "email"]).build();
         let stmts = vec![dol_core::ir::Statement::Insert(insert_ir)];
         let ir = TransactionBuilder::block(stmts);
-        let sql = TransactionBuilder::to_sql(&ir, Some(&pg()));
+        let sql = TransactionBuilder::render(&ir, Some(&pg())).unwrap();
         assert!(sql.starts_with("BEGIN"), "Should start with BEGIN: {sql}");
         assert!(sql.contains("INSERT INTO"), "Should contain INSERT: {sql}");
         assert!(sql.ends_with("COMMIT"), "Should end with COMMIT: {sql}");
