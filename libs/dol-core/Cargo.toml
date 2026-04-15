@@ -6,11 +6,11 @@ publish = false
 description = "DOL Core — the complete language layer (expressions, models, IR, builders, Backend trait)."
 
 [dependencies]
-dol-expr = { path = "crates/dol-expr" }
-dol-model = { path = "crates/dol-model" }
-dol-ir = { path = "crates/dol-ir" }
-dol-builder = { path = "crates/dol-builder" }
+dol-expr = { path = "crates/expr" }
+dol-entity = { path = "crates/entity" }
+dol-ir = { path = "crates/ir" }
+dol-builder = { path = "crates/builder" }
 
 [features]
 default = []
-serde = ["dol-expr/serde", "dol-model/serde", "dol-ir/serde"]
+serde = ["dol-expr/serde", "dol-entity/serde", "dol-ir/serde"]

@@ -1,9 +1,9 @@
 [package]
-name = "dol-model"
+name = "dol-entity"
 version.workspace = true
 edition.workspace = true
 publish = false
-description = "DOL schema language — Model, Field, FieldType, and constraints."
+description = "DOL schema language — Entity, Field, FieldType, and constraints."
 
 [dependencies]
 serde = { workspace = true, optional = true }

@@ -20,9 +20,9 @@ dependencies = [
 name = "dol-builder"
 version = "0.1.0"
 dependencies = [
+ "dol-entity",
  "dol-expr",
  "dol-ir",
- "dol-model",
 ]
 
 [[package]]
@@ -41,9 +41,16 @@ name = "dol-core"
 version = "0.1.0"
 dependencies = [
  "dol-builder",
+ "dol-entity",
  "dol-expr",
  "dol-ir",
- "dol-model",
+]
+
+[[package]]
+name = "dol-entity"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -57,8 +64,8 @@ dependencies = [
 name = "dol-ir"
 version = "0.1.0"
 dependencies = [
+ "dol-entity",
  "dol-expr",
- "dol-model",
  "serde",
 ]
 
@@ -78,13 +85,6 @@ dependencies = [
  "dol-sql",
  "serde",
  "toml",
-]
-
-[[package]]
-name = "dol-model"
-version = "0.1.0"
-dependencies = [
- "serde",
 ]
 
 [[package]]

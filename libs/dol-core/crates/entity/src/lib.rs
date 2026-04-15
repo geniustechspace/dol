@@ -29,7 +29,7 @@ use field::Field as F;
 ///
 /// Define as a `static` in your domain crate:
 /// ```rust
-/// use dol_model::{Model, Field, FieldType, FkAction, ModelConstraint};
+/// use dol_entity::{Model, Field, FieldType, FkAction, ModelConstraint};
 ///
 /// pub static USERS: Model = Model::new("users", &[
 ///     Field::new("id", FieldType::Uuid).primary_key(),

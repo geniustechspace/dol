@@ -19,7 +19,7 @@
 pub use dol_expr as expr;
 
 /// Schema language — Model, Field, FieldType, and constraints.
-pub use dol_model as model;
+pub use dol_entity as model;
 
 /// Intermediate representation — backend-agnostic AST, Backend trait, output types.
 pub use dol_ir as ir;

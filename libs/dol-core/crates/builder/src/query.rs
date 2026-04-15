@@ -7,7 +7,7 @@
 
 use dol_expr::{Direction, Expr, NullsPosition, OrderByExpr, col, param, raw_expr};
 use dol_ir::{JoinIR, JoinType, LockMode, ModelRef, OffsetLimit, QueryIR};
-use dol_model::Model;
+use dol_entity::Model;
 
 // ---------------------------------------------------------------------------
 // Private join helper

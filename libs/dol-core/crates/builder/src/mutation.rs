@@ -7,7 +7,7 @@
 
 use dol_expr::{Expr, col, param, raw_expr};
 use dol_ir::{InsertIR, InsertSelectIR, ModelRef, RemoveIR, UpdateIR, UpsertIR};
-use dol_model::Model;
+use dol_entity::Model;
 
 use super::query::count_single_expr_params;
 

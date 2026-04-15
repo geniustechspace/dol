@@ -33,7 +33,7 @@ pub use storage::{
 };
 pub use transaction::TransactionBuilder;
 
-use dol_model::Model;
+use dol_entity::Model;
 
 // ---------------------------------------------------------------------------
 // Model entry points — extension trait for builder access
@@ -114,7 +114,7 @@ mod tests {
     use dol_ir::storage::ObjectSource;
     use dol_ir::transaction::TransactionIR;
     use dol_ir::{JoinType, LockMode, OffsetLimit};
-    use dol_model::{Field, FieldType};
+    use dol_entity::{Field, FieldType};
 
     static TEST_MODEL: Model = Model::new(
         "users",
@@ -944,7 +944,7 @@ mod tests {
 
     #[test]
     fn alter_add_constraint() {
-        use dol_model::constraint::ModelConstraint;
+        use dol_entity::constraint::ModelConstraint;
         let ir = TEST_MODEL
             .alter()
             .add_constraint(ModelConstraint::Unique(&["email", "name"]))
@@ -1155,7 +1155,7 @@ mod tests {
 
     #[test]
     fn define_model_with_constraint() {
-        use dol_model::constraint::ModelConstraint;
+        use dol_entity::constraint::ModelConstraint;
         let ir = DefineModelBuilder::new("test")
             .constraint(ModelConstraint::Unique(&["a", "b"]))
             .build();

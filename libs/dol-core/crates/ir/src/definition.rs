@@ -1,8 +1,8 @@
 //! Definition IR — canonical representation of schema operations.
 
 use super::ModelRef;
-use dol_model::FieldType;
-use dol_model::constraint::{FkAction, GeneratedKind, ModelConstraint};
+use dol_entity::FieldType;
+use dol_entity::constraint::{FkAction, GeneratedKind, ModelConstraint};
 
 /// Define (create) a new model.
 #[derive(Debug, Clone, PartialEq)]

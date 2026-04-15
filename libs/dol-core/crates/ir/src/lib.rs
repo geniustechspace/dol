@@ -206,7 +206,7 @@ mod tests {
         GetObjectIR, ListObjectsIR, MoveFileIR, ObjectSource, PutObjectIR, ReadFileIR, WriteFileIR,
     };
     use crate::transaction::TransactionIR;
-    use dol_model::{FieldType, FkAction};
+    use dol_entity::{FieldType, FkAction};
 
     // -- helpers --
 
@@ -698,7 +698,7 @@ mod tests {
             .generated_stored("first_name || ' ' || last_name");
         assert!(f.generated.is_some());
         let (kind, expr) = f.generated.unwrap();
-        assert!(matches!(kind, dol_model::GeneratedKind::Stored));
+        assert!(matches!(kind, dol_entity::GeneratedKind::Stored));
         assert_eq!(expr, "first_name || ' ' || last_name");
     }
 
@@ -707,7 +707,7 @@ mod tests {
         let f = FieldDef::new("age_group", FieldType::Text).generated_virtual("age_bucket(age)");
         assert!(f.generated.is_some());
         let (kind, expr) = f.generated.unwrap();
-        assert!(matches!(kind, dol_model::GeneratedKind::Virtual));
+        assert!(matches!(kind, dol_entity::GeneratedKind::Virtual));
         assert_eq!(expr, "age_bucket(age)");
     }
 
@@ -1100,7 +1100,7 @@ mod tests {
 
     #[test]
     fn alter_action_add_constraint() {
-        let action = AlterAction::AddConstraint(dol_model::ModelConstraint::Check("age > 0"));
+        let action = AlterAction::AddConstraint(dol_entity::ModelConstraint::Check("age > 0"));
         assert!(matches!(action, AlterAction::AddConstraint(_)));
     }
 

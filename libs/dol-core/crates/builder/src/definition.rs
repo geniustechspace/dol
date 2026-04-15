@@ -14,8 +14,8 @@ use dol_ir::definition::{
     AlterAction, AlterModelIR, DefineIndexIR, DefineModelIR, DropIndexIR, DropModelIR, FieldDef,
     IndexMethod, OwnedForeignKeyRef,
 };
-use dol_model::constraint::ModelConstraint;
-use dol_model::{Field, FieldType, Model};
+use dol_entity::constraint::ModelConstraint;
+use dol_entity::{Field, FieldType, Model};
 
 // ---------------------------------------------------------------------------
 // Field -> FieldDef conversion helper
