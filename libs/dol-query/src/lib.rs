@@ -43,6 +43,16 @@
 //!     .build();
 //! assert_eq!(ir.source.name, "users");
 //! assert_eq!(ir.source.namespace.as_deref(), Some("identity"));
+//!
+//! // Namespace chaining — builds hierarchical paths
+//! let ir = Query::from("api")
+//!     .namespace("v1")
+//!     .namespace("users")
+//!     .get()
+//!     .columns(&["id"])
+//!     .build();
+//! assert_eq!(ir.source.namespace.as_deref(), Some("api.v1"));
+//! assert_eq!(ir.source.name, "users");
 //! ```
 //!
 //! # Backend Neutrality
@@ -76,6 +86,35 @@ use dol_entity::Entity;
 /// Construct via `Query::from(&entity)` or `Query::from("entity_name")`.
 /// Then call `.get()`, `.insert()`, `.update()`, `.remove()`, or `.upsert()`
 /// to begin building a specific operation.
+///
+/// # Namespace chaining
+///
+/// Use `.namespace()` to append hierarchical segments. Each call pushes
+/// the current name into the namespace prefix and replaces the name with
+/// the new segment:
+///
+/// ```rust
+/// use dol_query::Query;
+///
+/// // Single namespace
+/// let ir = Query::from("api")
+///     .namespace("users")
+///     .get()
+///     .columns(&["id"])
+///     .build();
+/// assert_eq!(ir.source.namespace.as_deref(), Some("api"));
+/// assert_eq!(ir.source.name, "users");
+///
+/// // Chained namespaces — builds "api.v1.users"
+/// let ir = Query::from("api")
+///     .namespace("v1")
+///     .namespace("users")
+///     .get()
+///     .columns(&["id"])
+///     .build();
+/// assert_eq!(ir.source.namespace.as_deref(), Some("api.v1"));
+/// assert_eq!(ir.source.name, "users");
+/// ```
 #[derive(Debug, Clone)]
 pub struct Query {
     name: String,
@@ -84,6 +123,29 @@ pub struct Query {
 }
 
 impl Query {
+    /// Append a namespace segment.
+    ///
+    /// Pushes the current `name` into the namespace prefix and sets `name`
+    /// to the new segment. Chaining multiple calls builds a hierarchical
+    /// path — useful for API endpoints and multi-level schemas:
+    ///
+    /// ```text
+    /// Query::from("api").namespace("v1").namespace("users")
+    ///   → namespace = "api.v1", name = "users"
+    ///   → SQL: api.v1.users   API: /api/v1/users
+    /// ```
+    pub fn namespace(mut self, segment: &str) -> Self {
+        // Push current name into the namespace prefix.
+        self.namespace = Some(match self.namespace.take() {
+            Some(ns) => format!("{}.{}", ns, self.name),
+            None => self.name.clone(),
+        });
+        self.name = segment.to_string();
+        // Field metadata is no longer valid after changing the target entity.
+        self.field_names = None;
+        self
+    }
+
     /// Start building a GET (SELECT) query.
     pub fn get(self) -> GetQuery {
         GetQuery::new(self.name, self.namespace, self.field_names)
@@ -203,6 +265,99 @@ mod tests {
         let q = Query::from(String::from("identity.users"));
         assert_eq!(q.name, "users");
         assert_eq!(q.namespace.as_deref(), Some("identity"));
+    }
+
+    // ── Namespace chaining ──────────────────────────────────────────
+
+    #[test]
+    fn namespace_single_segment() {
+        let q = Query::from("api").namespace("users");
+        assert_eq!(q.name, "users");
+        assert_eq!(q.namespace.as_deref(), Some("api"));
+    }
+
+    #[test]
+    fn namespace_chained_segments() {
+        let q = Query::from("api").namespace("v1").namespace("users");
+        assert_eq!(q.name, "users");
+        assert_eq!(q.namespace.as_deref(), Some("api.v1"));
+    }
+
+    #[test]
+    fn namespace_three_levels() {
+        let q = Query::from("api")
+            .namespace("v1")
+            .namespace("admin")
+            .namespace("users");
+        assert_eq!(q.name, "users");
+        assert_eq!(q.namespace.as_deref(), Some("api.v1.admin"));
+    }
+
+    #[test]
+    fn namespace_on_already_namespaced_string() {
+        // "identity.users" → namespace="identity", name="users"
+        // .namespace("profiles") → namespace="identity.users", name="profiles"
+        let q = Query::from("identity.users").namespace("profiles");
+        assert_eq!(q.name, "profiles");
+        assert_eq!(q.namespace.as_deref(), Some("identity.users"));
+    }
+
+    #[test]
+    fn namespace_propagates_to_get_ir() {
+        let ir = Query::from("api")
+            .namespace("v1")
+            .namespace("users")
+            .get()
+            .columns(&["id"])
+            .build();
+        assert_eq!(ir.source.name, "users");
+        assert_eq!(ir.source.namespace.as_deref(), Some("api.v1"));
+    }
+
+    #[test]
+    fn namespace_propagates_to_insert_ir() {
+        let ir = Query::from("api")
+            .namespace("users")
+            .insert()
+            .columns(&["id", "email"])
+            .build();
+        assert_eq!(ir.target.name, "users");
+        assert_eq!(ir.target.namespace.as_deref(), Some("api"));
+    }
+
+    #[test]
+    fn namespace_propagates_to_update_ir() {
+        let ir = Query::from("api")
+            .namespace("users")
+            .update()
+            .set("email")
+            .build();
+        assert_eq!(ir.target.name, "users");
+        assert_eq!(ir.target.namespace.as_deref(), Some("api"));
+    }
+
+    #[test]
+    fn namespace_propagates_to_remove_ir() {
+        let ir = Query::from("api")
+            .namespace("users")
+            .remove()
+            .where_eq("id")
+            .build();
+        assert_eq!(ir.target.name, "users");
+        assert_eq!(ir.target.namespace.as_deref(), Some("api"));
+    }
+
+    #[test]
+    fn namespace_propagates_to_upsert_ir() {
+        let ir = Query::from("api")
+            .namespace("users")
+            .upsert()
+            .columns(&["id", "email"])
+            .on_conflict(&["id"])
+            .do_nothing()
+            .build();
+        assert_eq!(ir.target.name, "users");
+        assert_eq!(ir.target.namespace.as_deref(), Some("api"));
     }
 
     // ── GetQuery from Entity ────────────────────────────────────────
