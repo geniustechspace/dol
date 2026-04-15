@@ -10,6 +10,7 @@ dol-expr = { path = "crates/expr" }
 dol-entity = { path = "crates/entity" }
 dol-ir = { path = "crates/ir" }
 dol-builder = { path = "crates/builder" }
+dol-query = { workspace = true }
 
 [features]
 default = []

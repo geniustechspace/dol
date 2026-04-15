@@ -44,6 +44,7 @@ dependencies = [
  "dol-entity",
  "dol-expr",
  "dol-ir",
+ "dol-query",
 ]
 
 [[package]]
@@ -92,6 +93,16 @@ name = "dol-objects"
 version = "0.1.0"
 dependencies = [
  "dol-core",
+]
+
+[[package]]
+name = "dol-query"
+version = "0.1.0"
+dependencies = [
+ "dol-builder",
+ "dol-entity",
+ "dol-expr",
+ "dol-ir",
 ]
 
 [[package]]

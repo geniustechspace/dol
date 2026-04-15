@@ -27,6 +27,9 @@ pub use dol_ir as ir;
 /// Builder API — composable method-chain builders that produce IR.
 pub use dol_builder as builder;
 
+/// Query entry point — backend-neutral query construction from entities or strings.
+pub use dol_query as query;
+
 // ── Top-level convenience re-exports ──
 
 pub use model::{Entity, Field, FieldType};
@@ -34,3 +37,5 @@ pub use model::{Entity, Field, FieldType};
 pub use ir::{Backend, BackendError, RenderedOutput, Statement};
 
 pub use builder::{EntityBuilderExt, EntityDefineExt};
+
+pub use query::Query;

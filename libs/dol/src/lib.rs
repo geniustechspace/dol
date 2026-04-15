@@ -86,6 +86,9 @@ pub use dol_core::ir;
 /// Builder API — composable method-chain builders that produce IR.
 pub use dol_core::builder;
 
+/// Query entry point — backend-neutral query construction from entities or strings.
+pub use dol_core::query;
+
 /// Backend implementations.
 pub mod backend {
     /// Backend trait and shared output types (from dol-core::ir).
@@ -134,6 +137,9 @@ pub use dol_config::{BackendFilter, LockStrategy, UnifiedMigrationConfig};
 
 // Re-export builder extension traits so users can call model.get(), etc.
 pub use dol_core::builder::{EntityBuilderExt, EntityDefineExt};
+
+// Re-export Query for backend-neutral entry point.
+pub use dol_core::query::Query;
 
 // Re-export the ToSql extension trait so builders have .to_sql() in scope.
 pub use dol_sql::ext::ToSql;
