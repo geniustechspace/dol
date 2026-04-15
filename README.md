@@ -9,6 +9,7 @@ object storage — from a single, unified API.
 ```rust
 use dol::model::{Entity, Field, FieldType};
 use dol::builder::EntityBuilderExt;
+use dol::expr::{field, param};
 use dol::backend::sql::dialect::Dialect;
 use dol::Render;
 
@@ -21,13 +22,13 @@ static USERS: Entity = Entity::new("users", &[
 
 // Render directly to any SQL dialect
 let pg = USERS.get()
-    .where_eq("email")
+    .filter(field("email").eq(param()))
     .limit()
     .render(Some(&Dialect::postgres())).unwrap();
 // → SELECT id, email, name, created_at FROM users WHERE email = $1 LIMIT $2
 
 let sqlite = USERS.get()
-    .where_eq("email")
+    .filter(field("email").eq(param()))
     .limit()
     .render(None).unwrap(); // default dialect (SQLite)
 // → SELECT id, email, name, created_at FROM users WHERE email = ? LIMIT ?
@@ -138,13 +139,13 @@ DOL uses `Entity` as a universal term:
 
 ```rust
 use dol::builder::EntityBuilderExt;
-use dol::expr::{field, param, lit};
+use dol::expr::{Expr, field, param, lit, raw_expr};
 use dol::expr::func;
 use dol::Render;
 
 // SELECT with joins, filtering, ordering, pagination
 let sql = USERS.get()
-    .columns(&["id", "email", "name"])
+    .fields(&["id", "email", "name"])
     .left_join(&POSTS, &[("id", "author_id")])
     .filter(field("email").ilike(param()))
     .order_by_desc("created_at")
@@ -154,15 +155,15 @@ let sql = USERS.get()
 
 // Aggregations with GROUP BY / HAVING
 let sql = POSTS.get()
-    .columns(&["author_id"])
-    .count_all_as("post_count")
+    .fields(&["author_id"])
+    .field(Expr::CountStar.alias("post_count"))
     .group_by(&["author_id"])
     .having(func::count(field("*")).gt(lit(5)))
     .render(Some(&Dialect::postgres())).unwrap();
 
 // Subqueries
 let active_ids = USERS.get()
-    .columns(&["id"])
+    .fields(&["id"])
     .filter(field("active").eq(lit(true)))
     .build();
 
@@ -176,13 +177,13 @@ let sql = POSTS.get()
 ```rust
 // INSERT with RETURNING
 let insert = USERS.insert()
-    .columns(&["id", "email", "name"])
+    .fields(&["id", "email", "name"])
     .returning_all()
     .build();
 
 // Batch INSERT (multiple rows)
 let batch = USERS.insert()
-    .columns(&["id", "email"])
+    .fields(&["id", "email"])
     .rows(3)
     .build();
 
@@ -190,20 +191,20 @@ let batch = USERS.insert()
 let update = USERS.update()
     .set("name")
     .set("email")
-    .where_eq("id")
+    .filter(field("id").eq(param()))
     .returning_all()
     .build();
 
 // UPSERT (ON CONFLICT)
 let upsert = USERS.upsert()
-    .columns(&["id", "email", "name"])
+    .fields(&["id", "email", "name"])
     .on_conflict(&["email"])
     .do_update(&["name"])
     .build();
 
 // DELETE
 let remove = USERS.remove()
-    .where_eq("id")
+    .filter(field("id").eq(param()))
     .build();
 ```
 
@@ -239,8 +240,8 @@ use dol::TransactionRender;
 use dol::backend::sql::dialect::Dialect;
 use dol::ir::Statement;
 
-let insert_ir = USERS.insert().columns(&["id", "email"]).build();
-let update_ir = POSTS.update().set("author_id").where_eq("id").build();
+let insert_ir = USERS.insert().fields(&["id", "email"]).build();
+let update_ir = POSTS.update().set("author_id").filter(field("id").eq(param())).build();
 
 let block = TransactionBuilder::block(vec![
     Statement::Insert(insert_ir),
@@ -288,8 +289,8 @@ use dol::CompoundSelectBuilder;
 use dol::GetBuilderSqlExt;
 use dol::Render;
 
-let active = USERS.get().columns(&["id", "name"]).filter(field("active").eq(lit(true)));
-let admins = USERS.get().columns(&["id", "name"]).filter(field("role").eq(lit("admin")));
+let active = USERS.get().fields(&["id", "name"]).filter(field("active").eq(lit(true)));
+let admins = USERS.get().fields(&["id", "name"]).filter(field("role").eq(lit("admin")));
 
 let union_sql = active.union(admins).render(Some(&Dialect::postgres())).unwrap();
 ```

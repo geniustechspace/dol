@@ -110,7 +110,7 @@ mod tests {
     use super::*;
     use control::Privilege;
     use dol_entity::{Field, FieldType};
-    use dol_expr::{Direction, Expr, NullsPosition, OrderByExpr, field, func, param, raw_expr};
+    use dol_expr::{Direction, Expr, NullsPosition, OrderByExpr, field, param, raw_expr};
     use dol_ir::definition::{AlterAction, FieldDef, IndexMethod};
     use dol_ir::storage::ObjectSource;
     use dol_ir::transaction::TransactionIR;

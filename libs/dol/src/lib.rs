@@ -39,6 +39,7 @@
 //! use dol::model::{Entity, Field, FieldType};
 //! use dol::backend::sql::dialect::Dialect;
 //! use dol::builder::EntityBuilderExt;
+//! use dol::expr::{field, param};
 //! use dol::Render;
 //!
 //! // Define a static model (zero-cost, const-compatible)
@@ -50,12 +51,12 @@
 //!
 //! // Generate SQL for different dialects
 //! let pg_sql = USERS.get()
-//!     .where_eq("id")
+//!     .filter(field("id").eq(param()))
 //!     .render(Some(&Dialect::postgres())).unwrap();
 //! assert!(pg_sql.contains("$1"));
 //!
 //! let sqlite_sql = USERS.get()
-//!     .where_eq("id")
+//!     .filter(field("id").eq(param()))
 //!     .render(None).unwrap();  // Uses default (SQLite)
 //! assert!(sqlite_sql.contains("?"));
 //! ```
