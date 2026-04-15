@@ -1,9 +1,9 @@
-/// Bind parameter styles and counter for dialect-aware SQL rendering.
-use serde::{Deserialize, Serialize};
+//! Bind parameter styles and counter for dialect-aware SQL rendering.
 
 /// How bind parameters are formatted in SQL.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "style", content = "prefix")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(tag = "style", content = "prefix"))]
 pub enum ParamStyle {
     /// PostgreSQL: `$1, $2, $3`
     Numbered(String),

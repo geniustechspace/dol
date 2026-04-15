@@ -1,8 +1,8 @@
-/// Pagination styles for different SQL dialects.
-use serde::{Deserialize, Serialize};
+//! Pagination styles for different SQL dialects.
 
 /// How a dialect implements result-set pagination.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PaginationStyle {
     /// `LIMIT n OFFSET m` (PostgreSQL, MySQL, SQLite, MariaDB, CockroachDB).
     #[default]

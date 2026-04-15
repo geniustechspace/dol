@@ -1,8 +1,8 @@
-/// Identifier quoting styles for different SQL dialects.
-use serde::{Deserialize, Serialize};
+//! Identifier quoting styles for different SQL dialects.
 
 /// How identifiers (table names, column names) are quoted.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum QuoteStyle {
     /// PostgreSQL / Oracle / ANSI SQL: `"identifier"`
     DoubleQuote,

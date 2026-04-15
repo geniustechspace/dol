@@ -1,5 +1,5 @@
-/// Logical-to-physical type mapping for SQL dialects.
-use serde::{Deserialize, Serialize};
+//! Logical-to-physical type mapping for SQL dialects.
+
 use std::collections::HashMap;
 
 use dol_core::model::FieldType;
@@ -9,7 +9,8 @@ use dol_core::model::FieldType;
 /// `FieldType::Custom` has no mapping — it passes through as-is.
 /// Capability types (`Url`, `ResourceId`, `Version`, `Etag`, `Mime`) and composite
 /// aliases (`Object`, `Blob`, `Path`) are mapped to their underlying logical types.
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum LogicalType {
     Uuid,
     Text,
@@ -78,7 +79,8 @@ impl LogicalType {
 }
 
 /// Maps logical types to physical SQL type strings for a specific dialect.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TypeMap {
     mappings: HashMap<LogicalType, String>,
 }

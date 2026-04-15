@@ -19,7 +19,6 @@
 /// // Set the global default (one-shot, typically at startup)
 /// // dol_sql::dialect::set_default_dialect(pg);
 /// ```
-use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 
 pub mod concat;
@@ -50,7 +49,8 @@ pub use types::{LogicalType, TypeMap};
 pub use upsert::UpsertStyle;
 
 /// How nested field / JSON access is rendered in SQL.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum JsonAccessStyle {
     /// `->>` operator (PostgreSQL, CockroachDB).
     ArrowOperator,
@@ -64,7 +64,8 @@ pub enum JsonAccessStyle {
 }
 
 /// How array literals are rendered in SQL.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ArrayLiteralStyle {
     /// `ARRAY[1, 2, 3]` (PostgreSQL, CockroachDB).
     ArrayKeyword,
@@ -76,7 +77,8 @@ pub enum ArrayLiteralStyle {
 }
 
 /// Extension point for future non-SQL store kinds.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum StoreKind {
     /// Relational SQL database (default).
     #[default]
@@ -95,7 +97,8 @@ pub enum StoreKind {
 ///
 /// This is a **data struct**, not a trait — it can be deserialized from config files
 /// (JSON, TOML, YAML) or constructed programmatically via preset methods.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Dialect {
     /// Human-readable dialect name (e.g. "postgresql", "mysql").
     pub name: String,
@@ -118,28 +121,30 @@ pub struct Dialect {
     /// Feature flags for optional SQL constructs.
     pub features: DialectFeatures,
     /// SQL literal for boolean TRUE.
-    #[serde(default = "default_true_str")]
+    #[cfg_attr(feature = "serde", serde(default = "default_true_str"))]
     pub bool_true: String,
     /// SQL literal for boolean FALSE.
-    #[serde(default = "default_false_str")]
+    #[cfg_attr(feature = "serde", serde(default = "default_false_str"))]
     pub bool_false: String,
     /// String concatenation style.
     pub concat_style: ConcatStyle,
     /// Store kind — extension point for non-SQL databases.
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub store_kind: StoreKind,
     /// JSON/nested field access style.
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub json_access: JsonAccessStyle,
     /// Array literal rendering style.
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub array_literal_style: ArrayLiteralStyle,
 }
 
+#[cfg(feature = "serde")]
 fn default_true_str() -> String {
     "TRUE".into()
 }
 
+#[cfg(feature = "serde")]
 fn default_false_str() -> String {
     "FALSE".into()
 }

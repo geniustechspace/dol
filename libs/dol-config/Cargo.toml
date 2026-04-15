@@ -6,7 +6,7 @@ publish = false
 description = "DOL unified configuration — SQL, KV, and storage backend config from files."
 
 [dependencies]
-dol-sql = { workspace = true }
+dol-sql = { workspace = true, features = ["serde"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 toml_crate = { workspace = true }
