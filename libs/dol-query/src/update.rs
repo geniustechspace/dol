@@ -1,6 +1,6 @@
 //! UPDATE query builder for `dol-query`.
 
-use dol_expr::{Expr, field, param};
+use dol_expr::{Expr, field};
 use dol_ir::{EntityRef, UpdateIR};
 
 // ===========================================================================

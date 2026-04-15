@@ -2,6 +2,7 @@
 
 use super::MigrationError;
 use dol_core::builder::EntityBuilderExt;
+use dol_core::expr::{field, param};
 use dol_core::model::{Entity, Field, FieldType};
 use dol_sql::ext::Render;
 
@@ -186,7 +187,7 @@ pub fn create_history_table_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> 
 pub fn insert_applied_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> String {
     MIGRATION_HISTORY
         .insert()
-        .columns(&["version", "description", "checksum"])
+        .fields(&["version", "description", "checksum"])
         .render(dialect)
         .unwrap()
 }
@@ -206,7 +207,7 @@ pub fn insert_applied_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> String
 pub fn delete_reverted_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> String {
     MIGRATION_HISTORY
         .remove()
-        .where_eq("version")
+        .filter(field("version").eq(param()))
         .render(dialect)
         .unwrap()
 }

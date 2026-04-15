@@ -37,7 +37,7 @@ use dol::builder::storage::{
 };
 use dol::builder::transaction::TransactionBuilder;
 use dol::expr::window::FrameBound;
-use dol::expr::{Direction, case, field, func, lit, param, raw_expr};
+use dol::expr::{Direction, Expr, case, field, func, lit, param, raw_expr};
 use dol::ir::LockMode;
 use dol::model::{Entity, EntityConstraint, Field, FieldType, FkAction};
 
@@ -252,9 +252,9 @@ fn main() {
     // 2b. SELECT specific columns with WHERE
     let sql = USERS
         .get()
-        .columns(&["id", "email", "status"])
-        .where_eq("tenant_id")
-        .where_eq("status")
+        .fields(&["id", "email", "status"])
+        .filter(field("tenant_id").eq(param()))
+        .filter(field("status").eq(param()))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Filtered: {}", sql);
@@ -264,14 +264,14 @@ fn main() {
     // 2c. WHERE with OR groups
     let sql = USERS
         .get()
-        .where_eq("tenant_id")
+        .filter(field("tenant_id").eq(param()))
         .filter(field("status").eq(lit("active")) | field("status").eq(lit("pending")))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] OR filter: {}", sql);
 
     // 2d. LIKE / ILIKE patterns
-    let sql = USERS.get().where_ilike("email").render(Some(&pg)).unwrap();
+    let sql = USERS.get().filter(field("email").ilike(param())).render(Some(&pg)).unwrap();
     println!("  [PG] ILIKE: {}", sql);
     assert!(sql.contains("ILIKE"));
 
@@ -302,10 +302,11 @@ fn main() {
     // 2h. IN subquery
     let sql = USERS
         .get()
-        .where_in_subquery(
-            "tenant_id",
-            "SELECT id FROM tenants WHERE status = 'active'",
-        )
+        .filter(Expr::InSubquery {
+            expr: Box::new(field("tenant_id")),
+            subquery: "SELECT id FROM tenants WHERE status = 'active'".to_string(),
+            negated: false,
+        })
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] IN subquery: {}", sql);
@@ -322,7 +323,7 @@ fn main() {
     // 2j. EXISTS subquery
     let sql = USERS
         .get()
-        .where_exists("SELECT 1 FROM sessions WHERE sessions.user_id = users.id")
+        .filter(Expr::Exists { subquery: "SELECT 1 FROM sessions WHERE sessions.user_id = users.id".to_string(), negated: false })
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] EXISTS: {}", sql);
@@ -330,7 +331,7 @@ fn main() {
     // 2k. NOT EXISTS subquery
     let sql = USERS
         .get()
-        .where_not_exists("SELECT 1 FROM banned WHERE banned.user_id = users.id")
+        .filter(Expr::Exists { subquery: "SELECT 1 FROM banned WHERE banned.user_id = users.id".to_string(), negated: true })
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] NOT EXISTS: {}", sql);
@@ -338,8 +339,8 @@ fn main() {
     // 2l. Scalar subquery in projection
     let sql = USERS
         .get()
-        .columns(&["id", "email"])
-        .select_item(
+        .fields(&["id", "email"])
+        .field(
             dol::expr::Expr::Subquery(
                 "SELECT COUNT(*) FROM sessions WHERE sessions.user_id = users.id".into(),
             )
@@ -382,7 +383,7 @@ fn main() {
     // 2p. DISTINCT
     let sql = USERS
         .get()
-        .columns(&["tenant_id"])
+        .fields(&["tenant_id"])
         .distinct()
         .render(Some(&pg))
         .unwrap();
@@ -401,8 +402,8 @@ fn main() {
     // 2r. GROUP BY + HAVING
     let sql = USERS
         .get()
-        .columns(&["tenant_id"])
-        .count_all_as("cnt")
+        .fields(&["tenant_id"])
+        .field(Expr::CountStar.alias("cnt"))
         .group_by(&["tenant_id"])
         .having(raw_expr("COUNT(*) > 10"))
         .render(Some(&pg))
@@ -412,15 +413,15 @@ fn main() {
     // 2s. Aggregate functions
     let sql = SETTINGS
         .get()
-        .select_item(func::sum(field("max_users")).alias("total_users"))
+        .field(func::sum(field("max_users")).alias("total_users"))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] SUM: {}", sql);
 
     let sql = USERS
         .get()
-        .count_all_as("total")
-        .where_eq("tenant_id")
+        .field(Expr::CountStar.alias("total"))
+        .filter(field("tenant_id").eq(param()))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] COUNT: {}", sql);
@@ -428,15 +429,15 @@ fn main() {
     // 2t. Column aliases and raw expressions
     let sql = USERS
         .get()
-        .column_as("email", "user_email")
+        .field(field("email").alias("user_email"))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Column alias: {}", sql);
 
     let sql = USERS
         .get()
-        .raw_column("COALESCE(display_name, email) AS name")
-        .where_eq("id")
+        .field(raw_expr("COALESCE(display_name, email) AS name"))
+        .filter(field("id").eq(param()))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Raw column: {}", sql);
@@ -445,7 +446,7 @@ fn main() {
     let sql = USERS
         .get()
         .inner_join(&TENANTS, &[("tenant_id", "id")])
-        .where_eq("tenant_id")
+        .filter(field("tenant_id").eq(param()))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] INNER JOIN: {}", sql);
@@ -463,7 +464,7 @@ fn main() {
         .get()
         .inner_join(&TENANTS, &[("tenant_id", "id")])
         .left_join(&SESSIONS, &[("id", "user_id")])
-        .where_eq("tenant_id")
+        .filter(field("tenant_id").eq(param()))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Multi JOIN: {}", sql);
@@ -471,7 +472,7 @@ fn main() {
     // 2x. FOR UPDATE (pessimistic locking)
     let sql = USERS
         .get()
-        .where_eq("id")
+        .filter(field("id").eq(param()))
         .lock(LockMode::ForUpdate)
         .render(Some(&pg))
         .unwrap();
@@ -481,7 +482,7 @@ fn main() {
     // 2y. FOR UPDATE SKIP LOCKED (queue pattern)
     let sql = USERS
         .get()
-        .where_eq("status")
+        .filter(field("status").eq(param()))
         .lock(LockMode::ForUpdateSkipLocked)
         .limit()
         .render(Some(&pg))
@@ -491,7 +492,7 @@ fn main() {
     // 2z. Window functions — ROW_NUMBER
     let sql = USERS
         .get()
-        .select_item(
+        .field(
             func::row_number()
                 .over()
                 .partition_by(vec![field("tenant_id")])
@@ -506,9 +507,9 @@ fn main() {
     // 2aa. Window functions — RANK with frame
     let sql = USERS
         .get()
-        .select_item(field("id"))
-        .select_item(field("login_count"))
-        .select_item(
+        .field(field("id"))
+        .field(field("login_count"))
+        .field(
             func::rank()
                 .over()
                 .partition_by(vec![field("tenant_id")])
@@ -525,7 +526,7 @@ fn main() {
     let sql = USERS
         .get()
         .alias("u")
-        .where_eq("id")
+        .filter(field("id").eq(param()))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Table alias: {}", sql);
@@ -533,8 +534,8 @@ fn main() {
     // 2ac. Param count tracking
     let q = USERS
         .get()
-        .where_eq("tenant_id")
-        .where_eq("status")
+        .filter(field("tenant_id").eq(param()))
+        .filter(field("status").eq(param()))
         .offset()
         .limit();
     assert_eq!(q.param_count(), 4);
@@ -557,7 +558,7 @@ fn main() {
     // 3b. INSERT specific columns
     let sql = USERS
         .insert()
-        .columns(&["id", "email", "tenant_id", "display_name"])
+        .fields(&["id", "email", "tenant_id", "display_name"])
         .returning(&["id", "email"])
         .render(Some(&pg))
         .unwrap();
@@ -566,7 +567,7 @@ fn main() {
     // 3c. Batch INSERT (multiple rows)
     let sql = USERS
         .insert()
-        .columns(&["id", "email", "tenant_id"])
+        .fields(&["id", "email", "tenant_id"])
         .rows(3)
         .render(Some(&pg))
         .unwrap();
@@ -577,7 +578,7 @@ fn main() {
     // 3d. INSERT param count tracking
     let builder = USERS
         .insert()
-        .columns(&["id", "email", "tenant_id"])
+        .fields(&["id", "email", "tenant_id"])
         .rows(5);
     assert_eq!(builder.param_count(), 15); // 5 × 3
     println!("  Param count (5×3): {}", builder.param_count());
@@ -585,13 +586,13 @@ fn main() {
     // 3e. INSERT ... SELECT
     let source_query = USERS
         .get()
-        .columns(&["id", "email"])
-        .where_eq("tenant_id")
+        .fields(&["id", "email"])
+        .filter(field("tenant_id").eq(param()))
         .render(Some(&pg))
         .unwrap();
     let sql = USERS
         .insert_select()
-        .columns(&["id", "email"])
+        .fields(&["id", "email"])
         .from_select(&source_query)
         .returning_all()
         .render(Some(&pg))
@@ -603,7 +604,7 @@ fn main() {
         .update()
         .set("display_name")
         .set("updated_at")
-        .where_eq("id")
+        .filter(field("id").eq(param()))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Update: {}", sql);
@@ -612,7 +613,7 @@ fn main() {
     let sql = USERS
         .update()
         .set_columns(&["display_name", "status", "updated_at"])
-        .where_eq("id")
+        .filter(field("id").eq(param()))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Update set_columns: {}", sql);
@@ -622,7 +623,7 @@ fn main() {
         .update()
         .set("status")
         .set_literal("updated_at", "NOW()")
-        .where_eq("id")
+        .filter(field("id").eq(param()))
         .returning_all()
         .render(Some(&pg))
         .unwrap();
@@ -633,8 +634,8 @@ fn main() {
         .update()
         .set("display_name")
         .set_increment("version")
-        .where_eq("id")
-        .where_eq("version")
+        .filter(field("id").eq(param()))
+        .filter(field("version").eq(param()))
         .returning_all()
         .render(Some(&pg))
         .unwrap();
@@ -645,7 +646,7 @@ fn main() {
     let sql = USERS
         .update()
         .set_expr("login_count", field("login_count") + lit(1))
-        .where_eq("id")
+        .filter(field("id").eq(param()))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Update set_expr: {}", sql);
@@ -654,7 +655,7 @@ fn main() {
     let sql = USERS
         .update()
         .set("status")
-        .where_raw("created_at < NOW() - INTERVAL '30 days'")
+        .filter(raw_expr("created_at < NOW() - INTERVAL '30 days'"))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Update raw WHERE: {}", sql);
@@ -671,7 +672,7 @@ fn main() {
     // 3m. DELETE with WHERE
     let sql = USERS
         .remove()
-        .where_eq("id")
+        .filter(field("id").eq(param()))
         .returning_all()
         .render(Some(&pg))
         .unwrap();
@@ -688,13 +689,13 @@ fn main() {
     // 3o. DELETE with raw WHERE
     let sql = USERS
         .remove()
-        .where_raw("created_at < NOW() - INTERVAL '90 days'")
+        .filter(raw_expr("created_at < NOW() - INTERVAL '90 days'"))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Delete raw: {}", sql);
 
     // 3p. DELETE param count
-    let builder = USERS.remove().where_eq("id").where_eq("tenant_id");
+    let builder = USERS.remove().filter(field("id").eq(param())).filter(field("tenant_id").eq(param()));
     assert_eq!(builder.param_count(), 2);
     println!("  Delete param count: {}", builder.param_count());
 
@@ -1122,13 +1123,13 @@ fn main() {
 
     let q1 = USERS
         .get()
-        .columns(&["id", "email"])
-        .where_eq("status")
+        .fields(&["id", "email"])
+        .filter(field("status").eq(param()))
         .build();
     let q2 = USERS
         .get()
-        .columns(&["id", "email"])
-        .where_eq("tenant_id")
+        .fields(&["id", "email"])
+        .filter(field("tenant_id").eq(param()))
         .build();
 
     // 6a. UNION
@@ -1276,8 +1277,8 @@ fn main() {
     ] {
         let sql = USERS
             .get()
-            .columns(&["id", "email"])
-            .where_eq("id")
+            .fields(&["id", "email"])
+            .filter(field("id").eq(param()))
             .render(Some(d))
             .unwrap();
         println!("    [{}] {}", name, sql);
@@ -1293,7 +1294,7 @@ fn main() {
     ] {
         let sql = USERS
             .insert()
-            .columns(&["id", "email"])
+            .fields(&["id", "email"])
             .returning_all()
             .render(Some(d))
             .unwrap();
@@ -1309,7 +1310,7 @@ fn main() {
     ] {
         let sql = USERS
             .upsert()
-            .columns(&["id", "email", "display_name"])
+            .fields(&["id", "email", "display_name"])
             .on_conflict(&["email"])
             .do_update(&["display_name"])
             .render(Some(d))
@@ -2153,7 +2154,7 @@ mod tests {
 
         for d in &dialects {
             // SELECT
-            let sql = USERS.get().where_eq("id").render(Some(d)).unwrap();
+            let sql = USERS.get().filter(field("id").eq(param())).render(Some(d)).unwrap();
             assert!(sql.contains("SELECT"), "{}: missing SELECT", d.name);
             assert!(sql.contains("FROM users"), "{}: missing FROM", d.name);
 
@@ -2165,13 +2166,13 @@ mod tests {
             let sql = USERS
                 .update()
                 .set("email")
-                .where_eq("id")
+                .filter(field("id").eq(param()))
                 .render(Some(d))
                 .unwrap();
             assert!(sql.contains("UPDATE users"), "{}: missing UPDATE", d.name);
 
             // DELETE
-            let sql = USERS.remove().where_eq("id").render(Some(d)).unwrap();
+            let sql = USERS.remove().filter(field("id").eq(param())).render(Some(d)).unwrap();
             assert!(sql.contains("DELETE FROM"), "{}: missing DELETE", d.name);
 
             // CREATE TABLE
