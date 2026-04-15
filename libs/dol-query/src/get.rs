@@ -81,23 +81,6 @@ impl GetQuery {
 
     // ── Projection methods ──────────────────────────────────────────────
 
-    /// Select all fields known from the entity metadata.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this query was constructed from a plain string without
-    /// field metadata. Use `.columns()` instead for string-sourced queries.
-    pub fn all_fields(mut self) -> Self {
-        let fields = self
-            .field_names
-            .as_ref()
-            .expect("all_fields() requires an Entity source with field metadata");
-        for name in fields {
-            self.projections.push(Expr::Identifier(name.clone()));
-        }
-        self
-    }
-
     /// Select a list of named columns.
     pub fn columns(mut self, names: &[&str]) -> Self {
         for name in names {
@@ -382,6 +365,9 @@ impl GetQuery {
     // ── Build to IR ─────────────────────────────────────────────────────
 
     /// Consume the builder and produce a [`QueryIR`].
+    ///
+    /// When no projections have been set and Entity field metadata is
+    /// available, all entity fields are selected by default.
     pub fn build(self) -> QueryIR {
         let source = EntityRef {
             name: self.name,
@@ -415,9 +401,21 @@ impl GetQuery {
             None
         };
 
+        // Default: select all entity fields when no projections were specified
+        // and field metadata is available.
+        let projections = if self.projections.is_empty() {
+            if let Some(ref names) = self.field_names {
+                names.iter().map(|n| Expr::Identifier(n.clone())).collect()
+            } else {
+                self.projections
+            }
+        } else {
+            self.projections
+        };
+
         QueryIR {
             source,
-            projections: self.projections,
+            projections,
             joins,
             filters: self.filters,
             group_by: self.group_by,

@@ -451,7 +451,6 @@ mod tests {
     fn get_builder_render() {
         let sql = TEST_MODEL
             .get()
-            .all_fields()
             .where_eq("status")
             .order_by_desc("email")
             .limit()
@@ -464,12 +463,8 @@ mod tests {
     // -- InsertBuilder --
 
     #[test]
-    fn insert_all_fields() {
-        let sql = TEST_MODEL
-            .insert()
-            .all_fields()
-            .render(Some(&pg()))
-            .unwrap();
+    fn insert_defaults() {
+        let sql = TEST_MODEL.insert().render(Some(&pg())).unwrap();
         assert!(sql.contains("INSERT INTO users (id, tenant_id, email, status, created_at)"));
         assert!(sql.contains("VALUES ($1, $2, $3, $4, $5)"));
     }

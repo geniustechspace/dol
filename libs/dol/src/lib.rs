@@ -50,13 +50,11 @@
 //!
 //! // Generate SQL for different dialects
 //! let pg_sql = USERS.get()
-//!     .all_fields()
 //!     .where_eq("id")
 //!     .render(Some(&Dialect::postgres())).unwrap();
 //! assert!(pg_sql.contains("$1"));
 //!
 //! let sqlite_sql = USERS.get()
-//!     .all_fields()
 //!     .where_eq("id")
 //!     .render(None).unwrap();  // Uses default (SQLite)
 //! assert!(sqlite_sql.contains("?"));

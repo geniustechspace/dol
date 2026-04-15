@@ -244,7 +244,7 @@ fn main() {
     println!("\n--- 2. SELECT Queries ---");
 
     // 2a. Simple SELECT all columns
-    let sql = USERS.get().all_fields().render(Some(&pg)).unwrap();
+    let sql = USERS.get().render(Some(&pg)).unwrap();
     println!("  [PG] Select all: {}", sql);
     assert!(sql.contains("SELECT"));
     assert!(sql.contains("FROM users"));
@@ -264,7 +264,6 @@ fn main() {
     // 2c. WHERE with OR groups
     let sql = USERS
         .get()
-        .all_fields()
         .where_eq("tenant_id")
         .filter(field("status").eq(lit("active")) | field("status").eq(lit("pending")))
         .render(Some(&pg))
@@ -272,19 +271,13 @@ fn main() {
     println!("  [PG] OR filter: {}", sql);
 
     // 2d. LIKE / ILIKE patterns
-    let sql = USERS
-        .get()
-        .all_fields()
-        .where_ilike("email")
-        .render(Some(&pg))
-        .unwrap();
+    let sql = USERS.get().where_ilike("email").render(Some(&pg)).unwrap();
     println!("  [PG] ILIKE: {}", sql);
     assert!(sql.contains("ILIKE"));
 
     // 2e. NULL checks
     let sql = USERS
         .get()
-        .all_fields()
         .filter(field("profile").is_not_null())
         .render(Some(&pg))
         .unwrap();
@@ -293,7 +286,6 @@ fn main() {
     // 2f. BETWEEN range
     let sql = USERS
         .get()
-        .all_fields()
         .filter(field("login_count").between(lit(10), lit(100)))
         .render(Some(&pg))
         .unwrap();
@@ -302,7 +294,6 @@ fn main() {
     // 2g. IN list
     let sql = USERS
         .get()
-        .all_fields()
         .filter(field("status").in_list(vec![lit("active"), lit("pending"), lit("suspended")]))
         .render(Some(&pg))
         .unwrap();
@@ -311,7 +302,6 @@ fn main() {
     // 2h. IN subquery
     let sql = USERS
         .get()
-        .all_fields()
         .where_in_subquery(
             "tenant_id",
             "SELECT id FROM tenants WHERE status = 'active'",
@@ -324,7 +314,6 @@ fn main() {
     let subquery = "SELECT user_id FROM banned_users";
     let sql = USERS
         .get()
-        .all_fields()
         .filter(field("id").not_in_subquery(subquery))
         .render(Some(&pg))
         .unwrap();
@@ -333,7 +322,6 @@ fn main() {
     // 2j. EXISTS subquery
     let sql = USERS
         .get()
-        .all_fields()
         .where_exists("SELECT 1 FROM sessions WHERE sessions.user_id = users.id")
         .render(Some(&pg))
         .unwrap();
@@ -342,7 +330,6 @@ fn main() {
     // 2k. NOT EXISTS subquery
     let sql = USERS
         .get()
-        .all_fields()
         .where_not_exists("SELECT 1 FROM banned WHERE banned.user_id = users.id")
         .render(Some(&pg))
         .unwrap();
@@ -365,7 +352,6 @@ fn main() {
     // 2m. Ordering with NULLS FIRST/LAST
     let sql = USERS
         .get()
-        .all_fields()
         .order_by_expr(field("display_name").asc_nulls_last())
         .render(Some(&pg))
         .unwrap();
@@ -374,7 +360,6 @@ fn main() {
     // 2n. ORDER BY with Direction enum
     let sql = USERS
         .get()
-        .all_fields()
         .order_by(
             "display_name",
             Direction::Asc,
@@ -387,7 +372,6 @@ fn main() {
     // 2o. Pagination (LIMIT + OFFSET)
     let sql = USERS
         .get()
-        .all_fields()
         .order_by_asc("email")
         .limit()
         .offset()
@@ -407,7 +391,6 @@ fn main() {
     // 2q. DISTINCT ON (PostgreSQL only)
     let sql = USERS
         .get()
-        .all_fields()
         .distinct_on(&["tenant_id"])
         .order_by_asc("tenant_id")
         .order_by_desc("created_at")
@@ -461,7 +444,6 @@ fn main() {
     // 2u. INNER JOIN
     let sql = USERS
         .get()
-        .all_fields()
         .inner_join(&TENANTS, &[("tenant_id", "id")])
         .where_eq("tenant_id")
         .render(Some(&pg))
@@ -471,7 +453,6 @@ fn main() {
     // 2v. LEFT JOIN
     let sql = USERS
         .get()
-        .all_fields()
         .left_join(&SESSIONS, &[("id", "user_id")])
         .render(Some(&pg))
         .unwrap();
@@ -480,7 +461,6 @@ fn main() {
     // 2w. Multiple JOINs
     let sql = USERS
         .get()
-        .all_fields()
         .inner_join(&TENANTS, &[("tenant_id", "id")])
         .left_join(&SESSIONS, &[("id", "user_id")])
         .where_eq("tenant_id")
@@ -491,7 +471,6 @@ fn main() {
     // 2x. FOR UPDATE (pessimistic locking)
     let sql = USERS
         .get()
-        .all_fields()
         .where_eq("id")
         .lock(LockMode::ForUpdate)
         .render(Some(&pg))
@@ -502,7 +481,6 @@ fn main() {
     // 2y. FOR UPDATE SKIP LOCKED (queue pattern)
     let sql = USERS
         .get()
-        .all_fields()
         .where_eq("status")
         .lock(LockMode::ForUpdateSkipLocked)
         .limit()
@@ -513,7 +491,6 @@ fn main() {
     // 2z. Window functions — ROW_NUMBER
     let sql = USERS
         .get()
-        .all_fields()
         .select_item(
             func::row_number()
                 .over()
@@ -548,7 +525,6 @@ fn main() {
     let sql = USERS
         .get()
         .alias("u")
-        .all_fields()
         .where_eq("id")
         .render(Some(&pg))
         .unwrap();
@@ -557,7 +533,6 @@ fn main() {
     // 2ac. Param count tracking
     let q = USERS
         .get()
-        .all_fields()
         .where_eq("tenant_id")
         .where_eq("status")
         .offset()
@@ -574,12 +549,7 @@ fn main() {
     println!("\n--- 3. Mutations ---");
 
     // 3a. INSERT all columns
-    let sql = USERS
-        .insert()
-        .all_fields()
-        .returning_all()
-        .render(Some(&pg))
-        .unwrap();
+    let sql = USERS.insert().returning_all().render(Some(&pg)).unwrap();
     println!("  [PG] Insert all: {}", sql);
     assert!(sql.contains("INSERT INTO users"));
     assert!(sql.contains("RETURNING *"));
@@ -731,7 +701,6 @@ fn main() {
     // 3q. UPSERT (ON CONFLICT DO UPDATE)
     let sql = USERS
         .upsert()
-        .all_fields()
         .on_conflict(&["email"])
         .do_update(&["display_name", "status", "updated_at"])
         .returning_all()
@@ -744,7 +713,6 @@ fn main() {
     // 3r. UPSERT DO NOTHING
     let sql = USERS
         .upsert()
-        .all_fields()
         .on_conflict(&["email"])
         .do_nothing()
         .render(Some(&pg))
@@ -755,7 +723,6 @@ fn main() {
     // 3s. UPSERT with named constraint
     let sql = USERS
         .upsert()
-        .all_fields()
         .on_conflict_constraint("users_email_key")
         .do_update(&["display_name"])
         .render(Some(&pg))
@@ -765,7 +732,6 @@ fn main() {
     // 3t. UPSERT with conflict filter
     let sql = USERS
         .upsert()
-        .all_fields()
         .on_conflict(&["email"])
         .conflict_filter(field("status").ne(lit("deleted")))
         .do_update(&["display_name"])
@@ -1362,7 +1328,6 @@ fn main() {
     ] {
         let sql = USERS
             .get()
-            .all_fields()
             .order_by_asc("email")
             .limit()
             .offset()
@@ -1391,7 +1356,6 @@ fn main() {
     ] {
         let sql = PRODUCTS
             .get()
-            .all_fields()
             .filter(field("is_active").eq(lit(true)))
             .render(Some(d))
             .unwrap();
@@ -2189,17 +2153,12 @@ mod tests {
 
         for d in &dialects {
             // SELECT
-            let sql = USERS
-                .get()
-                .all_fields()
-                .where_eq("id")
-                .render(Some(d))
-                .unwrap();
+            let sql = USERS.get().where_eq("id").render(Some(d)).unwrap();
             assert!(sql.contains("SELECT"), "{}: missing SELECT", d.name);
             assert!(sql.contains("FROM users"), "{}: missing FROM", d.name);
 
             // INSERT
-            let sql = USERS.insert().all_fields().render(Some(d)).unwrap();
+            let sql = USERS.insert().render(Some(d)).unwrap();
             assert!(sql.contains("INSERT INTO"), "{}: missing INSERT", d.name);
 
             // UPDATE

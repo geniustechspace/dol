@@ -36,21 +36,6 @@ impl InsertQuery {
         }
     }
 
-    /// Include all entity fields in the INSERT column list.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this query was constructed from a plain string without
-    /// field metadata. Use `.columns()` instead for string-sourced queries.
-    pub fn all_fields(mut self) -> Self {
-        let names = self
-            .field_names
-            .as_ref()
-            .expect("all_fields() requires an Entity source with field metadata");
-        self.fields = names.clone();
-        self
-    }
-
     /// Specify which columns to insert.
     pub fn columns(mut self, cols: &[&str]) -> Self {
         self.fields = cols.iter().map(|s| s.to_string()).collect();
@@ -77,18 +62,33 @@ impl InsertQuery {
 
     /// Total bind-parameter count for this INSERT.
     pub fn param_count(&self) -> usize {
-        self.fields.len() * self.row_count
+        let field_count = if self.fields.is_empty() {
+            self.field_names.as_ref().map_or(0, |n| n.len())
+        } else {
+            self.fields.len()
+        };
+        field_count * self.row_count
     }
 
     /// Build the canonical [`InsertIR`].
+    ///
+    /// When no columns have been set (via `.columns()`) and Entity field
+    /// metadata is available, all entity fields are included by default.
     pub fn build(self) -> InsertIR {
+        // Default: include all entity fields when none were specified.
+        let fields = if self.fields.is_empty() {
+            self.field_names.unwrap_or_default()
+        } else {
+            self.fields
+        };
+
         InsertIR {
             target: EntityRef {
                 name: self.name,
                 namespace: self.namespace,
                 alias: None,
             },
-            fields: self.fields,
+            fields,
             row_count: self.row_count,
             returning: self.returning,
         }

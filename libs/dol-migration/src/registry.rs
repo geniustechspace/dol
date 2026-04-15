@@ -222,11 +222,7 @@ pub fn delete_reverted_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> Strin
 /// assert!(sql.contains("_dol_migrations"));
 /// ```
 pub fn select_applied_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> String {
-    MIGRATION_HISTORY
-        .get()
-        .all_fields()
-        .render(dialect)
-        .unwrap()
+    MIGRATION_HISTORY.get().render(dialect).unwrap()
 }
 
 #[cfg(test)]

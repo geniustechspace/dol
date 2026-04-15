@@ -48,12 +48,6 @@ impl<'a> InsertBuilder<'a> {
         }
     }
 
-    /// Include all entity fields in the INSERT column list.
-    pub fn all_fields(mut self) -> Self {
-        self.fields = self.model.field_names().map(|s| s.to_string()).collect();
-        self
-    }
-
     /// Specify which columns to insert.
     pub fn columns(mut self, cols: &[&str]) -> Self {
         self.fields = cols.iter().map(|s| s.to_string()).collect();
@@ -80,14 +74,29 @@ impl<'a> InsertBuilder<'a> {
 
     /// Total bind-parameter count for this INSERT.
     pub fn param_count(&self) -> usize {
-        self.fields.len() * self.row_count
+        let field_count = if self.fields.is_empty() {
+            self.model.fields.len()
+        } else {
+            self.fields.len()
+        };
+        field_count * self.row_count
     }
 
     /// Build the canonical [`InsertIR`].
+    ///
+    /// When no columns have been set (via `.columns()`), all entity fields
+    /// are included by default.
     pub fn build(&self) -> InsertIR {
+        // Default: include all entity fields when none were specified.
+        let fields = if self.fields.is_empty() {
+            self.model.field_names().map(|s| s.to_string()).collect()
+        } else {
+            self.fields.clone()
+        };
+
         InsertIR {
             target: entity_ref(self.model),
-            fields: self.fields.clone(),
+            fields,
             row_count: self.row_count,
             returning: self.returning.clone(),
         }
@@ -376,12 +385,6 @@ impl<'a> UpsertBuilder<'a> {
         }
     }
 
-    /// Include all entity fields in the INSERT column list.
-    pub fn all_fields(mut self) -> Self {
-        self.fields = self.model.field_names().map(|s| s.to_string()).collect();
-        self
-    }
-
     /// Specify which columns to insert.
     pub fn columns(mut self, cols: &[&str]) -> Self {
         self.fields = cols.iter().map(|s| s.to_string()).collect();
@@ -451,7 +454,11 @@ impl<'a> UpsertBuilder<'a> {
     /// Counts the insert-row parameters plus any parameters inside
     /// conflict filter expressions.
     pub fn param_count(&self) -> usize {
-        let insert_params = self.fields.len();
+        let insert_params = if self.fields.is_empty() {
+            self.model.fields.len()
+        } else {
+            self.fields.len()
+        };
         let conflict_params: usize = self
             .conflict_filters
             .iter()
@@ -461,10 +468,20 @@ impl<'a> UpsertBuilder<'a> {
     }
 
     /// Build the canonical [`UpsertIR`].
+    ///
+    /// When no columns have been set (via `.columns()`), all entity fields
+    /// are included by default.
     pub fn build(&self) -> UpsertIR {
+        // Default: include all entity fields when none were specified.
+        let fields = if self.fields.is_empty() {
+            self.model.field_names().map(|s| s.to_string()).collect()
+        } else {
+            self.fields.clone()
+        };
+
         UpsertIR {
             target: entity_ref(self.model),
-            fields: self.fields.clone(),
+            fields,
             conflict_fields: self.conflict_fields.clone(),
             conflict_constraint: self.conflict_constraint.clone(),
             update_fields: self.update_fields.clone(),

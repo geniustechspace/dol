@@ -115,7 +115,6 @@ fn model_qualified_name_without_namespace() {
 fn select_all_with_where() {
     let sql = USERS
         .get()
-        .all_fields()
         .where_eq("tenant_id")
         .where_eq("id")
         .render(Some(&pg()))
@@ -131,7 +130,6 @@ fn select_all_with_where() {
 fn select_with_pagination() {
     let sql = USERS
         .get()
-        .all_fields()
         .where_eq("tenant_id")
         .order_by_desc("created_at")
         .offset()
@@ -149,7 +147,6 @@ fn select_with_pagination() {
 fn select_with_ilike() {
     let sql = USERS
         .get()
-        .all_fields()
         .where_eq("tenant_id")
         .where_ilike("email")
         .order_by_desc("created_at")
@@ -180,7 +177,6 @@ fn select_specific_columns() {
 fn select_no_where() {
     let sql = TENANTS
         .get()
-        .all_fields()
         .order_by_desc("created_at")
         .offset()
         .limit()
@@ -194,7 +190,6 @@ fn select_no_where() {
 fn select_with_literal_where() {
     let sql = USERS
         .get()
-        .all_fields()
         .where_eq_literal("status", raw_expr("'active'"))
         .where_eq("tenant_id")
         .render(Some(&pg()))
@@ -262,7 +257,6 @@ fn select_distinct() {
 fn select_distinct_on() {
     let sql = USERS
         .get()
-        .all_fields()
         .distinct_on(&["tenant_id"])
         .order_by_desc("created_at")
         .render(Some(&pg()))
@@ -275,7 +269,6 @@ fn select_distinct_on() {
 fn select_for_update() {
     let sql = USERS
         .get()
-        .all_fields()
         .where_eq("id")
         .for_update()
         .render(Some(&pg()))
@@ -287,7 +280,6 @@ fn select_for_update() {
 fn select_for_update_skip_locked() {
     let sql = USERS
         .get()
-        .all_fields()
         .where_eq("id")
         .lock(LockMode::ForUpdateSkipLocked)
         .render(Some(&pg()))
@@ -324,7 +316,6 @@ fn select_raw_column() {
 fn select_or_predicate() {
     let sql = USERS
         .get()
-        .all_fields()
         .where_eq("tenant_id")
         .filter(
             field("status").eq(raw_expr("'active'")) | field("status").eq(raw_expr("'pending'")),
@@ -338,7 +329,6 @@ fn select_or_predicate() {
 fn select_exists_subquery() {
     let sql = USERS
         .get()
-        .all_fields()
         .where_exists("SELECT 1 FROM sessions WHERE sessions.user_id = users.id")
         .render(Some(&pg()))
         .unwrap();
@@ -351,7 +341,6 @@ fn select_exists_subquery() {
 fn select_in_subquery() {
     let sql = USERS
         .get()
-        .all_fields()
         .where_in_subquery(
             "tenant_id",
             "SELECT id FROM tenants WHERE status = 'active'",
@@ -365,7 +354,6 @@ fn select_in_subquery() {
 fn select_where_raw() {
     let sql = USERS
         .get()
-        .all_fields()
         .where_eq("tenant_id")
         .where_raw("created_at > NOW() - INTERVAL '30 days'")
         .render(Some(&pg()))
@@ -377,7 +365,6 @@ fn select_where_raw() {
 fn select_order_by_nulls() {
     let sql = USERS
         .get()
-        .all_fields()
         .order_by("display_name", Direction::Asc, Some(NullsPosition::Last))
         .render(Some(&pg()))
         .unwrap();
@@ -388,7 +375,6 @@ fn select_order_by_nulls() {
 fn select_param_count() {
     let q = USERS
         .get()
-        .all_fields()
         .where_eq("tenant_id")
         .where_eq("status")
         .offset()
@@ -444,14 +430,12 @@ fn select_multiple_joins() {
 fn select_filter_produces_same_as_where_eq() {
     let sql_legacy = USERS
         .get()
-        .all_fields()
         .where_eq("tenant_id")
         .where_eq("id")
         .render(Some(&pg()))
         .unwrap();
     let sql_expr = USERS
         .get()
-        .all_fields()
         .filter(field("tenant_id").eq(param()))
         .filter(field("id").eq(param()))
         .render(Some(&pg()))
@@ -492,7 +476,6 @@ fn delete_filter_api() {
 fn select_filter_or_group() {
     let sql = USERS
         .get()
-        .all_fields()
         .where_eq("tenant_id")
         .filter(
             field("status").eq(raw_expr("'active'")) | field("status").eq(raw_expr("'pending'")),
@@ -507,8 +490,8 @@ fn select_filter_or_group() {
 // ===========================================================================
 
 #[test]
-fn insert_all_fields() {
-    let sql = USERS.insert().all_fields().render(Some(&pg())).unwrap();
+fn insert_defaults() {
+    let sql = USERS.insert().render(Some(&pg())).unwrap();
     assert_eq!(
         sql,
         "INSERT INTO users (id, tenant_id, email, display_name, status, created_at, updated_at) \
@@ -533,7 +516,6 @@ fn insert_specific_columns() {
 fn insert_with_returning() {
     let sql = USERS
         .insert()
-        .all_fields()
         .returning(&["id"])
         .render(Some(&pg()))
         .unwrap();
@@ -542,12 +524,7 @@ fn insert_with_returning() {
 
 #[test]
 fn insert_batch() {
-    let sql = SETTINGS
-        .insert()
-        .all_fields()
-        .rows(3)
-        .render(Some(&pg()))
-        .unwrap();
+    let sql = SETTINGS.insert().rows(3).render(Some(&pg())).unwrap();
     assert_eq!(
         sql,
         "INSERT INTO tenant_settings (tenant_id, max_users, mfa_required) \
@@ -557,7 +534,7 @@ fn insert_batch() {
 
 #[test]
 fn insert_batch_param_count() {
-    let q = SETTINGS.insert().all_fields().rows(3);
+    let q = SETTINGS.insert().rows(3);
     assert_eq!(q.param_count(), 9);
 }
 
@@ -716,7 +693,6 @@ fn delete_param_count() {
 fn upsert_basic() {
     let sql = SETTINGS
         .upsert()
-        .all_fields()
         .on_conflict(&["tenant_id"])
         .do_update(&["max_users", "mfa_required"])
         .render(Some(&pg()))
@@ -734,7 +710,6 @@ fn upsert_basic() {
 fn upsert_do_nothing() {
     let sql = SETTINGS
         .upsert()
-        .all_fields()
         .on_conflict(&["tenant_id"])
         .do_nothing()
         .render(Some(&pg()))
@@ -751,7 +726,6 @@ fn upsert_do_nothing() {
 fn upsert_with_returning() {
     let sql = SETTINGS
         .upsert()
-        .all_fields()
         .on_conflict(&["tenant_id"])
         .do_update(&["max_users", "mfa_required"])
         .returning_all()
@@ -764,7 +738,6 @@ fn upsert_with_returning() {
 fn upsert_on_conflict_constraint() {
     let sql = SETTINGS
         .upsert()
-        .all_fields()
         .on_conflict_constraint("uq_tenant_settings_pk")
         .do_update(&["max_users"])
         .render(Some(&pg()))
@@ -776,7 +749,6 @@ fn upsert_on_conflict_constraint() {
 fn upsert_with_conflict_where() {
     let sql = SETTINGS
         .upsert()
-        .all_fields()
         .on_conflict(&["tenant_id"])
         .do_update(&["max_users"])
         .conflict_where_eq("mfa_required")
@@ -789,7 +761,6 @@ fn upsert_with_conflict_where() {
 fn upsert_param_count() {
     let q = SETTINGS
         .upsert()
-        .all_fields()
         .on_conflict(&["tenant_id"])
         .do_update(&["max_users"])
         .conflict_where_eq("mfa_required");
@@ -1572,8 +1543,8 @@ fn set_op_union() {
 
 #[test]
 fn set_op_union_all() {
-    let q1 = SETTINGS.get().all_fields().build();
-    let q2 = SETTINGS.get().all_fields().where_eq("tenant_id").build();
+    let q1 = SETTINGS.get().build();
+    let q2 = SETTINGS.get().where_eq("tenant_id").build();
     let sql = CompoundSelectBuilder::new(q1)
         .union_all(q2)
         .render(Some(&pg()))
@@ -1627,7 +1598,6 @@ fn subquery_as_scalar() {
         .unwrap();
     let sql = USERS
         .get()
-        .all_fields()
         .filter(field("id").in_subquery(&sub))
         .render(Some(&pg()))
         .unwrap();
@@ -1658,7 +1628,6 @@ fn dialect_mysql_select_with_where() {
     let mysql = Dialect::mysql();
     let sql = USERS
         .get()
-        .all_fields()
         .where_eq("tenant_id")
         .where_eq("id")
         .render(Some(&mysql))
@@ -1696,7 +1665,7 @@ fn dialect_oracle_select_with_where() {
 #[test]
 fn dialect_mysql_insert() {
     let mysql = Dialect::mysql();
-    let sql = SETTINGS.insert().all_fields().render(Some(&mysql)).unwrap();
+    let sql = SETTINGS.insert().render(Some(&mysql)).unwrap();
     assert_eq!(
         sql,
         "INSERT INTO tenant_settings (tenant_id, max_users, mfa_required) VALUES (?, ?, ?)"
@@ -1706,7 +1675,7 @@ fn dialect_mysql_insert() {
 #[test]
 fn dialect_mssql_insert() {
     let mssql = Dialect::mssql();
-    let sql = SETTINGS.insert().all_fields().render(Some(&mssql)).unwrap();
+    let sql = SETTINGS.insert().render(Some(&mssql)).unwrap();
     assert_eq!(
         sql,
         "INSERT INTO tenant_settings (tenant_id, max_users, mfa_required) VALUES (@p1, @p2, @p3)"
@@ -1716,12 +1685,7 @@ fn dialect_mssql_insert() {
 #[test]
 fn dialect_mysql_batch_insert() {
     let mysql = Dialect::mysql();
-    let sql = SETTINGS
-        .insert()
-        .all_fields()
-        .rows(2)
-        .render(Some(&mysql))
-        .unwrap();
+    let sql = SETTINGS.insert().rows(2).render(Some(&mysql)).unwrap();
     assert_eq!(
         sql,
         "INSERT INTO tenant_settings (tenant_id, max_users, mfa_required) VALUES (?, ?, ?), (?, ?, ?)"
@@ -1789,7 +1753,6 @@ fn dialect_mssql_returning_output() {
     let mssql = Dialect::mssql();
     let sql = SETTINGS
         .insert()
-        .all_fields()
         .returning(&["tenant_id"])
         .render(Some(&mssql))
         .unwrap();
@@ -1801,7 +1764,6 @@ fn dialect_mssql_pagination_offset_fetch() {
     let mssql = Dialect::mssql();
     let sql = USERS
         .get()
-        .all_fields()
         .order_by_asc("id")
         .offset()
         .limit()
@@ -1815,7 +1777,6 @@ fn dialect_pg_pagination_limit_offset() {
     let pg = Dialect::postgres();
     let sql = USERS
         .get()
-        .all_fields()
         .order_by_asc("id")
         .offset()
         .limit()
@@ -1831,7 +1792,6 @@ fn dialect_mysql_upsert_on_duplicate_key() {
     let mysql = Dialect::mysql();
     let sql = SETTINGS
         .upsert()
-        .all_fields()
         .on_conflict(&["tenant_id"])
         .do_update(&["max_users", "mfa_required"])
         .render(Some(&mysql))
@@ -1846,7 +1806,6 @@ fn dialect_mysql_upsert_do_nothing() {
     let mysql = Dialect::mysql();
     let sql = SETTINGS
         .upsert()
-        .all_fields()
         .on_conflict(&["tenant_id"])
         .do_nothing()
         .render(Some(&mysql))
@@ -1861,7 +1820,6 @@ fn dialect_mssql_upsert_merge() {
     let mssql = Dialect::mssql();
     let sql = SETTINGS
         .upsert()
-        .all_fields()
         .on_conflict(&["tenant_id"])
         .do_update(&["max_users", "mfa_required"])
         .render(Some(&mssql))
@@ -1888,7 +1846,6 @@ fn dialect_distinct_on_pg_only() {
 
     let pg_sql = USERS
         .get()
-        .all_fields()
         .distinct_on(&["tenant_id"])
         .render(Some(&pg))
         .unwrap();
@@ -1896,7 +1853,6 @@ fn dialect_distinct_on_pg_only() {
 
     let mysql_sql = USERS
         .get()
-        .all_fields()
         .distinct_on(&["tenant_id"])
         .render(Some(&mysql))
         .unwrap();
@@ -1923,24 +1879,14 @@ fn dialect_create_table_sqlite_types() {
 #[test]
 fn dialect_cockroachdb_is_pg_compatible() {
     let crdb = Dialect::cockroachdb();
-    let sql = USERS
-        .get()
-        .all_fields()
-        .where_eq("id")
-        .render(Some(&crdb))
-        .unwrap();
+    let sql = USERS.get().where_eq("id").render(Some(&crdb)).unwrap();
     assert!(sql.contains("WHERE id = $1"));
 }
 
 #[test]
 fn dialect_for_update_sqlite_unsupported() {
     let sqlite = Dialect::sqlite();
-    let sql = USERS
-        .get()
-        .all_fields()
-        .for_update()
-        .render(Some(&sqlite))
-        .unwrap();
+    let sql = USERS.get().for_update().render(Some(&sqlite)).unwrap();
     assert!(!sql.contains("FOR UPDATE"));
 }
 
@@ -1949,7 +1895,6 @@ fn dialect_nulls_ordering_mysql_unsupported() {
     let mysql = Dialect::mysql();
     let sql = USERS
         .get()
-        .all_fields()
         .order_by("created_at", Direction::Desc, Some(NullsPosition::Last))
         .render(Some(&mysql))
         .unwrap();
@@ -2065,7 +2010,6 @@ fn dialect_mysql_ilike_fallback() {
     let mysql = Dialect::mysql();
     let sql = USERS
         .get()
-        .all_fields()
         .where_eq("tenant_id")
         .where_ilike("email")
         .render(Some(&mysql))
@@ -2078,7 +2022,6 @@ fn dialect_mssql_expr_params() {
     let mssql = Dialect::mssql();
     let sql = USERS
         .get()
-        .all_fields()
         .filter(field("id").eq(param()))
         .filter(field("status").eq(param()))
         .render(Some(&mssql))
@@ -2197,7 +2140,7 @@ on_conflict = false
         assert_eq!(d.bool_true, "1");
         assert!(!d.features.distinct_on);
 
-        let sql = SETTINGS.insert().all_fields().render(Some(&d)).unwrap();
+        let sql = SETTINGS.insert().render(Some(&d)).unwrap();
         assert!(sql.contains("VALUES (?, ?, ?)"));
     }
 

@@ -23,7 +23,6 @@
 //!
 //! let ir = Query::from(&USERS)
 //!     .get()
-//!     .all_fields()
 //!     .where_eq("id")
 //!     .build();
 //! assert_eq!(ir.source.name, "users");
@@ -209,8 +208,8 @@ mod tests {
     // ── GetQuery from Entity ────────────────────────────────────────
 
     #[test]
-    fn get_from_entity_all_fields() {
-        let ir = Query::from(&USERS).get().all_fields().build();
+    fn get_from_entity_defaults() {
+        let ir = Query::from(&USERS).get().build();
         assert_eq!(ir.source.name, "users");
         assert_eq!(ir.projections.len(), 3);
         assert!(matches!(&ir.projections[0], Expr::Identifier(n) if n == "id"));
@@ -219,11 +218,7 @@ mod tests {
 
     #[test]
     fn get_from_entity_where_eq() {
-        let ir = Query::from(&USERS)
-            .get()
-            .all_fields()
-            .where_eq("id")
-            .build();
+        let ir = Query::from(&USERS).get().where_eq("id").build();
         assert_eq!(ir.filters.len(), 1);
     }
 
@@ -252,8 +247,8 @@ mod tests {
     // ── InsertQuery ─────────────────────────────────────────────────
 
     #[test]
-    fn insert_from_entity_all_fields() {
-        let ir = Query::from(&USERS).insert().all_fields().build();
+    fn insert_from_entity_defaults() {
+        let ir = Query::from(&USERS).insert().build();
         assert_eq!(ir.target.name, "users");
         assert_eq!(ir.fields, ["id", "email", "name"]);
     }

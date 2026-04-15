@@ -144,7 +144,8 @@ mod tests {
         assert_eq!(ir.source.name, "users");
         assert!(ir.source.namespace.is_none());
         assert!(ir.source.alias.is_none());
-        assert!(ir.projections.is_empty());
+        assert_eq!(ir.projections.len(), 5);
+        assert!(matches!(&ir.projections[0], Expr::Identifier(n) if n == "id"));
         assert!(ir.joins.is_empty());
         assert!(ir.filters.is_empty());
         assert!(ir.group_by.is_empty());
@@ -158,8 +159,8 @@ mod tests {
     }
 
     #[test]
-    fn get_all_fields() {
-        let ir = TEST_MODEL.get().all_fields().build();
+    fn get_defaults() {
+        let ir = TEST_MODEL.get().build();
         assert_eq!(ir.projections.len(), 5);
         assert!(matches!(&ir.projections[0], Expr::Identifier(n) if n == "id"));
         assert!(matches!(&ir.projections[4], Expr::Identifier(n) if n == "created_at"));
@@ -478,8 +479,8 @@ mod tests {
     // ── InsertBuilder tests ─────────────────────────────────────────────
 
     #[test]
-    fn insert_all_fields() {
-        let ir = TEST_MODEL.insert().all_fields().build();
+    fn insert_defaults() {
+        let ir = TEST_MODEL.insert().build();
         assert_eq!(ir.target.name, "users");
         assert_eq!(
             ir.fields,
@@ -507,7 +508,7 @@ mod tests {
 
     #[test]
     fn insert_returning_all() {
-        let ir = TEST_MODEL.insert().all_fields().returning_all().build();
+        let ir = TEST_MODEL.insert().returning_all().build();
         assert_eq!(ir.returning, vec!["*"]);
     }
 
@@ -756,10 +757,9 @@ mod tests {
     }
 
     #[test]
-    fn upsert_all_fields() {
+    fn upsert_defaults() {
         let ir = TEST_MODEL
             .upsert()
-            .all_fields()
             .on_conflict(&["id"])
             .do_update(&["name"])
             .build();

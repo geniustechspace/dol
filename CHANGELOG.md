@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **BREAKING**: Renamed `all_columns()` → `all_fields()` across all builders
+- **BREAKING**: Removed `all_fields()` — all entity fields are now included by default; use `.columns()` to narrow
 - **BREAKING**: Replaced `TryToSql`/`ToSql` traits with unified `Render` trait (`.render()`)
 - **BREAKING**: Replaced `TransactionSqlExt` with `TransactionRender` trait
 - **BREAKING**: Removed `col()` and `qualified_col()` aliases — use `field()` and `qualified()`

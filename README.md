@@ -21,14 +21,12 @@ static USERS: Entity = Entity::new("users", &[
 
 // Render directly to any SQL dialect
 let pg = USERS.get()
-    .all_fields()
     .where_eq("email")
     .limit()
     .render(Some(&Dialect::postgres())).unwrap();
 // → SELECT id, email, name, created_at FROM users WHERE email = $1 LIMIT $2
 
 let sqlite = USERS.get()
-    .all_fields()
     .where_eq("email")
     .limit()
     .render(None).unwrap(); // default dialect (SQLite)
@@ -169,7 +167,6 @@ let active_ids = USERS.get()
     .build();
 
 let sql = POSTS.get()
-    .all_fields()
     .filter(field("author_id").in_subquery(active_ids))
     .render(Some(&Dialect::postgres())).unwrap();
 ```

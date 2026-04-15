@@ -76,17 +76,6 @@ impl<'a> GetBuilder<'a> {
 
     // ── Projection methods ──────────────────────────────────────────────
 
-    /// Select all fields defined in the entity.
-    ///
-    /// Adds each field as an `Expr::Identifier` projection.
-    pub fn all_fields(mut self) -> Self {
-        for field in self.model.fields {
-            self.projections
-                .push(Expr::Identifier(field.name.to_string()));
-        }
-        self
-    }
-
     /// Select a list of named columns.
     pub fn columns(mut self, names: &[&str]) -> Self {
         for name in names {
@@ -397,6 +386,9 @@ impl<'a> GetBuilder<'a> {
     // ── Build to IR ─────────────────────────────────────────────────────
 
     /// Consume the builder and produce a [`QueryIR`].
+    ///
+    /// When no projections have been set (via `.columns()`, `.select_item()`,
+    /// etc.), all entity fields are selected by default.
     pub fn build(self) -> QueryIR {
         let source = EntityRef {
             name: self.model.name.to_string(),
@@ -430,9 +422,20 @@ impl<'a> GetBuilder<'a> {
             None
         };
 
+        // Default: select all entity fields when no projections were specified.
+        let projections = if self.projections.is_empty() {
+            self.model
+                .fields
+                .iter()
+                .map(|f| Expr::Identifier(f.name.to_string()))
+                .collect()
+        } else {
+            self.projections
+        };
+
         QueryIR {
             source,
-            projections: self.projections,
+            projections,
             joins,
             filters: self.filters,
             group_by: self.group_by,
