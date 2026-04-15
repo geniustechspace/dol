@@ -423,6 +423,7 @@ impl GetBuilderSqlExt for GetBuilder<'_> {
 mod tests {
     use super::*;
     use dol_core::builder::EntityBuilderExt;
+    use dol_core::expr::{field, param};
     use dol_core::ir::definition::FieldDef;
     use dol_core::model::{Entity, Field, FieldType};
 
@@ -451,7 +452,7 @@ mod tests {
     fn get_builder_render() {
         let sql = TEST_MODEL
             .get()
-            .where_eq("status")
+            .filter(field("status").eq(param()))
             .order_by_desc("email")
             .limit()
             .render(Some(&pg()))
@@ -473,7 +474,7 @@ mod tests {
     fn insert_specific_columns() {
         let sql = TEST_MODEL
             .insert()
-            .columns(&["id", "email"])
+            .fields(&["id", "email"])
             .render(Some(&pg()))
             .unwrap();
         assert!(sql.contains("(id, email)"));
@@ -484,7 +485,7 @@ mod tests {
     fn insert_multiple_rows() {
         let sql = TEST_MODEL
             .insert()
-            .columns(&["id", "email"])
+            .fields(&["id", "email"])
             .rows(3)
             .render(Some(&pg()))
             .unwrap();
@@ -495,7 +496,7 @@ mod tests {
     fn insert_returning_all() {
         let sql = TEST_MODEL
             .insert()
-            .columns(&["id"])
+            .fields(&["id"])
             .returning_all()
             .render(None)
             .unwrap();
@@ -504,7 +505,7 @@ mod tests {
 
     #[test]
     fn insert_with_namespace() {
-        let sql = NS_MODEL.insert().columns(&["id"]).render(None).unwrap();
+        let sql = NS_MODEL.insert().fields(&["id"]).render(None).unwrap();
         assert!(sql.contains("INSERT INTO auth.users"));
     }
 
@@ -516,7 +517,7 @@ mod tests {
             .update()
             .set("email")
             .set("status")
-            .where_eq("id")
+            .filter(field("id").eq(param()))
             .render(Some(&pg()))
             .unwrap();
         assert!(sql.contains("UPDATE users SET"));
@@ -531,7 +532,7 @@ mod tests {
     fn remove_basic() {
         let sql = TEST_MODEL
             .remove()
-            .where_eq("id")
+            .filter(field("id").eq(param()))
             .render(Some(&pg()))
             .unwrap();
         assert!(sql.contains("DELETE FROM users"));
@@ -544,7 +545,7 @@ mod tests {
     fn upsert_basic() {
         let sql = TEST_MODEL
             .upsert()
-            .columns(&["id", "email", "status"])
+            .fields(&["id", "email", "status"])
             .on_conflict(&["id"])
             .do_update(&["email", "status"])
             .render(Some(&pg()))
@@ -680,10 +681,10 @@ mod tests {
         // renders them with a shared counter so params are globally unique.
         let base_ir = TEST_MODEL
             .get()
-            .columns(&["id"])
-            .where_eq("tenant_id")
+            .fields(&["id"])
+            .filter(field("tenant_id").eq(param()))
             .build();
-        let part_ir = TEST_MODEL.get().columns(&["id"]).where_eq("status").build();
+        let part_ir = TEST_MODEL.get().fields(&["id"]).filter(field("status").eq(param())).build();
         let sql = CompoundSelectBuilder::new(base_ir)
             .union(part_ir)
             .limit()
@@ -706,8 +707,8 @@ mod tests {
     #[test]
     fn compound_select_no_params_starts_at_one() {
         // Sub-queries with no WHERE params → LIMIT gets $1.
-        let base_ir = TEST_MODEL.get().columns(&["id"]).build();
-        let part_ir = TEST_MODEL.get().columns(&["id"]).build();
+        let base_ir = TEST_MODEL.get().fields(&["id"]).build();
+        let part_ir = TEST_MODEL.get().fields(&["id"]).build();
         let sql = CompoundSelectBuilder::new(base_ir)
             .union(part_ir)
             .limit()
@@ -882,7 +883,7 @@ mod tests {
     fn transaction_block_postgres() {
         use dol_core::builder::transaction::TransactionBuilder;
 
-        let insert_ir = TEST_MODEL.insert().columns(&["id", "email"]).build();
+        let insert_ir = TEST_MODEL.insert().fields(&["id", "email"]).build();
         let stmts = vec![dol_core::ir::Statement::Insert(insert_ir)];
         let ir = TransactionBuilder::block(stmts);
         let sql = TransactionBuilder::render(&ir, Some(&pg())).unwrap();

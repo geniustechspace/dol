@@ -14,6 +14,7 @@
 //! ```rust
 //! use dol_query::Query;
 //! use dol_entity::{Entity, Field, FieldType};
+//! use dol_expr::{field, param};
 //!
 //! // From a static Entity — full field-aware API
 //! static USERS: Entity = Entity::new("users", &[
@@ -23,7 +24,7 @@
 //!
 //! let ir = Query::from(&USERS)
 //!     .get()
-//!     .where_eq("id")
+//!     .filter(field("id").eq(param()))
 //!     .build();
 //! assert_eq!(ir.source.name, "users");
 //! assert_eq!(ir.projections.len(), 2);
@@ -31,15 +32,15 @@
 //! // From a plain string — no field metadata needed
 //! let ir = Query::from("users")
 //!     .get()
-//!     .columns(&["id", "email"])
-//!     .where_eq("id")
+//!     .fields(&["id", "email"])
+//!     .filter(field("id").eq(param()))
 //!     .build();
 //! assert_eq!(ir.source.name, "users");
 //!
 //! // From a namespaced string
 //! let ir = Query::from("identity.users")
 //!     .get()
-//!     .columns(&["id"])
+//!     .fields(&["id"])
 //!     .build();
 //! assert_eq!(ir.source.name, "users");
 //! assert_eq!(ir.source.namespace.as_deref(), Some("identity"));
@@ -49,7 +50,7 @@
 //!     .namespace("v1")
 //!     .namespace("users")
 //!     .get()
-//!     .columns(&["id"])
+//!     .fields(&["id"])
 //!     .build();
 //! assert_eq!(ir.source.namespace.as_deref(), Some("api.v1"));
 //! assert_eq!(ir.source.name, "users");
@@ -100,7 +101,7 @@ use dol_entity::Entity;
 /// let ir = Query::from("api")
 ///     .namespace("users")
 ///     .get()
-///     .columns(&["id"])
+///     .fields(&["id"])
 ///     .build();
 /// assert_eq!(ir.source.namespace.as_deref(), Some("api"));
 /// assert_eq!(ir.source.name, "users");
@@ -110,7 +111,7 @@ use dol_entity::Entity;
 ///     .namespace("v1")
 ///     .namespace("users")
 ///     .get()
-///     .columns(&["id"])
+///     .fields(&["id"])
 ///     .build();
 /// assert_eq!(ir.source.namespace.as_deref(), Some("api.v1"));
 /// assert_eq!(ir.source.name, "users");
@@ -220,7 +221,7 @@ impl From<String> for Query {
 mod tests {
     use super::*;
     use dol_entity::{Field, FieldType};
-    use dol_expr::Expr;
+    use dol_expr::{Expr, field, param};
 
     static USERS: Entity = Entity::new(
         "users",
@@ -308,7 +309,7 @@ mod tests {
             .namespace("v1")
             .namespace("users")
             .get()
-            .columns(&["id"])
+            .fields(&["id"])
             .build();
         assert_eq!(ir.source.name, "users");
         assert_eq!(ir.source.namespace.as_deref(), Some("api.v1"));
@@ -319,7 +320,7 @@ mod tests {
         let ir = Query::from("api")
             .namespace("users")
             .insert()
-            .columns(&["id", "email"])
+            .fields(&["id", "email"])
             .build();
         assert_eq!(ir.target.name, "users");
         assert_eq!(ir.target.namespace.as_deref(), Some("api"));
@@ -341,7 +342,7 @@ mod tests {
         let ir = Query::from("api")
             .namespace("users")
             .remove()
-            .where_eq("id")
+            .filter(field("id").eq(param()))
             .build();
         assert_eq!(ir.target.name, "users");
         assert_eq!(ir.target.namespace.as_deref(), Some("api"));
@@ -352,7 +353,7 @@ mod tests {
         let ir = Query::from("api")
             .namespace("users")
             .upsert()
-            .columns(&["id", "email"])
+            .fields(&["id", "email"])
             .on_conflict(&["id"])
             .do_nothing()
             .build();
@@ -372,8 +373,11 @@ mod tests {
     }
 
     #[test]
-    fn get_from_entity_where_eq() {
-        let ir = Query::from(&USERS).get().where_eq("id").build();
+    fn get_from_entity_filter() {
+        let ir = Query::from(&USERS)
+            .get()
+            .filter(field("id").eq(param()))
+            .build();
         assert_eq!(ir.filters.len(), 1);
     }
 
@@ -383,8 +387,8 @@ mod tests {
     fn get_from_string_columns() {
         let ir = Query::from("users")
             .get()
-            .columns(&["id", "email"])
-            .where_eq("id")
+            .fields(&["id", "email"])
+            .filter(field("id").eq(param()))
             .build();
         assert_eq!(ir.source.name, "users");
         assert!(ir.source.namespace.is_none());
@@ -394,7 +398,7 @@ mod tests {
 
     #[test]
     fn get_from_namespaced_string() {
-        let ir = Query::from("identity.users").get().columns(&["id"]).build();
+        let ir = Query::from("identity.users").get().fields(&["id"]).build();
         assert_eq!(ir.source.name, "users");
         assert_eq!(ir.source.namespace.as_deref(), Some("identity"));
     }
@@ -412,7 +416,7 @@ mod tests {
     fn insert_from_string_columns() {
         let ir = Query::from("users")
             .insert()
-            .columns(&["id", "email"])
+            .fields(&["id", "email"])
             .rows(2)
             .returning_all()
             .build();
@@ -429,7 +433,7 @@ mod tests {
         let ir = Query::from("users")
             .update()
             .set("email")
-            .where_eq("id")
+            .filter(field("id").eq(param()))
             .returning_all()
             .build();
         assert_eq!(ir.target.name, "users");
@@ -444,7 +448,7 @@ mod tests {
     fn remove_from_string() {
         let ir = Query::from("users")
             .remove()
-            .where_eq("id")
+            .filter(field("id").eq(param()))
             .returning_all()
             .build();
         assert_eq!(ir.target.name, "users");
@@ -458,7 +462,7 @@ mod tests {
     fn upsert_from_string() {
         let ir = Query::from("users")
             .upsert()
-            .columns(&["id", "email", "name"])
+            .fields(&["id", "email", "name"])
             .on_conflict(&["id"])
             .do_update(&["email", "name"])
             .build();
@@ -472,7 +476,7 @@ mod tests {
     fn upsert_do_nothing() {
         let ir = Query::from("users")
             .upsert()
-            .columns(&["id", "email"])
+            .fields(&["id", "email"])
             .on_conflict(&["id"])
             .do_nothing()
             .build();
