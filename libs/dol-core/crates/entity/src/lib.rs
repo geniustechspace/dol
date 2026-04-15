@@ -499,10 +499,12 @@ mod tests {
     fn field_type_serde_round_trip_custom() {
         // Custom variant round-trips: the deserialized &'static str is
         // leaked from a String, so equality holds by value.
-        let ft = FieldType::Custom("CITEXT");
-        let json = serde_json::to_string(&ft).unwrap();
-        let back: FieldType = serde_json::from_str(&json).unwrap();
-        assert_eq!(ft, back);
+        for name in ["CITEXT", "MONEY", "VARCHAR(50)", "item_status", ""] {
+            let ft = FieldType::Custom(name);
+            let json = serde_json::to_string(&ft).unwrap();
+            let back: FieldType = serde_json::from_str(&json).unwrap();
+            assert_eq!(ft, back, "round-trip failed for Custom({:?})", name);
+        }
     }
 
     // ── 22. FkAction Display — all 5 variants ──────────────────────────
