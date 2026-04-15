@@ -7,7 +7,9 @@ use super::dialect::{
     ReturningStyle,
 };
 use dol_core::expr::window::{FrameBound, FrameKind, WindowFrame};
-use dol_core::expr::{BinOp, Direction, Expr, Literal, NullsPosition, OrderByExpr, UnaryOp};
+use dol_core::expr::{
+    BinOp, Direction, Expr, Literal, NullsPosition, OrderByExpr, Quantifier, TernaryOp, UnaryOp,
+};
 use dol_core::ir::BackendError;
 use dol_core::ir::SqlOutput;
 use dol_core::ir::*;
@@ -46,13 +48,31 @@ pub fn render_expr(expr: &Expr, counter: &mut ParamCounter, dialect: &Dialect) -
 
         Expr::Literal(lit) => render_literal(lit, dialect),
 
-        Expr::BinaryOp { left, op, right } => render_binary_op(left, *op, right, counter, dialect),
+        Expr::BinaryOp {
+            left,
+            op,
+            right,
+            negated,
+        } => render_binary_op(left, *op, right, *negated, counter, dialect),
 
         Expr::UnaryOp { op, expr } => {
             let inner = render_expr(expr, counter, dialect);
             match op {
                 UnaryOp::Not => format!("NOT ({})", inner),
                 UnaryOp::Neg => format!("-({})", inner),
+                UnaryOp::IsNull => format!("{} IS NULL", inner),
+                UnaryOp::IsNotNull => format!("{} IS NOT NULL", inner),
+                UnaryOp::IsTrue => format!("{} IS TRUE", inner),
+                UnaryOp::IsNotTrue => format!("{} IS NOT TRUE", inner),
+                UnaryOp::IsFalse => format!("{} IS FALSE", inner),
+                UnaryOp::IsNotFalse => format!("{} IS NOT FALSE", inner),
+                UnaryOp::IsUnknown => format!("{} IS UNKNOWN", inner),
+                UnaryOp::IsNotUnknown => format!("{} IS NOT UNKNOWN", inner),
+                UnaryOp::BitNot => format!("~({})", inner),
+                UnaryOp::Sqrt => format!("|/({})", inner),
+                UnaryOp::CubeRoot => format!("||/({})", inner),
+                UnaryOp::Abs => format!("@({})", inner),
+                UnaryOp::Factorial => format!("({}!)", inner),
             }
         }
 
@@ -209,6 +229,42 @@ pub fn render_expr(expr: &Expr, counter: &mut ParamCounter, dialect: &Dialect) -
 
             format!("{} OVER ({})", func_sql, over_parts.join(" "))
         }
+
+        Expr::TernaryOp {
+            expr,
+            op,
+            first,
+            second,
+            negated,
+        } => {
+            let expr_sql = render_expr(expr, counter, dialect);
+            let first_sql = render_expr(first, counter, dialect);
+            let second_sql = render_expr(second, counter, dialect);
+            let not = if *negated { " NOT" } else { "" };
+            match op {
+                TernaryOp::Between => {
+                    format!(
+                        "{}{} BETWEEN {} AND {}",
+                        expr_sql, not, first_sql, second_sql
+                    )
+                }
+            }
+        }
+
+        Expr::QuantifiedCmp {
+            expr,
+            op,
+            quantifier,
+            subquery,
+        } => {
+            let lhs = render_expr(expr, counter, dialect);
+            let op_str = render_binop_token(*op);
+            let quant = match quantifier {
+                Quantifier::Any => "ANY",
+                Quantifier::All => "ALL",
+            };
+            format!("{} {} {} ({})", lhs, op_str, quant, subquery)
+        }
     }
 }
 
@@ -230,6 +286,7 @@ fn render_binary_op(
     left: &Expr,
     op: BinOp,
     right: &Expr,
+    negated: bool,
     counter: &mut ParamCounter,
     dialect: &Dialect,
 ) -> String {
@@ -237,7 +294,8 @@ fn render_binary_op(
     if op == BinOp::ILike && !dialect.features.ilike {
         let lhs = render_expr(left, counter, dialect);
         let rhs = render_expr(right, counter, dialect);
-        return format!("LOWER({}) LIKE LOWER({})", lhs, rhs);
+        let not = if negated { "NOT " } else { "" };
+        return format!("{}LOWER({}) LIKE LOWER({})", not, lhs, rhs);
     }
 
     // Special case: Concat dispatches on dialect.concat_style
@@ -253,29 +311,82 @@ fn render_binary_op(
 
     let lhs = render_expr(left, counter, dialect);
     let rhs = render_expr(right, counter, dialect);
+    let op_str = render_binop_token(op);
 
-    let op_str = match op {
+    let base = match op {
+        BinOp::And | BinOp::Or => format!("({} {} {})", lhs, op_str, rhs),
+        _ => format!("{} {} {}", lhs, op_str, rhs),
+    };
+
+    if negated {
+        format!("NOT ({})", base)
+    } else {
+        base
+    }
+}
+
+/// Map a [`BinOp`] to its SQL token string.
+fn render_binop_token(op: BinOp) -> &'static str {
+    match op {
+        // Comparison
         BinOp::Eq => "=",
         BinOp::Ne => "!=",
         BinOp::Lt => "<",
         BinOp::Gt => ">",
         BinOp::Le => "<=",
         BinOp::Ge => ">=",
+        // Null-safe comparison
+        BinOp::IsDistinctFrom => "IS DISTINCT FROM",
+        BinOp::IsNotDistinctFrom => "IS NOT DISTINCT FROM",
+        // Arithmetic
         BinOp::Add => "+",
         BinOp::Sub => "-",
         BinOp::Mul => "*",
         BinOp::Div => "/",
         BinOp::Mod => "%",
+        // Logical
         BinOp::And => "AND",
         BinOp::Or => "OR",
+        // Pattern
         BinOp::Like => "LIKE",
         BinOp::ILike => "ILIKE",
-        BinOp::Concat => unreachable!(),
-    };
-
-    match op {
-        BinOp::And | BinOp::Or => format!("({} {} {})", lhs, op_str, rhs),
-        _ => format!("{} {} {}", lhs, op_str, rhs),
+        BinOp::SimilarTo => "SIMILAR TO",
+        BinOp::RegexMatch => "~",
+        BinOp::RegexMatchInsensitive => "~*",
+        BinOp::Glob => "GLOB",
+        // String
+        BinOp::Concat => "||",
+        BinOp::StartsWith => "^@",
+        BinOp::Contains => "LIKE", // lowered by backend
+        // Bitwise
+        BinOp::BitAnd => "&",
+        BinOp::BitOr => "|",
+        BinOp::BitXor => "#",
+        BinOp::ShiftLeft => "<<",
+        BinOp::ShiftRight => ">>",
+        // Array / Collection
+        BinOp::ArrayContains => "@>",
+        BinOp::ArrayContainedBy => "<@",
+        BinOp::ArrayOverlap => "&&",
+        // JSON / Document
+        BinOp::JsonGet => "->",
+        BinOp::JsonGetText => "->>",
+        BinOp::JsonPath => "#>",
+        BinOp::JsonPathText => "#>>",
+        BinOp::JsonHasKey => "?",
+        BinOp::JsonHasAnyKey => "?|",
+        BinOp::JsonHasAllKeys => "?&",
+        // Range
+        BinOp::RangeContains => "@>",
+        BinOp::RangeContainedBy => "<@",
+        BinOp::RangeOverlap => "&&",
+        // Collection ops (value-level)
+        BinOp::Merge => "MERGE",
+        BinOp::Append => "APPEND",
+        BinOp::Prepend => "PREPEND",
+        BinOp::RemoveKey => "REMOVE",
+        // Spatial
+        BinOp::Distance => "<->",
     }
 }
 

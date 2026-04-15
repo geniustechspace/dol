@@ -33,7 +33,7 @@ pub mod order;
 pub mod window;
 
 pub use literal::Literal;
-pub use ops::{BinOp, UnaryOp};
+pub use ops::{BinOp, Quantifier, TernaryOp, UnaryOp};
 pub use order::{Direction, NullsPosition, OrderByExpr};
 pub use window::{CaseBuilder, FrameBound, FrameKind, WindowBuilder, WindowFrame};
 
@@ -76,14 +76,35 @@ pub enum Expr {
     Literal(Literal),
 
     // ── Operations ──
-    /// A binary operation: `left op right`.
+    /// A binary operation: `left op right`, optionally negated.
+    ///
+    /// The `negated` flag handles `NOT LIKE`, `NOT SIMILAR TO`, etc. without
+    /// doubling the `BinOp` variant count.
     BinaryOp {
         left: Box<Expr>,
         op: BinOp,
         right: Box<Expr>,
+        negated: bool,
     },
     /// A unary operation: `op expr`.
     UnaryOp { op: UnaryOp, expr: Box<Expr> },
+    /// A ternary operation: `expr op(operand1, operand2)`.
+    ///
+    /// Canonical example: `expr [NOT] BETWEEN low AND high`.
+    TernaryOp {
+        expr: Box<Expr>,
+        op: TernaryOp,
+        first: Box<Expr>,
+        second: Box<Expr>,
+        negated: bool,
+    },
+    /// A quantified comparison: `expr op ANY(subquery)` / `expr op ALL(subquery)`.
+    QuantifiedCmp {
+        expr: Box<Expr>,
+        op: BinOp,
+        quantifier: Quantifier,
+        subquery: String,
+    },
 
     // ── Function call ──
     /// A function call: `name(args...)`.
@@ -250,80 +271,122 @@ impl Expr {
         }
     }
 
+    // ── Helper ──
+
+    /// Internal helper to construct a non-negated binary op.
+    fn binop(self, op: BinOp, rhs: impl Into<Expr>) -> Expr {
+        Expr::BinaryOp {
+            left: Box::new(self),
+            op,
+            right: Box::new(rhs.into()),
+            negated: false,
+        }
+    }
+
+    /// Internal helper to construct a negated binary op.
+    fn binop_neg(self, op: BinOp, rhs: impl Into<Expr>) -> Expr {
+        Expr::BinaryOp {
+            left: Box::new(self),
+            op,
+            right: Box::new(rhs.into()),
+            negated: true,
+        }
+    }
+
     // ── Comparison operators ──
 
     /// `self == rhs`
     pub fn eq(self, rhs: impl Into<Expr>) -> Expr {
-        Expr::BinaryOp {
-            left: Box::new(self),
-            op: BinOp::Eq,
-            right: Box::new(rhs.into()),
-        }
+        self.binop(BinOp::Eq, rhs)
     }
 
     /// `self != rhs`
     pub fn ne(self, rhs: impl Into<Expr>) -> Expr {
-        Expr::BinaryOp {
-            left: Box::new(self),
-            op: BinOp::Ne,
-            right: Box::new(rhs.into()),
-        }
+        self.binop(BinOp::Ne, rhs)
     }
 
     /// `self < rhs`
     pub fn lt(self, rhs: impl Into<Expr>) -> Expr {
-        Expr::BinaryOp {
-            left: Box::new(self),
-            op: BinOp::Lt,
-            right: Box::new(rhs.into()),
-        }
+        self.binop(BinOp::Lt, rhs)
     }
 
     /// `self > rhs`
     pub fn gt(self, rhs: impl Into<Expr>) -> Expr {
-        Expr::BinaryOp {
-            left: Box::new(self),
-            op: BinOp::Gt,
-            right: Box::new(rhs.into()),
-        }
+        self.binop(BinOp::Gt, rhs)
     }
 
     /// `self <= rhs`
     pub fn le(self, rhs: impl Into<Expr>) -> Expr {
-        Expr::BinaryOp {
-            left: Box::new(self),
-            op: BinOp::Le,
-            right: Box::new(rhs.into()),
-        }
+        self.binop(BinOp::Le, rhs)
     }
 
     /// `self >= rhs`
     pub fn ge(self, rhs: impl Into<Expr>) -> Expr {
-        Expr::BinaryOp {
-            left: Box::new(self),
-            op: BinOp::Ge,
-            right: Box::new(rhs.into()),
-        }
+        self.binop(BinOp::Ge, rhs)
     }
 
-    // ── Pattern matching ──
+    // ── Null-safe comparison ──
+
+    /// `self IS DISTINCT FROM rhs` (null-safe inequality).
+    pub fn is_distinct_from(self, rhs: impl Into<Expr>) -> Expr {
+        self.binop(BinOp::IsDistinctFrom, rhs)
+    }
+
+    /// `self IS NOT DISTINCT FROM rhs` (null-safe equality).
+    pub fn is_not_distinct_from(self, rhs: impl Into<Expr>) -> Expr {
+        self.binop(BinOp::IsNotDistinctFrom, rhs)
+    }
+
+    // ── Pattern matching (support negation via `negated`) ──
 
     /// `self LIKE rhs`
     pub fn like(self, rhs: impl Into<Expr>) -> Expr {
-        Expr::BinaryOp {
-            left: Box::new(self),
-            op: BinOp::Like,
-            right: Box::new(rhs.into()),
-        }
+        self.binop(BinOp::Like, rhs)
+    }
+
+    /// `self NOT LIKE rhs`
+    pub fn not_like(self, rhs: impl Into<Expr>) -> Expr {
+        self.binop_neg(BinOp::Like, rhs)
     }
 
     /// `self ILIKE rhs` (dialect-aware: falls back to `LOWER(self) LIKE LOWER(rhs)`).
     pub fn ilike(self, rhs: impl Into<Expr>) -> Expr {
-        Expr::BinaryOp {
-            left: Box::new(self),
-            op: BinOp::ILike,
-            right: Box::new(rhs.into()),
-        }
+        self.binop(BinOp::ILike, rhs)
+    }
+
+    /// `self NOT ILIKE rhs`
+    pub fn not_ilike(self, rhs: impl Into<Expr>) -> Expr {
+        self.binop_neg(BinOp::ILike, rhs)
+    }
+
+    /// `self SIMILAR TO rhs` (SQL-standard regex).
+    pub fn similar_to(self, rhs: impl Into<Expr>) -> Expr {
+        self.binop(BinOp::SimilarTo, rhs)
+    }
+
+    /// `self NOT SIMILAR TO rhs`
+    pub fn not_similar_to(self, rhs: impl Into<Expr>) -> Expr {
+        self.binop_neg(BinOp::SimilarTo, rhs)
+    }
+
+    /// `self ~ rhs` (POSIX regex match).
+    pub fn regex_match(self, rhs: impl Into<Expr>) -> Expr {
+        self.binop(BinOp::RegexMatch, rhs)
+    }
+
+    /// `self !~ rhs` (negated POSIX regex match).
+    pub fn not_regex_match(self, rhs: impl Into<Expr>) -> Expr {
+        self.binop_neg(BinOp::RegexMatch, rhs)
+    }
+
+    /// `self ~* rhs` (POSIX regex match, case-insensitive).
+    pub fn regex_match_insensitive(self, rhs: impl Into<Expr>) -> Expr {
+        self.binop(BinOp::RegexMatchInsensitive, rhs)
+    }
+
+    /// `self !~* rhs` (negated case-insensitive regex match).
+    pub fn not_regex_match_insensitive(self, rhs: impl Into<Expr>) -> Expr {
+        self.binop_neg(BinOp::RegexMatchInsensitive, rhs)
     }
 
     // ── Null checks ──
@@ -426,11 +489,7 @@ impl Expr {
 
     /// String concatenation (dialect-aware: `||` vs `CONCAT()` vs `+`).
     pub fn concat(self, rhs: impl Into<Expr>) -> Expr {
-        Expr::BinaryOp {
-            left: Box::new(self),
-            op: BinOp::Concat,
-            right: Box::new(rhs.into()),
-        }
+        self.binop(BinOp::Concat, rhs)
     }
 
     // ── Ordering ──
@@ -509,6 +568,7 @@ impl std_ops::BitAnd for Expr {
             left: Box::new(self),
             op: BinOp::And,
             right: Box::new(rhs),
+            negated: false,
         }
     }
 }
@@ -521,6 +581,7 @@ impl std_ops::BitOr for Expr {
             left: Box::new(self),
             op: BinOp::Or,
             right: Box::new(rhs),
+            negated: false,
         }
     }
 }
@@ -544,6 +605,7 @@ impl std_ops::Add for Expr {
             left: Box::new(self),
             op: BinOp::Add,
             right: Box::new(rhs),
+            negated: false,
         }
     }
 }
@@ -556,6 +618,7 @@ impl std_ops::Sub for Expr {
             left: Box::new(self),
             op: BinOp::Sub,
             right: Box::new(rhs),
+            negated: false,
         }
     }
 }
@@ -568,6 +631,7 @@ impl std_ops::Mul for Expr {
             left: Box::new(self),
             op: BinOp::Mul,
             right: Box::new(rhs),
+            negated: false,
         }
     }
 }
@@ -580,6 +644,7 @@ impl std_ops::Div for Expr {
             left: Box::new(self),
             op: BinOp::Div,
             right: Box::new(rhs),
+            negated: false,
         }
     }
 }
@@ -592,6 +657,7 @@ impl std_ops::Rem for Expr {
             left: Box::new(self),
             op: BinOp::Mod,
             right: Box::new(rhs),
+            negated: false,
         }
     }
 }
@@ -1269,10 +1335,16 @@ mod tests {
     fn test_comparison_preserves_operands() {
         let e = field("age").gt(lit(18_i64));
         match e {
-            Expr::BinaryOp { left, op, right } => {
+            Expr::BinaryOp {
+                left,
+                op,
+                right,
+                negated,
+            } => {
                 assert!(matches!(*left, Expr::Identifier(s) if s == "age"));
                 assert_eq!(op, BinOp::Gt);
                 assert!(matches!(*right, Expr::Literal(Literal::Int(18))));
+                assert!(!negated);
             }
             other => panic!("expected BinaryOp, got {other:?}"),
         }
@@ -1326,8 +1398,11 @@ mod tests {
         // &str implements Into<Expr> via From<&str>
         let e = field("status").eq("active");
         match e {
-            Expr::BinaryOp { right, op, .. } => {
+            Expr::BinaryOp {
+                right, op, negated, ..
+            } => {
                 assert_eq!(op, BinOp::Eq);
+                assert!(!negated);
                 assert!(matches!(*right, Expr::Identifier(s) if s == "active"));
             }
             other => panic!("expected BinaryOp, got {other:?}"),

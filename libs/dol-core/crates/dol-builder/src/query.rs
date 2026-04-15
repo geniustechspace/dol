@@ -516,6 +516,16 @@ pub(crate) fn count_single_expr_params(expr: &Expr) -> usize {
 
         Expr::FieldAccess { base, .. } => count_single_expr_params(base),
 
+        Expr::TernaryOp {
+            expr, first, second, ..
+        } => {
+            count_single_expr_params(expr)
+                + count_single_expr_params(first)
+                + count_single_expr_params(second)
+        }
+
+        Expr::QuantifiedCmp { expr, .. } => count_single_expr_params(expr),
+
         Expr::ObjectLiteral(fields) => fields
             .iter()
             .map(|(_, v)| count_single_expr_params(v))
