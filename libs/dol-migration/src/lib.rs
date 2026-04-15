@@ -46,8 +46,8 @@
 //!     fn description(&self) -> &str { "Create users table" }
 //!
 //!     fn up(&self) -> Vec<MigrationStep> {
-//!         vec![MigrationStep::define_model(
-//!             dol_core::builder::definition::DefineModelBuilder::new("users")
+//!         vec![MigrationStep::define_entity(
+//!             dol_core::builder::definition::DefineEntityBuilder::new("users")
 //!                 .field(FieldDef::new("id", FieldType::Uuid).primary_key())
 //!                 .field(FieldDef::new("email", FieldType::Text).unique())
 //!                 .if_not_exists()
@@ -56,7 +56,7 @@
 //!     }
 //!
 //!     fn down(&self) -> Vec<MigrationStep> {
-//!         vec![MigrationStep::drop_model("users")]
+//!         vec![MigrationStep::drop_entity("users")]
 //!     }
 //! }
 //!
@@ -86,8 +86,8 @@ pub use runner::{
     MigrationRunner, MigrationState, MigrationStatus, RenderedMigration, RenderedStep,
 };
 pub use schema_diff::{
-    FieldSnapshot, ModelSnapshot, create_model_step, diff_models, diff_to_steps, drop_model_step,
-    field_to_field_def,
+    EntitySnapshot, FieldSnapshot, create_entity_step, diff_entities, diff_to_steps,
+    drop_entity_step, field_to_field_def,
 };
 
 use dol_core::ir;
@@ -124,7 +124,7 @@ use std::fmt;
 ///     fn description(&self) -> &str { "Add profile JSON column to users" }
 ///
 ///     fn up(&self) -> Vec<MigrationStep> {
-///         vec![MigrationStep::alter_model(
+///         vec![MigrationStep::alter_entity(
 ///             "users",
 ///             vec![dol_core::ir::AlterAction::AddField(
 ///                 FieldDef::new("profile", FieldType::Json).nullable()
@@ -133,7 +133,7 @@ use std::fmt;
 ///     }
 ///
 ///     fn down(&self) -> Vec<MigrationStep> {
-///         vec![MigrationStep::alter_model(
+///         vec![MigrationStep::alter_entity(
 ///             "users",
 ///             vec![dol_core::ir::AlterAction::DropField("profile".into())]
 ///         )]
@@ -180,15 +180,15 @@ pub enum MigrationStep {
 impl MigrationStep {
     // -- SQL convenience constructors --
 
-    /// Create a table from a [`DefineModelIR`](ir::DefineModelIR).
-    pub fn define_model(ir: ir::DefineModelIR) -> Self {
-        Self::Sql(ir::Statement::DefineModel(ir))
+    /// Create a table from a [`DefineEntityIR`](ir::DefineEntityIR).
+    pub fn define_entity(ir: ir::DefineEntityIR) -> Self {
+        Self::Sql(ir::Statement::DefineEntity(ir))
     }
 
     /// Drop a table by name (with IF EXISTS).
-    pub fn drop_model(name: &str) -> Self {
-        Self::Sql(ir::Statement::DropModel(ir::DropModelIR {
-            target: ir::ModelRef {
+    pub fn drop_entity(name: &str) -> Self {
+        Self::Sql(ir::Statement::DropEntity(ir::DropEntityIR {
+            target: ir::EntityRef {
                 name: name.to_string(),
                 namespace: None,
                 alias: None,
@@ -200,8 +200,8 @@ impl MigrationStep {
 
     /// Drop a table by name with CASCADE.
     pub fn drop_model_cascade(name: &str) -> Self {
-        Self::Sql(ir::Statement::DropModel(ir::DropModelIR {
-            target: ir::ModelRef {
+        Self::Sql(ir::Statement::DropEntity(ir::DropEntityIR {
+            target: ir::EntityRef {
                 name: name.to_string(),
                 namespace: None,
                 alias: None,
@@ -212,9 +212,9 @@ impl MigrationStep {
     }
 
     /// Alter a table with the given actions.
-    pub fn alter_model(name: &str, actions: Vec<ir::AlterAction>) -> Self {
-        Self::Sql(ir::Statement::AlterModel(ir::AlterModelIR {
-            target: ir::ModelRef {
+    pub fn alter_entity(name: &str, actions: Vec<ir::AlterAction>) -> Self {
+        Self::Sql(ir::Statement::AlterEntity(ir::AlterEntityIR {
+            target: ir::EntityRef {
                 name: name.to_string(),
                 namespace: None,
                 alias: None,
@@ -579,8 +579,8 @@ impl std::error::Error for MigrationError {}
 #[cfg(test)]
 pub(crate) mod test_helpers {
     use super::*;
-    use dol_core::builder::DefineModelBuilder;
-    use dol_core::ir::ModelRef;
+    use dol_core::builder::DefineEntityBuilder;
+    use dol_core::ir::EntityRef;
     use dol_core::ir::definition::{DefineIndexIR, FieldDef};
     use dol_core::model::FieldType;
 
@@ -595,8 +595,8 @@ pub(crate) mod test_helpers {
             "Create users table"
         }
         fn up(&self) -> Vec<MigrationStep> {
-            vec![MigrationStep::define_model(
-                DefineModelBuilder::new("users")
+            vec![MigrationStep::define_entity(
+                DefineEntityBuilder::new("users")
                     .field(FieldDef::new("id", FieldType::Uuid).primary_key())
                     .field(FieldDef::new("email", FieldType::Text).unique())
                     .field(FieldDef::new("status", FieldType::Text).default("'active'"))
@@ -606,7 +606,7 @@ pub(crate) mod test_helpers {
             )]
         }
         fn down(&self) -> Vec<MigrationStep> {
-            vec![MigrationStep::drop_model("users")]
+            vec![MigrationStep::drop_entity("users")]
         }
     }
 
@@ -623,7 +623,7 @@ pub(crate) mod test_helpers {
         fn up(&self) -> Vec<MigrationStep> {
             vec![MigrationStep::define_index(DefineIndexIR {
                 name: "idx_users_email".to_string(),
-                target: ModelRef {
+                target: EntityRef {
                     name: "users".to_string(),
                     namespace: None,
                     alias: None,
@@ -652,8 +652,8 @@ pub(crate) mod test_helpers {
             "Create sessions table"
         }
         fn up(&self) -> Vec<MigrationStep> {
-            vec![MigrationStep::define_model(
-                DefineModelBuilder::new("sessions")
+            vec![MigrationStep::define_entity(
+                DefineEntityBuilder::new("sessions")
                     .field(FieldDef::new("id", FieldType::Uuid).primary_key())
                     .field(FieldDef::new("user_id", FieldType::Uuid))
                     .field(FieldDef::new("token", FieldType::Text))
@@ -663,7 +663,7 @@ pub(crate) mod test_helpers {
             )]
         }
         fn down(&self) -> Vec<MigrationStep> {
-            vec![MigrationStep::drop_model("sessions")]
+            vec![MigrationStep::drop_entity("sessions")]
         }
     }
 

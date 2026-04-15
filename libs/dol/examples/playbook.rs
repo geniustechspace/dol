@@ -25,12 +25,12 @@
 //! 14. **Config-Integrated Migrations** — run migrations using DolConfig settings
 
 use dol::CompoundSelectBuilder;
-use dol::ModelBuilderExt;
+use dol::EntityBuilderExt;
 use dol::ToSql;
 use dol::TransactionSqlExt;
 use dol::backend::sql::dialect::Dialect;
 use dol::builder::control::{GrantBuilder, Privilege, RevokeBuilder};
-use dol::builder::definition::{DefineIndexBuilder, DefineModelBuilder, DropIndexBuilder};
+use dol::builder::definition::{DefineEntityBuilder, DefineIndexBuilder, DropIndexBuilder};
 use dol::builder::storage::{
     GetObjectBuilder, ListObjectsBuilder, MoveFileBuilder, PutObjectBuilder, ReadFileBuilder,
     WriteFileBuilder,
@@ -39,14 +39,14 @@ use dol::builder::transaction::TransactionBuilder;
 use dol::expr::window::FrameBound;
 use dol::expr::{Direction, case, col, field, func, lit, param, raw_expr};
 use dol::ir::LockMode;
-use dol::model::{Field, FieldType, FkAction, Model, ModelConstraint};
+use dol::model::{Entity, EntityConstraint, Field, FieldType, FkAction};
 
 // ============================================================================
 // 1. MODEL DEFINITION — the single source of truth for a data shape
 // ============================================================================
 
 /// Users table with all common field constraint types.
-static USERS: Model = Model::new(
+static USERS: Entity = Entity::new(
     "users",
     &[
         Field::new("id", FieldType::Uuid).primary_key(),
@@ -62,7 +62,7 @@ static USERS: Model = Model::new(
 );
 
 /// Tenants table with composite constraints and version field.
-static TENANTS: Model = Model::new(
+static TENANTS: Entity = Entity::new(
     "tenants",
     &[
         Field::new("id", FieldType::Uuid).primary_key(),
@@ -78,10 +78,10 @@ static TENANTS: Model = Model::new(
         Field::new("version", FieldType::Int).default("1"),
     ],
 )
-.with_constraints(&[ModelConstraint::Unique(&["slug"])]);
+.with_constraints(&[EntityConstraint::Unique(&["slug"])]);
 
 /// Sessions table for join examples.
-static SESSIONS: Model = Model::new(
+static SESSIONS: Entity = Entity::new(
     "sessions",
     &[
         Field::new("id", FieldType::Uuid).primary_key(),
@@ -103,7 +103,7 @@ static SESSIONS: Model = Model::new(
 );
 
 /// Audit log with foreign keys, CHECK constraint, and namespace.
-static AUDIT_LOG: Model = Model::new(
+static AUDIT_LOG: Entity = Entity::new(
     "audit_log",
     &[
         Field::new("id", FieldType::BigSerial).primary_key(),
@@ -129,7 +129,7 @@ static AUDIT_LOG: Model = Model::new(
     ],
 )
 .with_namespace("audit")
-.with_constraints(&[ModelConstraint::ForeignKey {
+.with_constraints(&[EntityConstraint::ForeignKey {
     columns: &["tenant_id"],
     ref_table: "tenants",
     ref_columns: &["id"],
@@ -137,7 +137,7 @@ static AUDIT_LOG: Model = Model::new(
 }]);
 
 /// Products table with various field types for type-mapping demos.
-static PRODUCTS: Model = Model::new(
+static PRODUCTS: Entity = Entity::new(
     "products",
     &[
         Field::new("id", FieldType::Uuid).primary_key(),
@@ -157,7 +157,7 @@ static PRODUCTS: Model = Model::new(
 );
 
 /// Orders table with composite primary key.
-static ORDER_ITEMS: Model = Model::new(
+static ORDER_ITEMS: Entity = Entity::new(
     "order_items",
     &[
         Field::new("order_id", FieldType::Uuid),
@@ -167,8 +167,8 @@ static ORDER_ITEMS: Model = Model::new(
     ],
 )
 .with_constraints(&[
-    ModelConstraint::PrimaryKey(&["order_id", "product_id"]),
-    ModelConstraint::ForeignKey {
+    EntityConstraint::PrimaryKey(&["order_id", "product_id"]),
+    EntityConstraint::ForeignKey {
         columns: &["product_id"],
         ref_table: "products",
         ref_columns: &["id"],
@@ -177,7 +177,7 @@ static ORDER_ITEMS: Model = Model::new(
 ]);
 
 /// Settings table for aggregate examples.
-static SETTINGS: Model = Model::new(
+static SETTINGS: Entity = Entity::new(
     "tenant_settings",
     &[
         Field::new("tenant_id", FieldType::Uuid).primary_key(),
@@ -758,8 +758,8 @@ fn main() {
     assert!(sql.contains("PRIMARY KEY (order_id, product_id)"));
     println!("  [PG] Composite PK: {}...", &sql[..sql.len().min(100)]);
 
-    // 4f. DefineModelBuilder (runtime-defined schema)
-    let sql = DefineModelBuilder::new("dynamic_table")
+    // 4f. DefineEntityBuilder (runtime-defined schema)
+    let sql = DefineEntityBuilder::new("dynamic_table")
         .field(dol::FieldDef::new("id", FieldType::Uuid).primary_key())
         .field(dol::FieldDef::new("name", FieldType::Text))
         .field(dol::FieldDef::new("value", FieldType::Decimal).nullable())
@@ -817,7 +817,7 @@ fn main() {
     // 4n. ALTER TABLE — add/drop constraint
     let sql = USERS
         .alter()
-        .add_constraint(ModelConstraint::Unique(&["email", "tenant_id"]))
+        .add_constraint(EntityConstraint::Unique(&["email", "tenant_id"]))
         .to_sql(Some(&pg));
     println!("  [PG] Add constraint: {}", sql);
 
@@ -837,11 +837,11 @@ fn main() {
     println!("  [PG] Multi alter: {}", sql);
 
     // 4p. DROP TABLE
-    let sql = USERS.drop_model().to_sql(Some(&pg));
+    let sql = USERS.drop_entity().to_sql(Some(&pg));
     println!("  [PG] Drop table: {}", sql);
 
     // 4q. DROP TABLE IF EXISTS CASCADE
-    let sql = USERS.drop_model().if_exists().cascade().to_sql(Some(&pg));
+    let sql = USERS.drop_entity().if_exists().cascade().to_sql(Some(&pg));
     assert!(sql.contains("IF EXISTS"));
     assert!(sql.contains("CASCADE"));
     println!("  [PG] Drop if exists cascade: {}", sql);
@@ -1480,7 +1480,7 @@ fn main() {
 #[cfg(feature = "migration")]
 fn migration_examples() {
     use dol::ir::definition::{DefineIndexIR, FieldDef};
-    use dol::ir::{AlterAction, ModelRef};
+    use dol::ir::{AlterAction, EntityRef};
     use dol::migration::{
         InMemoryRegistry, Migration, MigrationDirection, MigrationRegistry, MigrationRunner,
         MigrationState, MigrationStep, MigrationTarget, RenderedStep,
@@ -1501,8 +1501,8 @@ fn migration_examples() {
             "Create users table"
         }
         fn up(&self) -> Vec<MigrationStep> {
-            vec![MigrationStep::define_model(
-                dol::builder::DefineModelBuilder::new("users")
+            vec![MigrationStep::define_entity(
+                dol::builder::DefineEntityBuilder::new("users")
                     .field(FieldDef::new("id", FieldType::Uuid).primary_key())
                     .field(FieldDef::new("email", FieldType::Text).unique())
                     .field(FieldDef::new("status", FieldType::Text).default("'active'"))
@@ -1512,7 +1512,7 @@ fn migration_examples() {
             )]
         }
         fn down(&self) -> Vec<MigrationStep> {
-            vec![MigrationStep::drop_model("users")]
+            vec![MigrationStep::drop_entity("users")]
         }
     }
 
@@ -1527,7 +1527,7 @@ fn migration_examples() {
         fn up(&self) -> Vec<MigrationStep> {
             vec![MigrationStep::define_index(DefineIndexIR {
                 name: "idx_users_email".into(),
-                target: ModelRef {
+                target: EntityRef {
                     name: "users".into(),
                     namespace: None,
                     alias: None,
@@ -1554,7 +1554,7 @@ fn migration_examples() {
             "Add profile JSON column to users"
         }
         fn up(&self) -> Vec<MigrationStep> {
-            vec![MigrationStep::alter_model(
+            vec![MigrationStep::alter_entity(
                 "users",
                 vec![AlterAction::AddField(
                     FieldDef::new("profile", FieldType::Json).nullable(),
@@ -1562,7 +1562,7 @@ fn migration_examples() {
             )]
         }
         fn down(&self) -> Vec<MigrationStep> {
-            vec![MigrationStep::alter_model(
+            vec![MigrationStep::alter_entity(
                 "users",
                 vec![AlterAction::DropField("profile".into())],
             )]
@@ -1739,14 +1739,14 @@ fn migration_examples() {
 fn schema_diff_examples() {
     use dol::ir::AlterAction;
     use dol::migration::schema_diff::{
-        ModelSnapshot, create_model_step, diff_models, diff_to_steps, drop_model_step,
+        EntitySnapshot, create_entity_step, diff_entities, diff_to_steps, drop_entity_step,
         field_to_field_def,
     };
 
     println!("\n--- 13. Schema Diff & Auto-Discovery ---");
 
     // 13a. Define two versions of a model
-    static USERS_V1: Model = Model::new(
+    static USERS_V1: Entity = Entity::new(
         "users",
         &[
             Field::new("id", FieldType::Uuid).primary_key(),
@@ -1755,7 +1755,7 @@ fn schema_diff_examples() {
         ],
     );
 
-    static USERS_V2: Model = Model::new(
+    static USERS_V2: Entity = Entity::new(
         "users",
         &[
             Field::new("id", FieldType::Uuid).primary_key(),
@@ -1767,9 +1767,9 @@ fn schema_diff_examples() {
     );
 
     // 13b. Take snapshots and compute diff
-    let v1 = ModelSnapshot::from_model(&USERS_V1);
-    let v2 = ModelSnapshot::from_model(&USERS_V2);
-    let actions = diff_models(&v1, &v2);
+    let v1 = EntitySnapshot::from_entity(&USERS_V1);
+    let v2 = EntitySnapshot::from_entity(&USERS_V2);
+    let actions = diff_entities(&v1, &v2);
     println!("  Diff V1→V2: {} change(s)", actions.len());
     assert_eq!(actions.len(), 1);
     assert!(matches!(&actions[0], AlterAction::AddField(f) if f.name == "display_name"));
@@ -1781,17 +1781,17 @@ fn schema_diff_examples() {
     println!("  Generated ALTER TABLE step for field addition");
 
     // 13d. Reverse diff (V2 → V1) produces DropField
-    let reverse_actions = diff_models(&v2, &v1);
+    let reverse_actions = diff_entities(&v2, &v1);
     assert_eq!(reverse_actions.len(), 1);
     assert!(matches!(&reverse_actions[0], AlterAction::DropField(name) if name == "display_name"));
     println!("  Reverse diff produces DropField");
 
     // 13e. Type change detection
-    static V_INT: Model = Model::new("t", &[Field::new("count", FieldType::Int)]);
-    static V_BIGINT: Model = Model::new("t", &[Field::new("count", FieldType::BigInt)]);
-    let type_actions = diff_models(
-        &ModelSnapshot::from_model(&V_INT),
-        &ModelSnapshot::from_model(&V_BIGINT),
+    static V_INT: Entity = Entity::new("t", &[Field::new("count", FieldType::Int)]);
+    static V_BIGINT: Entity = Entity::new("t", &[Field::new("count", FieldType::BigInt)]);
+    let type_actions = diff_entities(
+        &EntitySnapshot::from_entity(&V_INT),
+        &EntitySnapshot::from_entity(&V_BIGINT),
     );
     assert_eq!(type_actions.len(), 1);
     assert!(matches!(
@@ -1802,9 +1802,9 @@ fn schema_diff_examples() {
     println!("  Type change detected: Int → BigInt");
 
     // 13f. Create and drop model steps from static definitions
-    let create_step = create_model_step(&USERS_V1);
+    let create_step = create_entity_step(&USERS_V1);
     assert_eq!(create_step.kind(), "sql");
-    let drop_step = drop_model_step(&USERS_V1);
+    let drop_step = drop_entity_step(&USERS_V1);
     assert_eq!(drop_step.kind(), "sql");
     println!("  Create/drop model steps generated from static Model");
 
@@ -1853,8 +1853,8 @@ fn config_migration_examples() {
             "Create orders table"
         }
         fn up(&self) -> Vec<MigrationStep> {
-            vec![MigrationStep::define_model(
-                dol::builder::DefineModelBuilder::new("orders")
+            vec![MigrationStep::define_entity(
+                dol::builder::DefineEntityBuilder::new("orders")
                     .field(FieldDef::new("id", FieldType::Uuid).primary_key())
                     .field(FieldDef::new("total", FieldType::Decimal))
                     .if_not_exists()
@@ -1862,7 +1862,7 @@ fn config_migration_examples() {
             )]
         }
         fn down(&self) -> Vec<MigrationStep> {
-            vec![MigrationStep::drop_model("orders")]
+            vec![MigrationStep::drop_entity("orders")]
         }
     }
 
@@ -2106,7 +2106,7 @@ mod tests {
             assert!(sql.contains("CREATE TABLE"), "{}: missing CREATE", d.name);
 
             // DROP TABLE
-            let sql = USERS.drop_model().to_sql(Some(d));
+            let sql = USERS.drop_entity().to_sql(Some(d));
             assert!(sql.contains("DROP TABLE"), "{}: missing DROP", d.name);
         }
     }

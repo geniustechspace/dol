@@ -15,7 +15,7 @@ use dol_core::ir::SqlOutput;
 use dol_core::ir::*;
 use dol_core::model::Field;
 use dol_core::model::FieldType;
-use dol_core::model::constraint::{FkAction, GeneratedKind, ModelConstraint};
+use dol_core::model::constraint::{EntityConstraint, FkAction, GeneratedKind};
 
 // ===========================================================================
 // Expr rendering (the core recursive renderer)
@@ -657,12 +657,12 @@ pub fn render_type(field_type: &FieldType, dialect: &Dialect) -> String {
 }
 
 /// Renders a model-level constraint.
-pub fn render_model_constraint(constraint: &ModelConstraint) -> String {
+pub fn render_model_constraint(constraint: &EntityConstraint) -> String {
     match constraint {
-        ModelConstraint::Unique(cols) => {
+        EntityConstraint::Unique(cols) => {
             format!("UNIQUE ({})", cols.join(", "))
         }
-        ModelConstraint::ForeignKey {
+        EntityConstraint::ForeignKey {
             columns,
             ref_table,
             ref_columns,
@@ -679,10 +679,10 @@ pub fn render_model_constraint(constraint: &ModelConstraint) -> String {
             }
             sql
         }
-        ModelConstraint::Check(expr) => {
+        EntityConstraint::Check(expr) => {
             format!("CHECK ({})", expr)
         }
-        ModelConstraint::PrimaryKey(cols) => {
+        EntityConstraint::PrimaryKey(cols) => {
             format!("PRIMARY KEY ({})", cols.join(", "))
         }
     }
@@ -732,7 +732,7 @@ pub(crate) fn render_query_ir_with_counter(
     }
 
     // FROM
-    let table_name = model_ref_to_sql(&ir.source, dialect);
+    let table_name = entity_ref_to_sql(&ir.source, dialect);
     sql.push_str(&format!(" FROM {}", table_name));
 
     // JOINs
@@ -744,7 +744,7 @@ pub(crate) fn render_query_ir_with_counter(
             JoinType::Full => "FULL OUTER JOIN",
             JoinType::Cross => "CROSS JOIN",
         };
-        let target = model_ref_to_sql(&join.target, dialect);
+        let target = entity_ref_to_sql(&join.target, dialect);
         sql.push_str(&format!(" {} {}", join_type, target));
         if !join.on_conditions.is_empty() {
             let conds: Vec<_> = join
@@ -799,7 +799,7 @@ pub(crate) fn render_query_ir_with_counter(
 /// Render an InsertIR to SQL.
 pub fn render_insert_ir(ir: &InsertIR, dialect: &Dialect) -> Result<SqlOutput, BackendError> {
     let mut counter = ParamCounter::new(&dialect.param_style);
-    let table_name = model_ref_to_sql(&ir.target, dialect);
+    let table_name = entity_ref_to_sql(&ir.target, dialect);
 
     let cols = ir.fields.join(", ");
     let mut all_values = Vec::new();
@@ -828,7 +828,7 @@ pub fn render_insert_select_ir(
     ir: &InsertSelectIR,
     dialect: &Dialect,
 ) -> Result<SqlOutput, BackendError> {
-    let table_name = model_ref_to_sql(&ir.target, dialect);
+    let table_name = entity_ref_to_sql(&ir.target, dialect);
     let cols = ir.fields.join(", ");
 
     let mut sql = format!("INSERT INTO {} ({}) {}", table_name, cols, ir.source_query,);
@@ -846,7 +846,7 @@ pub fn render_insert_select_ir(
 /// Render an UpdateIR to SQL.
 pub fn render_update_ir(ir: &UpdateIR, dialect: &Dialect) -> Result<SqlOutput, BackendError> {
     let mut counter = ParamCounter::new(&dialect.param_style);
-    let table_name = model_ref_to_sql(&ir.target, dialect);
+    let table_name = entity_ref_to_sql(&ir.target, dialect);
 
     let sets: Vec<_> = ir
         .assignments
@@ -870,7 +870,7 @@ pub fn render_update_ir(ir: &UpdateIR, dialect: &Dialect) -> Result<SqlOutput, B
 /// Render a RemoveIR to SQL.
 pub fn render_remove_ir(ir: &RemoveIR, dialect: &Dialect) -> Result<SqlOutput, BackendError> {
     let mut counter = ParamCounter::new(&dialect.param_style);
-    let table_name = model_ref_to_sql(&ir.target, dialect);
+    let table_name = entity_ref_to_sql(&ir.target, dialect);
 
     let mut sql = format!("DELETE FROM {}", table_name);
     sql.push_str(&render_filters(&ir.filters, &mut counter, dialect));
@@ -885,7 +885,7 @@ pub fn render_remove_ir(ir: &RemoveIR, dialect: &Dialect) -> Result<SqlOutput, B
 /// Render an UpsertIR to SQL.
 pub fn render_upsert_ir(ir: &UpsertIR, dialect: &Dialect) -> Result<SqlOutput, BackendError> {
     let mut counter = ParamCounter::new(&dialect.param_style);
-    let table_name = model_ref_to_sql(&ir.target, dialect);
+    let table_name = entity_ref_to_sql(&ir.target, dialect);
 
     let cols = ir.fields.join(", ");
     let params: Vec<_> = ir.fields.iter().map(|_| counter.next()).collect();
@@ -933,9 +933,9 @@ pub fn render_upsert_ir(ir: &UpsertIR, dialect: &Dialect) -> Result<SqlOutput, B
     })
 }
 
-/// Render a DefineModelIR to SQL (CREATE TABLE).
-pub fn render_define_model_ir(
-    ir: &DefineModelIR,
+/// Render a DefineEntityIR to SQL (CREATE TABLE).
+pub fn render_define_entity_ir(
+    ir: &DefineEntityIR,
     dialect: &Dialect,
 ) -> Result<SqlOutput, BackendError> {
     let mut sql = String::from("CREATE TABLE ");
@@ -968,12 +968,12 @@ pub fn render_define_model_ir(
     })
 }
 
-/// Render an AlterModelIR to SQL (ALTER TABLE).
-pub fn render_alter_model_ir(
-    ir: &AlterModelIR,
+/// Render an AlterEntityIR to SQL (ALTER TABLE).
+pub fn render_alter_entity_ir(
+    ir: &AlterEntityIR,
     dialect: &Dialect,
 ) -> Result<SqlOutput, BackendError> {
-    let table_name = model_ref_to_sql(&ir.target, dialect);
+    let table_name = entity_ref_to_sql(&ir.target, dialect);
     let mut parts = Vec::new();
 
     for action in &ir.actions {
@@ -1035,7 +1035,7 @@ pub fn render_alter_model_ir(
             AlterAction::DropConstraint(name) => {
                 format!("ALTER TABLE {} DROP CONSTRAINT {}", table_name, name)
             }
-            AlterAction::RenameModel(new_name) => {
+            AlterAction::RenameEntity(new_name) => {
                 format!("ALTER TABLE {} RENAME TO {}", table_name, new_name)
             }
         };
@@ -1048,9 +1048,9 @@ pub fn render_alter_model_ir(
     })
 }
 
-/// Render a DropModelIR to SQL (DROP TABLE).
-pub fn render_drop_model_ir(
-    ir: &DropModelIR,
+/// Render a DropEntityIR to SQL (DROP TABLE).
+pub fn render_drop_entity_ir(
+    ir: &DropEntityIR,
     _dialect: &Dialect,
 ) -> Result<SqlOutput, BackendError> {
     let mut sql = String::from("DROP TABLE ");
@@ -1251,7 +1251,7 @@ pub fn render_compound_query_ir(
 // Helpers
 // ===========================================================================
 
-fn model_ref_to_sql(mref: &ModelRef, _dialect: &Dialect) -> String {
+fn entity_ref_to_sql(mref: &EntityRef, _dialect: &Dialect) -> String {
     let name = if let Some(ref ns) = mref.namespace {
         format!("{}.{}", ns, mref.name)
     } else {

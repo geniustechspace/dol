@@ -17,8 +17,8 @@ pub mod transaction;
 
 pub use control::{DefinePolicyIR, GrantIR, PolicyAction, Privilege, RevokeIR};
 pub use definition::{
-    AlterAction, AlterModelIR, DefineIndexIR, DefineModelIR, DefineTypeIR, DropIndexIR,
-    DropModelIR, DropTypeIR, FieldDef, IndexMethod, OwnedForeignKeyRef,
+    AlterAction, AlterEntityIR, DefineEntityIR, DefineIndexIR, DefineTypeIR, DropEntityIR,
+    DropIndexIR, DropTypeIR, FieldDef, IndexMethod, OwnedForeignKeyRef,
 };
 pub use mutation::{InsertIR, InsertSelectIR, RemoveIR, UpdateIR, UpsertIR};
 pub use query::{CompoundQueryIR, JoinIR, JoinType, LockMode, OffsetLimit, QueryIR, SetOpKind};
@@ -30,7 +30,7 @@ pub use transaction::TransactionIR;
 /// A reference to a model (table/collection/bucket), with optional alias.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ModelRef {
+pub struct EntityRef {
     pub name: String,
     pub namespace: Option<String>,
     pub alias: Option<String>,
@@ -41,9 +41,9 @@ pub struct ModelRef {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum Statement {
     // Definition
-    DefineModel(DefineModelIR),
-    AlterModel(AlterModelIR),
-    DropModel(DropModelIR),
+    DefineEntity(DefineEntityIR),
+    AlterEntity(AlterEntityIR),
+    DropEntity(DropEntityIR),
     DefineIndex(DefineIndexIR),
     DropIndex(DropIndexIR),
     DefineType(DefineTypeIR),
@@ -195,8 +195,8 @@ mod tests {
     use super::*;
     use crate::control::{DefinePolicyIR, GrantIR, PolicyAction, Privilege, RevokeIR};
     use crate::definition::{
-        AlterAction, AlterModelIR, DefineIndexIR, DefineModelIR, DefineTypeIR, DropIndexIR,
-        DropModelIR, DropTypeIR, FieldDef, IndexMethod, OwnedForeignKeyRef,
+        AlterAction, AlterEntityIR, DefineEntityIR, DefineIndexIR, DefineTypeIR, DropEntityIR,
+        DropIndexIR, DropTypeIR, FieldDef, IndexMethod, OwnedForeignKeyRef,
     };
     use crate::mutation::{InsertIR, InsertSelectIR, RemoveIR, UpdateIR, UpsertIR};
     use crate::query::{
@@ -210,16 +210,16 @@ mod tests {
 
     // -- helpers --
 
-    fn model_ref(name: &str) -> ModelRef {
-        ModelRef {
+    fn entity_ref(name: &str) -> EntityRef {
+        EntityRef {
             name: name.to_string(),
             namespace: None,
             alias: None,
         }
     }
 
-    fn model_ref_full(name: &str, ns: &str, alias: &str) -> ModelRef {
-        ModelRef {
+    fn entity_ref_full(name: &str, ns: &str, alias: &str) -> EntityRef {
+        EntityRef {
             name: name.to_string(),
             namespace: Some(ns.to_string()),
             alias: Some(alias.to_string()),
@@ -228,7 +228,7 @@ mod tests {
 
     fn simple_query_ir() -> QueryIR {
         QueryIR {
-            source: model_ref("users"),
+            source: entity_ref("users"),
             projections: vec![],
             joins: vec![],
             filters: vec![],
@@ -244,12 +244,12 @@ mod tests {
     }
 
     // ======================================================================
-    // 1. ModelRef
+    // 1. EntityRef
     // ======================================================================
 
     #[test]
     fn model_ref_construction_minimal() {
-        let mr = model_ref("users");
+        let mr = entity_ref("users");
         assert_eq!(mr.name, "users");
         assert!(mr.namespace.is_none());
         assert!(mr.alias.is_none());
@@ -257,7 +257,7 @@ mod tests {
 
     #[test]
     fn model_ref_construction_full() {
-        let mr = model_ref_full("users", "public", "u");
+        let mr = entity_ref_full("users", "public", "u");
         assert_eq!(mr.name, "users");
         assert_eq!(mr.namespace.as_deref(), Some("public"));
         assert_eq!(mr.alias.as_deref(), Some("u"));
@@ -265,14 +265,14 @@ mod tests {
 
     #[test]
     fn model_ref_debug() {
-        let mr = model_ref("orders");
+        let mr = entity_ref("orders");
         let dbg = format!("{:?}", mr);
         assert!(dbg.contains("orders"));
     }
 
     #[test]
     fn model_ref_clone() {
-        let mr = model_ref_full("products", "shop", "p");
+        let mr = entity_ref_full("products", "shop", "p");
         let cloned = mr.clone();
         assert_eq!(cloned.name, mr.name);
         assert_eq!(cloned.namespace, mr.namespace);
@@ -285,30 +285,30 @@ mod tests {
 
     #[test]
     fn statement_define_model() {
-        let stmt = Statement::DefineModel(DefineModelIR {
+        let stmt = Statement::DefineEntity(DefineEntityIR {
             name: "users".to_string(),
             namespace: None,
             fields: vec![],
             constraints: vec![],
             if_not_exists: false,
         });
-        assert!(matches!(stmt, Statement::DefineModel(_)));
+        assert!(matches!(stmt, Statement::DefineEntity(_)));
     }
 
     #[test]
     fn statement_drop_model() {
-        let stmt = Statement::DropModel(DropModelIR {
-            target: model_ref("users"),
+        let stmt = Statement::DropEntity(DropEntityIR {
+            target: entity_ref("users"),
             if_exists: true,
             cascade: false,
         });
-        assert!(matches!(stmt, Statement::DropModel(_)));
+        assert!(matches!(stmt, Statement::DropEntity(_)));
     }
 
     #[test]
     fn statement_insert() {
         let stmt = Statement::Insert(InsertIR {
-            target: model_ref("users"),
+            target: entity_ref("users"),
             fields: vec!["name".to_string()],
             row_count: 1,
             returning: vec![],
@@ -1100,7 +1100,7 @@ mod tests {
 
     #[test]
     fn alter_action_add_constraint() {
-        let action = AlterAction::AddConstraint(dol_entity::ModelConstraint::Check("age > 0"));
+        let action = AlterAction::AddConstraint(dol_entity::EntityConstraint::Check("age > 0"));
         assert!(matches!(action, AlterAction::AddConstraint(_)));
     }
 
@@ -1112,8 +1112,8 @@ mod tests {
 
     #[test]
     fn alter_action_rename_model() {
-        let action = AlterAction::RenameModel("new_name".to_string());
-        assert!(matches!(action, AlterAction::RenameModel(_)));
+        let action = AlterAction::RenameEntity("new_name".to_string());
+        assert!(matches!(action, AlterAction::RenameEntity(_)));
     }
 
     // ======================================================================
@@ -1135,18 +1135,18 @@ mod tests {
 
     #[test]
     fn statement_alter_model() {
-        let stmt = Statement::AlterModel(AlterModelIR {
-            target: model_ref("users"),
+        let stmt = Statement::AlterEntity(AlterEntityIR {
+            target: entity_ref("users"),
             actions: vec![AlterAction::AddField(FieldDef::new("age", FieldType::Int))],
         });
-        assert!(matches!(stmt, Statement::AlterModel(_)));
+        assert!(matches!(stmt, Statement::AlterEntity(_)));
     }
 
     #[test]
     fn statement_define_index() {
         let stmt = Statement::DefineIndex(DefineIndexIR {
             name: "idx_email".to_string(),
-            target: model_ref("users"),
+            target: entity_ref("users"),
             columns: vec!["email".to_string()],
             unique: true,
             if_not_exists: false,
@@ -1190,7 +1190,7 @@ mod tests {
     #[test]
     fn statement_insert_select() {
         let stmt = Statement::InsertSelect(InsertSelectIR {
-            target: model_ref("archive"),
+            target: entity_ref("archive"),
             fields: vec!["id".to_string(), "name".to_string()],
             source_query: "SELECT id, name FROM users WHERE archived".to_string(),
             returning: vec![],
@@ -1201,7 +1201,7 @@ mod tests {
     #[test]
     fn statement_update() {
         let stmt = Statement::Update(UpdateIR {
-            target: model_ref("users"),
+            target: entity_ref("users"),
             assignments: vec![],
             filters: vec![],
             returning: vec![],
@@ -1212,7 +1212,7 @@ mod tests {
     #[test]
     fn statement_remove() {
         let stmt = Statement::Remove(RemoveIR {
-            target: model_ref("users"),
+            target: entity_ref("users"),
             filters: vec![],
             returning: vec![],
         });
@@ -1222,7 +1222,7 @@ mod tests {
     #[test]
     fn statement_upsert() {
         let stmt = Statement::Upsert(UpsertIR {
-            target: model_ref("users"),
+            target: entity_ref("users"),
             fields: vec!["email".to_string()],
             conflict_fields: vec!["email".to_string()],
             conflict_constraint: None,
@@ -1329,7 +1329,7 @@ mod tests {
     fn join_ir_construction() {
         let join = JoinIR {
             join_type: JoinType::Left,
-            target: model_ref("orders"),
+            target: entity_ref("orders"),
             on_conditions: vec![("users.id".to_string(), "orders.user_id".to_string())],
         };
         assert_eq!(join.join_type, JoinType::Left);
@@ -1340,7 +1340,7 @@ mod tests {
     #[test]
     fn query_ir_with_options() {
         let q = QueryIR {
-            source: model_ref("users"),
+            source: entity_ref("users"),
             projections: vec![dol_expr::Expr::Identifier("id".to_string())],
             joins: vec![],
             filters: vec![],
@@ -1361,7 +1361,7 @@ mod tests {
 
     #[test]
     fn define_model_ir_with_fields() {
-        let ir = DefineModelIR {
+        let ir = DefineEntityIR {
             name: "products".to_string(),
             namespace: Some("shop".to_string()),
             fields: vec![
@@ -1382,7 +1382,7 @@ mod tests {
     fn define_index_ir_concurrently_with_where() {
         let ir = DefineIndexIR {
             name: "idx_active_users".to_string(),
-            target: model_ref("users"),
+            target: entity_ref("users"),
             columns: vec!["email".to_string()],
             unique: false,
             if_not_exists: true,

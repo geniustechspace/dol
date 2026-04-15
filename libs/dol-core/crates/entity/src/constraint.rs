@@ -69,7 +69,7 @@ impl ForeignKeyRef {
 /// A model-level constraint (composite UNIQUE, multi-field FK, CHECK, composite PK).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub enum ModelConstraint {
+pub enum EntityConstraint {
     /// `UNIQUE (field1, field2, ...)`
     Unique(&'static [&'static str]),
     /// `FOREIGN KEY (fields) REFERENCES ref_model (ref_fields) ON DELETE action`

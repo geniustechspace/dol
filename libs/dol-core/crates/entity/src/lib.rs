@@ -1,14 +1,14 @@
-//! # dol-model — DOL Schema Language
+//! # dol-entity — DOL Schema Language
 //!
-//! Model metadata — the universal schema definition.
+//! Entity metadata — the universal schema definition.
 //!
-//! In DOL, a **Model** is the neutral term for any structured data shape:
+//! In DOL, an **Entity** is the neutral term for any structured data shape:
 //! - SQL: table
 //! - Document store: collection
 //! - Object store: bucket schema
 //! - File system: typed resource
 //!
-//! A **Field** is a named property within a Model (SQL: column).
+//! A **Field** is a named property within an Entity (SQL: column).
 //!
 //! A **FieldType** is the backend-agnostic logical type (SQL: column type).
 
@@ -18,39 +18,39 @@ pub mod constraint;
 pub mod field;
 pub mod field_type;
 
-pub use constraint::{FkAction, ForeignKeyRef, GeneratedKind, ModelConstraint};
+pub use constraint::{EntityConstraint, FkAction, ForeignKeyRef, GeneratedKind};
 pub use field::Field;
 pub use field_type::FieldType;
 
-use constraint::ModelConstraint as Constraint;
+use constraint::EntityConstraint as Constraint;
 use field::Field as F;
 
 /// A model definition — the single source of truth for a data shape's schema.
 ///
 /// Define as a `static` in your domain crate:
 /// ```rust
-/// use dol_entity::{Model, Field, FieldType, FkAction, ModelConstraint};
+/// use dol_entity::{Entity, Field, FieldType, FkAction, EntityConstraint};
 ///
-/// pub static USERS: Model = Model::new("users", &[
+/// pub static USERS: Entity = Entity::new("users", &[
 ///     Field::new("id", FieldType::Uuid).primary_key(),
 ///     Field::new("tenant_id", FieldType::Uuid),
 ///     Field::new("email", FieldType::Text),
 ///     Field::new("status", FieldType::Text).default("'active'"),
 ///     Field::new("created_at", FieldType::Timestamp).default("NOW()"),
 /// ]).with_constraints(&[
-///     ModelConstraint::Unique(&["tenant_id", "email"]),
+///     EntityConstraint::Unique(&["tenant_id", "email"]),
 /// ]);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct Model {
+pub struct Entity {
     pub name: &'static str,
     pub namespace: Option<&'static str>,
     pub fields: &'static [F],
     pub constraints: &'static [Constraint],
 }
 
-impl Model {
+impl Entity {
     pub const fn new(name: &'static str, fields: &'static [F]) -> Self {
         Self {
             name,
@@ -120,7 +120,7 @@ impl Model {
 mod tests {
     use super::*;
 
-    // ── Helper statics for Model tests ──────────────────────────────────
+    // ── Helper statics for Entity tests ──────────────────────────────────
 
     static EMPTY_FIELDS: &[Field] = &[];
 
@@ -130,11 +130,11 @@ mod tests {
         Field::new("email", FieldType::Text).nullable(),
     ];
 
-    static BASIC_MODEL: Model = Model::new("users", BASIC_FIELDS);
+    static BASIC_MODEL: Entity = Entity::new("users", BASIC_FIELDS);
 
-    static NS_MODEL: Model = Model::new("users", BASIC_FIELDS).with_namespace("public");
+    static NS_MODEL: Entity = Entity::new("users", BASIC_FIELDS).with_namespace("public");
 
-    static CONSTRAINED_MODEL: Model = Model::new(
+    static CONSTRAINED_MODEL: Entity = Entity::new(
         "orders",
         &[
             Field::new("id", FieldType::Serial).primary_key(),
@@ -143,22 +143,22 @@ mod tests {
         ],
     )
     .with_constraints(&[
-        ModelConstraint::Unique(&["user_id", "product"]),
-        ModelConstraint::Check("user_id IS NOT NULL"),
+        EntityConstraint::Unique(&["user_id", "product"]),
+        EntityConstraint::Check("user_id IS NOT NULL"),
     ]);
 
-    // ── 1. Model::new ───────────────────────────────────────────────────
+    // ── 1. Entity::new ───────────────────────────────────────────────────
 
     #[test]
     fn model_new_defaults() {
-        let m = Model::new("items", EMPTY_FIELDS);
+        let m = Entity::new("items", EMPTY_FIELDS);
         assert_eq!(m.name, "items");
         assert_eq!(m.namespace, None);
         assert_eq!(m.fields.len(), 0);
         assert_eq!(m.constraints.len(), 0);
     }
 
-    // ── 2. Model::with_namespace ────────────────────────────────────────
+    // ── 2. Entity::with_namespace ────────────────────────────────────────
 
     #[test]
     fn model_with_namespace() {
@@ -166,22 +166,22 @@ mod tests {
         assert_eq!(NS_MODEL.name, "users");
     }
 
-    // ── 3. Model::with_constraints ──────────────────────────────────────
+    // ── 3. Entity::with_constraints ──────────────────────────────────────
 
     #[test]
     fn model_with_constraints() {
         assert_eq!(CONSTRAINED_MODEL.constraints.len(), 2);
         assert_eq!(
             CONSTRAINED_MODEL.constraints[0],
-            ModelConstraint::Unique(&["user_id", "product"]),
+            EntityConstraint::Unique(&["user_id", "product"]),
         );
         assert_eq!(
             CONSTRAINED_MODEL.constraints[1],
-            ModelConstraint::Check("user_id IS NOT NULL"),
+            EntityConstraint::Check("user_id IS NOT NULL"),
         );
     }
 
-    // ── 4. Model::qualified_name ────────────────────────────────────────
+    // ── 4. Entity::qualified_name ────────────────────────────────────────
 
     #[test]
     fn qualified_name_without_namespace() {
@@ -193,7 +193,7 @@ mod tests {
         assert_eq!(NS_MODEL.qualified_name(), "public.users");
     }
 
-    // ── 5 & 6. Model::field ─────────────────────────────────────────────
+    // ── 5 & 6. Entity::field ─────────────────────────────────────────────
 
     #[test]
     fn field_lookup_success() {
@@ -208,7 +208,7 @@ mod tests {
         BASIC_MODEL.field("missing");
     }
 
-    // ── 7. Model::try_field ─────────────────────────────────────────────
+    // ── 7. Entity::try_field ─────────────────────────────────────────────
 
     #[test]
     fn try_field_some() {
@@ -220,7 +220,7 @@ mod tests {
         assert!(BASIC_MODEL.try_field("nonexistent").is_none());
     }
 
-    // ── 8. Model::field_names ───────────────────────────────────────────
+    // ── 8. Entity::field_names ───────────────────────────────────────────
 
     #[test]
     fn field_names_iterator() {
@@ -228,7 +228,7 @@ mod tests {
         assert_eq!(names, vec!["id", "name", "email"]);
     }
 
-    // ── 9. Model::primary_keys ──────────────────────────────────────────
+    // ── 9. Entity::primary_keys ──────────────────────────────────────────
 
     #[test]
     fn primary_keys_filter() {
@@ -238,7 +238,7 @@ mod tests {
         assert!(pks[0].primary_key);
     }
 
-    // ── 10. Model::non_pk_fields ────────────────────────────────────────
+    // ── 10. Entity::non_pk_fields ────────────────────────────────────────
 
     #[test]
     fn non_pk_fields_filter() {
@@ -248,7 +248,7 @@ mod tests {
         assert_eq!(non_pk[1].name, "email");
     }
 
-    // ── 11. Model::field_list ───────────────────────────────────────────
+    // ── 11. Entity::field_list ───────────────────────────────────────────
 
     #[test]
     fn field_list_comma_separated() {
@@ -257,7 +257,7 @@ mod tests {
 
     #[test]
     fn field_list_empty_model() {
-        let m = Model::new("empty", EMPTY_FIELDS);
+        let m = Entity::new("empty", EMPTY_FIELDS);
         assert_eq!(m.field_list(), "");
     }
 
@@ -509,23 +509,23 @@ mod tests {
         assert_eq!(fk.on_update, FkAction::SetDefault);
     }
 
-    // ── 25. ModelConstraint variants ────────────────────────────────────
+    // ── 25. EntityConstraint variants ────────────────────────────────────
 
     #[test]
     fn model_constraint_unique() {
-        let c = ModelConstraint::Unique(&["a", "b"]);
-        assert_eq!(c, ModelConstraint::Unique(&["a", "b"]));
+        let c = EntityConstraint::Unique(&["a", "b"]);
+        assert_eq!(c, EntityConstraint::Unique(&["a", "b"]));
     }
 
     #[test]
     fn model_constraint_foreign_key() {
-        let c = ModelConstraint::ForeignKey {
+        let c = EntityConstraint::ForeignKey {
             columns: &["user_id"],
             ref_table: "users",
             ref_columns: &["id"],
             on_delete: FkAction::Cascade,
         };
-        if let ModelConstraint::ForeignKey {
+        if let EntityConstraint::ForeignKey {
             columns,
             ref_table,
             ref_columns,
@@ -543,29 +543,29 @@ mod tests {
 
     #[test]
     fn model_constraint_check() {
-        let c = ModelConstraint::Check("age > 0");
-        assert_eq!(c, ModelConstraint::Check("age > 0"));
+        let c = EntityConstraint::Check("age > 0");
+        assert_eq!(c, EntityConstraint::Check("age > 0"));
     }
 
     #[test]
     fn model_constraint_primary_key() {
-        let c = ModelConstraint::PrimaryKey(&["tenant_id", "user_id"]);
-        assert_eq!(c, ModelConstraint::PrimaryKey(&["tenant_id", "user_id"]));
+        let c = EntityConstraint::PrimaryKey(&["tenant_id", "user_id"]);
+        assert_eq!(c, EntityConstraint::PrimaryKey(&["tenant_id", "user_id"]));
     }
 
     // ── Model equality ─────────────────────────────────────────────────
 
     #[test]
     fn model_equality() {
-        let a = Model::new("t", EMPTY_FIELDS);
-        let b = Model::new("t", EMPTY_FIELDS);
+        let a = Entity::new("t", EMPTY_FIELDS);
+        let b = Entity::new("t", EMPTY_FIELDS);
         assert_eq!(a, b);
     }
 
     #[test]
     fn model_inequality() {
-        let a = Model::new("t1", EMPTY_FIELDS);
-        let b = Model::new("t2", EMPTY_FIELDS);
+        let a = Entity::new("t1", EMPTY_FIELDS);
+        let b = Entity::new("t2", EMPTY_FIELDS);
         assert_ne!(a, b);
     }
 }

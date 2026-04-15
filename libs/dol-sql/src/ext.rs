@@ -14,8 +14,8 @@ use crate::dialect::{self, Dialect};
 use crate::render;
 use dol_core::builder::control::{GrantBuilder, RevokeBuilder};
 use dol_core::builder::definition::{
-    AlterModelBuilder, CreateFromMeta, DefineIndexBuilder, DefineModelBuilder, DropIndexBuilder,
-    DropModelBuilder,
+    AlterEntityBuilder, CreateFromMeta, DefineEntityBuilder, DefineIndexBuilder, DropEntityBuilder,
+    DropIndexBuilder,
 };
 use dol_core::builder::mutation::{
     InsertBuilder, InsertSelectBuilder, RemoveBuilder, UpdateBuilder, UpsertBuilder,
@@ -143,7 +143,7 @@ impl TryToSql for UpsertBuilder<'_> {
 impl TryToSql for CreateFromMeta<'_> {
     fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
-        let model = self.get_model();
+        let model = self.get_entity();
         let mut sql = String::from("CREATE TABLE ");
         if self.has_if_not_exists() {
             sql.push_str("IF NOT EXISTS ");
@@ -180,33 +180,33 @@ impl TryToSql for CreateFromMeta<'_> {
     }
 }
 
-// ── DefineModelBuilder ──────────────────────────────────────────────────
+// ── DefineEntityBuilder ──────────────────────────────────────────────────
 
-impl TryToSql for DefineModelBuilder {
+impl TryToSql for DefineEntityBuilder {
     fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_define_model_ir(&ir, dialect).map(|o| o.sql)
+        render::render_define_entity_ir(&ir, dialect).map(|o| o.sql)
     }
 }
 
-// ── AlterModelBuilder ───────────────────────────────────────────────────
+// ── AlterEntityBuilder ───────────────────────────────────────────────────
 
-impl TryToSql for AlterModelBuilder<'_> {
+impl TryToSql for AlterEntityBuilder<'_> {
     fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_alter_model_ir(&ir, dialect).map(|o| o.sql)
+        render::render_alter_entity_ir(&ir, dialect).map(|o| o.sql)
     }
 }
 
-// ── DropModelBuilder ────────────────────────────────────────────────────
+// ── DropEntityBuilder ────────────────────────────────────────────────────
 
-impl TryToSql for DropModelBuilder<'_> {
+impl TryToSql for DropEntityBuilder<'_> {
     fn try_to_sql(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_drop_model_ir(&ir, dialect).map(|o| o.sql)
+        render::render_drop_entity_ir(&ir, dialect).map(|o| o.sql)
     }
 }
 
@@ -437,15 +437,15 @@ impl GetBuilderSqlExt for GetBuilder<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dol_core::builder::ModelBuilderExt;
+    use dol_core::builder::EntityBuilderExt;
     use dol_core::ir::definition::FieldDef;
-    use dol_core::model::{Field, FieldType, Model};
+    use dol_core::model::{Entity, Field, FieldType};
 
     fn pg() -> Dialect {
         Dialect::postgres()
     }
 
-    static TEST_MODEL: Model = Model::new(
+    static TEST_MODEL: Entity = Entity::new(
         "users",
         &[
             Field::new("id", FieldType::Uuid).primary_key(),
@@ -456,8 +456,8 @@ mod tests {
         ],
     );
 
-    static NS_MODEL: Model =
-        Model::new("users", &[Field::new("id", FieldType::Uuid).primary_key()])
+    static NS_MODEL: Entity =
+        Entity::new("users", &[Field::new("id", FieldType::Uuid).primary_key()])
             .with_namespace("auth");
 
     // -- GetBuilder --
@@ -578,12 +578,12 @@ mod tests {
         assert!(sql.starts_with("CREATE TABLE IF NOT EXISTS users ("));
     }
 
-    // -- DefineModelBuilder --
+    // -- DefineEntityBuilder --
 
     #[test]
     fn define_model_builder_basic() {
-        use dol_core::builder::ModelDefineExt;
-        let sql = Model::define("sessions")
+        use dol_core::builder::EntityDefineExt;
+        let sql = Entity::define("sessions")
             .field(FieldDef::new("id", FieldType::Uuid).primary_key())
             .field(FieldDef::new("user_id", FieldType::Uuid))
             .if_not_exists()
@@ -592,7 +592,7 @@ mod tests {
         assert!(sql.contains("id UUID NOT NULL"));
     }
 
-    // -- AlterModelBuilder --
+    // -- AlterEntityBuilder --
 
     #[test]
     fn alter_model_add_and_drop() {
@@ -605,17 +605,17 @@ mod tests {
         assert!(sql.contains("DROP COLUMN legacy"));
     }
 
-    // -- DropModelBuilder --
+    // -- DropEntityBuilder --
 
     #[test]
     fn drop_model_basic() {
-        let sql = TEST_MODEL.drop_model().to_sql(None);
+        let sql = TEST_MODEL.drop_entity().to_sql(None);
         assert_eq!(sql, "DROP TABLE users");
     }
 
     #[test]
     fn drop_model_if_exists_cascade() {
-        let sql = TEST_MODEL.drop_model().if_exists().cascade().to_sql(None);
+        let sql = TEST_MODEL.drop_entity().if_exists().cascade().to_sql(None);
         assert_eq!(sql, "DROP TABLE IF EXISTS users CASCADE");
     }
 

@@ -7,23 +7,23 @@
 //! # Usage
 //!
 //! ```rust
-//! use dol_core::model::{Model, Field, FieldType};
-//! use dol_migration::schema_diff::{diff_models, diff_to_steps, ModelSnapshot};
+//! use dol_core::model::{Entity, Field, FieldType};
+//! use dol_migration::schema_diff::{diff_entities, diff_to_steps, EntitySnapshot};
 //!
-//! static OLD: Model = Model::new("users", &[
+//! static OLD: Entity = Entity::new("users", &[
 //!     Field::new("id", FieldType::Uuid).primary_key(),
 //!     Field::new("email", FieldType::Text).unique(),
 //! ]);
 //!
-//! static NEW: Model = Model::new("users", &[
+//! static NEW: Entity = Entity::new("users", &[
 //!     Field::new("id", FieldType::Uuid).primary_key(),
 //!     Field::new("email", FieldType::Text).unique(),
 //!     Field::new("name", FieldType::Text).nullable(),
 //! ]);
 //!
-//! let old_snap = ModelSnapshot::from_model(&OLD);
-//! let new_snap = ModelSnapshot::from_model(&NEW);
-//! let actions = diff_models(&old_snap, &new_snap);
+//! let old_snap = EntitySnapshot::from_entity(&OLD);
+//! let new_snap = EntitySnapshot::from_entity(&NEW);
+//! let actions = diff_entities(&old_snap, &new_snap);
 //!
 //! assert_eq!(actions.len(), 1); // AddField("name")
 //!
@@ -33,12 +33,12 @@
 
 use dol_core::ir::AlterAction;
 use dol_core::ir::definition::{FieldDef, OwnedForeignKeyRef};
-use dol_core::model::{Field, FieldType, Model};
+use dol_core::model::{Entity, Field, FieldType};
 
 use super::MigrationStep;
 
 // ===========================================================================
-// ModelSnapshot — a cheaply-clonable snapshot of a Model's schema
+// EntitySnapshot — a cheaply-clonable snapshot of a Model's schema
 // ===========================================================================
 
 /// A snapshot of a model's field-level schema for diffing.
@@ -47,7 +47,7 @@ use super::MigrationStep;
 /// that affects schema DDL, not runtime query behaviour.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct ModelSnapshot {
+pub struct EntitySnapshot {
     /// Model name.
     pub name: String,
     /// Fields in order.
@@ -68,9 +68,9 @@ pub struct FieldSnapshot {
     pub indexed: bool,
 }
 
-impl ModelSnapshot {
+impl EntitySnapshot {
     /// Create a snapshot from a static `Model` definition.
-    pub fn from_model(model: &Model) -> Self {
+    pub fn from_entity(model: &Entity) -> Self {
         Self {
             name: model.name.to_string(),
             fields: model.fields.iter().map(FieldSnapshot::from_field).collect(),
@@ -149,7 +149,7 @@ impl FieldSnapshot {
 /// 3. Fields in both with different types → `AlterFieldType`
 /// 4. Fields with changed nullability → `SetFieldNotNull` / `DropFieldNotNull`
 /// 5. Fields with changed defaults → `SetFieldDefault` / `DropFieldDefault`
-pub fn diff_models(old: &ModelSnapshot, new: &ModelSnapshot) -> Vec<AlterAction> {
+pub fn diff_entities(old: &EntitySnapshot, new: &EntitySnapshot) -> Vec<AlterAction> {
     let mut actions = Vec::new();
 
     let old_fields: std::collections::HashMap<&str, &FieldSnapshot> =
@@ -222,23 +222,23 @@ pub fn diff_models(old: &ModelSnapshot, new: &ModelSnapshot) -> Vec<AlterAction>
 /// Otherwise, computes the diff and generates `AlterModel` steps.
 pub fn diff_to_steps(
     model_name: &str,
-    old: &ModelSnapshot,
-    new: &ModelSnapshot,
+    old: &EntitySnapshot,
+    new: &EntitySnapshot,
 ) -> Vec<MigrationStep> {
-    let actions = diff_models(old, new);
+    let actions = diff_entities(old, new);
     if actions.is_empty() {
         return Vec::new();
     }
-    vec![MigrationStep::alter_model(model_name, actions)]
+    vec![MigrationStep::alter_entity(model_name, actions)]
 }
 
 /// Generate a forward migration step for a brand new model.
 ///
 /// Converts a [`Model`] to a `DefineModel` IR step with all its fields.
-pub fn create_model_step(model: &Model) -> MigrationStep {
-    use dol_core::builder::DefineModelBuilder;
+pub fn create_entity_step(model: &Entity) -> MigrationStep {
+    use dol_core::builder::DefineEntityBuilder;
 
-    let mut builder = DefineModelBuilder::new(model.name);
+    let mut builder = DefineEntityBuilder::new(model.name);
     if let Some(ns) = model.namespace {
         builder = builder.namespace(ns);
     }
@@ -246,12 +246,12 @@ pub fn create_model_step(model: &Model) -> MigrationStep {
         builder = builder.field(field_to_field_def(field));
     }
     builder = builder.if_not_exists();
-    MigrationStep::define_model(builder.build())
+    MigrationStep::define_entity(builder.build())
 }
 
 /// Generate a backward migration step (DROP TABLE) for a model.
-pub fn drop_model_step(model: &Model) -> MigrationStep {
-    MigrationStep::drop_model(model.name)
+pub fn drop_entity_step(model: &Entity) -> MigrationStep {
+    MigrationStep::drop_entity(model.name)
 }
 
 /// Convert a static `Field` to an owned `FieldDef`.
@@ -305,7 +305,7 @@ pub fn field_to_field_def(field: &Field) -> FieldDef {
 mod tests {
     use super::*;
 
-    static OLD_MODEL: Model = Model::new(
+    static OLD_MODEL: Entity = Entity::new(
         "users",
         &[
             Field::new("id", FieldType::Uuid).primary_key(),
@@ -314,7 +314,7 @@ mod tests {
         ],
     );
 
-    static NEW_MODEL: Model = Model::new(
+    static NEW_MODEL: Entity = Entity::new(
         "users",
         &[
             Field::new("id", FieldType::Uuid).primary_key(),
@@ -326,32 +326,32 @@ mod tests {
 
     #[test]
     fn diff_add_field() {
-        let old = ModelSnapshot::from_model(&OLD_MODEL);
-        let new = ModelSnapshot::from_model(&NEW_MODEL);
-        let actions = diff_models(&old, &new);
+        let old = EntitySnapshot::from_entity(&OLD_MODEL);
+        let new = EntitySnapshot::from_entity(&NEW_MODEL);
+        let actions = diff_entities(&old, &new);
         assert_eq!(actions.len(), 1);
         assert!(matches!(&actions[0], AlterAction::AddField(f) if f.name == "name"));
     }
 
     #[test]
     fn diff_drop_field() {
-        let old = ModelSnapshot::from_model(&NEW_MODEL); // has "name"
-        let new = ModelSnapshot::from_model(&OLD_MODEL); // no "name"
-        let actions = diff_models(&old, &new);
+        let old = EntitySnapshot::from_entity(&NEW_MODEL); // has "name"
+        let new = EntitySnapshot::from_entity(&OLD_MODEL); // no "name"
+        let actions = diff_entities(&old, &new);
         assert_eq!(actions.len(), 1);
         assert!(matches!(&actions[0], AlterAction::DropField(name) if name == "name"));
     }
 
     #[test]
     fn diff_change_type() {
-        static V1: Model = Model::new(
+        static V1: Entity = Entity::new(
             "t",
             &[
                 Field::new("id", FieldType::Uuid).primary_key(),
                 Field::new("count", FieldType::Int),
             ],
         );
-        static V2: Model = Model::new(
+        static V2: Entity = Entity::new(
             "t",
             &[
                 Field::new("id", FieldType::Uuid).primary_key(),
@@ -359,9 +359,9 @@ mod tests {
             ],
         );
 
-        let actions = diff_models(
-            &ModelSnapshot::from_model(&V1),
-            &ModelSnapshot::from_model(&V2),
+        let actions = diff_entities(
+            &EntitySnapshot::from_entity(&V1),
+            &EntitySnapshot::from_entity(&V2),
         );
         assert_eq!(actions.len(), 1);
         assert!(matches!(
@@ -372,12 +372,12 @@ mod tests {
 
     #[test]
     fn diff_change_nullability() {
-        static V1: Model = Model::new("t", &[Field::new("name", FieldType::Text)]);
-        static V2: Model = Model::new("t", &[Field::new("name", FieldType::Text).nullable()]);
+        static V1: Entity = Entity::new("t", &[Field::new("name", FieldType::Text)]);
+        static V2: Entity = Entity::new("t", &[Field::new("name", FieldType::Text).nullable()]);
 
-        let actions = diff_models(
-            &ModelSnapshot::from_model(&V1),
-            &ModelSnapshot::from_model(&V2),
+        let actions = diff_entities(
+            &EntitySnapshot::from_entity(&V1),
+            &EntitySnapshot::from_entity(&V2),
         );
         assert_eq!(actions.len(), 1);
         assert!(matches!(&actions[0], AlterAction::DropFieldNotNull(n) if n == "name"));
@@ -385,15 +385,15 @@ mod tests {
 
     #[test]
     fn diff_change_default() {
-        static V1: Model = Model::new("t", &[Field::new("status", FieldType::Text)]);
-        static V2: Model = Model::new(
+        static V1: Entity = Entity::new("t", &[Field::new("status", FieldType::Text)]);
+        static V2: Entity = Entity::new(
             "t",
             &[Field::new("status", FieldType::Text).default("'new'")],
         );
 
-        let actions = diff_models(
-            &ModelSnapshot::from_model(&V1),
-            &ModelSnapshot::from_model(&V2),
+        let actions = diff_entities(
+            &EntitySnapshot::from_entity(&V1),
+            &EntitySnapshot::from_entity(&V2),
         );
         assert_eq!(actions.len(), 1);
         assert!(
@@ -403,15 +403,15 @@ mod tests {
 
     #[test]
     fn diff_drop_default() {
-        static V1: Model = Model::new(
+        static V1: Entity = Entity::new(
             "t",
             &[Field::new("status", FieldType::Text).default("'old'")],
         );
-        static V2: Model = Model::new("t", &[Field::new("status", FieldType::Text)]);
+        static V2: Entity = Entity::new("t", &[Field::new("status", FieldType::Text)]);
 
-        let actions = diff_models(
-            &ModelSnapshot::from_model(&V1),
-            &ModelSnapshot::from_model(&V2),
+        let actions = diff_entities(
+            &EntitySnapshot::from_entity(&V1),
+            &EntitySnapshot::from_entity(&V2),
         );
         assert_eq!(actions.len(), 1);
         assert!(matches!(&actions[0], AlterAction::DropFieldDefault(n) if n == "status"));
@@ -419,14 +419,14 @@ mod tests {
 
     #[test]
     fn diff_no_changes() {
-        let snap = ModelSnapshot::from_model(&OLD_MODEL);
-        let actions = diff_models(&snap, &snap.clone());
+        let snap = EntitySnapshot::from_entity(&OLD_MODEL);
+        let actions = diff_entities(&snap, &snap.clone());
         assert!(actions.is_empty());
     }
 
     #[test]
     fn diff_multiple_changes() {
-        static V1: Model = Model::new(
+        static V1: Entity = Entity::new(
             "items",
             &[
                 Field::new("id", FieldType::Uuid).primary_key(),
@@ -434,7 +434,7 @@ mod tests {
                 Field::new("removed_field", FieldType::Text),
             ],
         );
-        static V2: Model = Model::new(
+        static V2: Entity = Entity::new(
             "items",
             &[
                 Field::new("id", FieldType::Uuid).primary_key(),
@@ -443,9 +443,9 @@ mod tests {
             ],
         );
 
-        let actions = diff_models(
-            &ModelSnapshot::from_model(&V1),
-            &ModelSnapshot::from_model(&V2),
+        let actions = diff_entities(
+            &EntitySnapshot::from_entity(&V1),
+            &EntitySnapshot::from_entity(&V2),
         );
         // AddField(added_field), DropField(removed_field), AlterFieldType(name)
         assert_eq!(actions.len(), 3);
@@ -453,8 +453,8 @@ mod tests {
 
     #[test]
     fn diff_to_steps_produces_alter() {
-        let old = ModelSnapshot::from_model(&OLD_MODEL);
-        let new = ModelSnapshot::from_model(&NEW_MODEL);
+        let old = EntitySnapshot::from_entity(&OLD_MODEL);
+        let new = EntitySnapshot::from_entity(&NEW_MODEL);
         let steps = diff_to_steps("users", &old, &new);
         assert_eq!(steps.len(), 1);
         assert_eq!(steps[0].kind(), "sql");
@@ -462,20 +462,20 @@ mod tests {
 
     #[test]
     fn diff_to_steps_empty_when_no_changes() {
-        let snap = ModelSnapshot::from_model(&OLD_MODEL);
+        let snap = EntitySnapshot::from_entity(&OLD_MODEL);
         let steps = diff_to_steps("users", &snap, &snap.clone());
         assert!(steps.is_empty());
     }
 
     #[test]
     fn create_model_step_works() {
-        let step = create_model_step(&OLD_MODEL);
+        let step = create_entity_step(&OLD_MODEL);
         assert_eq!(step.kind(), "sql");
     }
 
     #[test]
     fn drop_model_step_works() {
-        let step = drop_model_step(&OLD_MODEL);
+        let step = drop_entity_step(&OLD_MODEL);
         assert_eq!(step.kind(), "sql");
     }
 
@@ -501,7 +501,7 @@ mod tests {
             FieldDef::new("id", FieldType::Uuid).primary_key(),
             FieldDef::new("name", FieldType::Text),
         ];
-        let snap = ModelSnapshot::from_field_defs("test", &fields);
+        let snap = EntitySnapshot::from_field_defs("test", &fields);
         assert_eq!(snap.name, "test");
         assert_eq!(snap.fields.len(), 2);
         assert!(snap.fields[0].primary_key);

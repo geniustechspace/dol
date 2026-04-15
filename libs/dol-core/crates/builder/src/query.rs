@@ -5,9 +5,9 @@
 //!
 //! For SQL rendering, import the `ToSql` extension trait from `dol-sql`.
 
+use dol_entity::Entity;
 use dol_expr::{Direction, Expr, NullsPosition, OrderByExpr, col, param, raw_expr};
-use dol_ir::{JoinIR, JoinType, LockMode, ModelRef, OffsetLimit, QueryIR};
-use dol_entity::Model;
+use dol_ir::{EntityRef, JoinIR, JoinType, LockMode, OffsetLimit, QueryIR};
 
 // ---------------------------------------------------------------------------
 // Private join helper
@@ -31,7 +31,7 @@ struct JoinClause {
 #[derive(Debug, Clone)]
 #[must_use = "builders do nothing until .build() is called"]
 pub struct GetBuilder<'a> {
-    model: &'a Model,
+    model: &'a Entity,
     table_alias: Option<String>,
     projections: Vec<Expr>,
     joins: Vec<JoinClause>,
@@ -48,7 +48,7 @@ pub struct GetBuilder<'a> {
 
 impl<'a> GetBuilder<'a> {
     /// Create a new `GetBuilder` for the given model.
-    pub fn new(model: &'a Model) -> Self {
+    pub fn new(model: &'a Entity) -> Self {
         Self {
             model,
             table_alias: None,
@@ -134,7 +134,7 @@ impl<'a> GetBuilder<'a> {
     pub fn join(
         mut self,
         join_type: JoinType,
-        target: &Model,
+        target: &Entity,
         on_conditions: &[(&str, &str)],
     ) -> Self {
         self.joins.push(JoinClause {
@@ -154,7 +154,7 @@ impl<'a> GetBuilder<'a> {
     pub fn join_aliased(
         mut self,
         join_type: JoinType,
-        target: &Model,
+        target: &Entity,
         alias: &str,
         on_conditions: &[(&str, &str)],
     ) -> Self {
@@ -172,22 +172,22 @@ impl<'a> GetBuilder<'a> {
     }
 
     /// Shorthand for `INNER JOIN`.
-    pub fn inner_join(self, target: &Model, on_conditions: &[(&str, &str)]) -> Self {
+    pub fn inner_join(self, target: &Entity, on_conditions: &[(&str, &str)]) -> Self {
         self.join(JoinType::Inner, target, on_conditions)
     }
 
     /// Shorthand for `LEFT JOIN`.
-    pub fn left_join(self, target: &Model, on_conditions: &[(&str, &str)]) -> Self {
+    pub fn left_join(self, target: &Entity, on_conditions: &[(&str, &str)]) -> Self {
         self.join(JoinType::Left, target, on_conditions)
     }
 
     /// Shorthand for `RIGHT JOIN`.
-    pub fn right_join(self, target: &Model, on_conditions: &[(&str, &str)]) -> Self {
+    pub fn right_join(self, target: &Entity, on_conditions: &[(&str, &str)]) -> Self {
         self.join(JoinType::Right, target, on_conditions)
     }
 
     /// Shorthand for `FULL OUTER JOIN`.
-    pub fn full_join(self, target: &Model, on_conditions: &[(&str, &str)]) -> Self {
+    pub fn full_join(self, target: &Entity, on_conditions: &[(&str, &str)]) -> Self {
         self.join(JoinType::Full, target, on_conditions)
     }
 
@@ -398,7 +398,7 @@ impl<'a> GetBuilder<'a> {
 
     /// Consume the builder and produce a [`QueryIR`].
     pub fn build(self) -> QueryIR {
-        let source = ModelRef {
+        let source = EntityRef {
             name: self.model.name.to_string(),
             namespace: self.model.namespace.map(|s| s.to_string()),
             alias: self.table_alias,
@@ -409,7 +409,7 @@ impl<'a> GetBuilder<'a> {
             .into_iter()
             .map(|jc| JoinIR {
                 join_type: jc.join_type,
-                target: ModelRef {
+                target: EntityRef {
                     name: jc.model_name,
                     namespace: jc.model_namespace,
                     alias: jc.alias,
@@ -517,7 +517,10 @@ pub(crate) fn count_single_expr_params(expr: &Expr) -> usize {
         Expr::FieldAccess { base, .. } => count_single_expr_params(base),
 
         Expr::TernaryOp {
-            expr, first, second, ..
+            expr,
+            first,
+            second,
+            ..
         } => {
             count_single_expr_params(expr)
                 + count_single_expr_params(first)

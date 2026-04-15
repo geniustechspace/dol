@@ -124,8 +124,8 @@ pub struct RenderedMigration {
 ///     fn version(&self) -> &str { "V001" }
 ///     fn description(&self) -> &str { "Create users table" }
 ///     fn up(&self) -> Vec<MigrationStep> {
-///         vec![MigrationStep::define_model(
-///             dol_core::builder::definition::DefineModelBuilder::new("users")
+///         vec![MigrationStep::define_entity(
+///             dol_core::builder::definition::DefineEntityBuilder::new("users")
 ///                 .field(FieldDef::new("id", FieldType::Uuid).primary_key())
 ///                 .field(FieldDef::new("email", FieldType::Text).unique())
 ///                 .if_not_exists()
@@ -133,7 +133,7 @@ pub struct RenderedMigration {
 ///         )]
 ///     }
 ///     fn down(&self) -> Vec<MigrationStep> {
-///         vec![MigrationStep::drop_model("users")]
+///         vec![MigrationStep::drop_entity("users")]
 ///     }
 /// }
 ///
@@ -494,9 +494,9 @@ fn render_step(step: &MigrationStep, dialect: &Dialect) -> RenderedStep {
 /// Render a SQL statement to a [`RenderedStep`].
 fn render_sql_step(stmt: &Statement, dialect: &Dialect) -> RenderedStep {
     let result: Result<dol_core::ir::SqlOutput, BackendError> = match stmt {
-        Statement::DefineModel(ir) => render::render_define_model_ir(ir, dialect),
-        Statement::AlterModel(ir) => render::render_alter_model_ir(ir, dialect),
-        Statement::DropModel(ir) => render::render_drop_model_ir(ir, dialect),
+        Statement::DefineEntity(ir) => render::render_define_entity_ir(ir, dialect),
+        Statement::AlterEntity(ir) => render::render_alter_entity_ir(ir, dialect),
+        Statement::DropEntity(ir) => render::render_drop_entity_ir(ir, dialect),
         Statement::DefineIndex(ir) => render::render_define_index_ir(ir, dialect),
         Statement::DropIndex(ir) => render::render_drop_index_ir(ir, dialect),
         Statement::Grant(ir) => render::render_grant_ir(ir),

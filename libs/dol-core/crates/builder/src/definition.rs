@@ -1,21 +1,21 @@
 //! Definition builders — CREATE, ALTER, DROP for models and indexes.
 //!
-//! - [`CreateFromMeta`]: builds a `DefineModelIR` from static [`Model`] metadata.
-//! - [`DefineModelBuilder`]: builds a CREATE TABLE from owned [`FieldDef`]s (runtime-defined).
-//! - [`AlterModelBuilder`]: builds ALTER TABLE statements from a Model reference.
-//! - [`DropModelBuilder`]: builds DROP TABLE from a Model reference.
+//! - [`CreateFromMeta`]: builds a `DefineEntityIR` from static [`Model`] metadata.
+//! - [`DefineEntityBuilder`]: builds a CREATE TABLE from owned [`FieldDef`]s (runtime-defined).
+//! - [`AlterEntityBuilder`]: builds ALTER TABLE statements from a Model reference.
+//! - [`DropEntityBuilder`]: builds DROP TABLE from a Model reference.
 //! - [`DefineIndexBuilder`]: builds CREATE INDEX.
 //! - [`DropIndexBuilder`]: builds DROP INDEX.
 //!
 //! For SQL rendering, import the extension traits from `dol-sql`.
 
-use dol_ir::ModelRef;
+use dol_entity::constraint::EntityConstraint;
+use dol_entity::{Entity, Field, FieldType};
+use dol_ir::EntityRef;
 use dol_ir::definition::{
-    AlterAction, AlterModelIR, DefineIndexIR, DefineModelIR, DropIndexIR, DropModelIR, FieldDef,
+    AlterAction, AlterEntityIR, DefineEntityIR, DefineIndexIR, DropEntityIR, DropIndexIR, FieldDef,
     IndexMethod, OwnedForeignKeyRef,
 };
-use dol_entity::constraint::ModelConstraint;
-use dol_entity::{Field, FieldType, Model};
 
 // ---------------------------------------------------------------------------
 // Field -> FieldDef conversion helper
@@ -48,19 +48,19 @@ fn field_to_field_def(f: &Field) -> FieldDef {
 // CreateFromMeta — renders CREATE TABLE from static Model metadata
 // ===========================================================================
 
-/// Builds a `DefineModelIR` from a static [`Model`]'s metadata.
+/// Builds a `DefineEntityIR` from a static [`Model`]'s metadata.
 ///
 /// Converts the model's static field definitions to owned [`FieldDef`]s and
 /// includes model-level constraints.
 #[derive(Debug, Clone)]
 #[must_use = "builders do nothing until .build() is called"]
 pub struct CreateFromMeta<'a> {
-    model: &'a Model,
+    model: &'a Entity,
     if_not_exists: bool,
 }
 
 impl<'a> CreateFromMeta<'a> {
-    pub fn new(model: &'a Model) -> Self {
+    pub fn new(model: &'a Entity) -> Self {
         Self {
             model,
             if_not_exists: false,
@@ -73,7 +73,7 @@ impl<'a> CreateFromMeta<'a> {
     }
 
     /// Access the underlying model.
-    pub fn get_model(&self) -> &'a Model {
+    pub fn get_entity(&self) -> &'a Entity {
         self.model
     }
 
@@ -82,15 +82,15 @@ impl<'a> CreateFromMeta<'a> {
         self.if_not_exists
     }
 
-    /// Build the canonical [`DefineModelIR`].
+    /// Build the canonical [`DefineEntityIR`].
     ///
     /// Converts static `Field`s to owned `FieldDef`s and copies model
     /// constraints. Note: primary-key constraints derived from fields
     /// are included in the model's `constraints` array when present;
     /// otherwise renderers should extract PKs from `FieldDef::primary_key`.
-    pub fn build(&self) -> DefineModelIR {
+    pub fn build(&self) -> DefineEntityIR {
         let fields = self.model.fields.iter().map(field_to_field_def).collect();
-        DefineModelIR {
+        DefineEntityIR {
             name: self.model.name.to_string(),
             namespace: self.model.namespace.map(|s| s.to_string()),
             fields,
@@ -101,24 +101,24 @@ impl<'a> CreateFromMeta<'a> {
 }
 
 // ===========================================================================
-// DefineModelBuilder — CREATE TABLE from owned FieldDefs
+// DefineEntityBuilder — CREATE TABLE from owned FieldDefs
 // ===========================================================================
 
 /// Builds a `CREATE TABLE` from owned [`FieldDef`]s.
 ///
-/// Use [`Model::define`] as the entry point for runtime-defined tables,
-/// or construct directly with [`DefineModelBuilder::new`].
+/// Use [`Entity::define`] as the entry point for runtime-defined tables,
+/// or construct directly with [`DefineEntityBuilder::new`].
 #[derive(Debug, Clone)]
 #[must_use = "builders do nothing until .build() is called"]
-pub struct DefineModelBuilder {
+pub struct DefineEntityBuilder {
     name: String,
     namespace: Option<String>,
     fields: Vec<FieldDef>,
-    constraints: Vec<ModelConstraint>,
+    constraints: Vec<EntityConstraint>,
     if_not_exists: bool,
 }
 
-impl DefineModelBuilder {
+impl DefineEntityBuilder {
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -149,7 +149,7 @@ impl DefineModelBuilder {
         self
     }
 
-    pub fn constraint(mut self, c: ModelConstraint) -> Self {
+    pub fn constraint(mut self, c: EntityConstraint) -> Self {
         self.constraints.push(c);
         self
     }
@@ -159,9 +159,9 @@ impl DefineModelBuilder {
         self
     }
 
-    /// Build the canonical [`DefineModelIR`].
-    pub fn build(&self) -> DefineModelIR {
-        DefineModelIR {
+    /// Build the canonical [`DefineEntityIR`].
+    pub fn build(&self) -> DefineEntityIR {
+        DefineEntityIR {
             name: self.name.clone(),
             namespace: self.namespace.clone(),
             fields: self.fields.clone(),
@@ -172,19 +172,19 @@ impl DefineModelBuilder {
 }
 
 // ===========================================================================
-// AlterModelBuilder
+// AlterEntityBuilder
 // ===========================================================================
 
 /// Builds `ALTER TABLE` statements from a [`Model`] reference.
 #[derive(Debug, Clone)]
 #[must_use = "builders do nothing until .build() is called"]
-pub struct AlterModelBuilder<'a> {
-    model: &'a Model,
+pub struct AlterEntityBuilder<'a> {
+    model: &'a Entity,
     actions: Vec<AlterAction>,
 }
 
-impl<'a> AlterModelBuilder<'a> {
-    pub fn new(model: &'a Model) -> Self {
+impl<'a> AlterEntityBuilder<'a> {
+    pub fn new(model: &'a Entity) -> Self {
         Self {
             model,
             actions: Vec::new(),
@@ -266,7 +266,7 @@ impl<'a> AlterModelBuilder<'a> {
     // -- Constraint operations --
 
     /// Add a model-level constraint.
-    pub fn add_constraint(mut self, c: ModelConstraint) -> Self {
+    pub fn add_constraint(mut self, c: EntityConstraint) -> Self {
         self.actions.push(AlterAction::AddConstraint(c));
         self
     }
@@ -283,16 +283,16 @@ impl<'a> AlterModelBuilder<'a> {
     /// Rename the model (table).
     pub fn rename_model(mut self, new_name: &str) -> Self {
         self.actions
-            .push(AlterAction::RenameModel(new_name.to_string()));
+            .push(AlterAction::RenameEntity(new_name.to_string()));
         self
     }
 
     // -- Build / render --
 
-    /// Build the canonical [`AlterModelIR`].
-    pub fn build(&self) -> AlterModelIR {
-        AlterModelIR {
-            target: ModelRef {
+    /// Build the canonical [`AlterEntityIR`].
+    pub fn build(&self) -> AlterEntityIR {
+        AlterEntityIR {
+            target: EntityRef {
                 name: self.model.name.to_string(),
                 namespace: self.model.namespace.map(|s| s.to_string()),
                 alias: None,
@@ -303,20 +303,20 @@ impl<'a> AlterModelBuilder<'a> {
 }
 
 // ===========================================================================
-// DropModelBuilder
+// DropEntityBuilder
 // ===========================================================================
 
 /// Builds a `DROP TABLE` from a [`Model`] reference.
 #[derive(Debug, Clone)]
 #[must_use = "builders do nothing until .build() is called"]
-pub struct DropModelBuilder<'a> {
-    model: &'a Model,
+pub struct DropEntityBuilder<'a> {
+    model: &'a Entity,
     if_exists: bool,
     cascade: bool,
 }
 
-impl<'a> DropModelBuilder<'a> {
-    pub fn new(model: &'a Model) -> Self {
+impl<'a> DropEntityBuilder<'a> {
+    pub fn new(model: &'a Entity) -> Self {
         Self {
             model,
             if_exists: false,
@@ -334,10 +334,10 @@ impl<'a> DropModelBuilder<'a> {
         self
     }
 
-    /// Build the canonical [`DropModelIR`].
-    pub fn build(&self) -> DropModelIR {
-        DropModelIR {
-            target: ModelRef {
+    /// Build the canonical [`DropEntityIR`].
+    pub fn build(&self) -> DropEntityIR {
+        DropEntityIR {
+            target: EntityRef {
                 name: self.model.name.to_string(),
                 namespace: self.model.namespace.map(|s| s.to_string()),
                 alias: None,
@@ -436,7 +436,7 @@ impl DefineIndexBuilder {
     pub fn build(&self) -> DefineIndexIR {
         DefineIndexIR {
             name: self.name.clone(),
-            target: ModelRef {
+            target: EntityRef {
                 name: self.target_name.clone(),
                 namespace: self.target_namespace.clone(),
                 alias: None,
@@ -502,20 +502,20 @@ impl DropIndexBuilder {
 }
 
 // ===========================================================================
-// Model::define — static entry point for runtime-defined models
+// Entity::define — static entry point for runtime-defined models
 // ===========================================================================
 
 /// Extension trait providing the `define()` associated function on [`Model`].
-pub trait ModelDefineExt {
+pub trait EntityDefineExt {
     /// Start building a `CREATE TABLE` from scratch with owned field definitions.
     ///
-    /// Unlike [`Model::create`](super::ModelBuilderExt::create) which builds from static metadata,
-    /// `define` produces a [`DefineModelBuilder`] for runtime-constructed schemas.
-    fn define(name: &str) -> DefineModelBuilder;
+    /// Unlike [`Entity::create`](super::EntityBuilderExt::create) which builds from static metadata,
+    /// `define` produces a [`DefineEntityBuilder`] for runtime-constructed schemas.
+    fn define(name: &str) -> DefineEntityBuilder;
 }
 
-impl ModelDefineExt for Model {
-    fn define(name: &str) -> DefineModelBuilder {
-        DefineModelBuilder::new(name)
+impl EntityDefineExt for Entity {
+    fn define(name: &str) -> DefineEntityBuilder {
+        DefineEntityBuilder::new(name)
     }
 }

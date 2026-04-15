@@ -1,13 +1,13 @@
 //! Query IR — the canonical representation of a data retrieval operation.
 
-use super::ModelRef;
+use super::EntityRef;
 use dol_expr::{Expr, OrderByExpr};
 
 /// How to retrieve data from a source.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct QueryIR {
-    pub source: ModelRef,
+    pub source: EntityRef,
     pub projections: Vec<Expr>,
     pub joins: Vec<JoinIR>,
     pub filters: Vec<Expr>,
@@ -36,7 +36,7 @@ pub enum OffsetLimit {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct JoinIR {
     pub join_type: JoinType,
-    pub target: ModelRef,
+    pub target: EntityRef,
     pub on_conditions: Vec<(String, String)>,
 }
 

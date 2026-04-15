@@ -9,7 +9,7 @@
 //! ## Internal Sub-crates
 //!
 //! - **`dol-expr`** — Expressions, operators, functions (leaf, no deps)
-//! - **`dol-model`** — Model, Field, FieldType, constraints (leaf, no deps)
+//! - **`dol-entity`** — Entity, Field, FieldType, constraints (leaf, no deps)
 //! - **`dol-ir`** — Statement enum, all IR types, Backend trait, output types
 //! - **`dol-builder`** — Composable builder API (GetBuilder, InsertBuilder, etc.)
 
@@ -18,7 +18,7 @@
 /// Expression engine — composable, backend-agnostic expression AST.
 pub use dol_expr as expr;
 
-/// Schema language — Model, Field, FieldType, and constraints.
+/// Schema language — Entity, Field, FieldType, and constraints.
 pub use dol_entity as model;
 
 /// Intermediate representation — backend-agnostic AST, Backend trait, output types.
@@ -29,8 +29,8 @@ pub use dol_builder as builder;
 
 // ── Top-level convenience re-exports ──
 
-pub use model::{Field, FieldType, Model};
+pub use model::{Entity, Field, FieldType};
 
 pub use ir::{Backend, BackendError, RenderedOutput, Statement};
 
-pub use builder::{ModelBuilderExt, ModelDefineExt};
+pub use builder::{EntityBuilderExt, EntityDefineExt};

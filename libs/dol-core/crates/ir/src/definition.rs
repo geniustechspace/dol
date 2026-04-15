@@ -1,17 +1,17 @@
 //! Definition IR — canonical representation of schema operations.
 
-use super::ModelRef;
+use super::EntityRef;
 use dol_entity::FieldType;
-use dol_entity::constraint::{FkAction, GeneratedKind, ModelConstraint};
+use dol_entity::constraint::{EntityConstraint, FkAction, GeneratedKind};
 
 /// Define (create) a new model.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct DefineModelIR {
+pub struct DefineEntityIR {
     pub name: String,
     pub namespace: Option<String>,
     pub fields: Vec<FieldDef>,
-    pub constraints: Vec<ModelConstraint>,
+    pub constraints: Vec<EntityConstraint>,
     pub if_not_exists: bool,
 }
 
@@ -151,8 +151,8 @@ impl OwnedForeignKeyRef {
 /// Alter an existing model.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct AlterModelIR {
-    pub target: ModelRef,
+pub struct AlterEntityIR {
+    pub target: EntityRef,
     pub actions: Vec<AlterAction>,
 }
 
@@ -168,16 +168,16 @@ pub enum AlterAction {
     DropFieldDefault(String),
     SetFieldNotNull(String),
     DropFieldNotNull(String),
-    AddConstraint(ModelConstraint),
+    AddConstraint(EntityConstraint),
     DropConstraint(String),
-    RenameModel(String),
+    RenameEntity(String),
 }
 
 /// Drop (remove) a model.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct DropModelIR {
-    pub target: ModelRef,
+pub struct DropEntityIR {
+    pub target: EntityRef,
     pub if_exists: bool,
     pub cascade: bool,
 }
@@ -187,7 +187,7 @@ pub struct DropModelIR {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DefineIndexIR {
     pub name: String,
-    pub target: ModelRef,
+    pub target: EntityRef,
     pub columns: Vec<String>,
     pub unique: bool,
     pub if_not_exists: bool,

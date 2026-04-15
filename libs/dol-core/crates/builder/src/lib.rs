@@ -3,7 +3,7 @@
 //! Composable method-chain APIs that produce DOL IR.
 //!
 //! Every builder follows the same pattern:
-//! 1. Create via `Model::get()`, `Model::insert()`, etc.
+//! 1. Create via `Entity::get()`, `Entity::insert()`, etc.
 //! 2. Chain configuration methods
 //! 3. Call `.build()` to produce IR
 //!
@@ -20,8 +20,8 @@ pub mod transaction;
 
 pub use control::{GrantBuilder, RevokeBuilder};
 pub use definition::{
-    AlterModelBuilder, DefineIndexBuilder, DefineModelBuilder, DropIndexBuilder, DropModelBuilder,
-    ModelDefineExt,
+    AlterEntityBuilder, DefineEntityBuilder, DefineIndexBuilder, DropEntityBuilder,
+    DropIndexBuilder, EntityDefineExt,
 };
 pub use mutation::{
     InsertBuilder, InsertSelectBuilder, RemoveBuilder, UpdateBuilder, UpsertBuilder,
@@ -33,7 +33,7 @@ pub use storage::{
 };
 pub use transaction::TransactionBuilder;
 
-use dol_entity::Model;
+use dol_entity::Entity;
 
 // ---------------------------------------------------------------------------
 // Model entry points — extension trait for builder access
@@ -42,19 +42,19 @@ use dol_entity::Model;
 /// Extension trait providing builder entry-point methods on [`Model`].
 ///
 /// Import this trait to use `model.get()`, `model.insert()`, etc.
-pub trait ModelBuilderExt {
+pub trait EntityBuilderExt {
     fn get(&self) -> GetBuilder<'_>;
     fn insert(&self) -> InsertBuilder<'_>;
     fn insert_select(&self) -> InsertSelectBuilder<'_>;
     fn update(&self) -> UpdateBuilder<'_>;
     fn remove(&self) -> RemoveBuilder<'_>;
     fn upsert(&self) -> UpsertBuilder<'_>;
-    fn alter(&self) -> AlterModelBuilder<'_>;
-    fn drop_model(&self) -> DropModelBuilder<'_>;
+    fn alter(&self) -> AlterEntityBuilder<'_>;
+    fn drop_entity(&self) -> DropEntityBuilder<'_>;
     fn create(&self) -> definition::CreateFromMeta<'_>;
 }
 
-impl ModelBuilderExt for Model {
+impl EntityBuilderExt for Entity {
     /// Start building a GET (SELECT) query.
     fn get(&self) -> GetBuilder<'_> {
         GetBuilder::new(self)
@@ -86,13 +86,13 @@ impl ModelBuilderExt for Model {
     }
 
     /// Start building an ALTER MODEL (ALTER TABLE).
-    fn alter(&self) -> AlterModelBuilder<'_> {
-        AlterModelBuilder::new(self)
+    fn alter(&self) -> AlterEntityBuilder<'_> {
+        AlterEntityBuilder::new(self)
     }
 
     /// Start building a DROP MODEL (DROP TABLE).
-    fn drop_model(&self) -> DropModelBuilder<'_> {
-        DropModelBuilder::new(self)
+    fn drop_entity(&self) -> DropEntityBuilder<'_> {
+        DropEntityBuilder::new(self)
     }
 
     /// Build a CREATE TABLE from this model's static metadata.
@@ -109,14 +109,14 @@ impl ModelBuilderExt for Model {
 mod tests {
     use super::*;
     use control::Privilege;
+    use dol_entity::{Field, FieldType};
     use dol_expr::{Direction, Expr, NullsPosition, OrderByExpr, col, param, raw_expr};
     use dol_ir::definition::{AlterAction, FieldDef, IndexMethod};
     use dol_ir::storage::ObjectSource;
     use dol_ir::transaction::TransactionIR;
     use dol_ir::{JoinType, LockMode, OffsetLimit};
-    use dol_entity::{Field, FieldType};
 
-    static TEST_MODEL: Model = Model::new(
+    static TEST_MODEL: Entity = Entity::new(
         "users",
         &[
             Field::new("id", FieldType::Uuid).primary_key(),
@@ -127,7 +127,7 @@ mod tests {
         ],
     );
 
-    static POSTS_MODEL: Model = Model::new(
+    static POSTS_MODEL: Entity = Entity::new(
         "posts",
         &[
             Field::new("id", FieldType::Uuid).primary_key(),
@@ -850,7 +850,7 @@ mod tests {
         assert_eq!(b.param_count(), 3);
     }
 
-    // ── AlterModelBuilder tests ─────────────────────────────────────────
+    // ── AlterEntityBuilder tests ─────────────────────────────────────────
 
     #[test]
     fn alter_add_field() {
@@ -944,10 +944,10 @@ mod tests {
 
     #[test]
     fn alter_add_constraint() {
-        use dol_entity::constraint::ModelConstraint;
+        use dol_entity::constraint::EntityConstraint;
         let ir = TEST_MODEL
             .alter()
-            .add_constraint(ModelConstraint::Unique(&["email", "name"]))
+            .add_constraint(EntityConstraint::Unique(&["email", "name"]))
             .build();
         assert!(matches!(&ir.actions[0], AlterAction::AddConstraint(_)));
     }
@@ -964,7 +964,7 @@ mod tests {
     #[test]
     fn alter_rename_model() {
         let ir = TEST_MODEL.alter().rename_model("people").build();
-        assert!(matches!(&ir.actions[0], AlterAction::RenameModel(n) if n == "people"));
+        assert!(matches!(&ir.actions[0], AlterAction::RenameEntity(n) if n == "people"));
     }
 
     #[test]
@@ -978,11 +978,11 @@ mod tests {
         assert_eq!(ir.actions.len(), 3);
     }
 
-    // ── DropModelBuilder tests ──────────────────────────────────────────
+    // ── DropEntityBuilder tests ──────────────────────────────────────────
 
     #[test]
     fn drop_model_minimal() {
-        let ir = TEST_MODEL.drop_model().build();
+        let ir = TEST_MODEL.drop_entity().build();
         assert_eq!(ir.target.name, "users");
         assert!(!ir.if_exists);
         assert!(!ir.cascade);
@@ -990,21 +990,21 @@ mod tests {
 
     #[test]
     fn drop_model_if_exists() {
-        let ir = TEST_MODEL.drop_model().if_exists().build();
+        let ir = TEST_MODEL.drop_entity().if_exists().build();
         assert!(ir.if_exists);
         assert!(!ir.cascade);
     }
 
     #[test]
     fn drop_model_cascade() {
-        let ir = TEST_MODEL.drop_model().cascade().build();
+        let ir = TEST_MODEL.drop_entity().cascade().build();
         assert!(!ir.if_exists);
         assert!(ir.cascade);
     }
 
     #[test]
     fn drop_model_if_exists_cascade() {
-        let ir = TEST_MODEL.drop_model().if_exists().cascade().build();
+        let ir = TEST_MODEL.drop_entity().if_exists().cascade().build();
         assert!(ir.if_exists);
         assert!(ir.cascade);
     }
@@ -1048,12 +1048,12 @@ mod tests {
     #[test]
     fn create_from_meta_get_model() {
         let builder = TEST_MODEL.create();
-        assert_eq!(builder.get_model().name, "users");
+        assert_eq!(builder.get_entity().name, "users");
     }
 
     #[test]
     fn create_from_meta_with_namespace() {
-        static NS_MODEL: Model = Model::new(
+        static NS_MODEL: Entity = Entity::new(
             "accounts",
             &[Field::new("id", FieldType::Uuid).primary_key()],
         )
@@ -1064,11 +1064,11 @@ mod tests {
         assert_eq!(ir.namespace.as_deref(), Some("public"));
     }
 
-    // ── DefineModelBuilder tests ────────────────────────────────────────
+    // ── DefineEntityBuilder tests ────────────────────────────────────────
 
     #[test]
     fn define_model_basic() {
-        let ir = DefineModelBuilder::new("events")
+        let ir = DefineEntityBuilder::new("events")
             .field(FieldDef {
                 name: "id".to_string(),
                 field_type: FieldType::Uuid,
@@ -1092,7 +1092,7 @@ mod tests {
 
     #[test]
     fn define_model_with_namespace() {
-        let ir = DefineModelBuilder::new("logs")
+        let ir = DefineEntityBuilder::new("logs")
             .namespace("analytics")
             .build();
         assert_eq!(ir.namespace.as_deref(), Some("analytics"));
@@ -1100,19 +1100,19 @@ mod tests {
 
     #[test]
     fn define_model_schema_alias() {
-        let ir = DefineModelBuilder::new("logs").schema("analytics").build();
+        let ir = DefineEntityBuilder::new("logs").schema("analytics").build();
         assert_eq!(ir.namespace.as_deref(), Some("analytics"));
     }
 
     #[test]
     fn define_model_if_not_exists() {
-        let ir = DefineModelBuilder::new("events").if_not_exists().build();
+        let ir = DefineEntityBuilder::new("events").if_not_exists().build();
         assert!(ir.if_not_exists);
     }
 
     #[test]
     fn define_model_via_model_define_ext() {
-        let ir = Model::define("sessions").if_not_exists().build();
+        let ir = Entity::define("sessions").if_not_exists().build();
         assert_eq!(ir.name, "sessions");
         assert!(ir.if_not_exists);
     }
@@ -1149,15 +1149,15 @@ mod tests {
                 indexed: false,
             },
         ];
-        let ir = DefineModelBuilder::new("test").fields(fields).build();
+        let ir = DefineEntityBuilder::new("test").fields(fields).build();
         assert_eq!(ir.fields.len(), 2);
     }
 
     #[test]
     fn define_model_with_constraint() {
-        use dol_entity::constraint::ModelConstraint;
-        let ir = DefineModelBuilder::new("test")
-            .constraint(ModelConstraint::Unique(&["a", "b"]))
+        use dol_entity::constraint::EntityConstraint;
+        let ir = DefineEntityBuilder::new("test")
+            .constraint(EntityConstraint::Unique(&["a", "b"]))
             .build();
         assert_eq!(ir.constraints.len(), 1);
     }
@@ -1472,7 +1472,7 @@ mod tests {
 
     #[test]
     fn namespace_propagates_to_get_ir() {
-        static NS_MODEL: Model = Model::new(
+        static NS_MODEL: Entity = Entity::new(
             "accounts",
             &[Field::new("id", FieldType::Uuid).primary_key()],
         )
@@ -1484,7 +1484,7 @@ mod tests {
 
     #[test]
     fn namespace_propagates_to_insert_ir() {
-        static NS_MODEL: Model = Model::new(
+        static NS_MODEL: Entity = Entity::new(
             "accounts",
             &[Field::new("id", FieldType::Uuid).primary_key()],
         )
@@ -1496,7 +1496,7 @@ mod tests {
 
     #[test]
     fn namespace_propagates_to_update_ir() {
-        static NS_MODEL: Model = Model::new(
+        static NS_MODEL: Entity = Entity::new(
             "accounts",
             &[Field::new("id", FieldType::Uuid).primary_key()],
         )
@@ -1508,7 +1508,7 @@ mod tests {
 
     #[test]
     fn namespace_propagates_to_remove_ir() {
-        static NS_MODEL: Model = Model::new(
+        static NS_MODEL: Entity = Entity::new(
             "accounts",
             &[Field::new("id", FieldType::Uuid).primary_key()],
         )
@@ -1520,7 +1520,7 @@ mod tests {
 
     #[test]
     fn namespace_propagates_to_upsert_ir() {
-        static NS_MODEL: Model = Model::new(
+        static NS_MODEL: Entity = Entity::new(
             "accounts",
             &[Field::new("id", FieldType::Uuid).primary_key()],
         )
@@ -1537,7 +1537,7 @@ mod tests {
 
     #[test]
     fn namespace_propagates_to_alter_ir() {
-        static NS_MODEL: Model = Model::new(
+        static NS_MODEL: Entity = Entity::new(
             "accounts",
             &[Field::new("id", FieldType::Uuid).primary_key()],
         )
@@ -1549,19 +1549,19 @@ mod tests {
 
     #[test]
     fn namespace_propagates_to_drop_ir() {
-        static NS_MODEL: Model = Model::new(
+        static NS_MODEL: Entity = Entity::new(
             "accounts",
             &[Field::new("id", FieldType::Uuid).primary_key()],
         )
         .with_namespace("auth");
 
-        let ir = NS_MODEL.drop_model().build();
+        let ir = NS_MODEL.drop_entity().build();
         assert_eq!(ir.target.namespace.as_deref(), Some("auth"));
     }
 
     #[test]
     fn namespace_propagates_to_create_ir() {
-        static NS_MODEL: Model = Model::new(
+        static NS_MODEL: Entity = Entity::new(
             "accounts",
             &[Field::new("id", FieldType::Uuid).primary_key()],
         )

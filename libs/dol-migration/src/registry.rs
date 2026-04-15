@@ -1,8 +1,8 @@
 //! Migration registry — tracks which migrations have been applied.
 
 use super::MigrationError;
-use dol_core::builder::ModelBuilderExt;
-use dol_core::model::{Field, FieldType, Model};
+use dol_core::builder::EntityBuilderExt;
+use dol_core::model::{Entity, Field, FieldType};
 use dol_sql::ext::ToSql;
 
 // ===========================================================================
@@ -21,7 +21,7 @@ use dol_sql::ext::ToSql;
 /// - `checksum` (TEXT): Hash of the migration steps for tamper detection.
 /// - `applied_at` (TIMESTAMP): When the migration was applied.
 /// - `execution_time_ms` (BIGINT): How long the migration took to run.
-pub static MIGRATION_HISTORY: Model = Model::new(
+pub static MIGRATION_HISTORY: Entity = Entity::new(
     "_dol_migrations",
     &[
         Field::new("version", FieldType::Varchar(Some(255))).primary_key(),
@@ -274,7 +274,7 @@ mod tests {
     }
 
     #[test]
-    fn migration_history_model() {
+    fn migration_history_entity() {
         assert_eq!(MIGRATION_HISTORY.name, "_dol_migrations");
         assert_eq!(MIGRATION_HISTORY.fields.len(), 5);
         assert!(MIGRATION_HISTORY.field("version").primary_key);

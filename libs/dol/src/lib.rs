@@ -36,13 +36,13 @@
 //! ## Quick Start
 //!
 //! ```rust
-//! use dol::model::{Model, Field, FieldType};
+//! use dol::model::{Entity, Field, FieldType};
 //! use dol::backend::sql::dialect::Dialect;
-//! use dol::builder::ModelBuilderExt;
+//! use dol::builder::EntityBuilderExt;
 //! use dol::ToSql;
 //!
 //! // Define a static model (zero-cost, const-compatible)
-//! static USERS: Model = Model::new("users", &[
+//! static USERS: Entity = Entity::new("users", &[
 //!     Field::new("id", FieldType::Uuid).primary_key(),
 //!     Field::new("email", FieldType::Text).unique(),
 //!     Field::new("status", FieldType::Text).default("'active'"),
@@ -77,7 +77,7 @@ pub use dol_core as language;
 /// Expression engine — composable, backend-agnostic expression AST.
 pub use dol_core::expr;
 
-/// Schema language — Model, Field, FieldType, and constraints.
+/// Schema language — Entity, Field, FieldType, and constraints.
 pub use dol_core::model;
 
 /// Intermediate representation — backend-agnostic AST.
@@ -123,8 +123,8 @@ pub use dol_config as config;
 // ── Top-level re-exports for ergonomic use ──
 
 pub use dol_core::ir::definition::FieldDef;
-pub use dol_core::model::constraint::{FkAction, ForeignKeyRef, GeneratedKind, ModelConstraint};
-pub use dol_core::model::{Field, FieldType, Model};
+pub use dol_core::model::constraint::{EntityConstraint, FkAction, ForeignKeyRef, GeneratedKind};
+pub use dol_core::model::{Entity, Field, FieldType};
 pub use dol_sql::dialect::Dialect;
 
 #[cfg(feature = "config")]
@@ -133,7 +133,7 @@ pub use dol_config::DolConfig;
 pub use dol_config::{BackendFilter, LockStrategy, UnifiedMigrationConfig};
 
 // Re-export builder extension traits so users can call model.get(), etc.
-pub use dol_core::builder::{ModelBuilderExt, ModelDefineExt};
+pub use dol_core::builder::{EntityBuilderExt, EntityDefineExt};
 
 // Re-export the ToSql extension trait so builders have .to_sql() in scope.
 pub use dol_sql::ext::ToSql;

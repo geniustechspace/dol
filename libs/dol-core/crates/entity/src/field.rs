@@ -1,4 +1,4 @@
-//! Field definition within a Model.
+//! Field definition within an Entity.
 //!
 //! In DOL, a **Field** is a named property with a type, optional constraints,
 //! and an optional default expression. The DOL philosophy:

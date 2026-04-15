@@ -1,11 +1,11 @@
 //! Comprehensive tests for the DOL crate — ported from core-db plus DOL-specific tests.
 
 use crate::CompoundSelectBuilder;
-use crate::ModelDefineExt;
+use crate::EntityDefineExt;
 use crate::ToSql;
 use crate::TransactionSqlExt;
 use crate::backend::sql::dialect::Dialect;
-use crate::builder::ModelBuilderExt;
+use crate::builder::EntityBuilderExt;
 use crate::builder::control::{GrantBuilder, Privilege, RevokeBuilder};
 use crate::builder::definition::{DefineIndexBuilder, DropIndexBuilder};
 use crate::builder::transaction::TransactionBuilder;
@@ -13,7 +13,7 @@ use crate::expr::func;
 use crate::expr::window::FrameBound;
 use crate::expr::{Direction, Expr, NullsPosition, case, col, field, lit, param, raw_expr};
 use crate::ir::LockMode;
-use crate::model::{Field, FieldType, FkAction, Model, ModelConstraint};
+use crate::model::{Entity, EntityConstraint, Field, FieldType, FkAction};
 
 fn pg() -> Dialect {
     Dialect::postgres()
@@ -23,7 +23,7 @@ fn pg() -> Dialect {
 // Test model definitions (mirrors core-db test fixtures)
 // ---------------------------------------------------------------------------
 
-static USERS: Model = Model::new(
+static USERS: Entity = Entity::new(
     "users",
     &[
         Field::new("id", FieldType::Uuid).primary_key(),
@@ -36,7 +36,7 @@ static USERS: Model = Model::new(
     ],
 );
 
-static TENANTS: Model = Model::new(
+static TENANTS: Entity = Entity::new(
     "tenants",
     &[
         Field::new("id", FieldType::Uuid).primary_key(),
@@ -54,7 +54,7 @@ static TENANTS: Model = Model::new(
     ],
 );
 
-static SETTINGS: Model = Model::new(
+static SETTINGS: Entity = Entity::new(
     "tenant_settings",
     &[
         Field::new("tenant_id", FieldType::Uuid).primary_key(),
@@ -97,7 +97,7 @@ fn model_field_list() {
 
 #[test]
 fn model_qualified_name_with_namespace() {
-    let m = Model::new("users", &[]).with_namespace("auth");
+    let m = Entity::new("users", &[]).with_namespace("auth");
     assert_eq!(m.qualified_name(), "auth.users");
 }
 
@@ -765,7 +765,7 @@ fn create_table_if_not_exists() {
 
 #[test]
 fn create_table_with_nullable() {
-    static T: Model = Model::new(
+    static T: Entity = Entity::new(
         "test",
         &[
             Field::new("id", FieldType::Uuid).primary_key(),
@@ -779,7 +779,7 @@ fn create_table_with_nullable() {
 
 #[test]
 fn create_table_with_default_expr() {
-    static T: Model = Model::new(
+    static T: Entity = Entity::new(
         "events",
         &[
             Field::new("id", FieldType::Uuid).primary_key(),
@@ -794,7 +794,7 @@ fn create_table_with_default_expr() {
 
 #[test]
 fn create_table_with_unique() {
-    static T: Model = Model::new(
+    static T: Entity = Entity::new(
         "accounts",
         &[
             Field::new("id", FieldType::Uuid).primary_key(),
@@ -807,7 +807,7 @@ fn create_table_with_unique() {
 
 #[test]
 fn create_table_with_references() {
-    static T: Model = Model::new(
+    static T: Entity = Entity::new(
         "posts",
         &[
             Field::new("id", FieldType::Uuid).primary_key(),
@@ -825,7 +825,7 @@ fn create_table_with_references() {
 
 #[test]
 fn create_table_with_constraints() {
-    static T: Model = Model::new(
+    static T: Entity = Entity::new(
         "memberships",
         &[
             Field::new("user_id", FieldType::Uuid),
@@ -834,8 +834,8 @@ fn create_table_with_constraints() {
         ],
     )
     .with_constraints(&[
-        ModelConstraint::Unique(&["user_id", "group_id"]),
-        ModelConstraint::Check("role IN ('admin', 'member')"),
+        EntityConstraint::Unique(&["user_id", "group_id"]),
+        EntityConstraint::Check("role IN ('admin', 'member')"),
     ]);
     let sql = T.create().to_sql(Some(&pg()));
     assert!(sql.contains("UNIQUE (user_id, group_id)"));
@@ -844,7 +844,7 @@ fn create_table_with_constraints() {
 
 #[test]
 fn create_table_with_fk_constraint() {
-    static T: Model = Model::new(
+    static T: Entity = Entity::new(
         "order_items",
         &[
             Field::new("id", FieldType::Uuid).primary_key(),
@@ -852,7 +852,7 @@ fn create_table_with_fk_constraint() {
             Field::new("product_id", FieldType::Uuid),
         ],
     )
-    .with_constraints(&[ModelConstraint::ForeignKey {
+    .with_constraints(&[EntityConstraint::ForeignKey {
         columns: &["order_id"],
         ref_table: "orders",
         ref_columns: &["id"],
@@ -864,7 +864,7 @@ fn create_table_with_fk_constraint() {
 
 #[test]
 fn create_table_with_default_unique_fk() {
-    static T: Model = Model::new(
+    static T: Entity = Entity::new(
         "credentials",
         &[
             Field::new("id", FieldType::Uuid).primary_key(),
@@ -888,7 +888,7 @@ fn create_table_with_default_unique_fk() {
 
 #[test]
 fn custom_field_type() {
-    static T: Model = Model::new(
+    static T: Entity = Entity::new(
         "items",
         &[
             Field::new("id", FieldType::Uuid).primary_key(),
@@ -900,13 +900,13 @@ fn custom_field_type() {
 }
 
 // ===========================================================================
-// DDL tests — DROP TABLE (DropModelBuilder)
+// DDL tests — DROP TABLE (DropEntityBuilder)
 // ===========================================================================
 
 #[test]
 fn drop_table() {
     let sql = SETTINGS
-        .drop_model()
+        .drop_entity()
         .if_exists()
         .cascade()
         .to_sql(Some(&pg()));
@@ -914,7 +914,7 @@ fn drop_table() {
 }
 
 // ===========================================================================
-// DDL tests — ALTER TABLE (AlterModelBuilder)
+// DDL tests — ALTER TABLE (AlterEntityBuilder)
 // ===========================================================================
 
 #[test]
@@ -1002,7 +1002,7 @@ fn alter_table_rename_table() {
 fn alter_table_add_constraint() {
     let sql = USERS
         .alter()
-        .add_constraint(ModelConstraint::Unique(&["tenant_id", "email"]))
+        .add_constraint(EntityConstraint::Unique(&["tenant_id", "email"]))
         .to_sql(Some(&pg()));
     assert!(sql.contains("ALTER TABLE users ADD UNIQUE (tenant_id, email)"));
 }
@@ -1912,7 +1912,7 @@ fn dialect_drop_table_mssql_no_cascade() {
     // This will be refined in Phase 9 when dialect-aware DDL is fully implemented.
     let mssql = Dialect::mssql();
     let sql = USERS
-        .drop_model()
+        .drop_entity()
         .if_exists()
         .cascade()
         .to_sql(Some(&mssql));
@@ -2232,14 +2232,14 @@ fn expr_array_literal() {
 }
 
 // ===========================================================================
-// DOL-specific: Model::define() (DefineModelBuilder)
+// DOL-specific: Entity::define() (DefineEntityBuilder)
 // ===========================================================================
 
 #[test]
 fn define_model_via_static_method() {
     use crate::ir::definition::FieldDef;
 
-    let ir = Model::define("users")
+    let ir = Entity::define("users")
         .field(FieldDef::new("id", FieldType::Uuid).primary_key())
         .field(FieldDef::new("email", FieldType::Text).unique())
         .build();
@@ -2281,7 +2281,7 @@ fn varchar_type_renders_in_display() {
 
 #[test]
 fn char_varchar_in_create_table() {
-    static CODES: Model = Model::new(
+    static CODES: Entity = Entity::new(
         "codes",
         &[
             Field::new("id", FieldType::Int).primary_key(),

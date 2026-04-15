@@ -5,9 +5,9 @@
 //!
 //! For SQL rendering, import the `ToSql` extension trait from `dol-sql`.
 
+use dol_entity::Entity;
 use dol_expr::{Expr, col, param, raw_expr};
-use dol_ir::{InsertIR, InsertSelectIR, ModelRef, RemoveIR, UpdateIR, UpsertIR};
-use dol_entity::Model;
+use dol_ir::{EntityRef, InsertIR, InsertSelectIR, RemoveIR, UpdateIR, UpsertIR};
 
 use super::query::count_single_expr_params;
 
@@ -15,9 +15,9 @@ use super::query::count_single_expr_params;
 // Helper
 // ===========================================================================
 
-/// Build a `ModelRef` from a `Model`'s static metadata.
-fn model_ref(model: &Model) -> ModelRef {
-    ModelRef {
+/// Build a `EntityRef` from a `Model`'s static metadata.
+fn entity_ref(model: &Entity) -> EntityRef {
+    EntityRef {
         name: model.name.to_string(),
         namespace: model.namespace.map(|s| s.to_string()),
         alias: None,
@@ -32,14 +32,14 @@ fn model_ref(model: &Model) -> ModelRef {
 #[derive(Debug, Clone)]
 #[must_use = "builders do nothing until .build() is called"]
 pub struct InsertBuilder<'a> {
-    model: &'a Model,
+    model: &'a Entity,
     fields: Vec<String>,
     row_count: usize,
     returning: Vec<String>,
 }
 
 impl<'a> InsertBuilder<'a> {
-    pub fn new(model: &'a Model) -> Self {
+    pub fn new(model: &'a Entity) -> Self {
         Self {
             model,
             fields: Vec::new(),
@@ -86,7 +86,7 @@ impl<'a> InsertBuilder<'a> {
     /// Build the canonical [`InsertIR`].
     pub fn build(&self) -> InsertIR {
         InsertIR {
-            target: model_ref(self.model),
+            target: entity_ref(self.model),
             fields: self.fields.clone(),
             row_count: self.row_count,
             returning: self.returning.clone(),
@@ -102,14 +102,14 @@ impl<'a> InsertBuilder<'a> {
 #[derive(Debug, Clone)]
 #[must_use = "builders do nothing until .build() is called"]
 pub struct InsertSelectBuilder<'a> {
-    model: &'a Model,
+    model: &'a Entity,
     fields: Vec<String>,
     source_query: String,
     returning: Vec<String>,
 }
 
 impl<'a> InsertSelectBuilder<'a> {
-    pub fn new(model: &'a Model) -> Self {
+    pub fn new(model: &'a Entity) -> Self {
         Self {
             model,
             fields: Vec::new(),
@@ -145,7 +145,7 @@ impl<'a> InsertSelectBuilder<'a> {
     /// Build the canonical [`InsertSelectIR`].
     pub fn build(&self) -> InsertSelectIR {
         InsertSelectIR {
-            target: model_ref(self.model),
+            target: entity_ref(self.model),
             fields: self.fields.clone(),
             source_query: self.source_query.clone(),
             returning: self.returning.clone(),
@@ -161,14 +161,14 @@ impl<'a> InsertSelectBuilder<'a> {
 #[derive(Debug, Clone)]
 #[must_use = "builders do nothing until .build() is called"]
 pub struct UpdateBuilder<'a> {
-    model: &'a Model,
+    model: &'a Entity,
     assignments: Vec<(String, Expr)>,
     filters: Vec<Expr>,
     returning: Vec<String>,
 }
 
 impl<'a> UpdateBuilder<'a> {
-    pub fn new(model: &'a Model) -> Self {
+    pub fn new(model: &'a Entity) -> Self {
         Self {
             model,
             assignments: Vec::new(),
@@ -263,7 +263,7 @@ impl<'a> UpdateBuilder<'a> {
     /// Build the canonical [`UpdateIR`].
     pub fn build(&self) -> UpdateIR {
         UpdateIR {
-            target: model_ref(self.model),
+            target: entity_ref(self.model),
             assignments: self.assignments.clone(),
             filters: self.filters.clone(),
             returning: self.returning.clone(),
@@ -279,13 +279,13 @@ impl<'a> UpdateBuilder<'a> {
 #[derive(Debug, Clone)]
 #[must_use = "builders do nothing until .build() is called"]
 pub struct RemoveBuilder<'a> {
-    model: &'a Model,
+    model: &'a Entity,
     filters: Vec<Expr>,
     returning: Vec<String>,
 }
 
 impl<'a> RemoveBuilder<'a> {
-    pub fn new(model: &'a Model) -> Self {
+    pub fn new(model: &'a Entity) -> Self {
         Self {
             model,
             filters: Vec::new(),
@@ -337,7 +337,7 @@ impl<'a> RemoveBuilder<'a> {
     /// Build the canonical [`RemoveIR`].
     pub fn build(&self) -> RemoveIR {
         RemoveIR {
-            target: model_ref(self.model),
+            target: entity_ref(self.model),
             filters: self.filters.clone(),
             returning: self.returning.clone(),
         }
@@ -352,7 +352,7 @@ impl<'a> RemoveBuilder<'a> {
 #[derive(Debug, Clone)]
 #[must_use = "builders do nothing until .build() is called"]
 pub struct UpsertBuilder<'a> {
-    model: &'a Model,
+    model: &'a Entity,
     fields: Vec<String>,
     conflict_fields: Vec<String>,
     conflict_constraint: Option<String>,
@@ -363,7 +363,7 @@ pub struct UpsertBuilder<'a> {
 }
 
 impl<'a> UpsertBuilder<'a> {
-    pub fn new(model: &'a Model) -> Self {
+    pub fn new(model: &'a Entity) -> Self {
         Self {
             model,
             fields: Vec::new(),
@@ -463,7 +463,7 @@ impl<'a> UpsertBuilder<'a> {
     /// Build the canonical [`UpsertIR`].
     pub fn build(&self) -> UpsertIR {
         UpsertIR {
-            target: model_ref(self.model),
+            target: entity_ref(self.model),
             fields: self.fields.clone(),
             conflict_fields: self.conflict_fields.clone(),
             conflict_constraint: self.conflict_constraint.clone(),
