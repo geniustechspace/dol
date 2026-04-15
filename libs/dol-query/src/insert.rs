@@ -36,8 +36,8 @@ impl InsertQuery {
         }
     }
 
-    /// Specify which columns to insert.
-    pub fn columns(mut self, cols: &[&str]) -> Self {
+    /// Specify which fields to insert.
+    pub fn fields(mut self, cols: &[&str]) -> Self {
         self.fields = cols.iter().map(|s| s.to_string()).collect();
         self
     }
@@ -72,7 +72,7 @@ impl InsertQuery {
 
     /// Build the canonical [`InsertIR`].
     ///
-    /// When no columns have been set (via `.columns()`) and Entity field
+    /// When no fields have been set (via `.fields()`) and Entity field
     /// metadata is available, all entity fields are included by default.
     pub fn build(self) -> InsertIR {
         // Default: include all entity fields when none were specified.

@@ -1,6 +1,6 @@
 //! UPDATE query builder for `dol-query`.
 
-use dol_expr::{Expr, field, param, raw_expr};
+use dol_expr::{Expr, field, param};
 use dol_ir::{EntityRef, UpdateIR};
 
 // ===========================================================================
@@ -48,7 +48,7 @@ impl UpdateQuery {
     /// Set a column to a literal SQL expression: `col = <literal>`.
     pub fn set_literal(mut self, column: &str, literal: &str) -> Self {
         self.assignments
-            .push((column.to_string(), raw_expr(literal)));
+            .push((column.to_string(), dol_expr::raw_expr(literal)));
         self
     }
 
@@ -66,26 +66,10 @@ impl UpdateQuery {
     }
 
     /// Add an arbitrary filter expression to the WHERE clause.
+    ///
+    /// Multiple filters are AND-joined.
     pub fn filter(mut self, expr: Expr) -> Self {
         self.filters.push(expr);
-        self
-    }
-
-    /// Add `column = $N` to the WHERE clause (bind parameter).
-    pub fn where_eq(mut self, column: &str) -> Self {
-        self.filters.push(field(column).eq(param()));
-        self
-    }
-
-    /// Add `column = <literal>` to the WHERE clause.
-    pub fn where_eq_literal(mut self, column: &str, literal: &str) -> Self {
-        self.filters.push(field(column).eq(raw_expr(literal)));
-        self
-    }
-
-    /// Add a raw SQL filter to the WHERE clause.
-    pub fn where_raw(mut self, sql: &str) -> Self {
-        self.filters.push(raw_expr(sql));
         self
     }
 

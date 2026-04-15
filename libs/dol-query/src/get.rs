@@ -3,7 +3,7 @@
 //! Mirrors `dol-builder::GetBuilder` but works with owned name/namespace
 //! instead of requiring a static `&Entity` reference.
 
-use dol_expr::{Direction, Expr, NullsPosition, OrderByExpr, field, param, raw_expr};
+use dol_expr::{Direction, Expr, NullsPosition, OrderByExpr, field};
 use dol_ir::{EntityRef, JoinIR, JoinType, LockMode, OffsetLimit, QueryIR};
 
 // ---------------------------------------------------------------------------
@@ -81,41 +81,26 @@ impl GetQuery {
 
     // ── Projection methods ──────────────────────────────────────────────
 
-    /// Select a list of named columns.
-    pub fn columns(mut self, names: &[&str]) -> Self {
+    /// Add named columns to the projection list.
+    pub fn fields(mut self, names: &[&str]) -> Self {
         for name in names {
             self.projections.push(field(name));
         }
         self
     }
 
-    /// Add a single column/expression to the projection list.
-    pub fn select_item(mut self, expr: Expr) -> Self {
+    /// Add a single expression to the projection list.
+    ///
+    /// Use the expression language to build any projection:
+    ///
+    /// ```ignore
+    /// .field(field("email").alias("user_email"))
+    /// .field(Expr::CountStar.alias("total"))
+    /// .field(func::sum(field("amount")))
+    /// .field(raw_expr("COALESCE(name, email)"))
+    /// ```
+    pub fn field(mut self, expr: Expr) -> Self {
         self.projections.push(expr);
-        self
-    }
-
-    /// Select a column aliased to a different name (`col AS alias`).
-    pub fn column_as(mut self, name: &str, alias: &str) -> Self {
-        self.projections.push(field(name).alias(alias));
-        self
-    }
-
-    /// Add `COUNT(*)` to the projection list.
-    pub fn count_all(mut self) -> Self {
-        self.projections.push(Expr::CountStar);
-        self
-    }
-
-    /// Add `COUNT(*) AS alias` to the projection list.
-    pub fn count_all_as(mut self, alias: &str) -> Self {
-        self.projections.push(Expr::CountStar.alias(alias));
-        self
-    }
-
-    /// Add a raw SQL expression to the projection list.
-    pub fn raw_column(mut self, sql: &str) -> Self {
-        self.projections.push(raw_expr(sql));
         self
     }
 
@@ -188,71 +173,16 @@ impl GetQuery {
 
     /// Add an arbitrary filter expression to the WHERE clause.
     ///
-    /// Multiple filters are AND-joined.
+    /// Multiple filters are AND-joined. Use the expression language:
+    ///
+    /// ```ignore
+    /// .filter(field("id").eq(param()))
+    /// .filter(field("email").ilike(param()))
+    /// .filter(field("status").eq(raw_expr("'active'")))
+    /// .filter(raw_expr("created_at > NOW() - INTERVAL '30 days'"))
+    /// ```
     pub fn filter(mut self, expr: Expr) -> Self {
         self.filters.push(expr);
-        self
-    }
-
-    /// Add `column = $param` to the WHERE clause.
-    pub fn where_eq(mut self, column: &str) -> Self {
-        self.filters.push(field(column).eq(param()));
-        self
-    }
-
-    /// Add `column = <literal>` to the WHERE clause (inline literal, no bind param).
-    pub fn where_eq_literal(mut self, column: &str, value: Expr) -> Self {
-        self.filters.push(field(column).eq(value));
-        self
-    }
-
-    /// Add `column ILIKE $param` to the WHERE clause (dialect-aware).
-    pub fn where_ilike(mut self, column: &str) -> Self {
-        self.filters.push(field(column).ilike(param()));
-        self
-    }
-
-    /// Add `EXISTS (subquery)` to the WHERE clause.
-    pub fn where_exists(mut self, subquery: &str) -> Self {
-        self.filters.push(Expr::Exists {
-            subquery: subquery.to_string(),
-            negated: false,
-        });
-        self
-    }
-
-    /// Add `NOT EXISTS (subquery)` to the WHERE clause.
-    pub fn where_not_exists(mut self, subquery: &str) -> Self {
-        self.filters.push(Expr::Exists {
-            subquery: subquery.to_string(),
-            negated: true,
-        });
-        self
-    }
-
-    /// Add `column IN (subquery)` to the WHERE clause.
-    pub fn where_in_subquery(mut self, column: &str, subquery: &str) -> Self {
-        self.filters.push(Expr::InSubquery {
-            expr: Box::new(field(column)),
-            subquery: subquery.to_string(),
-            negated: false,
-        });
-        self
-    }
-
-    /// Add `column NOT IN (subquery)` to the WHERE clause.
-    pub fn where_not_in_subquery(mut self, column: &str, subquery: &str) -> Self {
-        self.filters.push(Expr::InSubquery {
-            expr: Box::new(field(column)),
-            subquery: subquery.to_string(),
-            negated: true,
-        });
-        self
-    }
-
-    /// Add a raw SQL expression to the WHERE clause.
-    pub fn where_raw(mut self, sql: &str) -> Self {
-        self.filters.push(raw_expr(sql));
         self
     }
 

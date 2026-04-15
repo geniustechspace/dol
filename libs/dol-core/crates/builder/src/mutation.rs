@@ -6,7 +6,7 @@
 //! For SQL rendering, import the `Render` extension trait from `dol-sql`.
 
 use dol_entity::Entity;
-use dol_expr::{Expr, field, param, raw_expr};
+use dol_expr::{Expr, field, param};
 use dol_ir::{EntityRef, InsertIR, InsertSelectIR, RemoveIR, UpdateIR, UpsertIR};
 
 use super::query::count_single_expr_params;
@@ -48,8 +48,8 @@ impl<'a> InsertBuilder<'a> {
         }
     }
 
-    /// Specify which columns to insert.
-    pub fn columns(mut self, cols: &[&str]) -> Self {
+    /// Specify which fields to insert.
+    pub fn fields(mut self, cols: &[&str]) -> Self {
         self.fields = cols.iter().map(|s| s.to_string()).collect();
         self
     }
@@ -84,7 +84,7 @@ impl<'a> InsertBuilder<'a> {
 
     /// Build the canonical [`InsertIR`].
     ///
-    /// When no columns have been set (via `.columns()`), all entity fields
+    /// When no fields have been set (via `.fields()`), all entity fields
     /// are included by default.
     pub fn build(&self) -> InsertIR {
         // Default: include all entity fields when none were specified.
@@ -127,8 +127,8 @@ impl<'a> InsertSelectBuilder<'a> {
         }
     }
 
-    /// Specify which columns to insert into.
-    pub fn columns(mut self, cols: &[&str]) -> Self {
+    /// Specify which fields to insert into.
+    pub fn fields(mut self, cols: &[&str]) -> Self {
         self.fields = cols.iter().map(|s| s.to_string()).collect();
         self
     }
@@ -223,26 +223,10 @@ impl<'a> UpdateBuilder<'a> {
     }
 
     /// Add an arbitrary filter expression to the WHERE clause.
+    ///
+    /// Multiple filters are AND-joined.
     pub fn filter(mut self, expr: Expr) -> Self {
         self.filters.push(expr);
-        self
-    }
-
-    /// Add `column = $N` to the WHERE clause (bind parameter).
-    pub fn where_eq(mut self, column: &str) -> Self {
-        self.filters.push(field(column).eq(param()));
-        self
-    }
-
-    /// Add `column = <literal>` to the WHERE clause.
-    pub fn where_eq_literal(mut self, column: &str, literal: &str) -> Self {
-        self.filters.push(field(column).eq(raw_expr(literal)));
-        self
-    }
-
-    /// Add a raw SQL filter to the WHERE clause.
-    pub fn where_raw(mut self, sql: &str) -> Self {
-        self.filters.push(raw_expr(sql));
         self
     }
 
@@ -303,26 +287,10 @@ impl<'a> RemoveBuilder<'a> {
     }
 
     /// Add an arbitrary filter expression to the WHERE clause.
+    ///
+    /// Multiple filters are AND-joined.
     pub fn filter(mut self, expr: Expr) -> Self {
         self.filters.push(expr);
-        self
-    }
-
-    /// Add `column = $N` to the WHERE clause (bind parameter).
-    pub fn where_eq(mut self, column: &str) -> Self {
-        self.filters.push(field(column).eq(param()));
-        self
-    }
-
-    /// Add `column = <literal>` to the WHERE clause.
-    pub fn where_eq_literal(mut self, column: &str, literal: &str) -> Self {
-        self.filters.push(field(column).eq(raw_expr(literal)));
-        self
-    }
-
-    /// Add a raw SQL filter to the WHERE clause.
-    pub fn where_raw(mut self, sql: &str) -> Self {
-        self.filters.push(raw_expr(sql));
         self
     }
 
@@ -385,8 +353,8 @@ impl<'a> UpsertBuilder<'a> {
         }
     }
 
-    /// Specify which columns to insert.
-    pub fn columns(mut self, cols: &[&str]) -> Self {
+    /// Specify which fields to insert.
+    pub fn fields(mut self, cols: &[&str]) -> Self {
         self.fields = cols.iter().map(|s| s.to_string()).collect();
         self
     }
@@ -436,19 +404,6 @@ impl<'a> UpsertBuilder<'a> {
         self
     }
 
-    /// Add `column = $N` to the conflict WHERE clause.
-    pub fn conflict_where_eq(mut self, column: &str) -> Self {
-        self.conflict_filters.push(field(column).eq(param()));
-        self
-    }
-
-    /// Add `column = <literal>` to the conflict WHERE clause.
-    pub fn conflict_where_eq_literal(mut self, column: &str, literal: &str) -> Self {
-        self.conflict_filters
-            .push(field(column).eq(raw_expr(literal)));
-        self
-    }
-
     /// Total bind-parameter count for this UPSERT.
     ///
     /// Counts the insert-row parameters plus any parameters inside
@@ -469,7 +424,7 @@ impl<'a> UpsertBuilder<'a> {
 
     /// Build the canonical [`UpsertIR`].
     ///
-    /// When no columns have been set (via `.columns()`), all entity fields
+    /// When no fields have been set (via `.fields()`), all entity fields
     /// are included by default.
     pub fn build(&self) -> UpsertIR {
         // Default: include all entity fields when none were specified.

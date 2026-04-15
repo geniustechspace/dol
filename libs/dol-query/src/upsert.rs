@@ -1,6 +1,6 @@
 //! UPSERT (INSERT ... ON CONFLICT) query builder for `dol-query`.
 
-use dol_expr::{Expr, field, param, raw_expr};
+use dol_expr::Expr;
 use dol_ir::{EntityRef, UpsertIR};
 
 // ===========================================================================
@@ -45,8 +45,8 @@ impl UpsertQuery {
         }
     }
 
-    /// Specify which columns to insert.
-    pub fn columns(mut self, cols: &[&str]) -> Self {
+    /// Specify which fields to insert.
+    pub fn fields(mut self, cols: &[&str]) -> Self {
         self.fields = cols.iter().map(|s| s.to_string()).collect();
         self
     }
@@ -95,19 +95,6 @@ impl UpsertQuery {
         self
     }
 
-    /// Add `column = $N` to the conflict WHERE clause.
-    pub fn conflict_where_eq(mut self, column: &str) -> Self {
-        self.conflict_filters.push(field(column).eq(param()));
-        self
-    }
-
-    /// Add `column = <literal>` to the conflict WHERE clause.
-    pub fn conflict_where_eq_literal(mut self, column: &str, literal: &str) -> Self {
-        self.conflict_filters
-            .push(field(column).eq(raw_expr(literal)));
-        self
-    }
-
     /// Total bind-parameter count for this UPSERT.
     pub fn param_count(&self) -> usize {
         if self.fields.is_empty() {
@@ -119,7 +106,7 @@ impl UpsertQuery {
 
     /// Build the canonical [`UpsertIR`].
     ///
-    /// When no columns have been set (via `.columns()`) and Entity field
+    /// When no fields have been set (via `.fields()`) and Entity field
     /// metadata is available, all entity fields are included by default.
     pub fn build(self) -> UpsertIR {
         // Default: include all entity fields when none were specified.
