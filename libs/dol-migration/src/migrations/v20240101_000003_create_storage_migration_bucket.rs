@@ -60,8 +60,7 @@ mod tests {
 
     #[test]
     fn renders_storage_operations() {
-        let runner =
-            crate::MigrationRunner::new().register(CreateStorageMigrationBucket);
+        let runner = crate::MigrationRunner::new().register(CreateStorageMigrationBucket);
         let registry = crate::InMemoryRegistry::new();
         let plan = runner.plan_forward(&registry).unwrap();
         let rendered = runner.render_plan(&plan, None);

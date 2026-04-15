@@ -14,11 +14,13 @@ use dol_core::model::FieldType;
 ///
 /// **Forward (up)**:
 /// - `CREATE TABLE IF NOT EXISTS _dol_migrations (version, description, checksum, applied_at, execution_time_ms)`
-/// - `CREATE INDEX IF NOT EXISTS idx_dol_migrations_applied_at ON _dol_migrations (applied_at)`
+/// - `CREATE INDEX idx_dol_migrations_applied_at ON _dol_migrations (applied_at)`
 ///
 /// **Backward (down)**:
-/// - `DROP INDEX IF EXISTS idx_dol_migrations_applied_at`
 /// - `DROP TABLE IF EXISTS _dol_migrations`
+///
+/// The index is dropped implicitly when the table is dropped, which is
+/// valid across all major SQL dialects (PostgreSQL, MySQL, SQLite).
 pub struct CreateMigrationHistory;
 
 impl Migration for CreateMigrationHistory {
@@ -35,18 +37,21 @@ impl Migration for CreateMigrationHistory {
             // Create the migration tracking table
             MigrationStep::define_model(
                 DefineModelBuilder::new("_dol_migrations")
-                    .field(FieldDef::new("version", FieldType::Text).primary_key())
+                    .field(FieldDef::new("version", FieldType::Varchar(Some(255))).primary_key())
                     .field(FieldDef::new("description", FieldType::Text))
                     .field(FieldDef::new("checksum", FieldType::Text))
-                    .field(FieldDef::new("applied_at", FieldType::Timestamp).default("NOW()"))
                     .field(
-                        FieldDef::new("execution_time_ms", FieldType::BigInt)
-                            .default("0"),
+                        FieldDef::new("applied_at", FieldType::Timestamp)
+                            .default("CURRENT_TIMESTAMP"),
                     )
+                    .field(FieldDef::new("execution_time_ms", FieldType::BigInt).default("0"))
                     .if_not_exists()
                     .build(),
             ),
-            // Index on applied_at for chronological queries
+            // Index on applied_at for chronological queries.
+            // `if_not_exists` is false because `CREATE INDEX IF NOT EXISTS`
+            // is not supported by MySQL. The migration runner already
+            // prevents re-applying, so this is safe.
             MigrationStep::define_index(DefineIndexIR {
                 name: "idx_dol_migrations_applied_at".to_string(),
                 target: ModelRef {
@@ -56,7 +61,7 @@ impl Migration for CreateMigrationHistory {
                 },
                 columns: vec!["applied_at".to_string()],
                 unique: false,
-                if_not_exists: true,
+                if_not_exists: false,
                 concurrently: false,
                 method: None,
                 where_clause: None,
@@ -65,10 +70,9 @@ impl Migration for CreateMigrationHistory {
     }
 
     fn down(&self) -> Vec<MigrationStep> {
-        vec![
-            MigrationStep::drop_index("idx_dol_migrations_applied_at"),
-            MigrationStep::drop_model("_dol_migrations"),
-        ]
+        // Dropping the table implicitly drops all its indexes across
+        // PostgreSQL, MySQL, and SQLite — no separate DROP INDEX needed.
+        vec![MigrationStep::drop_model("_dol_migrations")]
     }
 }
 
@@ -93,11 +97,11 @@ mod tests {
     }
 
     #[test]
-    fn down_drops_index_and_table() {
+    fn down_drops_table() {
         let steps = CreateMigrationHistory.down();
-        assert_eq!(steps.len(), 2);
+        // Only one step: DROP TABLE (indexes are dropped implicitly)
+        assert_eq!(steps.len(), 1);
         assert_eq!(steps[0].kind(), "sql");
-        assert_eq!(steps[1].kind(), "sql");
     }
 
     #[test]
@@ -112,10 +116,16 @@ mod tests {
         let sql0 = rendered[0].steps[0].sql().unwrap();
         assert!(sql0.contains("CREATE TABLE IF NOT EXISTS"));
         assert!(sql0.contains("_dol_migrations"));
+        // Uses CURRENT_TIMESTAMP (cross-dialect) instead of NOW()
+        assert!(sql0.contains("CURRENT_TIMESTAMP"));
+        // version column uses VARCHAR for MySQL PK compatibility
+        assert!(sql0.contains("VARCHAR(255)"));
 
         let sql1 = rendered[0].steps[1].sql().unwrap();
         assert!(sql1.contains("CREATE INDEX"));
         assert!(sql1.contains("idx_dol_migrations_applied_at"));
+        // No IF NOT EXISTS on index (not supported by MySQL)
+        assert!(!sql1.contains("IF NOT EXISTS"));
     }
 
     #[test]
@@ -130,6 +140,14 @@ mod tests {
         let sql0 = rendered[0].steps[0].sql().unwrap();
         assert!(sql0.contains("CREATE TABLE IF NOT EXISTS"));
         assert!(sql0.contains("_dol_migrations"));
+        // MySQL uses VARCHAR(255) for PK (TEXT cannot be a PK in MySQL)
+        assert!(sql0.contains("VARCHAR(255)"));
+        assert!(sql0.contains("CURRENT_TIMESTAMP"));
+
+        let sql1 = rendered[0].steps[1].sql().unwrap();
+        assert!(sql1.contains("CREATE INDEX"));
+        // No IF NOT EXISTS on index (MySQL does not support it)
+        assert!(!sql1.contains("IF NOT EXISTS"));
     }
 
     #[test]
@@ -144,5 +162,7 @@ mod tests {
         let sql0 = rendered[0].steps[0].sql().unwrap();
         assert!(sql0.contains("CREATE TABLE IF NOT EXISTS"));
         assert!(sql0.contains("_dol_migrations"));
+        // Uses CURRENT_TIMESTAMP (SQLite-compatible, not NOW())
+        assert!(sql0.contains("CURRENT_TIMESTAMP"));
     }
 }

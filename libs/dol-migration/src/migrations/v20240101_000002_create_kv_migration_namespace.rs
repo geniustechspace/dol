@@ -59,8 +59,7 @@ mod tests {
 
     #[test]
     fn renders_kv_operations() {
-        let runner =
-            crate::MigrationRunner::new().register(CreateKvMigrationNamespace);
+        let runner = crate::MigrationRunner::new().register(CreateKvMigrationNamespace);
         let registry = crate::InMemoryRegistry::new();
         let plan = runner.plan_forward(&registry).unwrap();
         let rendered = runner.render_plan(&plan, None);
