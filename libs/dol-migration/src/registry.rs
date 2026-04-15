@@ -164,7 +164,11 @@ impl MigrationRegistry for InMemoryRegistry {
 /// assert!(sql.contains("CREATE TABLE IF NOT EXISTS _dol_migrations"));
 /// ```
 pub fn create_history_table_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> String {
-    MIGRATION_HISTORY.create().if_not_exists().render(dialect).unwrap()
+    MIGRATION_HISTORY
+        .create()
+        .if_not_exists()
+        .render(dialect)
+        .unwrap()
 }
 
 /// Generate an INSERT SQL for recording an applied migration.
@@ -218,7 +222,11 @@ pub fn delete_reverted_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> Strin
 /// assert!(sql.contains("_dol_migrations"));
 /// ```
 pub fn select_applied_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> String {
-    MIGRATION_HISTORY.get().all_columns().render(dialect).unwrap()
+    MIGRATION_HISTORY
+        .get()
+        .all_fields()
+        .render(dialect)
+        .unwrap()
 }
 
 #[cfg(test)]

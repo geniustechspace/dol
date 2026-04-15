@@ -74,7 +74,7 @@ impl Field {
         self
     }
 
-    /// DOL alias for `nullable` — the field is optional.
+    /// Mark the field as optional. Equivalent to [`nullable`](Self::nullable).
     pub const fn optional(self) -> Self {
         self.nullable()
     }

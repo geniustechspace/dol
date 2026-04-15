@@ -6,7 +6,7 @@
 //! For SQL rendering, import the `Render` extension trait from `dol-sql`.
 
 use dol_entity::Entity;
-use dol_expr::{Expr, col, param, raw_expr};
+use dol_expr::{Expr, field, param, raw_expr};
 use dol_ir::{EntityRef, InsertIR, InsertSelectIR, RemoveIR, UpdateIR, UpsertIR};
 
 use super::query::count_single_expr_params;
@@ -48,15 +48,10 @@ impl<'a> InsertBuilder<'a> {
         }
     }
 
-    /// Include all model fields in the INSERT column list.
-    pub fn all_columns(mut self) -> Self {
+    /// Include all entity fields in the INSERT column list.
+    pub fn all_fields(mut self) -> Self {
         self.fields = self.model.field_names().map(|s| s.to_string()).collect();
         self
-    }
-
-    /// Alias for [`all_columns`](Self::all_columns).
-    pub fn all_fields(self) -> Self {
-        self.all_columns()
     }
 
     /// Specify which columns to insert.
@@ -207,7 +202,7 @@ impl<'a> UpdateBuilder<'a> {
 
     /// Increment a column: `col = col + $N`.
     pub fn set_increment(mut self, column: &str) -> Self {
-        let expr = col(column) + Expr::Param;
+        let expr = field(column) + Expr::Param;
         self.assignments.push((column.to_string(), expr));
         self
     }
@@ -226,13 +221,13 @@ impl<'a> UpdateBuilder<'a> {
 
     /// Add `column = $N` to the WHERE clause (bind parameter).
     pub fn where_eq(mut self, column: &str) -> Self {
-        self.filters.push(col(column).eq(param()));
+        self.filters.push(field(column).eq(param()));
         self
     }
 
     /// Add `column = <literal>` to the WHERE clause.
     pub fn where_eq_literal(mut self, column: &str, literal: &str) -> Self {
-        self.filters.push(col(column).eq(raw_expr(literal)));
+        self.filters.push(field(column).eq(raw_expr(literal)));
         self
     }
 
@@ -306,13 +301,13 @@ impl<'a> RemoveBuilder<'a> {
 
     /// Add `column = $N` to the WHERE clause (bind parameter).
     pub fn where_eq(mut self, column: &str) -> Self {
-        self.filters.push(col(column).eq(param()));
+        self.filters.push(field(column).eq(param()));
         self
     }
 
     /// Add `column = <literal>` to the WHERE clause.
     pub fn where_eq_literal(mut self, column: &str, literal: &str) -> Self {
-        self.filters.push(col(column).eq(raw_expr(literal)));
+        self.filters.push(field(column).eq(raw_expr(literal)));
         self
     }
 
@@ -381,15 +376,10 @@ impl<'a> UpsertBuilder<'a> {
         }
     }
 
-    /// Include all model fields in the INSERT column list.
-    pub fn all_columns(mut self) -> Self {
+    /// Include all entity fields in the INSERT column list.
+    pub fn all_fields(mut self) -> Self {
         self.fields = self.model.field_names().map(|s| s.to_string()).collect();
         self
-    }
-
-    /// Alias for [`all_columns`](Self::all_columns).
-    pub fn all_fields(self) -> Self {
-        self.all_columns()
     }
 
     /// Specify which columns to insert.
@@ -445,14 +435,14 @@ impl<'a> UpsertBuilder<'a> {
 
     /// Add `column = $N` to the conflict WHERE clause.
     pub fn conflict_where_eq(mut self, column: &str) -> Self {
-        self.conflict_filters.push(col(column).eq(param()));
+        self.conflict_filters.push(field(column).eq(param()));
         self
     }
 
     /// Add `column = <literal>` to the conflict WHERE clause.
     pub fn conflict_where_eq_literal(mut self, column: &str, literal: &str) -> Self {
         self.conflict_filters
-            .push(col(column).eq(raw_expr(literal)));
+            .push(field(column).eq(raw_expr(literal)));
         self
     }
 

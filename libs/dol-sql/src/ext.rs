@@ -448,7 +448,7 @@ mod tests {
     // -- GetBuilder --
 
     #[test]
-    fn get_builder_to_sql() {
+    fn get_builder_render() {
         let sql = TEST_MODEL
             .get()
             .all_fields()
@@ -509,11 +509,7 @@ mod tests {
 
     #[test]
     fn insert_with_namespace() {
-        let sql = NS_MODEL
-            .insert()
-            .columns(&["id"])
-            .render(None)
-            .unwrap();
+        let sql = NS_MODEL.insert().columns(&["id"]).render(None).unwrap();
         assert!(sql.contains("INSERT INTO auth.users"));
     }
 
@@ -577,11 +573,7 @@ mod tests {
 
     #[test]
     fn create_from_meta_if_not_exists() {
-        let sql = TEST_MODEL
-            .create()
-            .if_not_exists()
-            .render(None)
-            .unwrap();
+        let sql = TEST_MODEL.create().if_not_exists().render(None).unwrap();
         assert!(sql.starts_with("CREATE TABLE IF NOT EXISTS users ("));
     }
 

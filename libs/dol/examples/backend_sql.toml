@@ -15,7 +15,7 @@
 #
 #   // Resolve the dialect for SQL rendering:
 #   let dialect = sql_config.dialect.resolve();
-#   let sql = model.get().all_columns().where_eq("id").to_sql(Some(&dialect));
+#   let sql = model.get().all_fields().where_eq("id").render(Some(&dialect)).unwrap();
 
 # --- SQL dialect ---
 # Built-in presets: "postgresql", "mysql", "mariadb", "sqlite", "mssql",

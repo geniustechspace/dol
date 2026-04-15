@@ -7,34 +7,32 @@ that target multiple storage backends — SQL databases, key-value stores, and
 object storage — from a single, unified API.
 
 ```rust
-use dol::model::{Model, Field, FieldType};
-use dol::builder::ModelBuilderExt;
+use dol::model::{Entity, Field, FieldType};
+use dol::builder::EntityBuilderExt;
 use dol::backend::sql::dialect::Dialect;
-use dol::ToSql;
+use dol::Render;
 
-static USERS: Model = Model::new("users", &[
+static USERS: Entity = Entity::new("users", &[
     Field::new("id", FieldType::Uuid).primary_key(),
     Field::new("email", FieldType::Text).unique(),
     Field::new("name", FieldType::Varchar(Some(255))),
     Field::new("created_at", FieldType::Timestamp).default("now()"),
 ]);
 
-// Build a query — backend-agnostic
-let query = USERS.get()
-    .all_columns()
+// Render directly to any SQL dialect
+let pg = USERS.get()
+    .all_fields()
     .where_eq("email")
-    .limit(1)
-    .build();
+    .limit()
+    .render(Some(&Dialect::postgres())).unwrap();
+// → SELECT id, email, name, created_at FROM users WHERE email = $1 LIMIT $2
 
-// Render to any SQL dialect
-let pg = query.to_sql(Some(&Dialect::postgres()));
-// → SELECT "id", "email", "name", "created_at" FROM "users" WHERE "email" = $1 LIMIT 1
-
-let my = query.to_sql(Some(&Dialect::mysql()));
-// → SELECT `id`, `email`, `name`, `created_at` FROM `users` WHERE `email` = ? LIMIT 1
-
-let ms = query.to_sql(Some(&Dialect::mssql()));
-// → SELECT [id], [email], [name], [created_at] FROM [users] WHERE [email] = @p1 ... FETCH NEXT 1 ROWS ONLY
+let sqlite = USERS.get()
+    .all_fields()
+    .where_eq("email")
+    .limit()
+    .render(None).unwrap(); // default dialect (SQLite)
+// → SELECT id, email, name, created_at FROM users WHERE email = ? LIMIT ?
 ```
 
 ## Architecture
@@ -45,11 +43,11 @@ DOL follows a three-layer pipeline inspired by SQLAlchemy's Core/Engine separati
 Builders → IR → Backends
 (human API) (neutral AST) (rendering)
 ─────────────────────────────────────────────────────
-Model.get() Statement:: SqlBackend
-Model.insert() Query KvBackend
-Model.upsert() Insert ObjectStorageBackend
-Model.alter() DefineModel (your own)
-... ...
+Entity.get()       Statement::Query         SqlBackend
+Entity.insert()    Statement::Insert        KvBackend
+Entity.upsert()    Statement::Upsert        ObjectStorageBackend
+Entity.alter()     Statement::AlterEntity   (your own)
+...                ...
 ```
 
 **Layer 1 — Builders** provide a fluent, method-chain API for constructing operations.
@@ -79,7 +77,7 @@ Internal sub-crates (managed by `dol-core`, not intended for direct use):
 | Crate         | Role                                                                 |
 | ------------- | -------------------------------------------------------------------- |
 | `dol-expr`    | Composable expression AST — operators, functions, window expressions |
-| `dol-model`   | Schema language — `Model`, `Field`, `FieldType`, constraints         |
+| `dol-entity`  | Schema language — `Entity`, `Field`, `FieldType`, constraints         |
 | `dol-ir`      | Intermediate representation — `Statement` enum and `Backend` trait   |
 | `dol-builder` | Method-chain builders that produce IR                                |
 
@@ -116,9 +114,9 @@ dol = { version = "0.1", features = ["full"] }  # everything
 Models are `const`-compatible and zero-cost — define them as statics:
 
 ```rust
-use dol::model::{Model, Field, FieldType, FkAction};
+use dol::model::{Entity, Field, FieldType, FkAction};
 
-static POSTS: Model = Model::new("posts", &[
+static POSTS: Entity = Entity::new("posts", &[
     Field::new("id", FieldType::Uuid).primary_key(),
     Field::new("title", FieldType::Varchar(Some(255))),
     Field::new("body", FieldType::Text).nullable(),
@@ -131,7 +129,7 @@ static POSTS: Model = Model::new("posts", &[
 
 Fields are **NOT NULL by default** — call `.nullable()` to opt in.
 
-DOL uses `Model` as a universal term:
+DOL uses `Entity` as a universal term:
 
 - SQL → table
 - Document store → collection
@@ -141,28 +139,28 @@ DOL uses `Model` as a universal term:
 ### Queries
 
 ```rust
-use dol::builder::ModelBuilderExt;
+use dol::builder::EntityBuilderExt;
 use dol::expr::{field, param, lit};
 use dol::expr::func;
-use dol::ToSql;
+use dol::Render;
 
 // SELECT with joins, filtering, ordering, pagination
-let query = USERS.get()
+let sql = USERS.get()
     .columns(&["id", "email", "name"])
-    .left_join("posts", field("users.id").eq(field("posts.author_id")))
+    .left_join(&POSTS, &[("id", "author_id")])
     .filter(field("email").ilike(param()))
     .order_by_desc("created_at")
-    .limit(20)
-    .offset(40)
-    .build();
+    .limit()
+    .offset()
+    .render(Some(&Dialect::postgres())).unwrap();
 
 // Aggregations with GROUP BY / HAVING
-let stats = POSTS.get()
-    .column("author_id")
+let sql = POSTS.get()
+    .columns(&["author_id"])
     .count_all_as("post_count")
     .group_by(&["author_id"])
     .having(func::count(field("*")).gt(lit(5)))
-    .build();
+    .render(Some(&Dialect::postgres())).unwrap();
 
 // Subqueries
 let active_ids = USERS.get()
@@ -170,10 +168,10 @@ let active_ids = USERS.get()
     .filter(field("active").eq(lit(true)))
     .build();
 
-let posts = POSTS.get()
-    .all_columns()
+let sql = POSTS.get()
+    .all_fields()
     .filter(field("author_id").in_subquery(active_ids))
-    .build();
+    .render(Some(&Dialect::postgres())).unwrap();
 ```
 
 ### Mutations
@@ -216,7 +214,7 @@ let remove = USERS.remove()
 
 ```rust
 use dol::ir::definition::FieldDef;
-use dol::ModelDefineExt;
+use dol::EntityDefineExt;
 
 // CREATE TABLE from model metadata
 let create = USERS.create().build();
@@ -228,7 +226,7 @@ let alter = USERS.alter()
     .build();
 
 // Define a model programmatically
-let table = Model::define("sessions")
+let table = Entity::define("sessions")
     .field(FieldDef::new("id", FieldType::Uuid).primary_key())
     .field(FieldDef::new("user_id", FieldType::Uuid))
     .field(FieldDef::new("expires_at", FieldType::Timestamp))
@@ -239,14 +237,20 @@ let table = Model::define("sessions")
 ### Transactions
 
 ```rust
-use dol::TransactionSqlExt;
+use dol::builder::transaction::TransactionBuilder;
+use dol::TransactionRender;
 use dol::backend::sql::dialect::Dialect;
+use dol::ir::Statement;
 
-let insert = USERS.insert().columns(&["id", "email"]).build();
-let update = POSTS.update().set("author_id").where_eq("id").build();
+let insert_ir = USERS.insert().columns(&["id", "email"]).build();
+let update_ir = POSTS.update().set("author_id").where_eq("id").build();
 
-let tx_sql = vec![insert, update].to_transaction_sql(Some(&Dialect::postgres()));
-// → BEGIN; INSERT INTO "users" ...; UPDATE "posts" ...; COMMIT;
+let block = TransactionBuilder::block(vec![
+    Statement::Insert(insert_ir),
+    Statement::Update(update_ir),
+]);
+let tx_sql = TransactionBuilder::render(&block, Some(&Dialect::postgres())).unwrap();
+// → BEGIN;\nINSERT INTO users ...\nUPDATE posts ...\nCOMMIT
 ```
 
 ### Expressions
@@ -285,11 +289,12 @@ let label = case()
 ```rust
 use dol::CompoundSelectBuilder;
 use dol::GetBuilderSqlExt;
+use dol::Render;
 
-let active = USERS.get().columns(&["id", "name"]).filter(field("active").eq(lit(true))).build();
-let admins = USERS.get().columns(&["id", "name"]).filter(field("role").eq(lit("admin"))).build();
+let active = USERS.get().columns(&["id", "name"]).filter(field("active").eq(lit(true)));
+let admins = USERS.get().columns(&["id", "name"]).filter(field("role").eq(lit("admin")));
 
-let union_sql = active.union(admins).to_sql(Some(&Dialect::postgres()));
+let union_sql = active.union(admins).render(Some(&Dialect::postgres())).unwrap();
 ```
 
 ## SQL Dialects
@@ -337,8 +342,8 @@ type safety, backend agnosticism, and bidirectional (up/down) support.
 use dol::migration::*;
 use dol::model::FieldType;
 use dol::ir::definition::FieldDef;
-use dol::ModelDefineExt;
-use dol::model::Model;
+use dol::EntityDefineExt;
+use dol::model::Entity;
 
 struct CreateUsersTable;
 
@@ -348,7 +353,7 @@ impl Migration for CreateUsersTable {
 
     fn up(&self) -> Vec<MigrationStep> {
         vec![MigrationStep::define_model(
-            Model::define("users")
+            Entity::define("users")
                 .field(FieldDef::new("id", FieldType::Uuid).primary_key())
                 .field(FieldDef::new("email", FieldType::Text).unique())
                 .field(FieldDef::new("name", FieldType::Text))
@@ -387,10 +392,10 @@ Automatically compute the minimal set of `ALTER` actions by comparing model snap
 ```rust
 use dol::migration::schema_diff::*;
 
-let old = ModelSnapshot::from_model(&V1_USERS);
-let new = ModelSnapshot::from_model(&V2_USERS);
+let old = EntitySnapshot::from_entity(&V1_USERS);
+let new = EntitySnapshot::from_entity(&V2_USERS);
 
-let actions = diff_models(&old, &new);
+let actions = diff_entities(&old, &new);
 // → [AddField("avatar_url"), DropField("legacy"), AlterFieldType { name: "count", new_type: BigInt }]
 
 let steps = diff_to_steps("users", &old, &new);

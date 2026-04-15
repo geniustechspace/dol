@@ -1,6 +1,6 @@
 //! UPSERT (INSERT ... ON CONFLICT) query builder for `dol-query`.
 
-use dol_expr::{Expr, col, param, raw_expr};
+use dol_expr::{Expr, field, param, raw_expr};
 use dol_ir::{EntityRef, UpsertIR};
 
 // ===========================================================================
@@ -51,11 +51,11 @@ impl UpsertQuery {
     ///
     /// Panics if this query was constructed from a plain string without
     /// field metadata. Use `.columns()` instead for string-sourced queries.
-    pub fn all_columns(mut self) -> Self {
+    pub fn all_fields(mut self) -> Self {
         let names = self
             .field_names
             .as_ref()
-            .expect("all_columns() requires an Entity source with field metadata");
+            .expect("all_fields() requires an Entity source with field metadata");
         self.fields = names.clone();
         self
     }
@@ -112,14 +112,14 @@ impl UpsertQuery {
 
     /// Add `column = $N` to the conflict WHERE clause.
     pub fn conflict_where_eq(mut self, column: &str) -> Self {
-        self.conflict_filters.push(col(column).eq(param()));
+        self.conflict_filters.push(field(column).eq(param()));
         self
     }
 
     /// Add `column = <literal>` to the conflict WHERE clause.
     pub fn conflict_where_eq_literal(mut self, column: &str, literal: &str) -> Self {
         self.conflict_filters
-            .push(col(column).eq(raw_expr(literal)));
+            .push(field(column).eq(raw_expr(literal)));
         self
     }
 

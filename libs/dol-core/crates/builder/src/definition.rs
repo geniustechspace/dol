@@ -136,11 +136,6 @@ impl DefineEntityBuilder {
         self
     }
 
-    /// Alias for `namespace` — backward compat with SQL schema terminology.
-    pub fn schema(self, schema: &str) -> Self {
-        self.namespace(schema)
-    }
-
     pub fn field(mut self, fd: FieldDef) -> Self {
         self.fields.push(fd);
         self
@@ -199,12 +194,6 @@ impl<'a> AlterEntityBuilder<'a> {
     pub fn add_field(mut self, fd: FieldDef) -> Self {
         self.actions.push(AlterAction::AddField(fd));
         self
-    }
-
-    /// Backward-compat: add a column from a static [`Field`], converting to
-    /// an owned [`FieldDef`] internally.
-    pub fn add_column(self, col: Field) -> Self {
-        self.add_field(field_to_field_def(&col))
     }
 
     /// Drop a column by name.

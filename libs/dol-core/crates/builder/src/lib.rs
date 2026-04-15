@@ -110,7 +110,7 @@ mod tests {
     use super::*;
     use control::Privilege;
     use dol_entity::{Field, FieldType};
-    use dol_expr::{Direction, Expr, NullsPosition, OrderByExpr, col, param, raw_expr};
+    use dol_expr::{Direction, Expr, NullsPosition, OrderByExpr, field, param, raw_expr};
     use dol_ir::definition::{AlterAction, FieldDef, IndexMethod};
     use dol_ir::storage::ObjectSource;
     use dol_ir::transaction::TransactionIR;
@@ -158,8 +158,8 @@ mod tests {
     }
 
     #[test]
-    fn get_all_columns() {
-        let ir = TEST_MODEL.get().all_columns().build();
+    fn get_all_fields() {
+        let ir = TEST_MODEL.get().all_fields().build();
         assert_eq!(ir.projections.len(), 5);
         assert!(matches!(&ir.projections[0], Expr::Identifier(n) if n == "id"));
         assert!(matches!(&ir.projections[4], Expr::Identifier(n) if n == "created_at"));
@@ -279,7 +279,7 @@ mod tests {
             .get()
             .where_eq("id")
             .where_eq("status")
-            .filter(col("name").eq(param()))
+            .filter(field("name").eq(param()))
             .build();
         assert_eq!(ir.filters.len(), 3);
     }
@@ -385,7 +385,7 @@ mod tests {
     #[test]
     fn get_order_by_expr() {
         let obe = OrderByExpr {
-            expr: col("email"),
+            expr: field("email"),
             direction: Direction::Asc,
             nulls: None,
         };
@@ -478,8 +478,8 @@ mod tests {
     // ── InsertBuilder tests ─────────────────────────────────────────────
 
     #[test]
-    fn insert_all_columns() {
-        let ir = TEST_MODEL.insert().all_columns().build();
+    fn insert_all_fields() {
+        let ir = TEST_MODEL.insert().all_fields().build();
         assert_eq!(ir.target.name, "users");
         assert_eq!(
             ir.fields,
@@ -507,7 +507,7 @@ mod tests {
 
     #[test]
     fn insert_returning_all() {
-        let ir = TEST_MODEL.insert().all_columns().returning_all().build();
+        let ir = TEST_MODEL.insert().all_fields().returning_all().build();
         assert_eq!(ir.returning, vec!["*"]);
     }
 
@@ -688,7 +688,7 @@ mod tests {
 
     #[test]
     fn remove_with_expr_filter() {
-        let ir = TEST_MODEL.remove().filter(col("id").eq(param())).build();
+        let ir = TEST_MODEL.remove().filter(field("id").eq(param())).build();
         assert_eq!(ir.filters.len(), 1);
     }
 
@@ -756,10 +756,10 @@ mod tests {
     }
 
     #[test]
-    fn upsert_all_columns() {
+    fn upsert_all_fields() {
         let ir = TEST_MODEL
             .upsert()
-            .all_columns()
+            .all_fields()
             .on_conflict(&["id"])
             .do_update(&["name"])
             .build();
@@ -833,7 +833,7 @@ mod tests {
             .columns(&["id", "email"])
             .on_conflict(&["id"])
             .do_update(&["email"])
-            .conflict_filter(col("status").eq(raw_expr("'active'")))
+            .conflict_filter(field("status").eq(raw_expr("'active'")))
             .build();
         assert_eq!(ir.conflict_filters.len(), 1);
     }
@@ -875,10 +875,10 @@ mod tests {
     }
 
     #[test]
-    fn alter_add_column_from_static_field() {
+    fn alter_add_field_from_field_def() {
         let ir = TEST_MODEL
             .alter()
-            .add_column(Field::new("bio", FieldType::Text).nullable())
+            .add_field(FieldDef::new("bio", FieldType::Text).nullable())
             .build();
         assert_eq!(ir.actions.len(), 1);
         assert!(
@@ -1099,8 +1099,10 @@ mod tests {
     }
 
     #[test]
-    fn define_model_schema_alias() {
-        let ir = DefineEntityBuilder::new("logs").schema("analytics").build();
+    fn define_model_namespace_alias() {
+        let ir = DefineEntityBuilder::new("logs")
+            .namespace("analytics")
+            .build();
         assert_eq!(ir.namespace.as_deref(), Some("analytics"));
     }
 

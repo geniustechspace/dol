@@ -1,6 +1,6 @@
 //! REMOVE (DELETE) query builder for `dol-query`.
 
-use dol_expr::{Expr, col, param, raw_expr};
+use dol_expr::{Expr, field, param, raw_expr};
 use dol_ir::{EntityRef, RemoveIR};
 
 // ===========================================================================
@@ -37,13 +37,13 @@ impl RemoveQuery {
 
     /// Add `column = $N` to the WHERE clause (bind parameter).
     pub fn where_eq(mut self, column: &str) -> Self {
-        self.filters.push(col(column).eq(param()));
+        self.filters.push(field(column).eq(param()));
         self
     }
 
     /// Add `column = <literal>` to the WHERE clause.
     pub fn where_eq_literal(mut self, column: &str, literal: &str) -> Self {
-        self.filters.push(col(column).eq(raw_expr(literal)));
+        self.filters.push(field(column).eq(raw_expr(literal)));
         self
     }
 

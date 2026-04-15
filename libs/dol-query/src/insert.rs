@@ -42,11 +42,11 @@ impl InsertQuery {
     ///
     /// Panics if this query was constructed from a plain string without
     /// field metadata. Use `.columns()` instead for string-sourced queries.
-    pub fn all_columns(mut self) -> Self {
+    pub fn all_fields(mut self) -> Self {
         let names = self
             .field_names
             .as_ref()
-            .expect("all_columns() requires an Entity source with field metadata");
+            .expect("all_fields() requires an Entity source with field metadata");
         self.fields = names.clone();
         self
     }

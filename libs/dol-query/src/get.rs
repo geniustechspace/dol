@@ -3,7 +3,7 @@
 //! Mirrors `dol-builder::GetBuilder` but works with owned name/namespace
 //! instead of requiring a static `&Entity` reference.
 
-use dol_expr::{Direction, Expr, NullsPosition, OrderByExpr, col, param, raw_expr};
+use dol_expr::{Direction, Expr, NullsPosition, OrderByExpr, field, param, raw_expr};
 use dol_ir::{EntityRef, JoinIR, JoinType, LockMode, OffsetLimit, QueryIR};
 
 // ---------------------------------------------------------------------------
@@ -81,17 +81,17 @@ impl GetQuery {
 
     // ── Projection methods ──────────────────────────────────────────────
 
-    /// Select all columns known from the entity metadata.
+    /// Select all fields known from the entity metadata.
     ///
     /// # Panics
     ///
     /// Panics if this query was constructed from a plain string without
     /// field metadata. Use `.columns()` instead for string-sourced queries.
-    pub fn all_columns(mut self) -> Self {
+    pub fn all_fields(mut self) -> Self {
         let fields = self
             .field_names
             .as_ref()
-            .expect("all_columns() requires an Entity source with field metadata");
+            .expect("all_fields() requires an Entity source with field metadata");
         for name in fields {
             self.projections.push(Expr::Identifier(name.clone()));
         }
@@ -101,7 +101,7 @@ impl GetQuery {
     /// Select a list of named columns.
     pub fn columns(mut self, names: &[&str]) -> Self {
         for name in names {
-            self.projections.push(col(name));
+            self.projections.push(field(name));
         }
         self
     }
@@ -114,7 +114,7 @@ impl GetQuery {
 
     /// Select a column aliased to a different name (`col AS alias`).
     pub fn column_as(mut self, name: &str, alias: &str) -> Self {
-        self.projections.push(col(name).alias(alias));
+        self.projections.push(field(name).alias(alias));
         self
     }
 
@@ -213,19 +213,19 @@ impl GetQuery {
 
     /// Add `column = $param` to the WHERE clause.
     pub fn where_eq(mut self, column: &str) -> Self {
-        self.filters.push(col(column).eq(param()));
+        self.filters.push(field(column).eq(param()));
         self
     }
 
     /// Add `column = <literal>` to the WHERE clause (inline literal, no bind param).
     pub fn where_eq_literal(mut self, column: &str, value: Expr) -> Self {
-        self.filters.push(col(column).eq(value));
+        self.filters.push(field(column).eq(value));
         self
     }
 
     /// Add `column ILIKE $param` to the WHERE clause (dialect-aware).
     pub fn where_ilike(mut self, column: &str) -> Self {
-        self.filters.push(col(column).ilike(param()));
+        self.filters.push(field(column).ilike(param()));
         self
     }
 
@@ -250,7 +250,7 @@ impl GetQuery {
     /// Add `column IN (subquery)` to the WHERE clause.
     pub fn where_in_subquery(mut self, column: &str, subquery: &str) -> Self {
         self.filters.push(Expr::InSubquery {
-            expr: Box::new(col(column)),
+            expr: Box::new(field(column)),
             subquery: subquery.to_string(),
             negated: false,
         });
@@ -260,7 +260,7 @@ impl GetQuery {
     /// Add `column NOT IN (subquery)` to the WHERE clause.
     pub fn where_not_in_subquery(mut self, column: &str, subquery: &str) -> Self {
         self.filters.push(Expr::InSubquery {
-            expr: Box::new(col(column)),
+            expr: Box::new(field(column)),
             subquery: subquery.to_string(),
             negated: true,
         });
@@ -277,7 +277,7 @@ impl GetQuery {
 
     /// Set the GROUP BY columns.
     pub fn group_by(mut self, columns: &[&str]) -> Self {
-        self.group_by = columns.iter().map(|c| col(c)).collect();
+        self.group_by = columns.iter().map(|c| field(c)).collect();
         self
     }
 
@@ -292,7 +292,7 @@ impl GetQuery {
     /// Add `column DESC` to the ORDER BY clause.
     pub fn order_by_desc(mut self, column: &str) -> Self {
         self.order_by.push(OrderByExpr {
-            expr: col(column),
+            expr: field(column),
             direction: Direction::Desc,
             nulls: None,
         });
@@ -302,7 +302,7 @@ impl GetQuery {
     /// Add `column ASC` to the ORDER BY clause.
     pub fn order_by_asc(mut self, column: &str) -> Self {
         self.order_by.push(OrderByExpr {
-            expr: col(column),
+            expr: field(column),
             direction: Direction::Asc,
             nulls: None,
         });
@@ -317,7 +317,7 @@ impl GetQuery {
         nulls: Option<NullsPosition>,
     ) -> Self {
         self.order_by.push(OrderByExpr {
-            expr: col(column),
+            expr: field(column),
             direction,
             nulls,
         });

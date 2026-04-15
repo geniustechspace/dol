@@ -50,13 +50,13 @@
 //!
 //! // Generate SQL for different dialects
 //! let pg_sql = USERS.get()
-//!     .all_columns()
+//!     .all_fields()
 //!     .where_eq("id")
 //!     .render(Some(&Dialect::postgres())).unwrap();
 //! assert!(pg_sql.contains("$1"));
 //!
 //! let sqlite_sql = USERS.get()
-//!     .all_columns()
+//!     .all_fields()
 //!     .where_eq("id")
 //!     .render(None).unwrap();  // Uses default (SQLite)
 //! assert!(sqlite_sql.contains("?"));
@@ -100,7 +100,6 @@ pub mod backend {
     pub mod sql {
         pub use dol_sql::*;
 
-        // Re-export SqlOutput for backward compat at backend::sql::SqlOutput
         pub use dol_core::ir::SqlOutput;
     }
 
@@ -137,9 +136,6 @@ pub use dol_config::{BackendFilter, LockStrategy, UnifiedMigrationConfig};
 
 // Re-export builder extension traits so users can call model.get(), etc.
 pub use dol_core::builder::{EntityBuilderExt, EntityDefineExt};
-
-/// Backward-compatible alias for [`EntityDefineExt`].
-pub use dol_core::builder::EntityDefineExt as ModelDefineExt;
 
 // Re-export commonly used builders at the top level for ergonomic access.
 pub use dol_core::builder::{DefinePolicyBuilder, DefineTypeBuilder, DropTypeBuilder};

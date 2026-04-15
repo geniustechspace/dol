@@ -9,13 +9,10 @@
 //! # Constructors
 //!
 //! ```rust
-//! use dol_expr::{field, col, lit, param, raw_expr, case};
+//! use dol_expr::{field, lit, param, raw_expr, case};
 //!
 //! // field reference (DOL primary)
 //! let expr = field("email");
-//!
-//! // backward-compat alias
-//! let expr = col("email");
 //!
 //! // literal value
 //! let expr = lit("active");
@@ -191,22 +188,12 @@ pub fn field(name: &str) -> Expr {
     Expr::Identifier(name.to_string())
 }
 
-/// Create a field reference — backward-compat alias for [`field()`].
-pub fn col(name: &str) -> Expr {
-    Expr::Identifier(name.to_string())
-}
-
 /// Create a qualified field reference: `scope.name`.
 pub fn qualified(scope: &str, name: &str) -> Expr {
     Expr::QualifiedIdentifier {
         scope: scope.to_string(),
         name: name.to_string(),
     }
-}
-
-/// Create a qualified field reference — backward-compat alias for [`qualified()`].
-pub fn qualified_col(table: &str, column: &str) -> Expr {
-    qualified(table, column)
 }
 
 /// Create a literal expression from any value that implements `Into<Literal>`.
@@ -685,23 +672,10 @@ mod tests {
     }
 
     #[test]
-    fn test_col() {
-        assert!(matches!(col("name"), Expr::Identifier(s) if s == "name"));
-    }
-
-    #[test]
     fn test_qualified() {
         assert!(matches!(
             qualified("users", "email"),
             Expr::QualifiedIdentifier { scope, name } if scope == "users" && name == "email"
-        ));
-    }
-
-    #[test]
-    fn test_qualified_col() {
-        assert!(matches!(
-            qualified_col("orders", "id"),
-            Expr::QualifiedIdentifier { scope, name } if scope == "orders" && name == "id"
         ));
     }
 
