@@ -904,7 +904,7 @@ fn alter_action_drop_field_not_null() {
 
 #[test]
 fn alter_action_add_constraint() {
-    let action = AlterAction::AddConstraint(dol_entity::EntityConstraint::Check("age > 0"));
+    let action = AlterAction::AddConstraint(dol_entity::EntityConstraint::Check("age > 0").into());
     assert!(matches!(action, AlterAction::AddConstraint(_)));
 }
 

@@ -46,7 +46,7 @@ use super::MigrationStep;
 /// This is intentionally lightweight — it captures only the field metadata
 /// that affects schema DDL, not runtime query behaviour.
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EntitySnapshot {
     /// Model name.
     pub name: String,
@@ -56,7 +56,7 @@ pub struct EntitySnapshot {
 
 /// A snapshot of a single field's schema.
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FieldSnapshot {
     pub name: String,
     pub field_type: FieldType,

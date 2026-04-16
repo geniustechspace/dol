@@ -18,7 +18,7 @@ pub mod transaction;
 pub use control::{DefinePolicyIR, GrantIR, PolicyAction, Privilege, RevokeIR};
 pub use definition::{
     AlterAction, AlterEntityIR, DefineEntityIR, DefineIndexIR, DefineTypeIR, DropEntityIR,
-    DropIndexIR, DropTypeIR, FieldDef, IndexMethod, OwnedForeignKeyRef,
+    DropIndexIR, DropTypeIR, FieldDef, IndexMethod, OwnedEntityConstraint, OwnedForeignKeyRef,
 };
 pub use mutation::{InsertIR, InsertSelectIR, RemoveIR, UpdateIR, UpsertIR};
 pub use query::{CompoundQueryIR, JoinIR, JoinType, LockMode, OffsetLimit, QueryIR, SetOpKind};
@@ -38,7 +38,7 @@ pub struct EntityRef {
 
 /// Top-level DOL statement — the universal dispatch enum.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Statement {
     // Definition
     DefineEntity(DefineEntityIR),

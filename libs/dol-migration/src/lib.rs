@@ -165,7 +165,7 @@ pub trait Migration: Send + Sync {
 /// - **KV**: Key-value namespace and key-pattern operations via [`KvMigrationOp`]
 /// - **Storage**: Object storage bucket and prefix operations via [`StorageMigrationOp`]
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum MigrationStep {
     /// A DOL IR statement (SQL DDL, DML, indexes, grants, transactions, etc.).
     Sql(ir::Statement),

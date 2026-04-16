@@ -124,6 +124,7 @@ pub use dol_config as config;
 // ── Top-level re-exports for ergonomic use ──
 
 pub use dol_core::ir::definition::FieldDef;
+pub use dol_core::ir::definition::OwnedEntityConstraint;
 pub use dol_core::model::constraint::{EntityConstraint, FkAction, ForeignKeyRef, GeneratedKind};
 pub use dol_core::model::{Entity, Field, FieldType};
 pub use dol_sql::dialect::Dialect;

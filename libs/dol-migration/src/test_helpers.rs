@@ -1,4 +1,3 @@
-
 use super::*;
 use dol_core::builder::DefineEntityBuilder;
 use dol_core::ir::EntityRef;

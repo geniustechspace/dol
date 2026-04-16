@@ -37,7 +37,7 @@ pub enum MigrationTarget {
 
 /// A step in a migration plan, annotated with direction and version metadata.
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PlannedStep {
     /// The migration version this step belongs to.
     pub version: String,
@@ -62,7 +62,7 @@ pub struct PlannedStep {
 /// - Rendered to SQL/KV/Storage output via [`MigrationRunner::render_plan`]
 /// - Applied by iterating over steps and executing against a backend
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MigrationPlan {
     planned_steps: Vec<PlannedStep>,
 }

@@ -130,7 +130,8 @@ impl Render for CreateFromMeta<'_> {
 
         // Model-level constraints
         for constraint in model.constraints {
-            parts.push(format!("  {}", render::render_model_constraint(constraint)));
+            let owned = dol_core::ir::OwnedEntityConstraint::from(constraint);
+            parts.push(format!("  {}", render::render_model_constraint(&owned)));
         }
 
         sql.push_str(&parts.join(",\n"));

@@ -12,10 +12,11 @@ use dol_core::expr::{
 };
 use dol_core::ir::BackendError;
 use dol_core::ir::SqlOutput;
+use dol_core::ir::definition::OwnedEntityConstraint;
 use dol_core::ir::*;
 use dol_core::model::Field;
 use dol_core::model::FieldType;
-use dol_core::model::constraint::{EntityConstraint, FkAction, GeneratedKind};
+use dol_core::model::constraint::{FkAction, GeneratedKind};
 
 // ===========================================================================
 // Expr rendering (the core recursive renderer)
@@ -657,12 +658,12 @@ pub fn render_type(field_type: &FieldType, dialect: &Dialect) -> String {
 }
 
 /// Renders a model-level constraint.
-pub fn render_model_constraint(constraint: &EntityConstraint) -> String {
+pub fn render_model_constraint(constraint: &OwnedEntityConstraint) -> String {
     match constraint {
-        EntityConstraint::Unique(cols) => {
+        OwnedEntityConstraint::Unique(cols) => {
             format!("UNIQUE ({})", cols.join(", "))
         }
-        EntityConstraint::ForeignKey {
+        OwnedEntityConstraint::ForeignKey {
             columns,
             ref_table,
             ref_columns,
@@ -679,10 +680,10 @@ pub fn render_model_constraint(constraint: &EntityConstraint) -> String {
             }
             sql
         }
-        EntityConstraint::Check(expr) => {
+        OwnedEntityConstraint::Check(expr) => {
             format!("CHECK ({})", expr)
         }
-        EntityConstraint::PrimaryKey(cols) => {
+        OwnedEntityConstraint::PrimaryKey(cols) => {
             format!("PRIMARY KEY ({})", cols.join(", "))
         }
     }

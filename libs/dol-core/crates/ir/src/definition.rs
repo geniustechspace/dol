@@ -4,14 +4,68 @@ use super::EntityRef;
 use dol_entity::FieldType;
 use dol_entity::constraint::{EntityConstraint, FkAction, GeneratedKind};
 
+/// An owned model-level constraint for use in IR and builders (not `'static`).
+///
+/// This mirrors [`EntityConstraint`] but uses owned `String`/`Vec<String>`
+/// instead of `&'static str`/`&'static [&'static str]`, enabling serde
+/// round-tripping and runtime construction.
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum OwnedEntityConstraint {
+    /// `UNIQUE (field1, field2, ...)`
+    Unique(Vec<String>),
+    /// `FOREIGN KEY (fields) REFERENCES ref_model (ref_fields) ON DELETE action`
+    ForeignKey {
+        columns: Vec<String>,
+        ref_table: String,
+        ref_columns: Vec<String>,
+        on_delete: FkAction,
+    },
+    /// `CHECK (expression)`
+    Check(String),
+    /// `PRIMARY KEY (field1, field2, ...)` — composite primary key.
+    PrimaryKey(Vec<String>),
+}
+
+impl From<&EntityConstraint> for OwnedEntityConstraint {
+    fn from(c: &EntityConstraint) -> Self {
+        match c {
+            EntityConstraint::Unique(cols) => {
+                Self::Unique(cols.iter().map(|s| (*s).to_string()).collect())
+            }
+            EntityConstraint::ForeignKey {
+                columns,
+                ref_table,
+                ref_columns,
+                on_delete,
+            } => Self::ForeignKey {
+                columns: columns.iter().map(|s| (*s).to_string()).collect(),
+                ref_table: (*ref_table).to_string(),
+                ref_columns: ref_columns.iter().map(|s| (*s).to_string()).collect(),
+                on_delete: *on_delete,
+            },
+            EntityConstraint::Check(expr) => Self::Check((*expr).to_string()),
+            EntityConstraint::PrimaryKey(cols) => {
+                Self::PrimaryKey(cols.iter().map(|s| (*s).to_string()).collect())
+            }
+        }
+    }
+}
+
+impl From<EntityConstraint> for OwnedEntityConstraint {
+    fn from(c: EntityConstraint) -> Self {
+        Self::from(&c)
+    }
+}
+
 /// Define (create) a new model.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DefineEntityIR {
     pub name: String,
     pub namespace: Option<String>,
     pub fields: Vec<FieldDef>,
-    pub constraints: Vec<EntityConstraint>,
+    pub constraints: Vec<OwnedEntityConstraint>,
     pub if_not_exists: bool,
 }
 
@@ -150,7 +204,7 @@ impl OwnedForeignKeyRef {
 
 /// Alter an existing model.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AlterEntityIR {
     pub target: EntityRef,
     pub actions: Vec<AlterAction>,
@@ -158,7 +212,7 @@ pub struct AlterEntityIR {
 
 /// A single alter action within an ALTER MODEL statement.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum AlterAction {
     AddField(FieldDef),
     DropField(String),
@@ -168,7 +222,7 @@ pub enum AlterAction {
     DropFieldDefault(String),
     SetFieldNotNull(String),
     DropFieldNotNull(String),
-    AddConstraint(EntityConstraint),
+    AddConstraint(OwnedEntityConstraint),
     DropConstraint(String),
     RenameEntity(String),
 }

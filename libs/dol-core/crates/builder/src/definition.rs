@@ -11,12 +11,11 @@
 //!
 //! For SQL rendering, import the extension traits from `dol-sql`.
 
-use dol_entity::constraint::EntityConstraint;
 use dol_entity::{Entity, Field, FieldType};
 use dol_ir::EntityRef;
 use dol_ir::definition::{
     AlterAction, AlterEntityIR, DefineEntityIR, DefineIndexIR, DefineTypeIR, DropEntityIR,
-    DropIndexIR, DropTypeIR, FieldDef, IndexMethod, OwnedForeignKeyRef,
+    DropIndexIR, DropTypeIR, FieldDef, IndexMethod, OwnedEntityConstraint, OwnedForeignKeyRef,
 };
 
 // ---------------------------------------------------------------------------
@@ -96,7 +95,12 @@ impl<'a> CreateFromMeta<'a> {
             name: self.model.name.to_string(),
             namespace: self.model.namespace.map(|s| s.to_string()),
             fields,
-            constraints: self.model.constraints.to_vec(),
+            constraints: self
+                .model
+                .constraints
+                .iter()
+                .map(OwnedEntityConstraint::from)
+                .collect(),
             if_not_exists: self.if_not_exists,
         }
     }
@@ -116,7 +120,7 @@ pub struct DefineEntityBuilder {
     name: String,
     namespace: Option<String>,
     fields: Vec<FieldDef>,
-    constraints: Vec<EntityConstraint>,
+    constraints: Vec<OwnedEntityConstraint>,
     if_not_exists: bool,
 }
 
@@ -146,8 +150,8 @@ impl DefineEntityBuilder {
         self
     }
 
-    pub fn constraint(mut self, c: EntityConstraint) -> Self {
-        self.constraints.push(c);
+    pub fn constraint(mut self, c: impl Into<OwnedEntityConstraint>) -> Self {
+        self.constraints.push(c.into());
         self
     }
 
@@ -257,8 +261,8 @@ impl<'a> AlterEntityBuilder<'a> {
     // -- Constraint operations --
 
     /// Add a model-level constraint.
-    pub fn add_constraint(mut self, c: EntityConstraint) -> Self {
-        self.actions.push(AlterAction::AddConstraint(c));
+    pub fn add_constraint(mut self, c: impl Into<OwnedEntityConstraint>) -> Self {
+        self.actions.push(AlterAction::AddConstraint(c.into()));
         self
     }
 
