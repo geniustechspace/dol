@@ -74,12 +74,15 @@
 //! assert!(rendered[0].steps[0].sql().unwrap().contains("CREATE TABLE"));
 //! ```
 
+pub mod async_registry;
+mod async_runner;
 pub mod migrations;
 pub mod plan;
 pub mod registry;
 pub mod runner;
 pub mod schema_diff;
 
+pub use async_registry::{AsyncMigrationRegistry, InMemoryAsyncRegistry};
 pub use plan::{MigrationDirection, MigrationPlan, MigrationTarget, PlannedStep};
 pub use registry::{AppliedMigration, InMemoryRegistry, MIGRATION_HISTORY, MigrationRegistry};
 pub use runner::{
@@ -574,3 +577,7 @@ impl std::error::Error for MigrationError {}
 
 #[cfg(test)]
 pub(crate) mod test_helpers;
+
+#[cfg(test)]
+#[path = "async_tests.rs"]
+mod async_tests;
