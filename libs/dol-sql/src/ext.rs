@@ -684,7 +684,11 @@ mod tests {
             .fields(&["id"])
             .filter(field("tenant_id").eq(param()))
             .build();
-        let part_ir = TEST_MODEL.get().fields(&["id"]).filter(field("status").eq(param())).build();
+        let part_ir = TEST_MODEL
+            .get()
+            .fields(&["id"])
+            .filter(field("status").eq(param()))
+            .build();
         let sql = CompoundSelectBuilder::new(base_ir)
             .union(part_ir)
             .limit()

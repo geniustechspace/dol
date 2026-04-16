@@ -271,7 +271,11 @@ fn main() {
     println!("  [PG] OR filter: {}", sql);
 
     // 2d. LIKE / ILIKE patterns
-    let sql = USERS.get().filter(field("email").ilike(param())).render(Some(&pg)).unwrap();
+    let sql = USERS
+        .get()
+        .filter(field("email").ilike(param()))
+        .render(Some(&pg))
+        .unwrap();
     println!("  [PG] ILIKE: {}", sql);
     assert!(sql.contains("ILIKE"));
 
@@ -323,7 +327,10 @@ fn main() {
     // 2j. EXISTS subquery
     let sql = USERS
         .get()
-        .filter(Expr::Exists { subquery: "SELECT 1 FROM sessions WHERE sessions.user_id = users.id".to_string(), negated: false })
+        .filter(Expr::Exists {
+            subquery: "SELECT 1 FROM sessions WHERE sessions.user_id = users.id".to_string(),
+            negated: false,
+        })
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] EXISTS: {}", sql);
@@ -331,7 +338,10 @@ fn main() {
     // 2k. NOT EXISTS subquery
     let sql = USERS
         .get()
-        .filter(Expr::Exists { subquery: "SELECT 1 FROM banned WHERE banned.user_id = users.id".to_string(), negated: true })
+        .filter(Expr::Exists {
+            subquery: "SELECT 1 FROM banned WHERE banned.user_id = users.id".to_string(),
+            negated: true,
+        })
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] NOT EXISTS: {}", sql);
@@ -576,10 +586,7 @@ fn main() {
     assert!(sql.contains("$9"));
 
     // 3d. INSERT param count tracking
-    let builder = USERS
-        .insert()
-        .fields(&["id", "email", "tenant_id"])
-        .rows(5);
+    let builder = USERS.insert().fields(&["id", "email", "tenant_id"]).rows(5);
     assert_eq!(builder.param_count(), 15); // 5 × 3
     println!("  Param count (5×3): {}", builder.param_count());
 
@@ -695,7 +702,10 @@ fn main() {
     println!("  [PG] Delete raw: {}", sql);
 
     // 3p. DELETE param count
-    let builder = USERS.remove().filter(field("id").eq(param())).filter(field("tenant_id").eq(param()));
+    let builder = USERS
+        .remove()
+        .filter(field("id").eq(param()))
+        .filter(field("tenant_id").eq(param()));
     assert_eq!(builder.param_count(), 2);
     println!("  Delete param count: {}", builder.param_count());
 
@@ -2154,7 +2164,11 @@ mod tests {
 
         for d in &dialects {
             // SELECT
-            let sql = USERS.get().filter(field("id").eq(param())).render(Some(d)).unwrap();
+            let sql = USERS
+                .get()
+                .filter(field("id").eq(param()))
+                .render(Some(d))
+                .unwrap();
             assert!(sql.contains("SELECT"), "{}: missing SELECT", d.name);
             assert!(sql.contains("FROM users"), "{}: missing FROM", d.name);
 
@@ -2172,7 +2186,11 @@ mod tests {
             assert!(sql.contains("UPDATE users"), "{}: missing UPDATE", d.name);
 
             // DELETE
-            let sql = USERS.remove().filter(field("id").eq(param())).render(Some(d)).unwrap();
+            let sql = USERS
+                .remove()
+                .filter(field("id").eq(param()))
+                .render(Some(d))
+                .unwrap();
             assert!(sql.contains("DELETE FROM"), "{}: missing DELETE", d.name);
 
             // CREATE TABLE

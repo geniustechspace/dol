@@ -329,7 +329,10 @@ fn select_or_predicate() {
 fn select_exists_subquery() {
     let sql = USERS
         .get()
-        .filter(Expr::Exists { subquery: "SELECT 1 FROM sessions WHERE sessions.user_id = users.id".to_string(), negated: false })
+        .filter(Expr::Exists {
+            subquery: "SELECT 1 FROM sessions WHERE sessions.user_id = users.id".to_string(),
+            negated: false,
+        })
         .render(Some(&pg()))
         .unwrap();
     assert!(
@@ -341,7 +344,11 @@ fn select_exists_subquery() {
 fn select_in_subquery() {
     let sql = USERS
         .get()
-        .filter(Expr::InSubquery { expr: Box::new(field("tenant_id")), subquery: "SELECT id FROM tenants WHERE status = 'active'".to_string(), negated: false })
+        .filter(Expr::InSubquery {
+            expr: Box::new(field("tenant_id")),
+            subquery: "SELECT id FROM tenants WHERE status = 'active'".to_string(),
+            negated: false,
+        })
         .render(Some(&pg()))
         .unwrap();
     assert!(sql.contains("WHERE tenant_id IN (SELECT id FROM tenants WHERE status = 'active')"));
@@ -650,7 +657,11 @@ fn update_param_count() {
 
 #[test]
 fn delete_basic() {
-    let sql = USERS.remove().filter(field("id").eq(param())).render(Some(&pg())).unwrap();
+    let sql = USERS
+        .remove()
+        .filter(field("id").eq(param()))
+        .render(Some(&pg()))
+        .unwrap();
     assert_eq!(sql, "DELETE FROM users WHERE id = $1");
 }
 
@@ -678,7 +689,10 @@ fn delete_with_raw_where() {
 
 #[test]
 fn delete_param_count() {
-    let q = USERS.remove().filter(field("tenant_id").eq(param())).filter(field("id").eq(param()));
+    let q = USERS
+        .remove()
+        .filter(field("tenant_id").eq(param()))
+        .filter(field("id").eq(param()));
     assert_eq!(q.param_count(), 2);
 }
 
@@ -1541,7 +1555,10 @@ fn set_op_union() {
 #[test]
 fn set_op_union_all() {
     let q1 = SETTINGS.get().build();
-    let q2 = SETTINGS.get().filter(field("tenant_id").eq(param())).build();
+    let q2 = SETTINGS
+        .get()
+        .filter(field("tenant_id").eq(param()))
+        .build();
     let sql = CompoundSelectBuilder::new(q1)
         .union_all(q2)
         .render(Some(&pg()))
@@ -1552,7 +1569,11 @@ fn set_op_union_all() {
 #[test]
 fn set_op_intersect_except() {
     let q1 = USERS.get().fields(&["id"]).build();
-    let q2 = USERS.get().fields(&["id"]).filter(field("tenant_id").eq(param())).build();
+    let q2 = USERS
+        .get()
+        .fields(&["id"])
+        .filter(field("tenant_id").eq(param()))
+        .build();
     let q3 = USERS
         .get()
         .fields(&["id"])
@@ -1570,7 +1591,11 @@ fn set_op_intersect_except() {
 #[test]
 fn set_op_with_order_and_limit() {
     let q1 = USERS.get().fields(&["id"]).build();
-    let q2 = USERS.get().fields(&["id"]).filter(field("tenant_id").eq(param())).build();
+    let q2 = USERS
+        .get()
+        .fields(&["id"])
+        .filter(field("tenant_id").eq(param()))
+        .build();
     let sql = CompoundSelectBuilder::new(q1)
         .union_all(q2)
         .order_by(vec![field("id").asc()])
@@ -1716,7 +1741,11 @@ fn dialect_mssql_update() {
 #[test]
 fn dialect_mysql_delete() {
     let mysql = Dialect::mysql();
-    let sql = USERS.remove().filter(field("id").eq(param())).render(Some(&mysql)).unwrap();
+    let sql = USERS
+        .remove()
+        .filter(field("id").eq(param()))
+        .render(Some(&mysql))
+        .unwrap();
     assert_eq!(sql, "DELETE FROM users WHERE id = ?");
 }
 
@@ -1876,7 +1905,11 @@ fn dialect_create_table_sqlite_types() {
 #[test]
 fn dialect_cockroachdb_is_pg_compatible() {
     let crdb = Dialect::cockroachdb();
-    let sql = USERS.get().filter(field("id").eq(param())).render(Some(&crdb)).unwrap();
+    let sql = USERS
+        .get()
+        .filter(field("id").eq(param()))
+        .render(Some(&crdb))
+        .unwrap();
     assert!(sql.contains("WHERE id = $1"));
 }
 

@@ -2,6 +2,7 @@
 name = "dol-query"
 version.workspace = true
 edition.workspace = true
+publish = false
 description = "DOL Query — backend-neutral query entry point for any data source."
 
 [dependencies]

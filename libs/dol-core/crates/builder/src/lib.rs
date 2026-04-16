@@ -176,7 +176,10 @@ mod tests {
 
     #[test]
     fn get_column_as() {
-        let ir = TEST_MODEL.get().field(field("name").alias("user_name")).build();
+        let ir = TEST_MODEL
+            .get()
+            .field(field("name").alias("user_name"))
+            .build();
         assert_eq!(ir.projections.len(), 1);
         assert!(matches!(&ir.projections[0], Expr::Alias { alias, .. } if alias == "user_name"));
     }
@@ -190,7 +193,10 @@ mod tests {
 
     #[test]
     fn get_count_all_as() {
-        let ir = TEST_MODEL.get().field(Expr::CountStar.alias("total")).build();
+        let ir = TEST_MODEL
+            .get()
+            .field(Expr::CountStar.alias("total"))
+            .build();
         assert_eq!(ir.projections.len(), 1);
         assert!(matches!(&ir.projections[0], Expr::Alias { alias, .. } if alias == "total"));
     }
@@ -226,7 +232,10 @@ mod tests {
 
     #[test]
     fn get_where_ilike() {
-        let ir = TEST_MODEL.get().filter(field("name").ilike(param())).build();
+        let ir = TEST_MODEL
+            .get()
+            .filter(field("name").ilike(param()))
+            .build();
         assert_eq!(ir.filters.len(), 1);
     }
 
@@ -239,7 +248,13 @@ mod tests {
 
     #[test]
     fn get_where_exists() {
-        let ir = TEST_MODEL.get().filter(Expr::Exists { subquery: "SELECT 1 FROM posts".to_string(), negated: false }).build();
+        let ir = TEST_MODEL
+            .get()
+            .filter(Expr::Exists {
+                subquery: "SELECT 1 FROM posts".to_string(),
+                negated: false,
+            })
+            .build();
         assert_eq!(ir.filters.len(), 1);
         assert!(
             matches!(&ir.filters[0], Expr::Exists { subquery, negated } if subquery == "SELECT 1 FROM posts" && !negated)
@@ -250,7 +265,10 @@ mod tests {
     fn get_where_not_exists() {
         let ir = TEST_MODEL
             .get()
-            .filter(Expr::Exists { subquery: "SELECT 1 FROM bans".to_string(), negated: true })
+            .filter(Expr::Exists {
+                subquery: "SELECT 1 FROM bans".to_string(),
+                negated: true,
+            })
             .build();
         assert!(matches!(&ir.filters[0], Expr::Exists { negated, .. } if *negated));
     }
@@ -259,7 +277,11 @@ mod tests {
     fn get_where_in_subquery() {
         let ir = TEST_MODEL
             .get()
-            .filter(Expr::InSubquery { expr: Box::new(field("id")), subquery: "SELECT user_id FROM admins".to_string(), negated: false })
+            .filter(Expr::InSubquery {
+                expr: Box::new(field("id")),
+                subquery: "SELECT user_id FROM admins".to_string(),
+                negated: false,
+            })
             .build();
         assert_eq!(ir.filters.len(), 1);
         assert!(matches!(&ir.filters[0], Expr::InSubquery { negated, .. } if !negated));
@@ -269,7 +291,11 @@ mod tests {
     fn get_where_not_in_subquery() {
         let ir = TEST_MODEL
             .get()
-            .filter(Expr::InSubquery { expr: Box::new(field("id")), subquery: "SELECT user_id FROM banned".to_string(), negated: true })
+            .filter(Expr::InSubquery {
+                expr: Box::new(field("id")),
+                subquery: "SELECT user_id FROM banned".to_string(),
+                negated: true,
+            })
             .build();
         assert!(matches!(&ir.filters[0], Expr::InSubquery { negated, .. } if *negated));
     }
@@ -569,7 +595,11 @@ mod tests {
 
     #[test]
     fn update_set_single() {
-        let ir = TEST_MODEL.update().set("name").filter(field("id").eq(param())).build();
+        let ir = TEST_MODEL
+            .update()
+            .set("name")
+            .filter(field("id").eq(param()))
+            .build();
         assert_eq!(ir.target.name, "users");
         assert_eq!(ir.assignments.len(), 1);
         assert_eq!(ir.assignments[0].0, "name");
@@ -654,7 +684,11 @@ mod tests {
 
     #[test]
     fn update_param_count() {
-        let b = TEST_MODEL.update().set("name").set("email").filter(field("id").eq(param()));
+        let b = TEST_MODEL
+            .update()
+            .set("name")
+            .set("email")
+            .filter(field("id").eq(param()));
         // 2 set params + 1 where_eq param = 3
         assert_eq!(b.param_count(), 3);
     }
@@ -705,7 +739,11 @@ mod tests {
 
     #[test]
     fn remove_returning_all() {
-        let ir = TEST_MODEL.remove().filter(field("id").eq(param())).returning_all().build();
+        let ir = TEST_MODEL
+            .remove()
+            .filter(field("id").eq(param()))
+            .returning_all()
+            .build();
         assert_eq!(ir.returning, vec!["*"]);
     }
 
@@ -721,7 +759,10 @@ mod tests {
 
     #[test]
     fn remove_param_count() {
-        let b = TEST_MODEL.remove().filter(field("id").eq(param())).filter(field("status").eq(param()));
+        let b = TEST_MODEL
+            .remove()
+            .filter(field("id").eq(param()))
+            .filter(field("status").eq(param()));
         assert_eq!(b.param_count(), 2);
     }
 
