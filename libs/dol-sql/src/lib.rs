@@ -72,19 +72,19 @@ impl SqlBackend {
         render::render_upsert_ir(ir, &self.dialect)
     }
 
-    /// Render a DefineModelIR to SQL.
-    pub fn render_define_model(&self, ir: &DefineModelIR) -> Result<SqlOutput, BackendError> {
-        render::render_define_model_ir(ir, &self.dialect)
+    /// Render a DefineEntityIR to SQL.
+    pub fn render_define_entity(&self, ir: &DefineEntityIR) -> Result<SqlOutput, BackendError> {
+        render::render_define_entity_ir(ir, &self.dialect)
     }
 
-    /// Render an AlterModelIR to SQL.
-    pub fn render_alter_model(&self, ir: &AlterModelIR) -> Result<SqlOutput, BackendError> {
-        render::render_alter_model_ir(ir, &self.dialect)
+    /// Render an AlterEntityIR to SQL.
+    pub fn render_alter_entity(&self, ir: &AlterEntityIR) -> Result<SqlOutput, BackendError> {
+        render::render_alter_entity_ir(ir, &self.dialect)
     }
 
-    /// Render a DropModelIR to SQL.
-    pub fn render_drop_model(&self, ir: &DropModelIR) -> Result<SqlOutput, BackendError> {
-        render::render_drop_model_ir(ir, &self.dialect)
+    /// Render a DropEntityIR to SQL.
+    pub fn render_drop_entity(&self, ir: &DropEntityIR) -> Result<SqlOutput, BackendError> {
+        render::render_drop_entity_ir(ir, &self.dialect)
     }
 
     /// Render a DefineIndexIR to SQL.
@@ -114,7 +114,22 @@ impl SqlBackend {
 
     /// Render a TransactionIR to SQL.
     pub fn render_transaction(&self, ir: &TransactionIR) -> Result<SqlOutput, BackendError> {
-        render::render_transaction_ir(ir)
+        render::render_transaction_ir(ir, &self.dialect)
+    }
+
+    /// Render a DefineTypeIR to SQL.
+    pub fn render_define_type(&self, ir: &DefineTypeIR) -> Result<SqlOutput, BackendError> {
+        render::render_define_type_ir(ir, &self.dialect)
+    }
+
+    /// Render a DropTypeIR to SQL.
+    pub fn render_drop_type(&self, ir: &DropTypeIR) -> Result<SqlOutput, BackendError> {
+        render::render_drop_type_ir(ir, &self.dialect)
+    }
+
+    /// Render a DefinePolicyIR to SQL.
+    pub fn render_define_policy(&self, ir: &DefinePolicyIR) -> Result<SqlOutput, BackendError> {
+        render::render_define_policy_ir(ir, &self.dialect)
     }
 }
 
@@ -127,30 +142,18 @@ impl Backend for SqlBackend {
             Statement::Update(ir) => self.render_update(ir)?,
             Statement::Remove(ir) => self.render_remove(ir)?,
             Statement::Upsert(ir) => self.render_upsert(ir)?,
-            Statement::DefineModel(ir) => self.render_define_model(ir)?,
-            Statement::AlterModel(ir) => self.render_alter_model(ir)?,
-            Statement::DropModel(ir) => self.render_drop_model(ir)?,
+            Statement::DefineEntity(ir) => self.render_define_entity(ir)?,
+            Statement::AlterEntity(ir) => self.render_alter_entity(ir)?,
+            Statement::DropEntity(ir) => self.render_drop_entity(ir)?,
             Statement::DefineIndex(ir) => self.render_define_index(ir)?,
             Statement::DropIndex(ir) => self.render_drop_index(ir)?,
             Statement::Grant(ir) => self.render_grant(ir)?,
             Statement::Revoke(ir) => self.render_revoke(ir)?,
             Statement::Transaction(ir) => self.render_transaction(ir)?,
-            Statement::DefineType(_) => {
-                return Err(BackendError::Unsupported(
-                    "DefineType not yet implemented".into(),
-                ));
-            }
-            Statement::DropType(_) => {
-                return Err(BackendError::Unsupported(
-                    "DropType not yet implemented".into(),
-                ));
-            }
+            Statement::DefineType(ir) => self.render_define_type(ir)?,
+            Statement::DropType(ir) => self.render_drop_type(ir)?,
             Statement::Compound(ir) => self.render_compound(ir)?,
-            Statement::DefinePolicy(_) => {
-                return Err(BackendError::Unsupported(
-                    "DefinePolicy not yet implemented".into(),
-                ));
-            }
+            Statement::DefinePolicy(ir) => self.render_define_policy(ir)?,
             Statement::PutObject(_)
             | Statement::GetObject(_)
             | Statement::ListObjects(_)

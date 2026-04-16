@@ -5,10 +5,11 @@ resolver = "2"
 members = [
     "libs/dol",
     "libs/dol-core",
-    "libs/dol-core/crates/dol-expr",
-    "libs/dol-core/crates/dol-model",
-    "libs/dol-core/crates/dol-ir",
-    "libs/dol-core/crates/dol-builder",
+    "libs/dol-core/crates/expr",
+    "libs/dol-core/crates/entity",
+    "libs/dol-core/crates/ir",
+    "libs/dol-core/crates/builder",
+    "libs/dol-query",
     "libs/dol-sql",
     "libs/dol-kv",
     "libs/dol-objects",
@@ -29,6 +30,9 @@ serde_json = "1"
 serde_norway = "0.9"
 toml_crate = { package = "toml", version = "1" }
 
+# Async runtime (dev/test only)
+tokio = { version = "1", features = ["rt", "macros"] }
+
 # Internal crates
 dol-core = { path = "libs/dol-core" }
 dol-sql = { path = "libs/dol-sql" }
@@ -36,3 +40,4 @@ dol-kv = { path = "libs/dol-kv" }
 dol-objects = { path = "libs/dol-objects" }
 dol-migration = { path = "libs/dol-migration" }
 dol-config = { path = "libs/dol-config" }
+dol-query = { path = "libs/dol-query" }

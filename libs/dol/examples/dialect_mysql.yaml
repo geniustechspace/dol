@@ -2,7 +2,7 @@
 #
 # Usage in Rust:
 #   let dialect = Dialect::from_yaml_str(include_str!("dialect_mysql.yaml")).unwrap();
-#   let sql = model.get().all_columns().where_eq("id").to_sql(Some(&dialect));
+#   let sql = model.get().where_eq("id").render(Some(&dialect)).unwrap();
 #
 # This configuration matches Dialect::mysql() and can be customized as needed.
 

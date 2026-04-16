@@ -13,6 +13,7 @@ serde = { workspace = true, optional = true }
 
 [dev-dependencies]
 toml_crate = { workspace = true }
+tokio = { workspace = true }
 
 [features]
 default = []

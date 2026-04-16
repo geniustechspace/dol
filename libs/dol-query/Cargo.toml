@@ -1,0 +1,12 @@
+[package]
+name = "dol-query"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "DOL Query — backend-neutral query entry point for any data source."
+
+[dependencies]
+dol-expr = { path = "../dol-core/crates/expr" }
+dol-entity = { path = "../dol-core/crates/entity" }
+dol-ir = { path = "../dol-core/crates/ir" }
+dol-builder = { path = "../dol-core/crates/builder" }

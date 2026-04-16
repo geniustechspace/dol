@@ -5,8 +5,8 @@
 //! other migration can be recorded.
 
 use crate::{Migration, MigrationStep};
-use dol_core::builder::DefineModelBuilder;
-use dol_core::ir::ModelRef;
+use dol_core::builder::DefineEntityBuilder;
+use dol_core::ir::EntityRef;
 use dol_core::ir::definition::{DefineIndexIR, FieldDef};
 use dol_core::model::FieldType;
 
@@ -35,8 +35,8 @@ impl Migration for CreateMigrationHistory {
     fn up(&self) -> Vec<MigrationStep> {
         vec![
             // Create the migration tracking table
-            MigrationStep::define_model(
-                DefineModelBuilder::new("_dol_migrations")
+            MigrationStep::define_entity(
+                DefineEntityBuilder::new("_dol_migrations")
                     .field(FieldDef::new("version", FieldType::Varchar(Some(255))).primary_key())
                     .field(FieldDef::new("description", FieldType::Text))
                     .field(FieldDef::new("checksum", FieldType::Text))
@@ -54,7 +54,7 @@ impl Migration for CreateMigrationHistory {
             // prevents re-applying, so this is safe.
             MigrationStep::define_index(DefineIndexIR {
                 name: "idx_dol_migrations_applied_at".to_string(),
-                target: ModelRef {
+                target: EntityRef {
                     name: "_dol_migrations".to_string(),
                     namespace: None,
                     alias: None,
@@ -72,7 +72,7 @@ impl Migration for CreateMigrationHistory {
     fn down(&self) -> Vec<MigrationStep> {
         // Dropping the table implicitly drops all its indexes across
         // PostgreSQL, MySQL, and SQLite — no separate DROP INDEX needed.
-        vec![MigrationStep::drop_model("_dol_migrations")]
+        vec![MigrationStep::drop_entity("_dol_migrations")]
     }
 }
 

@@ -9,8 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Comprehensive unit tests for `dol-expr`, `dol-model`, `dol-ir`, and `dol-builder`
-- `TryToSql` trait for fallible SQL rendering (returns `Result` instead of panicking)
+- Comprehensive unit tests for `dol-expr`, `dol-entity`, `dol-ir`, and `dol-builder`
+- `Render` trait for SQL rendering (replaces `TryToSql`/`ToSql`)
+- `TransactionRender` trait for transaction control rendering
+- `DefineTypeBuilder`, `DropTypeBuilder`, `DefinePolicyBuilder` for DDL/RLS
+- `CompoundSelectBuilder` for UNION/INTERSECT/EXCEPT set operations
+- `GetBuilderSqlExt` for compound query and subquery methods on `GetBuilder`
+- `dol-query` crate for backend-neutral query entry points
 - `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md` governance files
 - `CHANGELOG.md` for tracking changes
 - `justfile` for developer task automation
@@ -23,9 +28,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING**: Removed `all_fields()` — all entity fields are now included by default; use `.columns()` to narrow
+- **BREAKING**: Replaced `TryToSql`/`ToSql` traits with unified `Render` trait (`.render()`)
+- **BREAKING**: Replaced `TransactionSqlExt` with `TransactionRender` trait
+- **BREAKING**: Removed `col()` and `qualified_col()` aliases — use `field()` and `qualified()`
+- **BREAKING**: Removed `ModelDefineExt` alias — use `EntityDefineExt`
+- **BREAKING**: Removed `add_column()` from `AlterEntityBuilder` — use `add_field()`
+- **BREAKING**: Removed `schema()` from `DefineEntityBuilder` — use `namespace()`
+- Renamed `dol-model` crate to `dol-entity` (Entity-centric naming)
 - Aligned `rust-toolchain.toml` to version 1.94 (matching CI)
 - Updated `.vscode/settings.json` from stale protobuf config to rust-analyzer
-- Replaced `expect()` panics in `ToSql` implementations with safe fallback
 
 ### Removed
 
@@ -40,7 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial release of DOL — Data Operating Language
 - Expression engine (`dol-expr`) with composable AST
-- Schema language (`dol-model`) with const-compatible Model/Field/FieldType
+- Schema language (`dol-entity`) with const-compatible Entity/Field/FieldType
 - Intermediate representation (`dol-ir`) with Backend trait
 - Builder API (`dol-builder`) with method-chain builders
 - SQL backend (`dol-sql`) with 7 dialect presets

@@ -36,13 +36,14 @@
 //! ## Quick Start
 //!
 //! ```rust
-//! use dol::model::{Model, Field, FieldType};
+//! use dol::model::{Entity, Field, FieldType};
 //! use dol::backend::sql::dialect::Dialect;
-//! use dol::builder::ModelBuilderExt;
-//! use dol::ToSql;
+//! use dol::builder::EntityBuilderExt;
+//! use dol::expr::{field, param};
+//! use dol::Render;
 //!
 //! // Define a static model (zero-cost, const-compatible)
-//! static USERS: Model = Model::new("users", &[
+//! static USERS: Entity = Entity::new("users", &[
 //!     Field::new("id", FieldType::Uuid).primary_key(),
 //!     Field::new("email", FieldType::Text).unique(),
 //!     Field::new("status", FieldType::Text).default("'active'"),
@@ -50,15 +51,13 @@
 //!
 //! // Generate SQL for different dialects
 //! let pg_sql = USERS.get()
-//!     .all_columns()
-//!     .where_eq("id")
-//!     .to_sql(Some(&Dialect::postgres()));
+//!     .filter(field("id").eq(param()))
+//!     .render(Some(&Dialect::postgres())).unwrap();
 //! assert!(pg_sql.contains("$1"));
 //!
 //! let sqlite_sql = USERS.get()
-//!     .all_columns()
-//!     .where_eq("id")
-//!     .to_sql(None);  // Uses default (SQLite)
+//!     .filter(field("id").eq(param()))
+//!     .render(None).unwrap();  // Uses default (SQLite)
 //! assert!(sqlite_sql.contains("?"));
 //! ```
 //!
@@ -77,7 +76,7 @@ pub use dol_core as language;
 /// Expression engine — composable, backend-agnostic expression AST.
 pub use dol_core::expr;
 
-/// Schema language — Model, Field, FieldType, and constraints.
+/// Schema language — Entity, Field, FieldType, and constraints.
 pub use dol_core::model;
 
 /// Intermediate representation — backend-agnostic AST.
@@ -85,6 +84,9 @@ pub use dol_core::ir;
 
 /// Builder API — composable method-chain builders that produce IR.
 pub use dol_core::builder;
+
+/// Query entry point — backend-neutral query construction from entities or strings.
+pub use dol_core::query;
 
 /// Backend implementations.
 pub mod backend {
@@ -97,7 +99,6 @@ pub mod backend {
     pub mod sql {
         pub use dol_sql::*;
 
-        // Re-export SqlOutput for backward compat at backend::sql::SqlOutput
         pub use dol_core::ir::SqlOutput;
     }
 
@@ -123,8 +124,9 @@ pub use dol_config as config;
 // ── Top-level re-exports for ergonomic use ──
 
 pub use dol_core::ir::definition::FieldDef;
-pub use dol_core::model::constraint::{FkAction, ForeignKeyRef, GeneratedKind, ModelConstraint};
-pub use dol_core::model::{Field, FieldType, Model};
+pub use dol_core::ir::definition::OwnedEntityConstraint;
+pub use dol_core::model::constraint::{EntityConstraint, FkAction, ForeignKeyRef, GeneratedKind};
+pub use dol_core::model::{Entity, Field, FieldType};
 pub use dol_sql::dialect::Dialect;
 
 #[cfg(feature = "config")]
@@ -133,16 +135,19 @@ pub use dol_config::DolConfig;
 pub use dol_config::{BackendFilter, LockStrategy, UnifiedMigrationConfig};
 
 // Re-export builder extension traits so users can call model.get(), etc.
-pub use dol_core::builder::{ModelBuilderExt, ModelDefineExt};
+pub use dol_core::builder::{EntityBuilderExt, EntityDefineExt};
 
-// Re-export the ToSql extension trait so builders have .to_sql() in scope.
-pub use dol_sql::ext::ToSql;
+// Re-export commonly used builders at the top level for ergonomic access.
+pub use dol_core::builder::{DefinePolicyBuilder, DefineTypeBuilder, DropTypeBuilder};
 
-// Re-export the TryToSql extension trait for fallible SQL rendering.
-pub use dol_sql::ext::TryToSql;
+// Re-export Query for backend-neutral entry point.
+pub use dol_core::query::Query;
 
-// Re-export TransactionSqlExt so TransactionBuilder::to_sql() works.
-pub use dol_sql::ext::TransactionSqlExt;
+// Re-export the Render extension trait so builders have .render() in scope.
+pub use dol_sql::ext::Render;
+
+// Re-export TransactionRender so TransactionBuilder::render() works.
+pub use dol_sql::ext::TransactionRender;
 
 // Re-export CompoundSelectBuilder (moved from dol-builder to dol-sql).
 pub use dol_sql::ext::CompoundSelectBuilder;

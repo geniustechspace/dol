@@ -1,9 +1,10 @@
 //! Migration registry — tracks which migrations have been applied.
 
 use super::MigrationError;
-use dol_core::builder::ModelBuilderExt;
-use dol_core::model::{Field, FieldType, Model};
-use dol_sql::ext::ToSql;
+use dol_core::builder::EntityBuilderExt;
+use dol_core::expr::{field, param};
+use dol_core::model::{Entity, Field, FieldType};
+use dol_sql::ext::Render;
 
 // ===========================================================================
 // Migration history model — the DOL model for tracking applied migrations
@@ -21,7 +22,7 @@ use dol_sql::ext::ToSql;
 /// - `checksum` (TEXT): Hash of the migration steps for tamper detection.
 /// - `applied_at` (TIMESTAMP): When the migration was applied.
 /// - `execution_time_ms` (BIGINT): How long the migration took to run.
-pub static MIGRATION_HISTORY: Model = Model::new(
+pub static MIGRATION_HISTORY: Entity = Entity::new(
     "_dol_migrations",
     &[
         Field::new("version", FieldType::Varchar(Some(255))).primary_key(),
@@ -164,7 +165,11 @@ impl MigrationRegistry for InMemoryRegistry {
 /// assert!(sql.contains("CREATE TABLE IF NOT EXISTS _dol_migrations"));
 /// ```
 pub fn create_history_table_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> String {
-    MIGRATION_HISTORY.create().if_not_exists().to_sql(dialect)
+    MIGRATION_HISTORY
+        .create()
+        .if_not_exists()
+        .render(dialect)
+        .unwrap()
 }
 
 /// Generate an INSERT SQL for recording an applied migration.
@@ -182,8 +187,9 @@ pub fn create_history_table_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> 
 pub fn insert_applied_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> String {
     MIGRATION_HISTORY
         .insert()
-        .columns(&["version", "description", "checksum"])
-        .to_sql(dialect)
+        .fields(&["version", "description", "checksum"])
+        .render(dialect)
+        .unwrap()
 }
 
 /// Generate a DELETE SQL for removing a migration record (on rollback).
@@ -201,8 +207,9 @@ pub fn insert_applied_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> String
 pub fn delete_reverted_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> String {
     MIGRATION_HISTORY
         .remove()
-        .where_eq("version")
-        .to_sql(dialect)
+        .filter(field("version").eq(param()))
+        .render(dialect)
+        .unwrap()
 }
 
 /// Generate a SELECT SQL for fetching all applied migrations.
@@ -216,101 +223,9 @@ pub fn delete_reverted_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> Strin
 /// assert!(sql.contains("_dol_migrations"));
 /// ```
 pub fn select_applied_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> String {
-    MIGRATION_HISTORY.get().all_columns().to_sql(dialect)
+    MIGRATION_HISTORY.get().render(dialect).unwrap()
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn in_memory_registry_basic() {
-        let mut reg = InMemoryRegistry::new();
-        assert!(reg.applied().unwrap().is_empty());
-
-        reg.mark_applied("V001", "First migration", "checksum1")
-            .unwrap();
-        reg.mark_applied("V002", "Second migration", "checksum2")
-            .unwrap();
-
-        let applied = reg.applied().unwrap();
-        assert_eq!(applied.len(), 2);
-        assert_eq!(applied[0].version, "V001");
-        assert_eq!(applied[1].version, "V002");
-    }
-
-    #[test]
-    fn in_memory_registry_revert() {
-        let mut reg = InMemoryRegistry::new();
-        reg.mark_applied("V001", "First", "c1").unwrap();
-        reg.mark_applied("V002", "Second", "c2").unwrap();
-
-        reg.mark_reverted("V001").unwrap();
-        let applied = reg.applied().unwrap();
-        assert_eq!(applied.len(), 1);
-        assert_eq!(applied[0].version, "V002");
-    }
-
-    #[test]
-    fn in_memory_registry_duplicate() {
-        let mut reg = InMemoryRegistry::new();
-        reg.mark_applied("V001", "First", "c1").unwrap();
-        let result = reg.mark_applied("V001", "Duplicate", "c2");
-        assert!(matches!(result, Err(MigrationError::DuplicateVersion(_))));
-    }
-
-    #[test]
-    fn in_memory_registry_ordered() {
-        let mut reg = InMemoryRegistry::new();
-        // Insert out of order
-        reg.mark_applied("V003", "Third", "c3").unwrap();
-        reg.mark_applied("V001", "First", "c1").unwrap();
-        reg.mark_applied("V002", "Second", "c2").unwrap();
-
-        let applied = reg.applied().unwrap();
-        assert_eq!(applied[0].version, "V001");
-        assert_eq!(applied[1].version, "V002");
-        assert_eq!(applied[2].version, "V003");
-    }
-
-    #[test]
-    fn migration_history_model() {
-        assert_eq!(MIGRATION_HISTORY.name, "_dol_migrations");
-        assert_eq!(MIGRATION_HISTORY.fields.len(), 5);
-        assert!(MIGRATION_HISTORY.field("version").primary_key);
-    }
-
-    #[test]
-    fn sql_helpers_postgres() {
-        let pg = dol_sql::dialect::Dialect::postgres();
-
-        let create_sql = create_history_table_sql(Some(&pg));
-        assert!(create_sql.contains("CREATE TABLE IF NOT EXISTS _dol_migrations"));
-        assert!(create_sql.contains("version VARCHAR(255) NOT NULL"));
-        assert!(create_sql.contains("checksum TEXT NOT NULL"));
-
-        let insert_sql = insert_applied_sql(Some(&pg));
-        assert!(insert_sql.contains("INSERT INTO _dol_migrations"));
-        assert!(insert_sql.contains("$1"));
-
-        let delete_sql = delete_reverted_sql(Some(&pg));
-        assert!(delete_sql.contains("DELETE FROM _dol_migrations"));
-        assert!(delete_sql.contains("$1"));
-
-        let select_sql = select_applied_sql(Some(&pg));
-        assert!(select_sql.contains("SELECT"));
-        assert!(select_sql.contains("_dol_migrations"));
-    }
-
-    #[test]
-    fn sql_helpers_sqlite() {
-        let create_sql = create_history_table_sql(None); // default is SQLite
-        assert!(create_sql.contains("CREATE TABLE IF NOT EXISTS _dol_migrations"));
-
-        let insert_sql = insert_applied_sql(None);
-        assert!(insert_sql.contains("?"));
-
-        let delete_sql = delete_reverted_sql(None);
-        assert!(delete_sql.contains("?"));
-    }
-}
+#[path = "registry_tests.rs"]
+mod tests;

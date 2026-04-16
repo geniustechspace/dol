@@ -7,13 +7,16 @@ use super::dialect::{
     ReturningStyle,
 };
 use dol_core::expr::window::{FrameBound, FrameKind, WindowFrame};
-use dol_core::expr::{BinOp, Direction, Expr, Literal, NullsPosition, OrderByExpr, UnaryOp};
+use dol_core::expr::{
+    BinOp, Direction, Expr, Literal, NullsPosition, OrderByExpr, Quantifier, TernaryOp, UnaryOp,
+};
 use dol_core::ir::BackendError;
 use dol_core::ir::SqlOutput;
+use dol_core::ir::definition::OwnedEntityConstraint;
 use dol_core::ir::*;
 use dol_core::model::Field;
 use dol_core::model::FieldType;
-use dol_core::model::constraint::{FkAction, GeneratedKind, ModelConstraint};
+use dol_core::model::constraint::{FkAction, GeneratedKind};
 
 // ===========================================================================
 // Expr rendering (the core recursive renderer)
@@ -46,13 +49,31 @@ pub fn render_expr(expr: &Expr, counter: &mut ParamCounter, dialect: &Dialect) -
 
         Expr::Literal(lit) => render_literal(lit, dialect),
 
-        Expr::BinaryOp { left, op, right } => render_binary_op(left, *op, right, counter, dialect),
+        Expr::BinaryOp {
+            left,
+            op,
+            right,
+            negated,
+        } => render_binary_op(left, *op, right, *negated, counter, dialect),
 
         Expr::UnaryOp { op, expr } => {
             let inner = render_expr(expr, counter, dialect);
             match op {
                 UnaryOp::Not => format!("NOT ({})", inner),
                 UnaryOp::Neg => format!("-({})", inner),
+                UnaryOp::IsNull => format!("{} IS NULL", inner),
+                UnaryOp::IsNotNull => format!("{} IS NOT NULL", inner),
+                UnaryOp::IsTrue => format!("{} IS TRUE", inner),
+                UnaryOp::IsNotTrue => format!("{} IS NOT TRUE", inner),
+                UnaryOp::IsFalse => format!("{} IS FALSE", inner),
+                UnaryOp::IsNotFalse => format!("{} IS NOT FALSE", inner),
+                UnaryOp::IsUnknown => format!("{} IS UNKNOWN", inner),
+                UnaryOp::IsNotUnknown => format!("{} IS NOT UNKNOWN", inner),
+                UnaryOp::BitNot => format!("~({})", inner),
+                UnaryOp::Sqrt => format!("|/({})", inner),
+                UnaryOp::CubeRoot => format!("||/({})", inner),
+                UnaryOp::Abs => format!("@({})", inner),
+                UnaryOp::Factorial => format!("({}!)", inner),
             }
         }
 
@@ -209,6 +230,42 @@ pub fn render_expr(expr: &Expr, counter: &mut ParamCounter, dialect: &Dialect) -
 
             format!("{} OVER ({})", func_sql, over_parts.join(" "))
         }
+
+        Expr::TernaryOp {
+            expr,
+            op,
+            first,
+            second,
+            negated,
+        } => {
+            let expr_sql = render_expr(expr, counter, dialect);
+            let first_sql = render_expr(first, counter, dialect);
+            let second_sql = render_expr(second, counter, dialect);
+            let not = if *negated { " NOT" } else { "" };
+            match op {
+                TernaryOp::Between => {
+                    format!(
+                        "{}{} BETWEEN {} AND {}",
+                        expr_sql, not, first_sql, second_sql
+                    )
+                }
+            }
+        }
+
+        Expr::QuantifiedCmp {
+            expr,
+            op,
+            quantifier,
+            subquery,
+        } => {
+            let lhs = render_expr(expr, counter, dialect);
+            let op_str = render_binop_token(*op);
+            let quant = match quantifier {
+                Quantifier::Any => "ANY",
+                Quantifier::All => "ALL",
+            };
+            format!("{} {} {} ({})", lhs, op_str, quant, subquery)
+        }
     }
 }
 
@@ -230,6 +287,7 @@ fn render_binary_op(
     left: &Expr,
     op: BinOp,
     right: &Expr,
+    negated: bool,
     counter: &mut ParamCounter,
     dialect: &Dialect,
 ) -> String {
@@ -237,7 +295,8 @@ fn render_binary_op(
     if op == BinOp::ILike && !dialect.features.ilike {
         let lhs = render_expr(left, counter, dialect);
         let rhs = render_expr(right, counter, dialect);
-        return format!("LOWER({}) LIKE LOWER({})", lhs, rhs);
+        let not = if negated { "NOT " } else { "" };
+        return format!("{}LOWER({}) LIKE LOWER({})", not, lhs, rhs);
     }
 
     // Special case: Concat dispatches on dialect.concat_style
@@ -253,29 +312,82 @@ fn render_binary_op(
 
     let lhs = render_expr(left, counter, dialect);
     let rhs = render_expr(right, counter, dialect);
+    let op_str = render_binop_token(op);
 
-    let op_str = match op {
+    let base = match op {
+        BinOp::And | BinOp::Or => format!("({} {} {})", lhs, op_str, rhs),
+        _ => format!("{} {} {}", lhs, op_str, rhs),
+    };
+
+    if negated {
+        format!("NOT ({})", base)
+    } else {
+        base
+    }
+}
+
+/// Map a [`BinOp`] to its SQL token string.
+fn render_binop_token(op: BinOp) -> &'static str {
+    match op {
+        // Comparison
         BinOp::Eq => "=",
         BinOp::Ne => "!=",
         BinOp::Lt => "<",
         BinOp::Gt => ">",
         BinOp::Le => "<=",
         BinOp::Ge => ">=",
+        // Null-safe comparison
+        BinOp::IsDistinctFrom => "IS DISTINCT FROM",
+        BinOp::IsNotDistinctFrom => "IS NOT DISTINCT FROM",
+        // Arithmetic
         BinOp::Add => "+",
         BinOp::Sub => "-",
         BinOp::Mul => "*",
         BinOp::Div => "/",
         BinOp::Mod => "%",
+        // Logical
         BinOp::And => "AND",
         BinOp::Or => "OR",
+        // Pattern
         BinOp::Like => "LIKE",
         BinOp::ILike => "ILIKE",
-        BinOp::Concat => unreachable!(),
-    };
-
-    match op {
-        BinOp::And | BinOp::Or => format!("({} {} {})", lhs, op_str, rhs),
-        _ => format!("{} {} {}", lhs, op_str, rhs),
+        BinOp::SimilarTo => "SIMILAR TO",
+        BinOp::RegexMatch => "~",
+        BinOp::RegexMatchInsensitive => "~*",
+        BinOp::Glob => "GLOB",
+        // String
+        BinOp::Concat => "||",
+        BinOp::StartsWith => "^@",
+        BinOp::Contains => "LIKE", // lowered by backend
+        // Bitwise
+        BinOp::BitAnd => "&",
+        BinOp::BitOr => "|",
+        BinOp::BitXor => "#",
+        BinOp::ShiftLeft => "<<",
+        BinOp::ShiftRight => ">>",
+        // Array / Collection
+        BinOp::ArrayContains => "@>",
+        BinOp::ArrayContainedBy => "<@",
+        BinOp::ArrayOverlap => "&&",
+        // JSON / Document
+        BinOp::JsonGet => "->",
+        BinOp::JsonGetText => "->>",
+        BinOp::JsonPath => "#>",
+        BinOp::JsonPathText => "#>>",
+        BinOp::JsonHasKey => "?",
+        BinOp::JsonHasAnyKey => "?|",
+        BinOp::JsonHasAllKeys => "?&",
+        // Range
+        BinOp::RangeContains => "@>",
+        BinOp::RangeContainedBy => "<@",
+        BinOp::RangeOverlap => "&&",
+        // Collection ops (value-level)
+        BinOp::Merge => "MERGE",
+        BinOp::Append => "APPEND",
+        BinOp::Prepend => "PREPEND",
+        BinOp::RemoveKey => "REMOVE",
+        // Spatial
+        BinOp::Distance => "<->",
     }
 }
 
@@ -546,12 +658,12 @@ pub fn render_type(field_type: &FieldType, dialect: &Dialect) -> String {
 }
 
 /// Renders a model-level constraint.
-pub fn render_model_constraint(constraint: &ModelConstraint) -> String {
+pub fn render_model_constraint(constraint: &OwnedEntityConstraint) -> String {
     match constraint {
-        ModelConstraint::Unique(cols) => {
+        OwnedEntityConstraint::Unique(cols) => {
             format!("UNIQUE ({})", cols.join(", "))
         }
-        ModelConstraint::ForeignKey {
+        OwnedEntityConstraint::ForeignKey {
             columns,
             ref_table,
             ref_columns,
@@ -568,10 +680,10 @@ pub fn render_model_constraint(constraint: &ModelConstraint) -> String {
             }
             sql
         }
-        ModelConstraint::Check(expr) => {
+        OwnedEntityConstraint::Check(expr) => {
             format!("CHECK ({})", expr)
         }
-        ModelConstraint::PrimaryKey(cols) => {
+        OwnedEntityConstraint::PrimaryKey(cols) => {
             format!("PRIMARY KEY ({})", cols.join(", "))
         }
     }
@@ -621,7 +733,7 @@ pub(crate) fn render_query_ir_with_counter(
     }
 
     // FROM
-    let table_name = model_ref_to_sql(&ir.source, dialect);
+    let table_name = entity_ref_to_sql(&ir.source, dialect);
     sql.push_str(&format!(" FROM {}", table_name));
 
     // JOINs
@@ -633,7 +745,7 @@ pub(crate) fn render_query_ir_with_counter(
             JoinType::Full => "FULL OUTER JOIN",
             JoinType::Cross => "CROSS JOIN",
         };
-        let target = model_ref_to_sql(&join.target, dialect);
+        let target = entity_ref_to_sql(&join.target, dialect);
         sql.push_str(&format!(" {} {}", join_type, target));
         if !join.on_conditions.is_empty() {
             let conds: Vec<_> = join
@@ -688,7 +800,7 @@ pub(crate) fn render_query_ir_with_counter(
 /// Render an InsertIR to SQL.
 pub fn render_insert_ir(ir: &InsertIR, dialect: &Dialect) -> Result<SqlOutput, BackendError> {
     let mut counter = ParamCounter::new(&dialect.param_style);
-    let table_name = model_ref_to_sql(&ir.target, dialect);
+    let table_name = entity_ref_to_sql(&ir.target, dialect);
 
     let cols = ir.fields.join(", ");
     let mut all_values = Vec::new();
@@ -717,7 +829,7 @@ pub fn render_insert_select_ir(
     ir: &InsertSelectIR,
     dialect: &Dialect,
 ) -> Result<SqlOutput, BackendError> {
-    let table_name = model_ref_to_sql(&ir.target, dialect);
+    let table_name = entity_ref_to_sql(&ir.target, dialect);
     let cols = ir.fields.join(", ");
 
     let mut sql = format!("INSERT INTO {} ({}) {}", table_name, cols, ir.source_query,);
@@ -735,7 +847,7 @@ pub fn render_insert_select_ir(
 /// Render an UpdateIR to SQL.
 pub fn render_update_ir(ir: &UpdateIR, dialect: &Dialect) -> Result<SqlOutput, BackendError> {
     let mut counter = ParamCounter::new(&dialect.param_style);
-    let table_name = model_ref_to_sql(&ir.target, dialect);
+    let table_name = entity_ref_to_sql(&ir.target, dialect);
 
     let sets: Vec<_> = ir
         .assignments
@@ -759,7 +871,7 @@ pub fn render_update_ir(ir: &UpdateIR, dialect: &Dialect) -> Result<SqlOutput, B
 /// Render a RemoveIR to SQL.
 pub fn render_remove_ir(ir: &RemoveIR, dialect: &Dialect) -> Result<SqlOutput, BackendError> {
     let mut counter = ParamCounter::new(&dialect.param_style);
-    let table_name = model_ref_to_sql(&ir.target, dialect);
+    let table_name = entity_ref_to_sql(&ir.target, dialect);
 
     let mut sql = format!("DELETE FROM {}", table_name);
     sql.push_str(&render_filters(&ir.filters, &mut counter, dialect));
@@ -774,7 +886,7 @@ pub fn render_remove_ir(ir: &RemoveIR, dialect: &Dialect) -> Result<SqlOutput, B
 /// Render an UpsertIR to SQL.
 pub fn render_upsert_ir(ir: &UpsertIR, dialect: &Dialect) -> Result<SqlOutput, BackendError> {
     let mut counter = ParamCounter::new(&dialect.param_style);
-    let table_name = model_ref_to_sql(&ir.target, dialect);
+    let table_name = entity_ref_to_sql(&ir.target, dialect);
 
     let cols = ir.fields.join(", ");
     let params: Vec<_> = ir.fields.iter().map(|_| counter.next()).collect();
@@ -822,9 +934,9 @@ pub fn render_upsert_ir(ir: &UpsertIR, dialect: &Dialect) -> Result<SqlOutput, B
     })
 }
 
-/// Render a DefineModelIR to SQL (CREATE TABLE).
-pub fn render_define_model_ir(
-    ir: &DefineModelIR,
+/// Render a DefineEntityIR to SQL (CREATE TABLE).
+pub fn render_define_entity_ir(
+    ir: &DefineEntityIR,
     dialect: &Dialect,
 ) -> Result<SqlOutput, BackendError> {
     let mut sql = String::from("CREATE TABLE ");
@@ -857,12 +969,12 @@ pub fn render_define_model_ir(
     })
 }
 
-/// Render an AlterModelIR to SQL (ALTER TABLE).
-pub fn render_alter_model_ir(
-    ir: &AlterModelIR,
+/// Render an AlterEntityIR to SQL (ALTER TABLE).
+pub fn render_alter_entity_ir(
+    ir: &AlterEntityIR,
     dialect: &Dialect,
 ) -> Result<SqlOutput, BackendError> {
-    let table_name = model_ref_to_sql(&ir.target, dialect);
+    let table_name = entity_ref_to_sql(&ir.target, dialect);
     let mut parts = Vec::new();
 
     for action in &ir.actions {
@@ -924,7 +1036,7 @@ pub fn render_alter_model_ir(
             AlterAction::DropConstraint(name) => {
                 format!("ALTER TABLE {} DROP CONSTRAINT {}", table_name, name)
             }
-            AlterAction::RenameModel(new_name) => {
+            AlterAction::RenameEntity(new_name) => {
                 format!("ALTER TABLE {} RENAME TO {}", table_name, new_name)
             }
         };
@@ -937,9 +1049,9 @@ pub fn render_alter_model_ir(
     })
 }
 
-/// Render a DropModelIR to SQL (DROP TABLE).
-pub fn render_drop_model_ir(
-    ir: &DropModelIR,
+/// Render a DropEntityIR to SQL (DROP TABLE).
+pub fn render_drop_entity_ir(
+    ir: &DropEntityIR,
     _dialect: &Dialect,
 ) -> Result<SqlOutput, BackendError> {
     let mut sql = String::from("DROP TABLE ");
@@ -1066,20 +1178,139 @@ fn render_privilege(p: &Privilege) -> String {
 }
 
 /// Render a TransactionIR to SQL.
-pub fn render_transaction_ir(ir: &TransactionIR) -> Result<SqlOutput, BackendError> {
-    let sql = match ir {
-        TransactionIR::Begin => "BEGIN".to_string(),
-        TransactionIR::Commit => "COMMIT".to_string(),
-        TransactionIR::Rollback => "ROLLBACK".to_string(),
-        TransactionIR::Savepoint(name) => format!("SAVEPOINT {}", name),
-        TransactionIR::ReleaseSavepoint(name) => format!("RELEASE SAVEPOINT {}", name),
-        TransactionIR::RollbackToSavepoint(name) => format!("ROLLBACK TO SAVEPOINT {}", name),
-        TransactionIR::Block(_) => {
-            return Err(BackendError::Unsupported(
-                "transaction blocks not yet implemented in SQL backend".into(),
-            ));
+pub fn render_transaction_ir(
+    ir: &TransactionIR,
+    dialect: &Dialect,
+) -> Result<SqlOutput, BackendError> {
+    match ir {
+        TransactionIR::Begin => Ok(SqlOutput {
+            sql: "BEGIN".to_string(),
+            param_count: 0,
+        }),
+        TransactionIR::Commit => Ok(SqlOutput {
+            sql: "COMMIT".to_string(),
+            param_count: 0,
+        }),
+        TransactionIR::Rollback => Ok(SqlOutput {
+            sql: "ROLLBACK".to_string(),
+            param_count: 0,
+        }),
+        TransactionIR::Savepoint(name) => Ok(SqlOutput {
+            sql: format!("SAVEPOINT {}", name),
+            param_count: 0,
+        }),
+        TransactionIR::ReleaseSavepoint(name) => Ok(SqlOutput {
+            sql: format!("RELEASE SAVEPOINT {}", name),
+            param_count: 0,
+        }),
+        TransactionIR::RollbackToSavepoint(name) => Ok(SqlOutput {
+            sql: format!("ROLLBACK TO SAVEPOINT {}", name),
+            param_count: 0,
+        }),
+        TransactionIR::Block(stmts) => render_transaction_block(stmts, dialect),
+    }
+}
+
+/// Render a transaction block: `BEGIN; stmt1; stmt2; ...; COMMIT`.
+///
+/// Each inner statement is rendered using the full SQL backend, and the block
+/// is wrapped in `BEGIN` / `COMMIT`.
+fn render_transaction_block(
+    stmts: &[Statement],
+    dialect: &Dialect,
+) -> Result<SqlOutput, BackendError> {
+    let backend = crate::SqlBackend::new(dialect.clone());
+    let mut parts = Vec::with_capacity(stmts.len() + 2);
+    let mut total_params = 0;
+
+    parts.push("BEGIN".to_string());
+
+    for stmt in stmts {
+        let output = backend.render(stmt)?;
+        match output {
+            RenderedOutput::Sql(sql_out) => {
+                total_params += sql_out.param_count;
+                parts.push(sql_out.sql);
+            }
+            _ => {
+                return Err(BackendError::RenderError(
+                    "transaction block contains non-SQL statement".into(),
+                ));
+            }
+        }
+    }
+
+    parts.push("COMMIT".to_string());
+
+    Ok(SqlOutput {
+        sql: parts.join(";\n"),
+        param_count: total_params,
+    })
+}
+
+// ===========================================================================
+// DefineType rendering (CREATE TYPE ... AS ENUM)
+// ===========================================================================
+
+/// Render a [`DefineTypeIR`] to SQL.
+///
+/// Dialect-aware:
+/// - **PostgreSQL / CockroachDB** (`EnumStyle::CreateType`):
+///   `CREATE TYPE name AS ENUM ('a', 'b', 'c')`
+/// - **MySQL / MariaDB** (`EnumStyle::InlineEnum`):
+///   Not a standalone statement — returns an informational comment.
+///   (Inline ENUMs are rendered at the column level in CREATE TABLE.)
+/// - **SQLite / MSSQL / Oracle** (`EnumStyle::CheckConstraint`):
+///   Not a standalone statement — returns an informational comment.
+///   (CHECK constraints are rendered at the column level in CREATE TABLE.)
+pub fn render_define_type_ir(
+    ir: &DefineTypeIR,
+    dialect: &Dialect,
+) -> Result<SqlOutput, BackendError> {
+    use super::dialect::ddl::EnumStyle;
+
+    let qualified_name = if let Some(ref ns) = ir.namespace {
+        format!("{}.{}", ns, ir.name)
+    } else {
+        ir.name.clone()
+    };
+
+    let sql = match dialect.ddl.enum_style {
+        EnumStyle::CreateType => {
+            let variants: Vec<String> = ir.variants.iter().map(|v| format!("'{}'", v)).collect();
+            format!(
+                "CREATE TYPE {} AS ENUM ({})",
+                qualified_name,
+                variants.join(", ")
+            )
+        }
+        EnumStyle::InlineEnum => {
+            // MySQL inline ENUMs are part of column definitions, not standalone.
+            // Return a comment so callers know this is intentionally a no-op.
+            format!(
+                "-- type {} is rendered inline as ENUM({}) in column definitions",
+                qualified_name,
+                ir.variants
+                    .iter()
+                    .map(|v| format!("'{}'", v))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        }
+        EnumStyle::CheckConstraint => {
+            // SQLite/MSSQL/Oracle use CHECK constraints instead of types.
+            format!(
+                "-- type {} is enforced via CHECK (col IN ({})) in column definitions",
+                qualified_name,
+                ir.variants
+                    .iter()
+                    .map(|v| format!("'{}'", v))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
         }
     };
+
     Ok(SqlOutput {
         sql,
         param_count: 0,
@@ -1087,8 +1318,85 @@ pub fn render_transaction_ir(ir: &TransactionIR) -> Result<SqlOutput, BackendErr
 }
 
 // ===========================================================================
-// Compound query rendering
+// DropType rendering (DROP TYPE)
 // ===========================================================================
+
+/// Render a [`DropTypeIR`] to SQL.
+///
+/// Only meaningful for dialects with `EnumStyle::CreateType` (PostgreSQL,
+/// CockroachDB). For other dialects, returns a comment.
+pub fn render_drop_type_ir(ir: &DropTypeIR, dialect: &Dialect) -> Result<SqlOutput, BackendError> {
+    use super::dialect::ddl::EnumStyle;
+
+    let sql = match dialect.ddl.enum_style {
+        EnumStyle::CreateType => {
+            let mut s = String::from("DROP TYPE ");
+            if ir.if_exists {
+                s.push_str("IF EXISTS ");
+            }
+            s.push_str(&ir.name);
+            s
+        }
+        _ => {
+            // Inline enums / check constraints don't have a separate type to drop.
+            format!(
+                "-- type {} does not exist as a standalone object in this dialect",
+                ir.name
+            )
+        }
+    };
+
+    Ok(SqlOutput {
+        sql,
+        param_count: 0,
+    })
+}
+
+// ===========================================================================
+// DefinePolicy rendering (CREATE POLICY ... ON ... FOR ... USING ... WITH CHECK)
+// ===========================================================================
+
+/// Render a [`DefinePolicyIR`] to SQL.
+///
+/// Produces PostgreSQL-style row-level security policy:
+/// ```sql
+/// CREATE POLICY name ON table
+///   FOR ALL
+///   USING (tenant_id = $1)
+///   WITH CHECK (tenant_id = $1)
+/// ```
+pub fn render_define_policy_ir(
+    ir: &DefinePolicyIR,
+    dialect: &Dialect,
+) -> Result<SqlOutput, BackendError> {
+    let mut counter = dialect.param_counter();
+
+    let action_str = match ir.action {
+        dol_core::ir::control::PolicyAction::Read => "SELECT",
+        dol_core::ir::control::PolicyAction::Write => "ALL",
+        dol_core::ir::control::PolicyAction::All => "ALL",
+    };
+
+    let mut sql = format!(
+        "CREATE POLICY {} ON {} FOR {}",
+        ir.name, ir.on_model, action_str
+    );
+
+    if let Some(ref expr) = ir.using_expr {
+        let rendered = render_expr(expr, &mut counter, dialect);
+        sql.push_str(&format!(" USING ({})", rendered));
+    }
+
+    if let Some(ref expr) = ir.check_expr {
+        let rendered = render_expr(expr, &mut counter, dialect);
+        sql.push_str(&format!(" WITH CHECK ({})", rendered));
+    }
+
+    Ok(SqlOutput {
+        sql,
+        param_count: counter.count(),
+    })
+}
 
 /// Render a compound query (UNION, INTERSECT, EXCEPT) to SQL.
 ///
@@ -1140,7 +1448,7 @@ pub fn render_compound_query_ir(
 // Helpers
 // ===========================================================================
 
-fn model_ref_to_sql(mref: &ModelRef, _dialect: &Dialect) -> String {
+fn entity_ref_to_sql(mref: &EntityRef, _dialect: &Dialect) -> String {
     let name = if let Some(ref ns) = mref.namespace {
         format!("{}.{}", ns, mref.name)
     } else {
