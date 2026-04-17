@@ -623,25 +623,28 @@ fn render_sort_spec(order: &OrderByExpr<'_>) -> Result<SpreadsheetSortSpec, Back
     Ok(SpreadsheetSortSpec { column, direction })
 }
 
-/// Validate that an expression is a plain column reference (identifier, qualified
-/// identifier, star, or alias wrapping an identifier), returning the rendered name.
+/// Validate that an expression is a supported column expression, returning the
+/// rendered name.
+///
+/// Accepted forms are identifiers, qualified identifiers, `*`, `COUNT(*)`, and
+/// aliases wrapping any other supported column expression.
 ///
 /// SpreadsheetOp::ReadRows `columns` and `SpreadsheetSortSpec::column` are
-/// documented as column names, so non-column expressions are rejected.
+/// documented as column names, so other expression kinds are rejected.
 fn validate_column_expr(expr: &Expr<'_>, context: &str) -> Result<String, BackendError> {
     match expr {
         Expr::Identifier(name) => Ok(name.to_string()),
         Expr::QualifiedIdentifier { scope, name } => Ok(format!("{}.{}", scope, name)),
         Expr::Star => Ok("*".to_string()),
         Expr::Alias { expr: inner, alias } => {
-            // Allow alias wrapping a plain identifier
+            // Allow alias wrapping any other supported column expression
             validate_column_expr(inner, context)?;
             Ok(alias.to_string())
         }
         Expr::CountStar => Ok("COUNT(*)".to_string()),
         other => Err(BackendError::Unsupported(format!(
-            "SpreadsheetBackend only supports plain column identifiers in {}; \
-             got unsupported expression: {:?}",
+            "SpreadsheetBackend only supports column identifiers, qualified identifiers, \
+             *, COUNT(*), and aliases of those forms in {}; got unsupported expression: {:?}",
             context, other,
         ))),
     }

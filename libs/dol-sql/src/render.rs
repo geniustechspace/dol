@@ -191,7 +191,8 @@ fn render_expr_inner(
                 .iter()
                 .map(|(k, v)| {
                     let val = render_expr_inner(v, counter, dialect, next)?;
-                    Ok(format!("'{}', {}", k, val))
+                    let escaped_key = escape_sql_string(k, dialect);
+                    Ok(format!("'{}', {}", escaped_key, val))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(match &dialect.json_access {
