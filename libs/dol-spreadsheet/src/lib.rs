@@ -377,57 +377,58 @@ fn render_filter_list(filters: &[Expr<'_>]) -> Result<Option<String>, BackendErr
 ///
 /// Uses stable formatting rather than `Debug`, so that serialized
 /// `SpreadsheetOp` values are predictable and executor-friendly.
-fn render_literal(lit: &Literal<'_>) -> String {
+fn render_literal(lit: &Literal<'_>) -> Result<String, BackendError> {
     use dol_core::expr::Literal as L;
     match lit {
-        L::Null => "NULL".to_string(),
-        L::Bool(v) => if *v { "true" } else { "false" }.to_string(),
-        L::String(v) => format!("'{}'", v.replace('\'', "''")),
-        L::Json(v) => format!("'{}'", v),
-        L::Xml(v) => format!("'{}'", v),
-        L::Enum(v) => format!("'{}'", v),
+        L::Null => Ok("NULL".to_string()),
+        L::Bool(v) => Ok(if *v { "true" } else { "false" }.to_string()),
+        L::String(v) => Ok(format!("'{}'", v.replace('\'', "''"))),
+        L::Json(v) => Ok(format!("'{}'", v)),
+        L::Xml(v) => Ok(format!("'{}'", v)),
+        L::Enum(v) => Ok(format!("'{}'", v)),
         L::Bytes(v) => {
             let hex: String = v.iter().map(|b| format!("{:02x}", b)).collect();
-            format!("0x{}", hex)
+            Ok(format!("0x{}", hex))
         }
         L::Uuid(v) => {
             let u = uuid_from_bytes(v);
-            format!("'{}'", u)
+            Ok(format!("'{}'", u))
         }
-        L::Int8(v) => v.to_string(),
-        L::Int16(v) => v.to_string(),
-        L::Int32(v) => v.to_string(),
-        L::Int64(v) => v.to_string(),
-        L::Int128(v) => v.to_string(),
-        L::UInt8(v) => v.to_string(),
-        L::UInt16(v) => v.to_string(),
-        L::UInt32(v) => v.to_string(),
-        L::UInt64(v) => v.to_string(),
-        L::UInt128(v) => v.to_string(),
-        L::Float32(v) => v.to_string(),
-        L::Float64(v) => v.to_string(),
-        L::Decimal(v) => v.to_string(),
-        L::Inet(v) => format!("'{}'", v),
-        L::MacAddr(v) => format!("'{}'", v),
-        L::MacAddr8(v) => format!("'{}'", v),
-        L::Date(v) => format!("'{}'", v),
-        L::Time(v) => format!("'{}'", v),
-        L::DateTime(v) => format!("'{}'", v),
-        L::TimestampTz(v) => format!("'{}'", v),
-        L::Interval(v) => format!("'{}'", v),
-        L::BitString(v) => format!("'{}'", v),
+        L::Int8(v) => Ok(v.to_string()),
+        L::Int16(v) => Ok(v.to_string()),
+        L::Int32(v) => Ok(v.to_string()),
+        L::Int64(v) => Ok(v.to_string()),
+        L::Int128(v) => Ok(v.to_string()),
+        L::UInt8(v) => Ok(v.to_string()),
+        L::UInt16(v) => Ok(v.to_string()),
+        L::UInt32(v) => Ok(v.to_string()),
+        L::UInt64(v) => Ok(v.to_string()),
+        L::UInt128(v) => Ok(v.to_string()),
+        L::Float32(v) => Ok(v.to_string()),
+        L::Float64(v) => Ok(v.to_string()),
+        L::Decimal(v) => Ok(v.to_string()),
+        L::Inet(v) => Ok(format!("'{}'", v)),
+        L::MacAddr(v) => Ok(format!("'{}'", v)),
+        L::MacAddr8(v) => Ok(format!("'{}'", v)),
+        L::Date(v) => Ok(format!("'{}'", v)),
+        L::Time(v) => Ok(format!("'{}'", v)),
+        L::DateTime(v) => Ok(format!("'{}'", v)),
+        L::TimestampTz(v) => Ok(format!("'{}'", v)),
+        L::Interval(v) => Ok(format!("'{}'", v)),
+        L::BitString(v) => Ok(format!("'{}'", v)),
         // Geometric types
-        L::Point(v) => format!("'{}'", v),
-        L::Line(v) => format!("'{}'", v),
-        L::Segment(v) => format!("'{}'", v),
-        L::Rect(v) => format!("'{}'", v),
-        L::Circle(v) => format!("'{}'", v),
-        L::Path(v) => format!("'{}'", v),
-        L::Polygon(v) => format!("'{}'", v),
-        // Composite types — these are already rejected by render_expr_simple
-        // but we handle them here for completeness.
+        L::Point(v) => Ok(format!("'{}'", v)),
+        L::Line(v) => Ok(format!("'{}'", v)),
+        L::Segment(v) => Ok(format!("'{}'", v)),
+        L::Rect(v) => Ok(format!("'{}'", v)),
+        L::Circle(v) => Ok(format!("'{}'", v)),
+        L::Path(v) => Ok(format!("'{}'", v)),
+        L::Polygon(v) => Ok(format!("'{}'", v)),
+        // Composite types are not supported in spreadsheet descriptors.
         L::Array(_) | L::Set(_) | L::Tuple(_) | L::Map(_) | L::Struct(_) | L::Range(_) => {
-            format!("{}", lit)
+            Err(BackendError::Unsupported(
+                "SpreadsheetBackend does not support composite literal types (array, set, tuple, map, struct, range)".into(),
+            ))
         }
     }
 }
@@ -454,7 +455,7 @@ fn render_expr_simple(expr: &Expr<'_>) -> Result<String, BackendError> {
             Ok(format!("{}.{}", render_expr_simple(base)?, field))
         }
         Expr::Param => Ok("?".to_string()),
-        Expr::Value(lit) => Ok(render_literal(lit)),
+        Expr::Value(lit) => render_literal(lit),
         Expr::BinaryOp {
             left,
             op,
