@@ -14,6 +14,14 @@ fn entity_ref(name: &str) -> EntityRef {
     }
 }
 
+fn entity_ref_ns(ns: &str, name: &str) -> EntityRef {
+    EntityRef {
+        name: name.to_string(),
+        namespace: Some(ns.to_string()),
+        alias: None,
+    }
+}
+
 // ── DefineEntity → CreateSheet ─────────────────────────────────────────
 
 #[test]
@@ -824,5 +832,140 @@ fn storage_operations_unsupported() {
         bucket: "bucket".to_string(),
     };
     let stmt = Statement::GetObject(ir);
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
+}
+
+// ── Rename with namespace ──────────────────────────────────────────────
+
+#[test]
+fn alter_entity_rename_qualifies_new_name_with_namespace() {
+    let ir = AlterEntityIR {
+        target: entity_ref_ns("hr", "users"),
+        actions: vec![AlterAction::RenameEntity("employees".to_string())],
+    };
+
+    let stmt = Statement::AlterEntity(ir);
+    let result = SpreadsheetBackend.render(&stmt).unwrap();
+
+    match result {
+        RenderedOutput::Spreadsheet(out) => {
+            assert_eq!(out.sheet, "hr.users");
+            match out.operation {
+                SpreadsheetOp::RenameSheet { new_name } => {
+                    assert_eq!(new_name, "hr.employees");
+                }
+                _ => panic!("expected RenameSheet"),
+            }
+        }
+        _ => panic!("expected Spreadsheet output"),
+    }
+}
+
+// ── Sort rejects NULLS ordering ────────────────────────────────────────
+
+#[test]
+fn query_rejects_nulls_first_ordering() {
+    let ir = QueryIR {
+        source: entity_ref("users"),
+        projections: vec![field("name")],
+        joins: vec![],
+        filters: vec![],
+        group_by: vec![],
+        having: vec![],
+        order_by: vec![OrderByExpr {
+            expr: field("name"),
+            direction: dol_core::expr::Direction::Asc,
+            nulls: Some(dol_core::expr::NullsPosition::First),
+        }],
+        offset: None,
+        limit: None,
+        distinct: false,
+        distinct_on: vec![],
+        lock_mode: None,
+    };
+    let stmt = Statement::Query(Box::new(ir));
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
+}
+
+// ── Projection validation ──────────────────────────────────────────────
+
+#[test]
+fn query_rejects_non_column_projection() {
+    let ir = QueryIR {
+        source: entity_ref("users"),
+        projections: vec![field("age").gt(int(18i32))],
+        joins: vec![],
+        filters: vec![],
+        group_by: vec![],
+        having: vec![],
+        order_by: vec![],
+        offset: None,
+        limit: None,
+        distinct: false,
+        distinct_on: vec![],
+        lock_mode: None,
+    };
+    let stmt = Statement::Query(Box::new(ir));
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
+}
+
+#[test]
+fn query_accepts_alias_projection() {
+    let ir = QueryIR {
+        source: entity_ref("users"),
+        projections: vec![Expr::Alias {
+            expr: Box::new(field("email")),
+            alias: "user_email".to_string(),
+        }],
+        joins: vec![],
+        filters: vec![],
+        group_by: vec![],
+        having: vec![],
+        order_by: vec![],
+        offset: None,
+        limit: None,
+        distinct: false,
+        distinct_on: vec![],
+        lock_mode: None,
+    };
+    let stmt = Statement::Query(Box::new(ir));
+    let result = SpreadsheetBackend.render(&stmt).unwrap();
+    match result {
+        RenderedOutput::Spreadsheet(out) => match out.operation {
+            SpreadsheetOp::ReadRows { columns, .. } => {
+                assert_eq!(columns, vec!["user_email"]);
+            }
+            _ => panic!("expected ReadRows"),
+        },
+        _ => panic!("expected Spreadsheet output"),
+    }
+}
+
+// ── Sort rejects non-column expression ─────────────────────────────────
+
+#[test]
+fn query_rejects_non_column_sort_expr() {
+    let ir = QueryIR {
+        source: entity_ref("users"),
+        projections: vec![field("name")],
+        joins: vec![],
+        filters: vec![],
+        group_by: vec![],
+        having: vec![],
+        order_by: vec![OrderByExpr {
+            expr: Expr::Func {
+                name: "UPPER".into(),
+                args: vec![field("name")],
+            },
+            direction: dol_core::expr::Direction::Asc,
+            nulls: None,
+        }],
+        offset: None,
+        limit: None,
+        distinct: false,
+        distinct_on: vec![],
+        lock_mode: None,
+    };
+    let stmt = Statement::Query(Box::new(ir));
     assert!(SpreadsheetBackend.render(&stmt).is_err());
 }

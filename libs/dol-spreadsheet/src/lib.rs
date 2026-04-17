@@ -261,7 +261,7 @@ impl Backend for SpreadsheetBackend {
                 let columns = ir
                     .projections
                     .iter()
-                    .map(render_expr_simple)
+                    .map(|e| validate_column_expr(e, "projection"))
                     .collect::<Result<Vec<_>, BackendError>>()?;
 
                 let filter = render_filter_list(&ir.filters)?;
@@ -542,13 +542,37 @@ fn render_sort_spec(order: &OrderByExpr<'_>) -> Result<SpreadsheetSortSpec, Back
             "SpreadsheetBackend does not support NULLS FIRST/LAST ordering".into(),
         ));
     }
-    let column = render_expr_simple(&order.expr)?;
+    let column = validate_column_expr(&order.expr, "ORDER BY")?;
     let direction = if order.direction == Direction::Desc {
         SortDirection::Descending
     } else {
         SortDirection::Ascending
     };
     Ok(SpreadsheetSortSpec { column, direction })
+}
+
+/// Validate that an expression is a plain column reference (identifier, qualified
+/// identifier, star, or alias wrapping an identifier), returning the rendered name.
+///
+/// SpreadsheetOp::ReadRows `columns` and `SpreadsheetSortSpec::column` are
+/// documented as column names, so non-column expressions are rejected.
+fn validate_column_expr(expr: &Expr<'_>, context: &str) -> Result<String, BackendError> {
+    match expr {
+        Expr::Identifier(name) => Ok(name.to_string()),
+        Expr::QualifiedIdentifier { scope, name } => Ok(format!("{}.{}", scope, name)),
+        Expr::Star => Ok("*".to_string()),
+        Expr::Alias { expr: inner, alias } => {
+            // Allow alias wrapping a plain identifier
+            validate_column_expr(inner, context)?;
+            Ok(alias.to_string())
+        }
+        Expr::CountStar => Ok("COUNT(*)".to_string()),
+        other => Err(BackendError::Unsupported(format!(
+            "SpreadsheetBackend only supports plain column identifiers in {}; \
+             got unsupported expression: {:?}",
+            context, other,
+        ))),
+    }
 }
 
 #[cfg(test)]

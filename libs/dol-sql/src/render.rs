@@ -322,7 +322,9 @@ fn render_literal(lit: &Literal<'_>, dialect: &Dialect) -> String {
         L::Bool(true) => dialect.bool_true.clone(),
         L::Bool(false) => dialect.bool_false.clone(),
 
-        // Text — escape embedded single quotes to prevent SQL injection
+        // Text — escape embedded single quotes to produce valid SQL
+        // string literals, reducing the risk of injection when literals
+        // are interpolated (does not make arbitrary string concatenation safe).
         L::String(s) => format!("'{}'", escape_sql_string(s, dialect)),
         L::Json(s) => format!("'{}'", escape_sql_string(s, dialect)),
         L::Xml(s) => format!("'{}'", escape_sql_string(s, dialect)),
@@ -1563,5 +1565,37 @@ fn entity_ref_to_sql(mref: &EntityRef, _dialect: &Dialect) -> String {
         format!("{} AS {}", name, alias)
     } else {
         name
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn render_string_literal_sql(value: &str, dialect: &Dialect) -> String {
+        let expr = Expr::Value(Literal::String(value.into()));
+        let mut counter = dialect.param_counter();
+        render_expr(&expr, &mut counter, dialect).unwrap()
+    }
+
+    #[test]
+    fn renders_postgres_string_literal_with_embedded_single_quote() {
+        let dialect = Dialect::postgres();
+        let sql = render_string_literal_sql("O'Reilly", &dialect);
+        assert_eq!(sql, "'O''Reilly'");
+    }
+
+    #[test]
+    fn renders_mysql_string_literal_with_embedded_single_quote() {
+        let dialect = Dialect::mysql();
+        let sql = render_string_literal_sql("O'Reilly", &dialect);
+        assert_eq!(sql, "'O''Reilly'");
+    }
+
+    #[test]
+    fn renders_mysql_string_literal_with_backslashes_and_single_quote() {
+        let dialect = Dialect::mysql();
+        let sql = render_string_literal_sql(r"C:\tmp\O'Reilly", &dialect);
+        assert_eq!(sql, r"'C:\\tmp\\O''Reilly'");
     }
 }
