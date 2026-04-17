@@ -70,7 +70,12 @@ fn render_expr_inner(
                 JsonAccessStyle::JsonValueFunction => {
                     format!("JSON_VALUE({}, '$.{}')", base_sql, escaped_field)
                 }
-                JsonAccessStyle::Unsupported => format!("{}.{}", base_sql, field),
+                JsonAccessStyle::Unsupported => {
+                    return Err(BackendError::Unsupported(format!(
+                        "JSON field access is not supported by this dialect (field '{}')",
+                        field
+                    )));
+                }
             })
         }
 
