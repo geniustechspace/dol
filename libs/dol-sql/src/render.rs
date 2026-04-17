@@ -61,13 +61,14 @@ fn render_expr_inner(
 
         Expr::FieldAccess { base, field } => {
             let base_sql = render_expr_inner(base, counter, dialect, next)?;
+            let escaped_field = escape_sql_string(field, dialect);
             Ok(match &dialect.json_access {
-                JsonAccessStyle::ArrowOperator => format!("{}->>'{}'", base_sql, field),
+                JsonAccessStyle::ArrowOperator => format!("{}->>'{}'", base_sql, escaped_field),
                 JsonAccessStyle::JsonExtractFunction => {
-                    format!("json_extract({}, '$.{}')", base_sql, field)
+                    format!("json_extract({}, '$.{}')", base_sql, escaped_field)
                 }
                 JsonAccessStyle::JsonValueFunction => {
-                    format!("JSON_VALUE({}, '$.{}')", base_sql, field)
+                    format!("JSON_VALUE({}, '$.{}')", base_sql, escaped_field)
                 }
                 JsonAccessStyle::Unsupported => format!("{}.{}", base_sql, field),
             })
