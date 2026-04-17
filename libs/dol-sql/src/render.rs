@@ -288,6 +288,23 @@ fn render_expr_inner(
     }
 }
 
+/// Escape a string value for safe embedding in a SQL literal.
+///
+/// - All dialects: single quotes are doubled (`'` → `''`), which is the ANSI
+///   SQL standard for escaping inside string literals.
+/// - MySQL/MariaDB: backslashes are also escaped (`\` → `\\`) because MySQL
+///   treats `\` as an escape character by default (unless `NO_BACKSLASH_ESCAPES`
+///   SQL mode is set).
+fn escape_sql_string(s: &str, dialect: &Dialect) -> String {
+    use super::dialect::types::TypeDialect;
+    let escaped = s.replace('\'', "''");
+    if dialect.type_dialect == TypeDialect::MySQL {
+        escaped.replace('\\', "\\\\")
+    } else {
+        escaped
+    }
+}
+
 fn render_literal(lit: &Literal<'_>, dialect: &Dialect) -> String {
     use dol_core::expr::Literal as L;
     match lit {
@@ -297,10 +314,10 @@ fn render_literal(lit: &Literal<'_>, dialect: &Dialect) -> String {
         L::Bool(false) => dialect.bool_false.clone(),
 
         // Text — escape embedded single quotes to prevent SQL injection
-        L::String(s) => format!("'{}'", s.replace('\'', "''")),
-        L::Json(s) => format!("'{}'", s.replace('\'', "''")),
-        L::Xml(s) => format!("'{}'", s.replace('\'', "''")),
-        L::Enum(s) => format!("'{}'", s.replace('\'', "''")),
+        L::String(s) => format!("'{}'", escape_sql_string(s, dialect)),
+        L::Json(s) => format!("'{}'", escape_sql_string(s, dialect)),
+        L::Xml(s) => format!("'{}'", escape_sql_string(s, dialect)),
+        L::Enum(s) => format!("'{}'", escape_sql_string(s, dialect)),
 
         // Binary
         L::Bytes(b) => {
