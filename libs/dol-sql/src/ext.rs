@@ -114,7 +114,7 @@ impl Render for CreateFromMeta<'_> {
 
         // Field definitions
         for field in &model.fields {
-            parts.push(format!("  {}", render::render_field_def(&field, dialect)));
+            parts.push(format!("  {}", render::render_field_def(field, dialect)));
         }
 
         // Primary key constraint (derived from fields marked as PK)

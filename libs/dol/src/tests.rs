@@ -2222,11 +2222,10 @@ bool_true = "1"
 bool_false = "0"
 concat_style = "ConcatFunction"
 quote_style = "Backtick"
+type_dialect = "MySQL"
 
 [param_style]
 style = "Positional"
-
-type_dialect = "MySQL"
 
 [locking]
 for_update = true

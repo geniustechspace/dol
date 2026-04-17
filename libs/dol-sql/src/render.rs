@@ -22,8 +22,27 @@ use dol_entity::constraint::{FkAction, GeneratedKind};
 // Expr rendering (the core recursive renderer)
 // ===========================================================================
 
+/// Maximum nesting depth for expression rendering.
+///
+/// Prevents stack overflow on pathologically deep expression trees
+/// (e.g. from untrusted input or very large generated queries).
+const MAX_EXPR_DEPTH: usize = 128;
+
 /// Renders an [`Expr`] tree into a SQL string.
 pub fn render_expr(expr: &Expr<'_>, counter: &mut ParamCounter, dialect: &Dialect) -> String {
+    render_expr_inner(expr, counter, dialect, 0)
+}
+
+fn render_expr_inner(
+    expr: &Expr<'_>,
+    counter: &mut ParamCounter,
+    dialect: &Dialect,
+    depth: usize,
+) -> String {
+    if depth > MAX_EXPR_DEPTH {
+        return "/* ERROR: expression nesting too deep */".to_string();
+    }
+    let next = depth + 1;
     match expr {
         Expr::Identifier(name) => name.clone(),
 
@@ -32,7 +51,7 @@ pub fn render_expr(expr: &Expr<'_>, counter: &mut ParamCounter, dialect: &Dialec
         }
 
         Expr::FieldAccess { base, field } => {
-            let base_sql = render_expr(base, counter, dialect);
+            let base_sql = render_expr_inner(base, counter, dialect, next);
             match &dialect.json_access {
                 JsonAccessStyle::ArrowOperator => format!("{}->>'{}'", base_sql, field),
                 JsonAccessStyle::JsonExtractFunction => {
@@ -54,10 +73,10 @@ pub fn render_expr(expr: &Expr<'_>, counter: &mut ParamCounter, dialect: &Dialec
             op,
             right,
             negated,
-        } => render_binary_op(left, *op, right, *negated, counter, dialect),
+        } => render_binary_op(left, *op, right, *negated, counter, dialect, next),
 
         Expr::UnaryOp { op, expr } => {
-            let inner = render_expr(expr, counter, dialect);
+            let inner = render_expr_inner(expr, counter, dialect, next);
             match op {
                 UnaryOp::Not => format!("NOT ({})", inner),
                 UnaryOp::Neg => format!("-({})", inner),
@@ -80,25 +99,25 @@ pub fn render_expr(expr: &Expr<'_>, counter: &mut ParamCounter, dialect: &Dialec
         Expr::Func { name, args } => {
             let rendered_args: Vec<_> = args
                 .iter()
-                .map(|a| render_expr(a, counter, dialect))
+                .map(|a| render_expr_inner(a, counter, dialect, next))
                 .collect();
             format!("{}({})", name, rendered_args.join(", "))
         }
 
         Expr::Cast { expr, as_type } => {
-            let inner = render_expr(expr, counter, dialect);
+            let inner = render_expr_inner(expr, counter, dialect, next);
             format!("CAST({} AS {})", inner, as_type)
         }
 
         Expr::Case { whens, else_expr } => {
             let mut sql = String::from("CASE");
             for (cond, then) in whens {
-                let cond_sql = render_expr(cond, counter, dialect);
-                let then_sql = render_expr(then, counter, dialect);
+                let cond_sql = render_expr_inner(cond, counter, dialect, next);
+                let then_sql = render_expr_inner(then, counter, dialect, next);
                 sql.push_str(&format!(" WHEN {} THEN {}", cond_sql, then_sql));
             }
             if let Some(else_val) = else_expr {
-                let else_sql = render_expr(else_val, counter, dialect);
+                let else_sql = render_expr_inner(else_val, counter, dialect, next);
                 sql.push_str(&format!(" ELSE {}", else_sql));
             }
             sql.push_str(" END");
@@ -112,10 +131,10 @@ pub fn render_expr(expr: &Expr<'_>, counter: &mut ParamCounter, dialect: &Dialec
             list,
             negated,
         } => {
-            let lhs = render_expr(expr, counter, dialect);
+            let lhs = render_expr_inner(expr, counter, dialect, next);
             let items: Vec<_> = list
                 .iter()
-                .map(|e| render_expr(e, counter, dialect))
+                .map(|e| render_expr_inner(e, counter, dialect, next))
                 .collect();
             let not = if *negated { " NOT" } else { "" };
             format!("{}{} IN ({})", lhs, not, items.join(", "))
@@ -127,9 +146,9 @@ pub fn render_expr(expr: &Expr<'_>, counter: &mut ParamCounter, dialect: &Dialec
             high,
             negated,
         } => {
-            let lhs = render_expr(expr, counter, dialect);
-            let low_sql = render_expr(low, counter, dialect);
-            let high_sql = render_expr(high, counter, dialect);
+            let lhs = render_expr_inner(expr, counter, dialect, next);
+            let low_sql = render_expr_inner(low, counter, dialect, next);
+            let high_sql = render_expr_inner(high, counter, dialect, next);
             let not = if *negated { " NOT" } else { "" };
             format!("{}{} BETWEEN {} AND {}", lhs, not, low_sql, high_sql)
         }
@@ -140,7 +159,7 @@ pub fn render_expr(expr: &Expr<'_>, counter: &mut ParamCounter, dialect: &Dialec
         }
 
         Expr::IsNull { expr, negated } => {
-            let inner = render_expr(expr, counter, dialect);
+            let inner = render_expr_inner(expr, counter, dialect, next);
             if *negated {
                 format!("{} IS NOT NULL", inner)
             } else {
@@ -153,7 +172,7 @@ pub fn render_expr(expr: &Expr<'_>, counter: &mut ParamCounter, dialect: &Dialec
             subquery,
             negated,
         } => {
-            let lhs = render_expr(expr, counter, dialect);
+            let lhs = render_expr_inner(expr, counter, dialect, next);
             let not = if *negated { " NOT" } else { "" };
             format!("{}{} IN ({})", lhs, not, subquery)
         }
@@ -162,7 +181,7 @@ pub fn render_expr(expr: &Expr<'_>, counter: &mut ParamCounter, dialect: &Dialec
             let pairs: Vec<_> = fields
                 .iter()
                 .map(|(k, v)| {
-                    let val = render_expr(v, counter, dialect);
+                    let val = render_expr_inner(v, counter, dialect, next);
                     format!("'{}', {}", k, val)
                 })
                 .collect();
@@ -177,7 +196,7 @@ pub fn render_expr(expr: &Expr<'_>, counter: &mut ParamCounter, dialect: &Dialec
         Expr::ArrayLiteral(elements) => {
             let items: Vec<_> = elements
                 .iter()
-                .map(|e| render_expr(e, counter, dialect))
+                .map(|e| render_expr_inner(e, counter, dialect, next))
                 .collect();
             match &dialect.array_literal_style {
                 ArrayLiteralStyle::ArrayKeyword => format!("ARRAY[{}]", items.join(", ")),
@@ -191,7 +210,7 @@ pub fn render_expr(expr: &Expr<'_>, counter: &mut ParamCounter, dialect: &Dialec
         Expr::Raw(sql) => sql.clone(),
 
         Expr::Alias { expr, alias } => {
-            let inner = render_expr(expr, counter, dialect);
+            let inner = render_expr_inner(expr, counter, dialect, next);
             format!("{} AS {}", inner, alias)
         }
 
@@ -205,13 +224,13 @@ pub fn render_expr(expr: &Expr<'_>, counter: &mut ParamCounter, dialect: &Dialec
             order_by,
             frame,
         } => {
-            let func_sql = render_expr(func, counter, dialect);
+            let func_sql = render_expr_inner(func, counter, dialect, next);
             let mut over_parts = Vec::new();
 
             if !partition_by.is_empty() {
                 let parts: Vec<_> = partition_by
                     .iter()
-                    .map(|e| render_expr(e, counter, dialect))
+                    .map(|e| render_expr_inner(e, counter, dialect, next))
                     .collect();
                 over_parts.push(format!("PARTITION BY {}", parts.join(", ")));
             }
@@ -238,9 +257,9 @@ pub fn render_expr(expr: &Expr<'_>, counter: &mut ParamCounter, dialect: &Dialec
             second,
             negated,
         } => {
-            let expr_sql = render_expr(expr, counter, dialect);
-            let first_sql = render_expr(first, counter, dialect);
-            let second_sql = render_expr(second, counter, dialect);
+            let expr_sql = render_expr_inner(expr, counter, dialect, next);
+            let first_sql = render_expr_inner(first, counter, dialect, next);
+            let second_sql = render_expr_inner(second, counter, dialect, next);
             let not = if *negated { " NOT" } else { "" };
             match op {
                 TernaryOp::Between => {
@@ -258,7 +277,7 @@ pub fn render_expr(expr: &Expr<'_>, counter: &mut ParamCounter, dialect: &Dialec
             quantifier,
             subquery,
         } => {
-            let lhs = render_expr(expr, counter, dialect);
+            let lhs = render_expr_inner(expr, counter, dialect, next);
             let op_str = render_binop_token(*op);
             let quant = match quantifier {
                 Quantifier::Any => "ANY",
@@ -277,11 +296,11 @@ fn render_literal(lit: &Literal<'_>, dialect: &Dialect) -> String {
         L::Bool(true) => dialect.bool_true.clone(),
         L::Bool(false) => dialect.bool_false.clone(),
 
-        // Text
-        L::String(s) => format!("'{}'", s),
-        L::Json(s) => format!("'{}'", s),
-        L::Xml(s) => format!("'{}'", s),
-        L::Enum(s) => format!("'{}'", s),
+        // Text — escape embedded single quotes to prevent SQL injection
+        L::String(s) => format!("'{}'", s.replace('\'', "''")),
+        L::Json(s) => format!("'{}'", s.replace('\'', "''")),
+        L::Xml(s) => format!("'{}'", s.replace('\'', "''")),
+        L::Enum(s) => format!("'{}'", s.replace('\'', "''")),
 
         // Binary
         L::Bytes(b) => {
@@ -349,19 +368,20 @@ fn render_binary_op(
     negated: bool,
     counter: &mut ParamCounter,
     dialect: &Dialect,
+    depth: usize,
 ) -> String {
     // Special case: ILike on dialects without native ILIKE support
     if op == BinOp::ILike && !dialect.features.ilike {
-        let lhs = render_expr(left, counter, dialect);
-        let rhs = render_expr(right, counter, dialect);
+        let lhs = render_expr_inner(left, counter, dialect, depth);
+        let rhs = render_expr_inner(right, counter, dialect, depth);
         let not = if negated { "NOT " } else { "" };
         return format!("{}LOWER({}) LIKE LOWER({})", not, lhs, rhs);
     }
 
     // Special case: Concat dispatches on dialect.concat_style
     if op == BinOp::Concat {
-        let lhs = render_expr(left, counter, dialect);
-        let rhs = render_expr(right, counter, dialect);
+        let lhs = render_expr_inner(left, counter, dialect, depth);
+        let rhs = render_expr_inner(right, counter, dialect, depth);
         return match &dialect.concat_style {
             ConcatStyle::PipeOperator => format!("{} || {}", lhs, rhs),
             ConcatStyle::ConcatFunction => format!("CONCAT({}, {})", lhs, rhs),
@@ -369,8 +389,8 @@ fn render_binary_op(
         };
     }
 
-    let lhs = render_expr(left, counter, dialect);
-    let rhs = render_expr(right, counter, dialect);
+    let lhs = render_expr_inner(left, counter, dialect, depth);
+    let rhs = render_expr_inner(right, counter, dialect, depth);
     let op_str = render_binop_token(op);
 
     let base = match op {

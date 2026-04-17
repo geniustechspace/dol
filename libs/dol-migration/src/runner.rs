@@ -65,10 +65,11 @@ impl RenderedStep {
     pub fn describe(&self) -> String {
         match self {
             Self::Sql { sql, .. } => {
-                // First line or first 120 chars
+                // First line or first 120 chars (UTF-8 safe)
                 let first_line = sql.lines().next().unwrap_or(sql);
                 if first_line.len() > 120 {
-                    format!("{}...", &first_line[..120])
+                    let truncated: String = first_line.chars().take(120).collect();
+                    format!("{}...", truncated)
                 } else {
                     first_line.to_string()
                 }

@@ -236,7 +236,7 @@ fn render_mssql(dt: &DataType) -> String {
         DataType::Varbinary(Some(n)) => format!("VARBINARY({})", n),
         DataType::Varbinary(None)  => "VARBINARY(MAX)".into(),
         DataType::Uuid             => "UNIQUEIDENTIFIER".into(),
-        DataType::Bit(n)           => format!("BINARY({})", (n + 7) / 8),
+        DataType::Bit(n)           => format!("BINARY({})", n.div_ceil(8)),
         DataType::Varbit(_)        => "VARBINARY(MAX)".into(),
         DataType::Date             => "DATE".into(),
         DataType::Time { .. }      => "TIME".into(),

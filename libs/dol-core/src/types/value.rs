@@ -686,7 +686,7 @@ impl<'a> From<Literal<'a>> for Value {
             Literal::Tuple(vs)       => Self::Tuple(own_slice(vs)),
             Literal::Map(entries)    => Self::Map(own_kv_slice(entries)),
             Literal::Struct(entries) => Self::Struct(own_kv_slice(entries)),
-            Literal::Range(r)        => Self::Range(convert_range(r)),
+            Literal::Range(r)        => Self::Range(convert_range(*r)),
         }
     }
 }
@@ -703,7 +703,7 @@ fn own_kv_slice<'a>(s: Box<[(Cow<'a, str>, Literal<'a>)]>) -> Box<[(Box<str>, Va
         .into_boxed_slice()
 }
 
-fn convert_range<'a>(r: Box<LiteralRange<'a>>) -> Box<ValueRange> {
+fn convert_range<'a>(r: LiteralRange<'a>) -> Box<ValueRange> {
     let cvt = |b: Bound<Box<Literal<'a>>>| -> Bound<Box<Value>> {
         match b {
             Bound::Included(v) => Bound::Included(Box::new(Value::from(*v))),
