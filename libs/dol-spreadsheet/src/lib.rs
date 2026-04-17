@@ -19,7 +19,7 @@
 
 #![deny(unsafe_code)]
 
-use dol_core::expr::{BinOp, Direction, Expr, OrderByExpr, UnaryOp};
+use dol_core::expr::{BinOp, Direction, Expr, Literal, OrderByExpr, UnaryOp};
 use dol_core::ir::{
     Backend, BackendError, RenderedOutput, SortDirection, SpreadsheetColumnDef, SpreadsheetOp,
     SpreadsheetOutput, SpreadsheetSortSpec, Statement,
@@ -372,6 +372,75 @@ fn render_filter_list(filters: &[Expr<'_>]) -> Result<Option<String>, BackendErr
     Ok(Some(parts.join(" AND ")))
 }
 
+/// Render a literal value into a deterministic, human-readable string suitable
+/// for spreadsheet operation descriptors.
+///
+/// Uses stable formatting rather than `Debug`, so that serialized
+/// `SpreadsheetOp` values are predictable and executor-friendly.
+fn render_literal(lit: &Literal<'_>) -> String {
+    use dol_core::expr::Literal as L;
+    match lit {
+        L::Null => "NULL".to_string(),
+        L::Bool(v) => if *v { "true" } else { "false" }.to_string(),
+        L::String(v) => format!("'{}'", v.replace('\'', "''")),
+        L::Json(v) => format!("'{}'", v),
+        L::Xml(v) => format!("'{}'", v),
+        L::Enum(v) => format!("'{}'", v),
+        L::Bytes(v) => {
+            let hex: String = v.iter().map(|b| format!("{:02x}", b)).collect();
+            format!("0x{}", hex)
+        }
+        L::Uuid(v) => {
+            let u = uuid_from_bytes(v);
+            format!("'{}'", u)
+        }
+        L::Int8(v) => v.to_string(),
+        L::Int16(v) => v.to_string(),
+        L::Int32(v) => v.to_string(),
+        L::Int64(v) => v.to_string(),
+        L::Int128(v) => v.to_string(),
+        L::UInt8(v) => v.to_string(),
+        L::UInt16(v) => v.to_string(),
+        L::UInt32(v) => v.to_string(),
+        L::UInt64(v) => v.to_string(),
+        L::UInt128(v) => v.to_string(),
+        L::Float32(v) => v.to_string(),
+        L::Float64(v) => v.to_string(),
+        L::Decimal(v) => v.to_string(),
+        L::Inet(v) => format!("'{}'", v),
+        L::MacAddr(v) => format!("'{}'", v),
+        L::MacAddr8(v) => format!("'{}'", v),
+        L::Date(v) => format!("'{}'", v),
+        L::Time(v) => format!("'{}'", v),
+        L::DateTime(v) => format!("'{}'", v),
+        L::TimestampTz(v) => format!("'{}'", v),
+        L::Interval(v) => format!("'{}'", v),
+        L::BitString(v) => format!("'{}'", v),
+        // Geometric types
+        L::Point(v) => format!("'{}'", v),
+        L::Line(v) => format!("'{}'", v),
+        L::Segment(v) => format!("'{}'", v),
+        L::Rect(v) => format!("'{}'", v),
+        L::Circle(v) => format!("'{}'", v),
+        L::Path(v) => format!("'{}'", v),
+        L::Polygon(v) => format!("'{}'", v),
+        // Composite types — these are already rejected by render_expr_simple
+        // but we handle them here for completeness.
+        L::Array(_) | L::Set(_) | L::Tuple(_) | L::Map(_) | L::Struct(_) | L::Range(_) => {
+            format!("{}", lit)
+        }
+    }
+}
+
+/// Format a UUID byte array as a canonical hyphenated string.
+fn uuid_from_bytes(b: &[u8; 16]) -> String {
+    format!(
+        "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+        b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7],
+        b[8], b[9], b[10], b[11], b[12], b[13], b[14], b[15]
+    )
+}
+
 /// Render an expression into a simple, human-readable string.
 ///
 /// Returns `Err(BackendError::Unsupported)` for expression variants that
@@ -385,7 +454,7 @@ fn render_expr_simple(expr: &Expr<'_>) -> Result<String, BackendError> {
             Ok(format!("{}.{}", render_expr_simple(base)?, field))
         }
         Expr::Param => Ok("?".to_string()),
-        Expr::Value(lit) => Ok(format!("{:?}", lit)),
+        Expr::Value(lit) => Ok(render_literal(lit)),
         Expr::BinaryOp {
             left,
             op,
@@ -502,7 +571,9 @@ fn render_expr_simple(expr: &Expr<'_>) -> Result<String, BackendError> {
         Expr::Alias { expr: inner, alias } => {
             Ok(format!("{} AS {}", render_expr_simple(inner)?, alias))
         }
-        Expr::Raw(s) => Ok(s.clone()),
+        Expr::Raw(_) => Err(BackendError::Unsupported(
+            "SpreadsheetBackend does not support raw expressions".into(),
+        )),
 
         // ── Unsupported expression variants ─────────────────────────
         Expr::Subquery(_) => Err(BackendError::Unsupported(

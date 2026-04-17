@@ -46,7 +46,7 @@ fn render_expr_inner(
     dialect: &Dialect,
     depth: usize,
 ) -> Result<String, BackendError> {
-    if depth > MAX_EXPR_DEPTH {
+    if depth >= MAX_EXPR_DEPTH {
         return Err(BackendError::RenderError(
             "expression nesting too deep (exceeded MAX_EXPR_DEPTH)".into(),
         ));
