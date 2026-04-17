@@ -146,6 +146,91 @@ pub enum StorageOp {
     },
 }
 
+/// A spreadsheet operation descriptor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SpreadsheetOutput {
+    /// The operation to perform.
+    pub operation: SpreadsheetOp,
+    /// Target sheet (tab) name.
+    pub sheet: String,
+    /// Optional workbook name / path.
+    pub workbook: Option<String>,
+}
+
+/// A column definition for spreadsheet sheet creation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SpreadsheetColumnDef {
+    /// Column header name.
+    pub name: String,
+    /// Data type for cell formatting.
+    pub data_type: crate::types::DataType,
+}
+
+/// Direction indicator for spreadsheet sort specifications.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum SortDirection {
+    Ascending,
+    Descending,
+}
+
+/// A sort specification for spreadsheet read operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SpreadsheetSortSpec {
+    /// Column name to sort by.
+    pub column: String,
+    /// Sort direction.
+    pub direction: SortDirection,
+}
+
+/// Spreadsheet operation kinds.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum SpreadsheetOp {
+    /// Create a new sheet with typed columns.
+    CreateSheet {
+        columns: Vec<SpreadsheetColumnDef>,
+        if_not_exists: bool,
+    },
+    /// Append rows to a sheet.
+    AppendRows {
+        columns: Vec<String>,
+        row_count: usize,
+    },
+    /// Update rows matching a filter.
+    UpdateRows {
+        /// Column name → new value expression pairs.
+        assignments: Vec<(String, String)>,
+        /// Optional filter expression (human-readable).
+        filter: Option<String>,
+    },
+    /// Delete rows matching a filter.
+    DeleteRows {
+        /// Optional filter expression (human-readable).
+        filter: Option<String>,
+    },
+    /// Read rows from a sheet with optional filtering, sorting, and pagination.
+    ReadRows {
+        columns: Vec<String>,
+        filter: Option<String>,
+        sort: Vec<SpreadsheetSortSpec>,
+        limit: Option<u64>,
+        offset: Option<u64>,
+        distinct: bool,
+    },
+    /// Rename a sheet.
+    RenameSheet {
+        new_name: String,
+    },
+    /// Drop (delete) a sheet.
+    DropSheet {
+        if_exists: bool,
+    },
+}
+
 /// The rendered output of a backend.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -156,6 +241,8 @@ pub enum RenderedOutput {
     KeyValue(KvOutput),
     /// Object storage operation descriptor.
     Storage(StorageOutput),
+    /// Spreadsheet operation descriptor.
+    Spreadsheet(SpreadsheetOutput),
 }
 
 /// Backend rendering errors.

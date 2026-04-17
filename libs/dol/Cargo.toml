@@ -15,6 +15,7 @@ dol-query = { workspace = true }
 dol-sql = { workspace = true }
 dol-kv = { workspace = true }
 dol-objects = { workspace = true }
+dol-spreadsheet = { workspace = true }
 
 # Tooling crates (feature-gated)
 dol-migration = { workspace = true, optional = true }
@@ -25,7 +26,7 @@ serde = { workspace = true, optional = true }
 
 [features]
 default = ["serde"]
-serde = ["dep:serde", "dol-sql/serde", "dol-kv/serde", "dol-objects/serde"]
+serde = ["dep:serde", "dol-sql/serde", "dol-kv/serde", "dol-objects/serde", "dol-spreadsheet/serde"]
 config = ["dep:dol-config", "dol-sql/config"]
 migration = ["dep:dol-migration"]
 migration-serde = ["migration", "serde", "dol-migration/serde"]
