@@ -214,11 +214,10 @@ pub enum SpreadsheetOp {
     },
     /// Read rows from a sheet with optional filtering, sorting, and pagination.
     ReadRows {
-        /// Column names to read. When a projection uses an alias (`col AS label`),
-        /// the alias name is used here so executors can label the output accordingly.
-        /// Plain identifiers, qualified identifiers (`scope.col`), `*`, and
-        /// `COUNT(*)` are also accepted. Non-column expressions are rejected by
-        /// the backend at render time.
+        /// Source column names to read. Plain identifiers, qualified identifiers
+        /// (`scope.col`), `*`, and `COUNT(*)` are accepted. Aliases and other
+        /// non-column expressions are rejected by the backend at render time to
+        /// preserve the underlying sheet column identity.
         columns: Vec<String>,
         filter: Option<String>,
         sort: Vec<SpreadsheetSortSpec>,

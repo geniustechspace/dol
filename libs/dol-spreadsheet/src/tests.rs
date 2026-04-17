@@ -910,7 +910,7 @@ fn query_rejects_non_column_projection() {
 }
 
 #[test]
-fn query_accepts_alias_projection() {
+fn query_rejects_alias_projection() {
     let ir = QueryIR {
         source: entity_ref("users"),
         projections: vec![Expr::Alias {
@@ -929,16 +929,7 @@ fn query_accepts_alias_projection() {
         lock_mode: None,
     };
     let stmt = Statement::Query(Box::new(ir));
-    let result = SpreadsheetBackend.render(&stmt).unwrap();
-    match result {
-        RenderedOutput::Spreadsheet(out) => match out.operation {
-            SpreadsheetOp::ReadRows { columns, .. } => {
-                assert_eq!(columns, vec!["user_email"]);
-            }
-            _ => panic!("expected ReadRows"),
-        },
-        _ => panic!("expected Spreadsheet output"),
-    }
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
 }
 
 // ── Sort rejects non-column expression ─────────────────────────────────
