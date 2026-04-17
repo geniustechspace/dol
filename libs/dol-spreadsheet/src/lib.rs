@@ -47,6 +47,47 @@ impl Backend for SpreadsheetBackend {
         match stmt {
             // ── Definition ──────────────────────────────────────────────
             Statement::DefineEntity(ir) => {
+                // Reject table-level constraints (spreadsheets have no constraint system)
+                if !ir.constraints.is_empty() {
+                    return Err(BackendError::Unsupported(
+                        "SpreadsheetBackend does not support table-level constraints".into(),
+                    ));
+                }
+
+                // Reject unsupported field-level attributes
+                for f in &ir.fields {
+                    if f.primary_key {
+                        return Err(BackendError::Unsupported(format!(
+                            "SpreadsheetBackend does not support primary_key (field '{}')", f.name,
+                        )));
+                    }
+                    if f.unique {
+                        return Err(BackendError::Unsupported(format!(
+                            "SpreadsheetBackend does not support unique constraint (field '{}')", f.name,
+                        )));
+                    }
+                    if f.references.is_some() {
+                        return Err(BackendError::Unsupported(format!(
+                            "SpreadsheetBackend does not support foreign key references (field '{}')", f.name,
+                        )));
+                    }
+                    if f.check.is_some() {
+                        return Err(BackendError::Unsupported(format!(
+                            "SpreadsheetBackend does not support check constraints (field '{}')", f.name,
+                        )));
+                    }
+                    if f.generated.is_some() {
+                        return Err(BackendError::Unsupported(format!(
+                            "SpreadsheetBackend does not support generated columns (field '{}')", f.name,
+                        )));
+                    }
+                    if f.auto_increment {
+                        return Err(BackendError::Unsupported(format!(
+                            "SpreadsheetBackend does not support auto_increment (field '{}')", f.name,
+                        )));
+                    }
+                }
+
                 let columns = ir
                     .fields
                     .iter()
@@ -69,6 +110,12 @@ impl Backend for SpreadsheetBackend {
             }
 
             Statement::DropEntity(ir) => {
+                if ir.cascade {
+                    return Err(BackendError::Unsupported(
+                        "SpreadsheetBackend does not support CASCADE drops".into(),
+                    ));
+                }
+
                 let sheet = qualified_name(&ir.target.namespace, &ir.target.name);
 
                 Ok(RenderedOutput::Spreadsheet(SpreadsheetOutput {
@@ -81,34 +128,48 @@ impl Backend for SpreadsheetBackend {
             }
 
             Statement::AlterEntity(ir) => {
-                // Only rename is naturally supported in spreadsheets.
-                let rename_action = ir.actions.iter().find_map(|a| {
-                    if let dol_core::ir::AlterAction::RenameEntity(new_name) = a {
-                        Some(new_name.clone())
-                    } else {
-                        None
-                    }
-                });
-
-                match rename_action {
-                    Some(new_name) => {
+                // Only a single rename action is supported in spreadsheets.
+                match ir.actions.as_slice() {
+                    [dol_core::ir::AlterAction::RenameEntity(new_name)] => {
                         let sheet =
                             qualified_name(&ir.target.namespace, &ir.target.name);
 
                         Ok(RenderedOutput::Spreadsheet(SpreadsheetOutput {
-                            operation: SpreadsheetOp::RenameSheet { new_name },
+                            operation: SpreadsheetOp::RenameSheet {
+                                new_name: new_name.clone(),
+                            },
                             sheet,
                             workbook: None,
                         }))
                     }
-                    None => Err(BackendError::Unsupported(
-                        "SpreadsheetBackend only supports RenameEntity alter actions".into(),
+                    [] => Err(BackendError::Unsupported(
+                        "SpreadsheetBackend requires exactly one AlterEntity action, \
+                         and it must be RenameEntity; received no actions"
+                            .into(),
+                    )),
+                    [_] => Err(BackendError::Unsupported(
+                        "SpreadsheetBackend only supports AlterEntity with exactly \
+                         one RenameEntity action; received a different single action"
+                            .into(),
+                    )),
+                    actions => Err(BackendError::Unsupported(
+                        format!(
+                            "SpreadsheetBackend only supports AlterEntity with exactly \
+                             one RenameEntity action; rejected {} actions",
+                            actions.len()
+                        ),
                     )),
                 }
             }
 
             // ── Mutation ────────────────────────────────────────────────
             Statement::Insert(ir) => {
+                if !ir.returning.is_empty() {
+                    return Err(BackendError::Unsupported(
+                        "SpreadsheetBackend does not support RETURNING clauses on INSERT".into(),
+                    ));
+                }
+
                 let sheet = qualified_name(&ir.target.namespace, &ir.target.name);
 
                 Ok(RenderedOutput::Spreadsheet(SpreadsheetOutput {
@@ -122,25 +183,21 @@ impl Backend for SpreadsheetBackend {
             }
 
             Statement::Update(ir) => {
+                if !ir.returning.is_empty() {
+                    return Err(BackendError::Unsupported(
+                        "SpreadsheetBackend does not support RETURNING clauses on UPDATE".into(),
+                    ));
+                }
+
                 let sheet = qualified_name(&ir.target.namespace, &ir.target.name);
 
                 let assignments = ir
                     .assignments
                     .iter()
-                    .map(|(col, expr)| (col.clone(), render_expr_simple(expr)))
-                    .collect();
+                    .map(|(col, expr)| Ok((col.clone(), render_expr_simple(expr)?)))
+                    .collect::<Result<Vec<_>, BackendError>>()?;
 
-                let filter = if ir.filters.is_empty() {
-                    None
-                } else {
-                    Some(
-                        ir.filters
-                            .iter()
-                            .map(render_expr_simple)
-                            .collect::<Vec<_>>()
-                            .join(" AND "),
-                    )
-                };
+                let filter = render_filter_list(&ir.filters)?;
 
                 Ok(RenderedOutput::Spreadsheet(SpreadsheetOutput {
                     operation: SpreadsheetOp::UpdateRows {
@@ -153,19 +210,15 @@ impl Backend for SpreadsheetBackend {
             }
 
             Statement::Remove(ir) => {
+                if !ir.returning.is_empty() {
+                    return Err(BackendError::Unsupported(
+                        "SpreadsheetBackend does not support RETURNING clauses on DELETE".into(),
+                    ));
+                }
+
                 let sheet = qualified_name(&ir.target.namespace, &ir.target.name);
 
-                let filter = if ir.filters.is_empty() {
-                    None
-                } else {
-                    Some(
-                        ir.filters
-                            .iter()
-                            .map(render_expr_simple)
-                            .collect::<Vec<_>>()
-                            .join(" AND "),
-                    )
-                };
+                let filter = render_filter_list(&ir.filters)?;
 
                 Ok(RenderedOutput::Spreadsheet(SpreadsheetOutput {
                     operation: SpreadsheetOp::DeleteRows { filter },
@@ -176,40 +229,69 @@ impl Backend for SpreadsheetBackend {
 
             // ── Query ───────────────────────────────────────────────────
             Statement::Query(ir) => {
+                // Reject unsupported query features
+                if !ir.joins.is_empty() {
+                    return Err(BackendError::Unsupported(
+                        "SpreadsheetBackend does not support JOINs".into(),
+                    ));
+                }
+                if !ir.group_by.is_empty() {
+                    return Err(BackendError::Unsupported(
+                        "SpreadsheetBackend does not support GROUP BY".into(),
+                    ));
+                }
+                if !ir.having.is_empty() {
+                    return Err(BackendError::Unsupported(
+                        "SpreadsheetBackend does not support HAVING".into(),
+                    ));
+                }
+                if !ir.distinct_on.is_empty() {
+                    return Err(BackendError::Unsupported(
+                        "SpreadsheetBackend does not support DISTINCT ON".into(),
+                    ));
+                }
+                if ir.lock_mode.is_some() {
+                    return Err(BackendError::Unsupported(
+                        "SpreadsheetBackend does not support lock modes (FOR UPDATE/SHARE)".into(),
+                    ));
+                }
+
+                // Reject parameterized limit/offset
+                if matches!(ir.limit, Some(dol_core::ir::OffsetLimit::Param)) {
+                    return Err(BackendError::Unsupported(
+                        "SpreadsheetBackend does not support parameterized LIMIT".into(),
+                    ));
+                }
+                if matches!(ir.offset, Some(dol_core::ir::OffsetLimit::Param)) {
+                    return Err(BackendError::Unsupported(
+                        "SpreadsheetBackend does not support parameterized OFFSET".into(),
+                    ));
+                }
+
                 let sheet = qualified_name(&ir.source.namespace, &ir.source.name);
 
                 let columns = ir
                     .projections
                     .iter()
                     .map(render_expr_simple)
-                    .collect();
+                    .collect::<Result<Vec<_>, BackendError>>()?;
 
-                let filter = if ir.filters.is_empty() {
-                    None
-                } else {
-                    Some(
-                        ir.filters
-                            .iter()
-                            .map(render_expr_simple)
-                            .collect::<Vec<_>>()
-                            .join(" AND "),
-                    )
-                };
+                let filter = render_filter_list(&ir.filters)?;
 
                 let sort = ir
                     .order_by
                     .iter()
                     .map(render_sort_spec)
-                    .collect();
+                    .collect::<Result<Vec<_>, BackendError>>()?;
 
-                let limit = ir.limit.as_ref().and_then(|l| match l {
-                    dol_core::ir::OffsetLimit::Value(v) => Some(*v),
-                    dol_core::ir::OffsetLimit::Param => None,
+                let limit = ir.limit.as_ref().map(|l| match l {
+                    dol_core::ir::OffsetLimit::Value(v) => *v,
+                    dol_core::ir::OffsetLimit::Param => unreachable!(),
                 });
 
-                let offset = ir.offset.as_ref().and_then(|o| match o {
-                    dol_core::ir::OffsetLimit::Value(v) => Some(*v),
-                    dol_core::ir::OffsetLimit::Param => None,
+                let offset = ir.offset.as_ref().map(|o| match o {
+                    dol_core::ir::OffsetLimit::Value(v) => *v,
+                    dol_core::ir::OffsetLimit::Param => unreachable!(),
                 });
 
                 Ok(RenderedOutput::Spreadsheet(SpreadsheetOutput {
@@ -278,19 +360,32 @@ fn qualified_name(namespace: &Option<String>, name: &str) -> String {
 // Simplified expression renderer for spreadsheet filter descriptions
 // ---------------------------------------------------------------------------
 
+/// Render a list of filter expressions joined by AND, returning `None` if empty.
+fn render_filter_list(filters: &[Expr<'_>]) -> Result<Option<String>, BackendError> {
+    if filters.is_empty() {
+        return Ok(None);
+    }
+    let parts = filters
+        .iter()
+        .map(render_expr_simple)
+        .collect::<Result<Vec<_>, BackendError>>()?;
+    Ok(Some(parts.join(" AND ")))
+}
+
 /// Render an expression into a simple, human-readable string.
 ///
-/// This is intentionally simplified — spreadsheets don't execute SQL, so we
-/// produce a readable description rather than executable syntax.
-fn render_expr_simple(expr: &Expr<'_>) -> String {
+/// Returns `Err(BackendError::Unsupported)` for expression variants that
+/// have no meaningful spreadsheet representation (subqueries, window
+/// functions, quantified comparisons, etc.).
+fn render_expr_simple(expr: &Expr<'_>) -> Result<String, BackendError> {
     match expr {
-        Expr::Identifier(name) => name.to_string(),
-        Expr::QualifiedIdentifier { scope, name } => format!("{}.{}", scope, name),
+        Expr::Identifier(name) => Ok(name.to_string()),
+        Expr::QualifiedIdentifier { scope, name } => Ok(format!("{}.{}", scope, name)),
         Expr::FieldAccess { base, field } => {
-            format!("{}.{}", render_expr_simple(base), field)
+            Ok(format!("{}.{}", render_expr_simple(base)?, field))
         }
-        Expr::Param => "?".to_string(),
-        Expr::Value(lit) => format!("{:?}", lit),
+        Expr::Param => Ok("?".to_string()),
+        Expr::Value(lit) => Ok(format!("{:?}", lit)),
         Expr::BinaryOp {
             left,
             op,
@@ -314,16 +409,21 @@ fn render_expr_simple(expr: &Expr<'_>) -> String {
                 BinOp::Like => "LIKE",
                 BinOp::ILike => "ILIKE",
                 BinOp::Concat => "||",
-                _ => "??",
+                other => {
+                    return Err(BackendError::Unsupported(format!(
+                        "SpreadsheetBackend does not support binary operator {:?}",
+                        other,
+                    )));
+                }
             };
             let not_prefix = if *negated { "NOT " } else { "" };
-            format!(
+            Ok(format!(
                 "({}{} {} {})",
                 not_prefix,
-                render_expr_simple(left),
+                render_expr_simple(left)?,
                 op_str,
-                render_expr_simple(right),
-            )
+                render_expr_simple(right)?,
+            ))
         }
         Expr::UnaryOp { op, expr: inner } => {
             let op_str = match op {
@@ -331,21 +431,29 @@ fn render_expr_simple(expr: &Expr<'_>) -> String {
                 UnaryOp::Neg => "-",
                 UnaryOp::IsNull => "IS NULL",
                 UnaryOp::IsNotNull => "IS NOT NULL",
-                _ => "??",
+                other => {
+                    return Err(BackendError::Unsupported(format!(
+                        "SpreadsheetBackend does not support unary operator {:?}",
+                        other,
+                    )));
+                }
             };
             match op {
                 UnaryOp::IsNull | UnaryOp::IsNotNull => {
-                    format!("({} {})", render_expr_simple(inner), op_str)
+                    Ok(format!("({} {})", render_expr_simple(inner)?, op_str))
                 }
-                _ => format!("({} {})", op_str, render_expr_simple(inner)),
+                _ => Ok(format!("({} {})", op_str, render_expr_simple(inner)?)),
             }
         }
         Expr::Func { name, args } => {
-            let arg_strs: Vec<String> = args.iter().map(render_expr_simple).collect();
-            format!("{}({})", name, arg_strs.join(", "))
+            let arg_strs = args
+                .iter()
+                .map(render_expr_simple)
+                .collect::<Result<Vec<_>, BackendError>>()?;
+            Ok(format!("{}({})", name, arg_strs.join(", ")))
         }
         Expr::Cast { expr: inner, as_type } => {
-            format!("CAST({} AS {})", render_expr_simple(inner), as_type)
+            Ok(format!("CAST({} AS {})", render_expr_simple(inner)?, as_type))
         }
         Expr::Between {
             expr: inner,
@@ -354,13 +462,13 @@ fn render_expr_simple(expr: &Expr<'_>) -> String {
             negated,
         } => {
             let not = if *negated { "NOT " } else { "" };
-            format!(
+            Ok(format!(
                 "({} {}BETWEEN {} AND {})",
-                render_expr_simple(inner),
+                render_expr_simple(inner)?,
                 not,
-                render_expr_simple(low),
-                render_expr_simple(high),
-            )
+                render_expr_simple(low)?,
+                render_expr_simple(high)?,
+            ))
         }
         Expr::InList {
             expr: inner,
@@ -368,42 +476,71 @@ fn render_expr_simple(expr: &Expr<'_>) -> String {
             negated,
         } => {
             let not = if *negated { "NOT " } else { "" };
-            let items: Vec<String> = list.iter().map(render_expr_simple).collect();
-            format!(
+            let items = list
+                .iter()
+                .map(render_expr_simple)
+                .collect::<Result<Vec<_>, BackendError>>()?;
+            Ok(format!(
                 "({} {}IN ({}))",
-                render_expr_simple(inner),
+                render_expr_simple(inner)?,
                 not,
                 items.join(", "),
-            )
+            ))
         }
         Expr::IsNull { expr: inner, negated } => {
             if *negated {
-                format!("({} IS NOT NULL)", render_expr_simple(inner))
+                Ok(format!("({} IS NOT NULL)", render_expr_simple(inner)?))
             } else {
-                format!("({} IS NULL)", render_expr_simple(inner))
+                Ok(format!("({} IS NULL)", render_expr_simple(inner)?))
             }
         }
-        Expr::Star => "*".to_string(),
-        Expr::CountStar => "COUNT(*)".to_string(),
+        Expr::Star => Ok("*".to_string()),
+        Expr::CountStar => Ok("COUNT(*)".to_string()),
         Expr::Alias { expr: inner, alias } => {
-            format!("{} AS {}", render_expr_simple(inner), alias)
+            Ok(format!("{} AS {}", render_expr_simple(inner)?, alias))
         }
-        Expr::Raw(s) => s.clone(),
-        // For anything complex (subqueries, window functions, etc.), produce
-        // a placeholder — these aren't meaningful in spreadsheet context.
-        _ => "<expr>".to_string(),
+        Expr::Raw(s) => Ok(s.clone()),
+
+        // ── Unsupported expression variants ─────────────────────────
+        Expr::Subquery(_) => Err(BackendError::Unsupported(
+            "SpreadsheetBackend does not support subquery expressions".into(),
+        )),
+        Expr::InSubquery { .. } => Err(BackendError::Unsupported(
+            "SpreadsheetBackend does not support IN (subquery) expressions".into(),
+        )),
+        Expr::Exists { .. } => Err(BackendError::Unsupported(
+            "SpreadsheetBackend does not support EXISTS expressions".into(),
+        )),
+        Expr::Window { .. } => Err(BackendError::Unsupported(
+            "SpreadsheetBackend does not support window function expressions".into(),
+        )),
+        Expr::QuantifiedCmp { .. } => Err(BackendError::Unsupported(
+            "SpreadsheetBackend does not support quantified comparisons (ANY/ALL)".into(),
+        )),
+        Expr::Case { .. } => Err(BackendError::Unsupported(
+            "SpreadsheetBackend does not support CASE expressions".into(),
+        )),
+        Expr::TernaryOp { .. } => Err(BackendError::Unsupported(
+            "SpreadsheetBackend does not support ternary operator expressions".into(),
+        )),
+        Expr::ObjectLiteral(_) => Err(BackendError::Unsupported(
+            "SpreadsheetBackend does not support object literal expressions".into(),
+        )),
+        Expr::ArrayLiteral(_) => Err(BackendError::Unsupported(
+            "SpreadsheetBackend does not support array literal expressions".into(),
+        )),
     }
 }
 
 /// Convert an `OrderByExpr` to a `SpreadsheetSortSpec`.
-fn render_sort_spec(order: &OrderByExpr<'_>) -> SpreadsheetSortSpec {
-    let column = render_expr_simple(&order.expr);
+fn render_sort_spec(order: &OrderByExpr<'_>) -> Result<SpreadsheetSortSpec, BackendError> {
+    let column = render_expr_simple(&order.expr)?;
     let direction = if order.direction == Direction::Desc {
         SortDirection::Descending
     } else {
         SortDirection::Ascending
     };
-    SpreadsheetSortSpec { column, direction }
+    Ok(SpreadsheetSortSpec { column, direction })
 }
 
 #[cfg(test)]

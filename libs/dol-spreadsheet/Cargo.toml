@@ -7,11 +7,7 @@ description = "DOL spreadsheet backend — renders IR into spreadsheet operation
 
 [dependencies]
 dol-core = { workspace = true }
-dol-entity = { workspace = true }
 
 [features]
 default = []
 serde = ["dol-core/serde"]
-
-[dev-dependencies]
-dol-query = { workspace = true }

@@ -1,7 +1,7 @@
 use super::*;
-use dol_core::ir::definition::{DefineEntityIR, DropEntityIR, FieldDef};
+use dol_core::ir::definition::{DefineEntityIR, DropEntityIR, FieldDef, OwnedForeignKeyRef};
 use dol_core::ir::mutation::{InsertIR, RemoveIR, UpdateIR};
-use dol_core::ir::query::QueryIR;
+use dol_core::ir::query::{JoinIR, JoinType, LockMode, QueryIR};
 use dol_core::ir::{AlterAction, AlterEntityIR, EntityRef, OffsetLimit};
 use dol_core::expr::{field, int, param, string};
 use dol_core::types::DataType;
@@ -22,7 +22,7 @@ fn define_entity_creates_sheet() {
         name: "users".to_string(),
         namespace: None,
         fields: vec![
-            FieldDef::new("id", DataType::Uuid).primary_key(),
+            FieldDef::new("id", DataType::Uuid),
             FieldDef::new("email", DataType::Text),
             FieldDef::new("age", DataType::Int32),
         ],
@@ -83,6 +83,103 @@ fn define_entity_with_namespace() {
     }
 }
 
+#[test]
+fn define_entity_rejects_primary_key() {
+    let ir = DefineEntityIR {
+        name: "users".to_string(),
+        namespace: None,
+        fields: vec![FieldDef::new("id", DataType::Uuid).primary_key()],
+        constraints: vec![],
+        if_not_exists: false,
+    };
+    let stmt = Statement::DefineEntity(Box::new(ir));
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
+}
+
+#[test]
+fn define_entity_rejects_unique() {
+    let ir = DefineEntityIR {
+        name: "users".to_string(),
+        namespace: None,
+        fields: vec![FieldDef::new("email", DataType::Text).unique()],
+        constraints: vec![],
+        if_not_exists: false,
+    };
+    let stmt = Statement::DefineEntity(Box::new(ir));
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
+}
+
+#[test]
+fn define_entity_rejects_references() {
+    let ir = DefineEntityIR {
+        name: "orders".to_string(),
+        namespace: None,
+        fields: vec![
+            FieldDef::new("user_id", DataType::Uuid)
+                .references(OwnedForeignKeyRef::new("users", "id")),
+        ],
+        constraints: vec![],
+        if_not_exists: false,
+    };
+    let stmt = Statement::DefineEntity(Box::new(ir));
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
+}
+
+#[test]
+fn define_entity_rejects_check() {
+    let ir = DefineEntityIR {
+        name: "items".to_string(),
+        namespace: None,
+        fields: vec![FieldDef::new("qty", DataType::Int32).check("qty > 0")],
+        constraints: vec![],
+        if_not_exists: false,
+    };
+    let stmt = Statement::DefineEntity(Box::new(ir));
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
+}
+
+#[test]
+fn define_entity_rejects_generated() {
+    let ir = DefineEntityIR {
+        name: "items".to_string(),
+        namespace: None,
+        fields: vec![
+            FieldDef::new("total", DataType::Int32).generated_stored("qty * price"),
+        ],
+        constraints: vec![],
+        if_not_exists: false,
+    };
+    let stmt = Statement::DefineEntity(Box::new(ir));
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
+}
+
+#[test]
+fn define_entity_rejects_auto_increment() {
+    let ir = DefineEntityIR {
+        name: "items".to_string(),
+        namespace: None,
+        fields: vec![FieldDef::new("id", DataType::Int64).auto_increment()],
+        constraints: vec![],
+        if_not_exists: false,
+    };
+    let stmt = Statement::DefineEntity(Box::new(ir));
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
+}
+
+#[test]
+fn define_entity_rejects_table_constraints() {
+    use dol_core::ir::definition::OwnedEntityConstraint;
+    let ir = DefineEntityIR {
+        name: "users".to_string(),
+        namespace: None,
+        fields: vec![FieldDef::new("id", DataType::Uuid)],
+        constraints: vec![OwnedEntityConstraint::Unique(vec!["id".to_string()])],
+        if_not_exists: false,
+    };
+    let stmt = Statement::DefineEntity(Box::new(ir));
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
+}
+
 // ── DropEntity → DropSheet ─────────────────────────────────────────────
 
 #[test]
@@ -108,6 +205,17 @@ fn drop_entity_drops_sheet() {
         }
         _ => panic!("expected Spreadsheet output"),
     }
+}
+
+#[test]
+fn drop_entity_rejects_cascade() {
+    let ir = DropEntityIR {
+        target: entity_ref("users"),
+        if_exists: false,
+        cascade: true,
+    };
+    let stmt = Statement::DropEntity(ir);
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
 }
 
 // ── AlterEntity (rename) → RenameSheet ─────────────────────────────────
@@ -148,6 +256,29 @@ fn alter_entity_add_field_unsupported() {
     assert!(result.is_err());
 }
 
+#[test]
+fn alter_entity_empty_actions_unsupported() {
+    let ir = AlterEntityIR {
+        target: entity_ref("users"),
+        actions: vec![],
+    };
+    let stmt = Statement::AlterEntity(ir);
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
+}
+
+#[test]
+fn alter_entity_multiple_actions_unsupported() {
+    let ir = AlterEntityIR {
+        target: entity_ref("users"),
+        actions: vec![
+            AlterAction::RenameEntity("employees".to_string()),
+            AlterAction::AddField(FieldDef::new("phone", DataType::Text)),
+        ],
+    };
+    let stmt = Statement::AlterEntity(ir);
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
+}
+
 // ── Insert → AppendRows ────────────────────────────────────────────────
 
 #[test]
@@ -178,6 +309,18 @@ fn insert_appends_rows() {
         }
         _ => panic!("expected Spreadsheet output"),
     }
+}
+
+#[test]
+fn insert_rejects_returning() {
+    let ir = InsertIR {
+        target: entity_ref("users"),
+        fields: vec!["id".to_string()],
+        row_count: 1,
+        returning: vec!["id".to_string()],
+    };
+    let stmt = Statement::Insert(ir);
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
 }
 
 // ── Update → UpdateRows ────────────────────────────────────────────────
@@ -239,6 +382,18 @@ fn update_without_filter() {
     }
 }
 
+#[test]
+fn update_rejects_returning() {
+    let ir = UpdateIR {
+        target: entity_ref("users"),
+        assignments: vec![("email".to_string(), string("x@y.com"))],
+        filters: vec![],
+        returning: vec!["id".to_string()],
+    };
+    let stmt = Statement::Update(ir);
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
+}
+
 // ── Remove → DeleteRows ────────────────────────────────────────────────
 
 #[test]
@@ -288,6 +443,17 @@ fn remove_without_filter() {
         },
         _ => panic!("expected Spreadsheet output"),
     }
+}
+
+#[test]
+fn remove_rejects_returning() {
+    let ir = RemoveIR {
+        target: entity_ref("users"),
+        filters: vec![],
+        returning: vec!["id".to_string()],
+    };
+    let stmt = Statement::Remove(ir);
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
 }
 
 // ── Query → ReadRows ───────────────────────────────────────────────────
@@ -432,6 +598,197 @@ fn query_with_sort() {
         },
         _ => panic!("expected Spreadsheet output"),
     }
+}
+
+#[test]
+fn query_rejects_joins() {
+    let ir = QueryIR {
+        source: entity_ref("users"),
+        projections: vec![field("id")],
+        joins: vec![JoinIR {
+            join_type: JoinType::Inner,
+            target: entity_ref("orders"),
+            on_conditions: vec![("users.id".to_string(), "orders.user_id".to_string())],
+        }],
+        filters: vec![],
+        group_by: vec![],
+        having: vec![],
+        order_by: vec![],
+        offset: None,
+        limit: None,
+        distinct: false,
+        distinct_on: vec![],
+        lock_mode: None,
+    };
+    let stmt = Statement::Query(Box::new(ir));
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
+}
+
+#[test]
+fn query_rejects_group_by() {
+    let ir = QueryIR {
+        source: entity_ref("users"),
+        projections: vec![field("status")],
+        joins: vec![],
+        filters: vec![],
+        group_by: vec![field("status")],
+        having: vec![],
+        order_by: vec![],
+        offset: None,
+        limit: None,
+        distinct: false,
+        distinct_on: vec![],
+        lock_mode: None,
+    };
+    let stmt = Statement::Query(Box::new(ir));
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
+}
+
+#[test]
+fn query_rejects_having() {
+    let ir = QueryIR {
+        source: entity_ref("users"),
+        projections: vec![field("status")],
+        joins: vec![],
+        filters: vec![],
+        group_by: vec![],
+        having: vec![field("count").gt(int(5i32))],
+        order_by: vec![],
+        offset: None,
+        limit: None,
+        distinct: false,
+        distinct_on: vec![],
+        lock_mode: None,
+    };
+    let stmt = Statement::Query(Box::new(ir));
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
+}
+
+#[test]
+fn query_rejects_distinct_on() {
+    let ir = QueryIR {
+        source: entity_ref("users"),
+        projections: vec![field("id")],
+        joins: vec![],
+        filters: vec![],
+        group_by: vec![],
+        having: vec![],
+        order_by: vec![],
+        offset: None,
+        limit: None,
+        distinct: false,
+        distinct_on: vec!["id".to_string()],
+        lock_mode: None,
+    };
+    let stmt = Statement::Query(Box::new(ir));
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
+}
+
+#[test]
+fn query_rejects_lock_mode() {
+    let ir = QueryIR {
+        source: entity_ref("users"),
+        projections: vec![field("id")],
+        joins: vec![],
+        filters: vec![],
+        group_by: vec![],
+        having: vec![],
+        order_by: vec![],
+        offset: None,
+        limit: None,
+        distinct: false,
+        distinct_on: vec![],
+        lock_mode: Some(LockMode::ForUpdate),
+    };
+    let stmt = Statement::Query(Box::new(ir));
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
+}
+
+#[test]
+fn query_rejects_parameterized_limit() {
+    let ir = QueryIR {
+        source: entity_ref("users"),
+        projections: vec![field("id")],
+        joins: vec![],
+        filters: vec![],
+        group_by: vec![],
+        having: vec![],
+        order_by: vec![],
+        offset: None,
+        limit: Some(OffsetLimit::Param),
+        distinct: false,
+        distinct_on: vec![],
+        lock_mode: None,
+    };
+    let stmt = Statement::Query(Box::new(ir));
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
+}
+
+#[test]
+fn query_rejects_parameterized_offset() {
+    let ir = QueryIR {
+        source: entity_ref("users"),
+        projections: vec![field("id")],
+        joins: vec![],
+        filters: vec![],
+        group_by: vec![],
+        having: vec![],
+        order_by: vec![],
+        offset: Some(OffsetLimit::Param),
+        limit: None,
+        distinct: false,
+        distinct_on: vec![],
+        lock_mode: None,
+    };
+    let stmt = Statement::Query(Box::new(ir));
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
+}
+
+// ── Expression renderer rejects unsupported variants ───────────────────
+
+#[test]
+fn expr_rejects_subquery() {
+    let ir = QueryIR {
+        source: entity_ref("users"),
+        projections: vec![Expr::Subquery("SELECT 1".into())],
+        joins: vec![],
+        filters: vec![],
+        group_by: vec![],
+        having: vec![],
+        order_by: vec![],
+        offset: None,
+        limit: None,
+        distinct: false,
+        distinct_on: vec![],
+        lock_mode: None,
+    };
+    let stmt = Statement::Query(Box::new(ir));
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
+}
+
+#[test]
+fn expr_rejects_window_function() {
+    let ir = QueryIR {
+        source: entity_ref("users"),
+        projections: vec![Expr::Window {
+            func: Box::new(Expr::CountStar),
+            partition_by: vec![],
+            order_by: vec![],
+            frame: None,
+        }],
+        joins: vec![],
+        filters: vec![],
+        group_by: vec![],
+        having: vec![],
+        order_by: vec![],
+        offset: None,
+        limit: None,
+        distinct: false,
+        distinct_on: vec![],
+        lock_mode: None,
+    };
+    let stmt = Statement::Query(Box::new(ir));
+    assert!(SpreadsheetBackend.render(&stmt).is_err());
 }
 
 // ── Unsupported operations ─────────────────────────────────────────────
