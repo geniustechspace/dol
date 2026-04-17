@@ -136,7 +136,7 @@ impl Backend for SpreadsheetBackend {
 
                         Ok(RenderedOutput::Spreadsheet(SpreadsheetOutput {
                             operation: SpreadsheetOp::RenameSheet {
-                                new_name: new_name.clone(),
+                                new_name: qualified_name(&ir.target.namespace, new_name),
                             },
                             sheet,
                             workbook: None,
@@ -275,8 +275,8 @@ impl Backend for SpreadsheetBackend {
                 let limit = match &ir.limit {
                     Some(dol_core::ir::OffsetLimit::Value(v)) => Some(*v),
                     Some(dol_core::ir::OffsetLimit::Param) => {
-                        // Guarded by the Param rejection above; kept explicit
-                        // to avoid unreachable!() if validation is refactored.
+                        // Reject parameterized LIMIT here explicitly, matching
+                        // the OFFSET handling below.
                         return Err(BackendError::Unsupported(
                             "SpreadsheetBackend does not support parameterized LIMIT".into(),
                         ));
@@ -416,14 +416,17 @@ fn render_expr_simple(expr: &Expr<'_>) -> Result<String, BackendError> {
                     )));
                 }
             };
-            let not_prefix = if *negated { "NOT " } else { "" };
-            Ok(format!(
-                "({}{} {} {})",
-                not_prefix,
+            let base_expr = format!(
+                "({} {} {})",
                 render_expr_simple(left)?,
                 op_str,
                 render_expr_simple(right)?,
-            ))
+            );
+            if *negated {
+                Ok(format!("(NOT {})", base_expr))
+            } else {
+                Ok(base_expr)
+            }
         }
         Expr::UnaryOp { op, expr: inner } => {
             let op_str = match op {
@@ -534,6 +537,11 @@ fn render_expr_simple(expr: &Expr<'_>) -> Result<String, BackendError> {
 
 /// Convert an `OrderByExpr` to a `SpreadsheetSortSpec`.
 fn render_sort_spec(order: &OrderByExpr<'_>) -> Result<SpreadsheetSortSpec, BackendError> {
+    if order.nulls.is_some() {
+        return Err(BackendError::Unsupported(
+            "SpreadsheetBackend does not support NULLS FIRST/LAST ordering".into(),
+        ));
+    }
     let column = render_expr_simple(&order.expr)?;
     let direction = if order.direction == Direction::Desc {
         SortDirection::Descending
