@@ -256,18 +256,6 @@ impl Backend for SpreadsheetBackend {
                     ));
                 }
 
-                // Reject parameterized limit/offset
-                if matches!(ir.limit, Some(dol_core::ir::OffsetLimit::Param)) {
-                    return Err(BackendError::Unsupported(
-                        "SpreadsheetBackend does not support parameterized LIMIT".into(),
-                    ));
-                }
-                if matches!(ir.offset, Some(dol_core::ir::OffsetLimit::Param)) {
-                    return Err(BackendError::Unsupported(
-                        "SpreadsheetBackend does not support parameterized OFFSET".into(),
-                    ));
-                }
-
                 let sheet = qualified_name(&ir.source.namespace, &ir.source.name);
 
                 let columns = ir
@@ -284,15 +272,27 @@ impl Backend for SpreadsheetBackend {
                     .map(render_sort_spec)
                     .collect::<Result<Vec<_>, BackendError>>()?;
 
-                let limit = ir.limit.as_ref().map(|l| match l {
-                    dol_core::ir::OffsetLimit::Value(v) => *v,
-                    dol_core::ir::OffsetLimit::Param => unreachable!(),
-                });
+                let limit = match &ir.limit {
+                    Some(dol_core::ir::OffsetLimit::Value(v)) => Some(*v),
+                    Some(dol_core::ir::OffsetLimit::Param) => {
+                        // Guarded by the Param rejection above; kept explicit
+                        // to avoid unreachable!() if validation is refactored.
+                        return Err(BackendError::Unsupported(
+                            "SpreadsheetBackend does not support parameterized LIMIT".into(),
+                        ));
+                    }
+                    None => None,
+                };
 
-                let offset = ir.offset.as_ref().map(|o| match o {
-                    dol_core::ir::OffsetLimit::Value(v) => *v,
-                    dol_core::ir::OffsetLimit::Param => unreachable!(),
-                });
+                let offset = match &ir.offset {
+                    Some(dol_core::ir::OffsetLimit::Value(v)) => Some(*v),
+                    Some(dol_core::ir::OffsetLimit::Param) => {
+                        return Err(BackendError::Unsupported(
+                            "SpreadsheetBackend does not support parameterized OFFSET".into(),
+                        ));
+                    }
+                    None => None,
+                };
 
                 Ok(RenderedOutput::Spreadsheet(SpreadsheetOutput {
                     operation: SpreadsheetOp::ReadRows {
