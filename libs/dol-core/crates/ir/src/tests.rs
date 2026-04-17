@@ -10,7 +10,7 @@ use crate::storage::{
     GetObjectIR, ListObjectsIR, MoveFileIR, ObjectSource, PutObjectIR, ReadFileIR, WriteFileIR,
 };
 use crate::transaction::TransactionIR;
-use dol_entity::{FieldType, FkAction};
+use dol_entity::{DataType, FkAction};
 
 // -- helpers --
 
@@ -30,7 +30,7 @@ fn entity_ref_full(name: &str, ns: &str, alias: &str) -> EntityRef {
     }
 }
 
-fn simple_query_ir() -> QueryIR {
+fn simple_query_ir() -> QueryIR<'static> {
     QueryIR {
         source: entity_ref("users"),
         projections: vec![],
@@ -89,13 +89,13 @@ fn model_ref_clone() {
 
 #[test]
 fn statement_define_model() {
-    let stmt = Statement::DefineEntity(DefineEntityIR {
+    let stmt = Statement::DefineEntity(Box::new(DefineEntityIR {
         name: "users".to_string(),
         namespace: None,
         fields: vec![],
         constraints: vec![],
         if_not_exists: false,
-    });
+    }));
     assert!(matches!(stmt, Statement::DefineEntity(_)));
 }
 
@@ -122,7 +122,7 @@ fn statement_insert() {
 
 #[test]
 fn statement_query() {
-    let stmt = Statement::Query(simple_query_ir());
+    let stmt = Statement::Query(Box::new(simple_query_ir()));
     assert!(matches!(stmt, Statement::Query(_)));
 }
 
@@ -422,7 +422,7 @@ fn rendered_output_storage() {
 
 #[test]
 fn field_def_new_defaults() {
-    let f = FieldDef::new("id", FieldType::Uuid);
+    let f = FieldDef::new("id", DataType::Uuid);
     assert_eq!(f.name, "id");
     assert!(!f.primary_key);
     assert!(!f.nullable);
@@ -438,67 +438,67 @@ fn field_def_new_defaults() {
 
 #[test]
 fn field_def_primary_key() {
-    let f = FieldDef::new("id", FieldType::Int).primary_key();
+    let f = FieldDef::new("id", DataType::Int32).primary_key();
     assert!(f.primary_key);
 }
 
 #[test]
 fn field_def_nullable() {
-    let f = FieldDef::new("bio", FieldType::Text).nullable();
+    let f = FieldDef::new("bio", DataType::Text).nullable();
     assert!(f.nullable);
 }
 
 #[test]
 fn field_def_optional_is_nullable() {
-    let f = FieldDef::new("bio", FieldType::Text).optional();
+    let f = FieldDef::new("bio", DataType::Text).optional();
     assert!(f.nullable);
 }
 
 #[test]
 fn field_def_required_is_not_nullable() {
-    let f = FieldDef::new("email", FieldType::Text).required();
+    let f = FieldDef::new("email", DataType::Text).required();
     assert!(!f.nullable);
 }
 
 #[test]
 fn field_def_default() {
-    let f = FieldDef::new("status", FieldType::Text).default("'active'");
+    let f = FieldDef::new("status", DataType::Text).default("'active'");
     assert_eq!(f.default_expr.as_deref(), Some("'active'"));
 }
 
 #[test]
 fn field_def_unique() {
-    let f = FieldDef::new("email", FieldType::Text).unique();
+    let f = FieldDef::new("email", DataType::Text).unique();
     assert!(f.unique);
 }
 
 #[test]
 fn field_def_check() {
-    let f = FieldDef::new("age", FieldType::Int).check("age > 0");
+    let f = FieldDef::new("age", DataType::Int32).check("age > 0");
     assert_eq!(f.check.as_deref(), Some("age > 0"));
 }
 
 #[test]
 fn field_def_comment() {
-    let f = FieldDef::new("id", FieldType::Uuid).comment("Primary key");
+    let f = FieldDef::new("id", DataType::Uuid).comment("Primary key");
     assert_eq!(f.comment.as_deref(), Some("Primary key"));
 }
 
 #[test]
 fn field_def_collation() {
-    let f = FieldDef::new("name", FieldType::Text).collation("en_US.utf8");
+    let f = FieldDef::new("name", DataType::Text).collation("en_US.utf8");
     assert_eq!(f.collation.as_deref(), Some("en_US.utf8"));
 }
 
 #[test]
 fn field_def_index() {
-    let f = FieldDef::new("email", FieldType::Text).index();
+    let f = FieldDef::new("email", DataType::Text).index();
     assert!(f.indexed);
 }
 
 #[test]
 fn field_def_generated_stored() {
-    let f = FieldDef::new("full_name", FieldType::Text)
+    let f = FieldDef::new("full_name", DataType::Text)
         .generated_stored("first_name || ' ' || last_name");
     assert!(f.generated.is_some());
     let (kind, expr) = f.generated.unwrap();
@@ -508,7 +508,7 @@ fn field_def_generated_stored() {
 
 #[test]
 fn field_def_generated_virtual() {
-    let f = FieldDef::new("age_group", FieldType::Text).generated_virtual("age_bucket(age)");
+    let f = FieldDef::new("age_group", DataType::Text).generated_virtual("age_bucket(age)");
     assert!(f.generated.is_some());
     let (kind, expr) = f.generated.unwrap();
     assert!(matches!(kind, dol_entity::GeneratedKind::Virtual));
@@ -518,7 +518,7 @@ fn field_def_generated_virtual() {
 #[test]
 fn field_def_references() {
     let fk = OwnedForeignKeyRef::new("users", "id");
-    let f = FieldDef::new("user_id", FieldType::Uuid).references(fk);
+    let f = FieldDef::new("user_id", DataType::Uuid).references(fk);
     assert!(f.references.is_some());
     let r = f.references.unwrap();
     assert_eq!(r.table, "users");
@@ -527,7 +527,7 @@ fn field_def_references() {
 
 #[test]
 fn field_def_builder_chain() {
-    let f = FieldDef::new("email", FieldType::Text)
+    let f = FieldDef::new("email", DataType::Text)
         .unique()
         .nullable()
         .index()
@@ -847,7 +847,7 @@ fn transaction_ir_block() {
 
 #[test]
 fn alter_action_add_field() {
-    let action = AlterAction::AddField(FieldDef::new("email", FieldType::Text));
+    let action = AlterAction::AddField(FieldDef::new("email", DataType::Text));
     assert!(matches!(action, AlterAction::AddField(_)));
 }
 
@@ -870,7 +870,7 @@ fn alter_action_rename_field() {
 fn alter_action_alter_field_type() {
     let action = AlterAction::AlterFieldType {
         name: "status".to_string(),
-        new_type: FieldType::Int,
+        new_type: DataType::Int32,
     };
     assert!(matches!(action, AlterAction::AlterFieldType { .. }));
 }
@@ -941,7 +941,7 @@ fn storage_output_construction() {
 fn statement_alter_model() {
     let stmt = Statement::AlterEntity(AlterEntityIR {
         target: entity_ref("users"),
-        actions: vec![AlterAction::AddField(FieldDef::new("age", FieldType::Int))],
+        actions: vec![AlterAction::AddField(FieldDef::new("age", DataType::Int32))],
     });
     assert!(matches!(stmt, Statement::AlterEntity(_)));
 }
@@ -1025,7 +1025,7 @@ fn statement_remove() {
 
 #[test]
 fn statement_upsert() {
-    let stmt = Statement::Upsert(UpsertIR {
+    let stmt = Statement::Upsert(Box::new(UpsertIR {
         target: entity_ref("users"),
         fields: vec!["email".to_string()],
         conflict_fields: vec!["email".to_string()],
@@ -1034,19 +1034,19 @@ fn statement_upsert() {
         do_nothing: false,
         conflict_filters: vec![],
         returning: vec![],
-    });
+    }));
     assert!(matches!(stmt, Statement::Upsert(_)));
 }
 
 #[test]
 fn statement_compound() {
-    let stmt = Statement::Compound(CompoundQueryIR {
+    let stmt = Statement::Compound(Box::new(CompoundQueryIR {
         base: Box::new(simple_query_ir()),
         operations: vec![(SetOpKind::Union, simple_query_ir())],
         order_by: vec![],
         offset: None,
         limit: None,
-    });
+    }));
     assert!(matches!(stmt, Statement::Compound(_)));
 }
 
@@ -1169,9 +1169,9 @@ fn define_model_ir_with_fields() {
         name: "products".to_string(),
         namespace: Some("shop".to_string()),
         fields: vec![
-            FieldDef::new("id", FieldType::Uuid).primary_key(),
-            FieldDef::new("name", FieldType::Text),
-            FieldDef::new("price", FieldType::Decimal),
+            FieldDef::new("id", DataType::Uuid).primary_key(),
+            FieldDef::new("name", DataType::Text),
+            FieldDef::new("price", DataType::Decimal { precision: None, scale: None }),
         ],
         constraints: vec![],
         if_not_exists: true,

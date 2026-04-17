@@ -35,7 +35,7 @@
 //! ```rust
 //! use dol_migration::{Migration, MigrationStep, MigrationRunner, InMemoryRegistry};
 //! use dol_core::ir::definition::FieldDef;
-//! use dol_core::model::FieldType;
+//! use dol_entity::DataType;
 //! use dol_core::ir::Statement;
 //!
 //! // Define a migration in pure Rust
@@ -47,9 +47,9 @@
 //!
 //!     fn up(&self) -> Vec<MigrationStep> {
 //!         vec![MigrationStep::define_entity(
-//!             dol_core::builder::definition::DefineEntityBuilder::new("users")
-//!                 .field(FieldDef::new("id", FieldType::Uuid).primary_key())
-//!                 .field(FieldDef::new("email", FieldType::Text).unique())
+//!             dol_entity::DefineEntityBuilder::new("users")
+//!                 .field(FieldDef::new("id", DataType::Uuid).primary_key())
+//!                 .field(FieldDef::new("email", DataType::Text).unique())
 //!                 .if_not_exists()
 //!                 .build()
 //!         )]
@@ -84,7 +84,7 @@ pub mod schema_diff;
 
 pub use async_registry::{AsyncMigrationRegistry, InMemoryAsyncRegistry};
 pub use plan::{MigrationDirection, MigrationPlan, MigrationTarget, PlannedStep};
-pub use registry::{AppliedMigration, InMemoryRegistry, MIGRATION_HISTORY, MigrationRegistry};
+pub use registry::{AppliedMigration, InMemoryRegistry, migration_history, MigrationRegistry};
 pub use runner::{
     MigrationRunner, MigrationState, MigrationStatus, RenderedMigration, RenderedStep,
 };
@@ -118,7 +118,7 @@ use std::fmt;
 /// ```rust
 /// use dol_migration::{Migration, MigrationStep};
 /// use dol_core::ir::definition::FieldDef;
-/// use dol_core::model::FieldType;
+/// use dol_entity::DataType;
 ///
 /// struct AddProfileColumn;
 ///
@@ -130,7 +130,7 @@ use std::fmt;
 ///         vec![MigrationStep::alter_entity(
 ///             "users",
 ///             vec![dol_core::ir::AlterAction::AddField(
-///                 FieldDef::new("profile", FieldType::Json).nullable()
+///                 FieldDef::new("profile", DataType::Json).nullable()
 ///             )]
 ///         )]
 ///     }
@@ -171,7 +171,7 @@ pub trait Migration: Send + Sync {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum MigrationStep {
     /// A DOL IR statement (SQL DDL, DML, indexes, grants, transactions, etc.).
-    Sql(ir::Statement),
+    Sql(ir::Statement<'static>),
 
     /// A key-value specific migration operation.
     Kv(KvMigrationOp),
@@ -185,7 +185,7 @@ impl MigrationStep {
 
     /// Create a table from a [`DefineEntityIR`](ir::DefineEntityIR).
     pub fn define_entity(ir: ir::DefineEntityIR) -> Self {
-        Self::Sql(ir::Statement::DefineEntity(ir))
+        Self::Sql(ir::Statement::DefineEntity(Box::new(ir)))
     }
 
     /// Drop a table by name (with IF EXISTS).
@@ -269,7 +269,7 @@ impl MigrationStep {
     }
 
     /// Wrap any raw [`ir::Statement`].
-    pub fn raw_statement(stmt: ir::Statement) -> Self {
+    pub fn raw_statement(stmt: ir::Statement<'static>) -> Self {
         Self::Sql(stmt)
     }
 

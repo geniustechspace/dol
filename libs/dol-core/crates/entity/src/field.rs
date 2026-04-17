@@ -7,25 +7,26 @@
 //! - Use `.required()` as a no-op self-documenting marker
 
 use super::constraint::{FkAction, ForeignKeyRef, GeneratedKind};
-use super::field_type::FieldType;
+use super::field_type::DataType;
 
-/// A field definition within a model.
+/// A field definition within an entity.
 ///
-/// Fields support the full range of column-level constraints and references:
+/// Fields support the full range of constraints and references:
 /// - `primary_key()` — marks as part of the primary key
 /// - `nullable()` / `optional()` — allows NULL values (NOT NULL by default)
 /// - `unique()` — adds a UNIQUE constraint
 /// - `default(expr)` — sets a DEFAULT expression rendered in DDL
-/// - `references(table, column, on_delete, on_update)` — inline foreign key
+/// - `references(entity, field, on_delete, on_update)` — inline foreign key
 /// - `check(expr)` — inline CHECK constraint
 /// - `index()` — hints that this field should be indexed
 /// - `collation(name)` — overrides the collation for this field
-/// - `generated_stored(expr)` / `generated_virtual(expr)` — computed columns
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// - `generated_stored(expr)` / `generated_virtual(expr)` — computed fields
+/// - `auto_increment()` — marks as auto-incrementing (replaces Serial/BigSerial)
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Field {
     pub name: &'static str,
-    pub field_type: FieldType,
+    pub data_type: DataType,
     pub primary_key: bool,
     pub nullable: bool,
     pub has_default: bool,
@@ -38,17 +39,19 @@ pub struct Field {
     pub comment: Option<&'static str>,
     /// Collation override (e.g. `"C"`, `"en_US.UTF-8"`).
     pub collation: Option<&'static str>,
-    /// Generated (computed) column: `(kind, expression)`.
+    /// Generated (computed) field: `(kind, expression)`.
     pub generated: Option<(GeneratedKind, &'static str)>,
     /// Hint that this field should be indexed (for schema generation tooling).
     pub indexed: bool,
+    /// Auto-incrementing field (replaces the old Serial/BigSerial types).
+    pub auto_increment: bool,
 }
 
 impl Field {
-    pub const fn new(name: &'static str, field_type: FieldType) -> Self {
+    pub fn new(name: &'static str, data_type: DataType) -> Self {
         Self {
             name,
-            field_type,
+            data_type,
             primary_key: false,
             nullable: false,
             has_default: false,
@@ -60,50 +63,51 @@ impl Field {
             collation: None,
             generated: None,
             indexed: false,
+            auto_increment: false,
         }
     }
 
-    pub const fn primary_key(mut self) -> Self {
+    pub fn primary_key(mut self) -> Self {
         self.primary_key = true;
         self
     }
 
     /// Mark field as nullable (optional in DOL terminology).
-    pub const fn nullable(mut self) -> Self {
+    pub fn nullable(mut self) -> Self {
         self.nullable = true;
         self
     }
 
     /// Mark the field as optional. Equivalent to [`nullable`](Self::nullable).
-    pub const fn optional(self) -> Self {
+    pub fn optional(self) -> Self {
         self.nullable()
     }
 
     /// No-op self-documenting marker — fields are required by default.
-    pub const fn required(self) -> Self {
+    pub fn required(self) -> Self {
         self
     }
 
     /// Mark field as having a server-side default (metadata only, no DDL rendering).
-    pub const fn has_default(mut self) -> Self {
+    pub fn has_default(mut self) -> Self {
         self.has_default = true;
         self
     }
 
     /// Set a DEFAULT expression that will be rendered in DDL.
-    pub const fn default(mut self, expr: &'static str) -> Self {
+    pub fn default(mut self, expr: &'static str) -> Self {
         self.has_default = true;
         self.default_expr = Some(expr);
         self
     }
 
-    pub const fn unique(mut self) -> Self {
+    pub fn unique(mut self) -> Self {
         self.unique = true;
         self
     }
 
     /// Add an inline REFERENCES constraint with ON DELETE and ON UPDATE actions.
-    pub const fn references(
+    pub fn references(
         mut self,
         table: &'static str,
         column: &'static str,
@@ -120,48 +124,52 @@ impl Field {
     }
 
     /// Add a fully-configured foreign key reference.
-    pub const fn references_full(mut self, fk: ForeignKeyRef) -> Self {
+    pub fn references_full(mut self, fk: ForeignKeyRef) -> Self {
         self.references = Some(fk);
         self
     }
 
     /// Add an inline CHECK constraint expression.
-    pub const fn check(mut self, expr: &'static str) -> Self {
+    pub fn check(mut self, expr: &'static str) -> Self {
         self.check = Some(expr);
         self
     }
 
     /// Set a human-readable comment / description for this field.
-    pub const fn comment(mut self, text: &'static str) -> Self {
+    pub fn comment(mut self, text: &'static str) -> Self {
         self.comment = Some(text);
         self
     }
 
     /// Override the collation for this field.
-    pub const fn collation(mut self, collation: &'static str) -> Self {
+    pub fn collation(mut self, collation: &'static str) -> Self {
         self.collation = Some(collation);
         self
     }
 
     /// Hint that this field should be indexed.
-    ///
-    /// This is a metadata hint for schema generation tooling — it does not
-    /// directly affect query rendering, but can be used by CREATE TABLE builders
-    /// to automatically generate index statements.
-    pub const fn index(mut self) -> Self {
+    pub fn index(mut self) -> Self {
         self.indexed = true;
         self
     }
 
-    /// Mark as a stored generated (computed) column.
-    pub const fn generated_stored(mut self, expr: &'static str) -> Self {
+    /// Mark as a stored generated (computed) field.
+    pub fn generated_stored(mut self, expr: &'static str) -> Self {
         self.generated = Some((GeneratedKind::Stored, expr));
         self
     }
 
-    /// Mark as a virtual generated (computed) column.
-    pub const fn generated_virtual(mut self, expr: &'static str) -> Self {
+    /// Mark as a virtual generated (computed) field.
+    pub fn generated_virtual(mut self, expr: &'static str) -> Self {
         self.generated = Some((GeneratedKind::Virtual, expr));
+        self
+    }
+
+    /// Mark as auto-incrementing (replaces the old Serial/BigSerial types).
+    ///
+    /// Typically used with `DataType::Int32` or `DataType::Int64`.
+    pub fn auto_increment(mut self) -> Self {
+        self.auto_increment = true;
         self
     }
 }

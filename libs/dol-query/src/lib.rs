@@ -13,16 +13,16 @@
 //!
 //! ```rust
 //! use dol_query::Query;
-//! use dol_entity::{Entity, Field, FieldType};
-//! use dol_expr::{field, param};
+//! use dol_entity::{Entity, Field, DataType};
+//! use dol_core::expr::{field, param};
 //!
-//! // From a static Entity — full field-aware API
-//! static USERS: Entity = Entity::new("users", &[
-//!     Field::new("id", FieldType::Uuid).primary_key(),
-//!     Field::new("email", FieldType::Text),
+//! // From an Entity — full field-aware API
+//! let users = Entity::new("users", vec![
+//!     Field::new("id", DataType::Uuid).primary_key(),
+//!     Field::new("email", DataType::Text),
 //! ]);
 //!
-//! let ir = Query::from(&USERS)
+//! let ir = Query::from(&users)
 //!     .get()
 //!     .filter(field("id").eq(param()))
 //!     .build();
@@ -69,6 +69,8 @@ mod insert;
 mod remove;
 mod update;
 mod upsert;
+
+pub mod builder;
 
 pub use get::GetQuery;
 pub use insert::InsertQuery;

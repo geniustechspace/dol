@@ -26,32 +26,32 @@ pub struct InsertSelectIR {
 /// Update existing records in a model.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct UpdateIR {
+pub struct UpdateIR<'a> {
     pub target: EntityRef,
-    pub assignments: Vec<(String, Expr)>,
-    pub filters: Vec<Expr>,
+    pub assignments: Vec<(String, Expr<'a>)>,
+    pub filters: Vec<Expr<'a>>,
     pub returning: Vec<String>,
 }
 
 /// Remove records from a model.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct RemoveIR {
+pub struct RemoveIR<'a> {
     pub target: EntityRef,
-    pub filters: Vec<Expr>,
+    pub filters: Vec<Expr<'a>>,
     pub returning: Vec<String>,
 }
 
 /// Upsert (insert or update on conflict).
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct UpsertIR {
+pub struct UpsertIR<'a> {
     pub target: EntityRef,
     pub fields: Vec<String>,
     pub conflict_fields: Vec<String>,
     pub conflict_constraint: Option<String>,
     pub update_fields: Vec<String>,
     pub do_nothing: bool,
-    pub conflict_filters: Vec<Expr>,
+    pub conflict_filters: Vec<Expr<'a>>,
     pub returning: Vec<String>,
 }

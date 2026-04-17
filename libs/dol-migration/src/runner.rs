@@ -117,7 +117,7 @@ pub struct RenderedMigration {
 ///     InMemoryRegistry, MigrationRegistry,
 /// };
 /// use dol_core::ir::definition::FieldDef;
-/// use dol_core::model::FieldType;
+/// use dol_entity::DataType;
 ///
 /// struct CreateUsers;
 /// impl Migration for CreateUsers {
@@ -125,9 +125,9 @@ pub struct RenderedMigration {
 ///     fn description(&self) -> &str { "Create users table" }
 ///     fn up(&self) -> Vec<MigrationStep> {
 ///         vec![MigrationStep::define_entity(
-///             dol_core::builder::definition::DefineEntityBuilder::new("users")
-///                 .field(FieldDef::new("id", FieldType::Uuid).primary_key())
-///                 .field(FieldDef::new("email", FieldType::Text).unique())
+///             dol_entity::DefineEntityBuilder::new("users")
+///                 .field(FieldDef::new("id", DataType::Uuid).primary_key())
+///                 .field(FieldDef::new("email", DataType::Text).unique())
 ///                 .if_not_exists()
 ///                 .build()
 ///         )]

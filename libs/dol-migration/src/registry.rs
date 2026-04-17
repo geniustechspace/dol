@@ -1,9 +1,9 @@
 //! Migration registry — tracks which migrations have been applied.
 
 use super::MigrationError;
-use dol_core::builder::EntityBuilderExt;
+use dol_query::builder::EntityBuilderExt;
 use dol_core::expr::{field, param};
-use dol_core::model::{Entity, Field, FieldType};
+use dol_entity::{Entity, Field, DataType};
 use dol_sql::ext::Render;
 
 // ===========================================================================
@@ -22,16 +22,18 @@ use dol_sql::ext::Render;
 /// - `checksum` (TEXT): Hash of the migration steps for tamper detection.
 /// - `applied_at` (TIMESTAMP): When the migration was applied.
 /// - `execution_time_ms` (BIGINT): How long the migration took to run.
-pub static MIGRATION_HISTORY: Entity = Entity::new(
-    "_dol_migrations",
-    &[
-        Field::new("version", FieldType::Varchar(Some(255))).primary_key(),
-        Field::new("description", FieldType::Text),
-        Field::new("checksum", FieldType::Text),
-        Field::new("applied_at", FieldType::Timestamp).default("CURRENT_TIMESTAMP"),
-        Field::new("execution_time_ms", FieldType::BigInt).default("0"),
-    ],
-);
+pub fn migration_history() -> Entity {
+    Entity::new(
+        "_dol_migrations",
+        vec![
+            Field::new("version", DataType::Varchar(Some(255))).primary_key(),
+            Field::new("description", DataType::Text),
+            Field::new("checksum", DataType::Text),
+            Field::new("applied_at", DataType::TimestampTz { precision: 6 }).default("CURRENT_TIMESTAMP"),
+            Field::new("execution_time_ms", DataType::Int64).default("0"),
+        ],
+    )
+}
 
 // ===========================================================================
 // AppliedMigration — a record of a previously applied migration
@@ -60,7 +62,7 @@ pub struct AppliedMigration {
 /// Trait for tracking which migrations have been applied.
 ///
 /// Implementations persist migration history in different backends:
-/// - SQL: A `_dol_migrations` table (see [`MIGRATION_HISTORY`])
+/// - SQL: A `_dol_migrations` table (see [`migration_history`])
 /// - File: A JSON/TOML file on disk
 /// - In-memory: For testing (see [`InMemoryRegistry`])
 ///
@@ -165,7 +167,7 @@ impl MigrationRegistry for InMemoryRegistry {
 /// assert!(sql.contains("CREATE TABLE IF NOT EXISTS _dol_migrations"));
 /// ```
 pub fn create_history_table_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> String {
-    MIGRATION_HISTORY
+    migration_history()
         .create()
         .if_not_exists()
         .render(dialect)
@@ -185,7 +187,7 @@ pub fn create_history_table_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> 
 /// assert!(sql.contains("$1")); // PostgreSQL params
 /// ```
 pub fn insert_applied_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> String {
-    MIGRATION_HISTORY
+    migration_history()
         .insert()
         .fields(&["version", "description", "checksum"])
         .render(dialect)
@@ -205,7 +207,7 @@ pub fn insert_applied_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> String
 /// assert!(sql.contains("$1")); // PostgreSQL params
 /// ```
 pub fn delete_reverted_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> String {
-    MIGRATION_HISTORY
+    migration_history()
         .remove()
         .filter(field("version").eq(param()))
         .render(dialect)
@@ -223,7 +225,7 @@ pub fn delete_reverted_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> Strin
 /// assert!(sql.contains("_dol_migrations"));
 /// ```
 pub fn select_applied_sql(dialect: Option<&dol_sql::dialect::Dialect>) -> String {
-    MIGRATION_HISTORY.get().render(dialect).unwrap()
+    migration_history().get().render(dialect).unwrap()
 }
 
 #[cfg(test)]

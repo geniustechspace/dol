@@ -1,41 +1,25 @@
-//! # dol-core — The DOL Language Layer
+//! # dol-core — DOL Core Language
 //!
-//! This is the standalone "language" crate for DOL. It re-exports every module
-//! needed to define schemas, build queries, produce IR, and define the
-//! `Backend` interface — with **zero engine dependencies**.
+//! The foundational crate for DOL: type system, expressions, intermediate
+//! representation, and the `Backend` trait. This is a true leaf crate with
+//! no dependencies on schema or builder crates.
 //!
-//! Custom engine authors only need `dol-core` to implement `Backend`.
+//! ## Modules
 //!
-//! ## Internal Sub-crates
-//!
-//! - **`dol-expr`** — Expressions, operators, functions (leaf, no deps)
-//! - **`dol-entity`** — Entity, Field, FieldType, constraints (leaf, no deps)
-//! - **`dol-ir`** — Statement enum, all IR types, Backend trait, output types
-//! - **`dol-builder`** — Composable builder API (GetBuilder, InsertBuilder, etc.)
+//! - **`types`** — `DataType` descriptors, `Value`/`Literal` data carriers
+//! - **`expr`** — Composable, backend-agnostic expression AST
+//! - **`ir`** — Statement enum, all IR types, Backend trait, output types
+//! - **`constraint`** — Constraint types shared between entity definitions and IR
 
 #![deny(unsafe_code)]
 
-/// Expression engine — composable, backend-agnostic expression AST.
-pub use dol_expr as expr;
-
-/// Schema language — Entity, Field, FieldType, and constraints.
-pub use dol_entity as model;
-
-/// Intermediate representation — backend-agnostic AST, Backend trait, output types.
-pub use dol_ir as ir;
-
-/// Builder API — composable method-chain builders that produce IR.
-pub use dol_builder as builder;
-
-/// Query entry point — backend-neutral query construction from entities or strings.
-pub use dol_query as query;
+pub mod types;
+pub mod expr;
+pub mod ir;
+pub mod constraint;
 
 // ── Top-level convenience re-exports ──
 
-pub use model::{Entity, Field, FieldType};
-
+pub use types::DataType;
+pub use constraint::{EntityConstraint, FkAction, ForeignKeyRef, GeneratedKind};
 pub use ir::{Backend, BackendError, RenderedOutput, Statement};
-
-pub use builder::{EntityBuilderExt, EntityDefineExt};
-
-pub use query::Query;

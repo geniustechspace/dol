@@ -6,8 +6,9 @@ publish = false
 description = "DOL expression engine — composable, backend-agnostic expression AST."
 
 [dependencies]
+dol-types = { path = "../types" }
 serde = { workspace = true, optional = true }
 
 [features]
 default = []
-serde = ["dep:serde"]
+serde = ["dep:serde", "dol-types/serde"]

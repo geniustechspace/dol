@@ -8,6 +8,8 @@ description = "DOL — Data Operating Language. A universal, storage-agnostic qu
 [dependencies]
 # Core language (expressions, models, IR, builders, Backend trait)
 dol-core = { workspace = true }
+dol-entity = { workspace = true }
+dol-query = { workspace = true }
 
 # Engine crates
 dol-sql = { workspace = true }

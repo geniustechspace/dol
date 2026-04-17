@@ -30,166 +30,188 @@ use dol::Render;
 use dol::TransactionRender;
 use dol::backend::sql::dialect::Dialect;
 use dol::builder::control::{GrantBuilder, Privilege, RevokeBuilder};
-use dol::builder::definition::{DefineEntityBuilder, DefineIndexBuilder, DropIndexBuilder};
+use dol::builder::{DefineEntityBuilder, DefineIndexBuilder, DropIndexBuilder};
 use dol::builder::storage::{
     GetObjectBuilder, ListObjectsBuilder, MoveFileBuilder, PutObjectBuilder, ReadFileBuilder,
     WriteFileBuilder,
 };
 use dol::builder::transaction::TransactionBuilder;
 use dol::expr::window::FrameBound;
-use dol::expr::{Direction, Expr, case, field, func, lit, param, raw_expr};
+use dol::expr::{Direction, Expr, bool_expr, case, field, float, func, int, param, raw_expr, string};
 use dol::ir::LockMode;
-use dol::model::{Entity, EntityConstraint, Field, FieldType, FkAction};
+use dol::model::{DataType, Entity, EntityConstraint, Field, FkAction};
 
 // ============================================================================
 // 1. MODEL DEFINITION — the single source of truth for a data shape
 // ============================================================================
 
 /// Users table with all common field constraint types.
-static USERS: Entity = Entity::new(
-    "users",
-    &[
-        Field::new("id", FieldType::Uuid).primary_key(),
-        Field::new("tenant_id", FieldType::Uuid).index(),
-        Field::new("email", FieldType::Text).unique(),
-        Field::new("display_name", FieldType::Text),
-        Field::new("status", FieldType::Text).default("'active'"),
-        Field::new("login_count", FieldType::Int).default("0"),
-        Field::new("profile", FieldType::Json).nullable(),
-        Field::new("created_at", FieldType::Timestamp).default("NOW()"),
-        Field::new("updated_at", FieldType::Timestamp).default("NOW()"),
-    ],
-);
+fn users() -> Entity {
+    Entity::new(
+        "users",
+        vec![
+            Field::new("id", DataType::Uuid).primary_key(),
+            Field::new("tenant_id", DataType::Uuid).index(),
+            Field::new("email", DataType::Text).unique(),
+            Field::new("display_name", DataType::Text),
+            Field::new("status", DataType::Text).default("'active'"),
+            Field::new("login_count", DataType::Int32).default("0"),
+            Field::new("profile", DataType::Json).nullable(),
+            Field::new("created_at", DataType::TimestampTz { precision: 6 }).default("NOW()"),
+            Field::new("updated_at", DataType::TimestampTz { precision: 6 }).default("NOW()"),
+        ],
+    )
+}
 
 /// Tenants table with composite constraints and version field.
-static TENANTS: Entity = Entity::new(
-    "tenants",
-    &[
-        Field::new("id", FieldType::Uuid).primary_key(),
-        Field::new("slug", FieldType::Text).unique(),
-        Field::new("display_name", FieldType::Text),
-        Field::new("status", FieldType::Text).default("'active'"),
-        Field::new("plan", FieldType::Text).default("'free'"),
-        Field::new("labels", FieldType::Json).nullable(),
-        Field::new("created_at", FieldType::Timestamp),
-        Field::new("created_by", FieldType::Uuid),
-        Field::new("updated_at", FieldType::Timestamp),
-        Field::new("updated_by", FieldType::Uuid),
-        Field::new("version", FieldType::Int).default("1"),
-    ],
-)
-.with_constraints(&[EntityConstraint::Unique(&["slug"])]);
+fn tenants() -> Entity {
+    Entity::new(
+        "tenants",
+        vec![
+            Field::new("id", DataType::Uuid).primary_key(),
+            Field::new("slug", DataType::Text).unique(),
+            Field::new("display_name", DataType::Text),
+            Field::new("status", DataType::Text).default("'active'"),
+            Field::new("plan", DataType::Text).default("'free'"),
+            Field::new("labels", DataType::Json).nullable(),
+            Field::new("created_at", DataType::TimestampTz { precision: 6 }),
+            Field::new("created_by", DataType::Uuid),
+            Field::new("updated_at", DataType::TimestampTz { precision: 6 }),
+            Field::new("updated_by", DataType::Uuid),
+            Field::new("version", DataType::Int32).default("1"),
+        ],
+    )
+    .with_constraints(vec![EntityConstraint::Unique(&["slug"])])
+}
 
 /// Sessions table for join examples.
-static SESSIONS: Entity = Entity::new(
-    "sessions",
-    &[
-        Field::new("id", FieldType::Uuid).primary_key(),
-        Field::new("user_id", FieldType::Uuid).references(
-            "users",
-            "id",
-            FkAction::Cascade,
-            FkAction::NoAction,
-        ),
-        Field::new("token_hash", FieldType::Bytes),
-        Field::new("user_agent", FieldType::Text)
-            .nullable()
-            .comment("Browser / client identifier"),
-        Field::new("ip_address", FieldType::Inet).nullable(),
-        Field::new("expires_at", FieldType::Timestamp),
-        Field::new("created_at", FieldType::Timestamp).default("NOW()"),
-        Field::new("is_expired", FieldType::Bool).generated_virtual("expires_at < NOW()"),
-    ],
-);
+fn sessions() -> Entity {
+    Entity::new(
+        "sessions",
+        vec![
+            Field::new("id", DataType::Uuid).primary_key(),
+            Field::new("user_id", DataType::Uuid).references(
+                "users",
+                "id",
+                FkAction::Cascade,
+                FkAction::NoAction,
+            ),
+            Field::new("token_hash", DataType::Varbinary(None)),
+            Field::new("user_agent", DataType::Text)
+                .nullable()
+                .comment("Browser / client identifier"),
+            Field::new("ip_address", DataType::Inet).nullable(),
+            Field::new("expires_at", DataType::TimestampTz { precision: 6 }),
+            Field::new("created_at", DataType::TimestampTz { precision: 6 }).default("NOW()"),
+            Field::new("is_expired", DataType::Bool).generated_virtual("expires_at < NOW()"),
+        ],
+    )
+}
 
 /// Audit log with foreign keys, CHECK constraint, and namespace.
-static AUDIT_LOG: Entity = Entity::new(
-    "audit_log",
-    &[
-        Field::new("id", FieldType::BigSerial).primary_key(),
-        Field::new("user_id", FieldType::Uuid).references(
-            "users",
-            "id",
-            FkAction::Cascade,
-            FkAction::NoAction,
-        ),
-        Field::new("tenant_id", FieldType::Uuid).references(
-            "tenants",
-            "id",
-            FkAction::Cascade,
-            FkAction::NoAction,
-        ),
-        Field::new("action", FieldType::Text)
-            .check("action IN ('create', 'read', 'update', 'delete')"),
-        Field::new("resource_type", FieldType::Text),
-        Field::new("resource_id", FieldType::Text),
-        Field::new("details", FieldType::Json).nullable(),
-        Field::new("ip_address", FieldType::Inet).nullable(),
-        Field::new("created_at", FieldType::Timestamp).default("NOW()"),
-    ],
-)
-.with_namespace("audit")
-.with_constraints(&[EntityConstraint::ForeignKey {
-    columns: &["tenant_id"],
-    ref_table: "tenants",
-    ref_columns: &["id"],
-    on_delete: FkAction::Cascade,
-}]);
+fn audit_log() -> Entity {
+    Entity::new(
+        "audit_log",
+        vec![
+            Field::new("id", DataType::Int64).auto_increment().primary_key(),
+            Field::new("user_id", DataType::Uuid).references(
+                "users",
+                "id",
+                FkAction::Cascade,
+                FkAction::NoAction,
+            ),
+            Field::new("tenant_id", DataType::Uuid).references(
+                "tenants",
+                "id",
+                FkAction::Cascade,
+                FkAction::NoAction,
+            ),
+            Field::new("action", DataType::Text)
+                .check("action IN ('create', 'read', 'update', 'delete')"),
+            Field::new("resource_type", DataType::Text),
+            Field::new("resource_id", DataType::Text),
+            Field::new("details", DataType::Json).nullable(),
+            Field::new("ip_address", DataType::Inet).nullable(),
+            Field::new("created_at", DataType::TimestampTz { precision: 6 }).default("NOW()"),
+        ],
+    )
+    .with_namespace("audit")
+    .with_constraints(vec![EntityConstraint::ForeignKey {
+        columns: &["tenant_id"],
+        ref_table: "tenants",
+        ref_columns: &["id"],
+        on_delete: FkAction::Cascade,
+    }])
+}
 
 /// Products table with various field types for type-mapping demos.
-static PRODUCTS: Entity = Entity::new(
-    "products",
-    &[
-        Field::new("id", FieldType::Uuid).primary_key(),
-        Field::new("name", FieldType::Varchar(Some(255))),
-        Field::new("sku", FieldType::Char(12)).unique(),
-        Field::new("price", FieldType::Decimal),
-        Field::new("quantity", FieldType::Int).default("0"),
-        Field::new("weight_kg", FieldType::Float).nullable(),
-        Field::new("description", FieldType::Text).nullable(),
-        Field::new("image_path", FieldType::Path).nullable(),
-        Field::new("mime_type", FieldType::Mime).nullable(),
-        Field::new("is_active", FieldType::Bool).default("TRUE"),
-        Field::new("tags", FieldType::TextArray).nullable(),
-        Field::new("metadata", FieldType::Object).nullable(),
-        Field::new("created_at", FieldType::Timestamp).default("NOW()"),
-    ],
-);
+fn products() -> Entity {
+    Entity::new(
+        "products",
+        vec![
+            Field::new("id", DataType::Uuid).primary_key(),
+            Field::new("name", DataType::Varchar(Some(255))),
+            Field::new("sku", DataType::Char(12)).unique(),
+            Field::new("price", DataType::Decimal { precision: None, scale: None }),
+            Field::new("quantity", DataType::Int32).default("0"),
+            Field::new("weight_kg", DataType::Float32).nullable(),
+            Field::new("description", DataType::Text).nullable(),
+            Field::new("image_path", DataType::FilePath).nullable(),
+            Field::new("mime_type", DataType::Mime).nullable(),
+            Field::new("is_active", DataType::Bool).default("TRUE"),
+            Field::new("tags", DataType::Array(Box::new(DataType::Text))).nullable(),
+            Field::new("metadata", DataType::Json).nullable(),
+            Field::new("created_at", DataType::TimestampTz { precision: 6 }).default("NOW()"),
+        ],
+    )
+}
 
 /// Orders table with composite primary key.
-static ORDER_ITEMS: Entity = Entity::new(
-    "order_items",
-    &[
-        Field::new("order_id", FieldType::Uuid),
-        Field::new("product_id", FieldType::Uuid),
-        Field::new("quantity", FieldType::Int),
-        Field::new("unit_price", FieldType::Decimal),
-    ],
-)
-.with_constraints(&[
-    EntityConstraint::PrimaryKey(&["order_id", "product_id"]),
-    EntityConstraint::ForeignKey {
-        columns: &["product_id"],
-        ref_table: "products",
-        ref_columns: &["id"],
-        on_delete: FkAction::Restrict,
-    },
-]);
+fn order_items() -> Entity {
+    Entity::new(
+        "order_items",
+        vec![
+            Field::new("order_id", DataType::Uuid),
+            Field::new("product_id", DataType::Uuid),
+            Field::new("quantity", DataType::Int32),
+            Field::new("unit_price", DataType::Decimal { precision: None, scale: None }),
+        ],
+    )
+    .with_constraints(vec![
+        EntityConstraint::PrimaryKey(&["order_id", "product_id"]),
+        EntityConstraint::ForeignKey {
+            columns: &["product_id"],
+            ref_table: "products",
+            ref_columns: &["id"],
+            on_delete: FkAction::Restrict,
+        },
+    ])
+}
 
 /// Settings table for aggregate examples.
-static SETTINGS: Entity = Entity::new(
-    "tenant_settings",
-    &[
-        Field::new("tenant_id", FieldType::Uuid).primary_key(),
-        Field::new("max_users", FieldType::Int),
-        Field::new("mfa_required", FieldType::Bool),
-    ],
-);
+fn settings() -> Entity {
+    Entity::new(
+        "tenant_settings",
+        vec![
+            Field::new("tenant_id", DataType::Uuid).primary_key(),
+            Field::new("max_users", DataType::Int32),
+            Field::new("mfa_required", DataType::Bool),
+        ],
+    )
+}
 
 fn main() {
     let pg = Dialect::postgres();
     let mysql = Dialect::mysql();
     let sqlite = Dialect::sqlite();
+
+    let users = users();
+    let tenants = tenants();
+    let sessions = sessions();
+    let audit_log = audit_log();
+    let products = products();
+    let order_items = order_items();
+    let settings = settings();
 
     println!("=== DOL Playbook — Comprehensive Feature Coverage ===\n");
 
@@ -199,42 +221,42 @@ fn main() {
     println!("--- 1. Model Introspection ---");
 
     // Field lookup
-    let email_field = USERS.field("email");
+    let email_field = users.field("email");
     assert_eq!(email_field.name, "email");
-    assert_eq!(email_field.field_type, FieldType::Text);
+    assert_eq!(email_field.data_type, DataType::Text);
     assert!(email_field.unique);
     println!(
         "  Field lookup: users.email -> {:?}",
-        email_field.field_type
+        email_field.data_type
     );
 
     // Safe field lookup
-    assert!(USERS.try_field("nonexistent").is_none());
+    assert!(users.try_field("nonexistent").is_none());
     println!("  Safe lookup: try_field('nonexistent') -> None");
 
     // Primary keys
-    let pks: Vec<_> = USERS.primary_keys().map(|f| f.name).collect();
+    let pks: Vec<_> = users.primary_keys().map(|f| f.name).collect();
     assert_eq!(pks, vec!["id"]);
     println!("  Primary keys: {:?}", pks);
 
     // Non-PK fields
-    let non_pk_count = USERS.non_pk_fields().count();
+    let non_pk_count = users.non_pk_fields().count();
     println!("  Non-PK fields: {} fields", non_pk_count);
 
     // Field list
-    let field_list = USERS.field_list();
+    let field_list = users.field_list();
     assert!(field_list.contains("id"));
     assert!(field_list.contains("email"));
     assert!(field_list.contains(", "));
     println!("  Field list: {}", field_list);
 
     // Qualified name with namespace
-    let qualified = AUDIT_LOG.qualified_name();
+    let qualified = audit_log.qualified_name();
     assert_eq!(qualified, "audit.audit_log");
     println!("  Qualified name: {}", qualified);
 
     // Qualified name without namespace
-    let simple_name = USERS.qualified_name();
+    let simple_name = users.qualified_name();
     assert_eq!(simple_name, "users");
     println!("  Simple name: {}", simple_name);
 
@@ -244,13 +266,13 @@ fn main() {
     println!("\n--- 2. SELECT Queries ---");
 
     // 2a. Simple SELECT all columns
-    let sql = USERS.get().render(Some(&pg)).unwrap();
+    let sql = users.get().render(Some(&pg)).unwrap();
     println!("  [PG] Select all: {}", sql);
     assert!(sql.contains("SELECT"));
     assert!(sql.contains("FROM users"));
 
     // 2b. SELECT specific columns with WHERE
-    let sql = USERS
+    let sql = users
         .get()
         .fields(&["id", "email", "status"])
         .filter(field("tenant_id").eq(param()))
@@ -262,16 +284,16 @@ fn main() {
     assert!(sql.contains("$2"));
 
     // 2c. WHERE with OR groups
-    let sql = USERS
+    let sql = users
         .get()
         .filter(field("tenant_id").eq(param()))
-        .filter(field("status").eq(lit("active")) | field("status").eq(lit("pending")))
+        .filter(field("status").eq(string("active")) | field("status").eq(string("pending")))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] OR filter: {}", sql);
 
     // 2d. LIKE / ILIKE patterns
-    let sql = USERS
+    let sql = users
         .get()
         .filter(field("email").ilike(param()))
         .render(Some(&pg))
@@ -280,7 +302,7 @@ fn main() {
     assert!(sql.contains("ILIKE"));
 
     // 2e. NULL checks
-    let sql = USERS
+    let sql = users
         .get()
         .filter(field("profile").is_not_null())
         .render(Some(&pg))
@@ -288,23 +310,23 @@ fn main() {
     println!("  [PG] IS NOT NULL: {}", sql);
 
     // 2f. BETWEEN range
-    let sql = USERS
+    let sql = users
         .get()
-        .filter(field("login_count").between(lit(10), lit(100)))
+        .filter(field("login_count").between(int(10), int(100)))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] BETWEEN: {}", sql);
 
     // 2g. IN list
-    let sql = USERS
+    let sql = users
         .get()
-        .filter(field("status").in_list(vec![lit("active"), lit("pending"), lit("suspended")]))
+        .filter(field("status").in_list(vec![string("active"), string("pending"), string("suspended")]))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] IN list: {}", sql);
 
     // 2h. IN subquery
-    let sql = USERS
+    let sql = users
         .get()
         .filter(Expr::InSubquery {
             expr: Box::new(field("tenant_id")),
@@ -317,7 +339,7 @@ fn main() {
 
     // 2i. NOT IN subquery (via filter)
     let subquery = "SELECT user_id FROM banned_users";
-    let sql = USERS
+    let sql = users
         .get()
         .filter(field("id").not_in_subquery(subquery))
         .render(Some(&pg))
@@ -325,7 +347,7 @@ fn main() {
     println!("  [PG] NOT IN subquery: {}", sql);
 
     // 2j. EXISTS subquery
-    let sql = USERS
+    let sql = users
         .get()
         .filter(Expr::Exists {
             subquery: "SELECT 1 FROM sessions WHERE sessions.user_id = users.id".to_string(),
@@ -336,7 +358,7 @@ fn main() {
     println!("  [PG] EXISTS: {}", sql);
 
     // 2k. NOT EXISTS subquery
-    let sql = USERS
+    let sql = users
         .get()
         .filter(Expr::Exists {
             subquery: "SELECT 1 FROM banned WHERE banned.user_id = users.id".to_string(),
@@ -347,7 +369,7 @@ fn main() {
     println!("  [PG] NOT EXISTS: {}", sql);
 
     // 2l. Scalar subquery in projection
-    let sql = USERS
+    let sql = users
         .get()
         .fields(&["id", "email"])
         .field(
@@ -361,7 +383,7 @@ fn main() {
     println!("  [PG] Scalar subquery: {}", sql);
 
     // 2m. Ordering with NULLS FIRST/LAST
-    let sql = USERS
+    let sql = users
         .get()
         .order_by_expr(field("display_name").asc_nulls_last())
         .render(Some(&pg))
@@ -369,7 +391,7 @@ fn main() {
     println!("  [PG] ORDER BY NULLS LAST: {}", sql);
 
     // 2n. ORDER BY with Direction enum
-    let sql = USERS
+    let sql = users
         .get()
         .order_by(
             "display_name",
@@ -381,7 +403,7 @@ fn main() {
     println!("  [PG] ORDER BY (Direction): {}", sql);
 
     // 2o. Pagination (LIMIT + OFFSET)
-    let sql = USERS
+    let sql = users
         .get()
         .order_by_asc("email")
         .limit()
@@ -391,7 +413,7 @@ fn main() {
     println!("  [PG] Pagination: {}", sql);
 
     // 2p. DISTINCT
-    let sql = USERS
+    let sql = users
         .get()
         .fields(&["tenant_id"])
         .distinct()
@@ -400,7 +422,7 @@ fn main() {
     println!("  [PG] DISTINCT: {}", sql);
 
     // 2q. DISTINCT ON (PostgreSQL only)
-    let sql = USERS
+    let sql = users
         .get()
         .distinct_on(&["tenant_id"])
         .order_by_asc("tenant_id")
@@ -410,7 +432,7 @@ fn main() {
     println!("  [PG] DISTINCT ON: {}", sql);
 
     // 2r. GROUP BY + HAVING
-    let sql = USERS
+    let sql = users
         .get()
         .fields(&["tenant_id"])
         .field(Expr::CountStar.alias("cnt"))
@@ -421,14 +443,14 @@ fn main() {
     println!("  [PG] GROUP BY HAVING: {}", sql);
 
     // 2s. Aggregate functions
-    let sql = SETTINGS
+    let sql = settings
         .get()
         .field(func::sum(field("max_users")).alias("total_users"))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] SUM: {}", sql);
 
-    let sql = USERS
+    let sql = users
         .get()
         .field(Expr::CountStar.alias("total"))
         .filter(field("tenant_id").eq(param()))
@@ -437,14 +459,14 @@ fn main() {
     println!("  [PG] COUNT: {}", sql);
 
     // 2t. Column aliases and raw expressions
-    let sql = USERS
+    let sql = users
         .get()
         .field(field("email").alias("user_email"))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Column alias: {}", sql);
 
-    let sql = USERS
+    let sql = users
         .get()
         .field(raw_expr("COALESCE(display_name, email) AS name"))
         .filter(field("id").eq(param()))
@@ -453,34 +475,34 @@ fn main() {
     println!("  [PG] Raw column: {}", sql);
 
     // 2u. INNER JOIN
-    let sql = USERS
+    let sql = users
         .get()
-        .inner_join(&TENANTS, &[("tenant_id", "id")])
+        .inner_join(&tenants, &[("tenant_id", "id")])
         .filter(field("tenant_id").eq(param()))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] INNER JOIN: {}", sql);
 
     // 2v. LEFT JOIN
-    let sql = USERS
+    let sql = users
         .get()
-        .left_join(&SESSIONS, &[("id", "user_id")])
+        .left_join(&sessions, &[("id", "user_id")])
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] LEFT JOIN: {}", sql);
 
     // 2w. Multiple JOINs
-    let sql = USERS
+    let sql = users
         .get()
-        .inner_join(&TENANTS, &[("tenant_id", "id")])
-        .left_join(&SESSIONS, &[("id", "user_id")])
+        .inner_join(&tenants, &[("tenant_id", "id")])
+        .left_join(&sessions, &[("id", "user_id")])
         .filter(field("tenant_id").eq(param()))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Multi JOIN: {}", sql);
 
     // 2x. FOR UPDATE (pessimistic locking)
-    let sql = USERS
+    let sql = users
         .get()
         .filter(field("id").eq(param()))
         .lock(LockMode::ForUpdate)
@@ -490,7 +512,7 @@ fn main() {
     assert!(sql.contains("FOR UPDATE"));
 
     // 2y. FOR UPDATE SKIP LOCKED (queue pattern)
-    let sql = USERS
+    let sql = users
         .get()
         .filter(field("status").eq(param()))
         .lock(LockMode::ForUpdateSkipLocked)
@@ -500,7 +522,7 @@ fn main() {
     println!("  [PG] SKIP LOCKED: {}", sql);
 
     // 2z. Window functions — ROW_NUMBER
-    let sql = USERS
+    let sql = users
         .get()
         .field(
             func::row_number()
@@ -515,7 +537,7 @@ fn main() {
     println!("  [PG] ROW_NUMBER: {}", sql);
 
     // 2aa. Window functions — RANK with frame
-    let sql = USERS
+    let sql = users
         .get()
         .field(field("id"))
         .field(field("login_count"))
@@ -533,7 +555,7 @@ fn main() {
     println!("  [PG] RANK + frame: {}", sql);
 
     // 2ab. Table alias
-    let sql = USERS
+    let sql = users
         .get()
         .alias("u")
         .filter(field("id").eq(param()))
@@ -542,7 +564,7 @@ fn main() {
     println!("  [PG] Table alias: {}", sql);
 
     // 2ac. Param count tracking
-    let q = USERS
+    let q = users
         .get()
         .filter(field("tenant_id").eq(param()))
         .filter(field("status").eq(param()))
@@ -560,13 +582,13 @@ fn main() {
     println!("\n--- 3. Mutations ---");
 
     // 3a. INSERT all columns
-    let sql = USERS.insert().returning_all().render(Some(&pg)).unwrap();
+    let sql = users.insert().returning_all().render(Some(&pg)).unwrap();
     println!("  [PG] Insert all: {}", sql);
     assert!(sql.contains("INSERT INTO users"));
     assert!(sql.contains("RETURNING *"));
 
     // 3b. INSERT specific columns
-    let sql = USERS
+    let sql = users
         .insert()
         .fields(&["id", "email", "tenant_id", "display_name"])
         .returning(&["id", "email"])
@@ -575,29 +597,29 @@ fn main() {
     println!("  [PG] Insert specific: {}", sql);
 
     // 3c. Batch INSERT (multiple rows)
-    let sql = USERS
+    let sql = users
         .insert()
         .fields(&["id", "email", "tenant_id"])
         .rows(3)
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Batch insert: {}", sql);
-    // 3 rows × 3 cols = 9 params
+    // 3 rows x 3 cols = 9 params
     assert!(sql.contains("$9"));
 
     // 3d. INSERT param count tracking
-    let builder = USERS.insert().fields(&["id", "email", "tenant_id"]).rows(5);
-    assert_eq!(builder.param_count(), 15); // 5 × 3
-    println!("  Param count (5×3): {}", builder.param_count());
+    let builder = users.insert().fields(&["id", "email", "tenant_id"]).rows(5);
+    assert_eq!(builder.param_count(), 15); // 5 x 3
+    println!("  Param count (5x3): {}", builder.param_count());
 
     // 3e. INSERT ... SELECT
-    let source_query = USERS
+    let source_query = users
         .get()
         .fields(&["id", "email"])
         .filter(field("tenant_id").eq(param()))
         .render(Some(&pg))
         .unwrap();
-    let sql = USERS
+    let sql = users
         .insert_select()
         .fields(&["id", "email"])
         .from_select(&source_query)
@@ -607,7 +629,7 @@ fn main() {
     println!("  [PG] Insert select: {}", sql);
 
     // 3f. UPDATE with set() (single column)
-    let sql = USERS
+    let sql = users
         .update()
         .set("display_name")
         .set("updated_at")
@@ -616,17 +638,17 @@ fn main() {
         .unwrap();
     println!("  [PG] Update: {}", sql);
 
-    // 3g. UPDATE with set_columns() (multiple columns)
-    let sql = USERS
+    // 3g. UPDATE with set_fields() (multiple fields)
+    let sql = users
         .update()
-        .set_columns(&["display_name", "status", "updated_at"])
+        .set_fields(&["display_name", "status", "updated_at"])
         .filter(field("id").eq(param()))
         .render(Some(&pg))
         .unwrap();
-    println!("  [PG] Update set_columns: {}", sql);
+    println!("  [PG] Update set_fields: {}", sql);
 
     // 3h. UPDATE with literal SET
-    let sql = USERS
+    let sql = users
         .update()
         .set("status")
         .set_literal("updated_at", "NOW()")
@@ -637,7 +659,7 @@ fn main() {
     println!("  [PG] Update literal + returning: {}", sql);
 
     // 3i. UPDATE with version increment (optimistic locking)
-    let sql = TENANTS
+    let sql = tenants
         .update()
         .set("display_name")
         .set_increment("version")
@@ -650,16 +672,16 @@ fn main() {
     assert!(sql.contains("version = version + $"));
 
     // 3j. UPDATE with arbitrary expression
-    let sql = USERS
+    let sql = users
         .update()
-        .set_expr("login_count", field("login_count") + lit(1))
+        .set_expr("login_count", field("login_count") + int(1))
         .filter(field("id").eq(param()))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Update set_expr: {}", sql);
 
     // 3k. UPDATE with raw WHERE
-    let sql = USERS
+    let sql = users
         .update()
         .set("status")
         .filter(raw_expr("created_at < NOW() - INTERVAL '30 days'"))
@@ -668,16 +690,16 @@ fn main() {
     println!("  [PG] Update raw WHERE: {}", sql);
 
     // 3l. UPDATE with expression filter
-    let sql = USERS
+    let sql = users
         .update()
         .set("status")
-        .filter(field("login_count").gt(lit(0)))
+        .filter(field("login_count").gt(int(0)))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Update filter: {}", sql);
 
     // 3m. DELETE with WHERE
-    let sql = USERS
+    let sql = users
         .remove()
         .filter(field("id").eq(param()))
         .returning_all()
@@ -686,15 +708,15 @@ fn main() {
     println!("  [PG] Delete: {}", sql);
 
     // 3n. DELETE with expression filter
-    let sql = USERS
+    let sql = users
         .remove()
-        .filter(field("status").eq(lit("deleted")))
+        .filter(field("status").eq(string("deleted")))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Delete filter: {}", sql);
 
     // 3o. DELETE with raw WHERE
-    let sql = USERS
+    let sql = users
         .remove()
         .filter(raw_expr("created_at < NOW() - INTERVAL '90 days'"))
         .render(Some(&pg))
@@ -702,7 +724,7 @@ fn main() {
     println!("  [PG] Delete raw: {}", sql);
 
     // 3p. DELETE param count
-    let builder = USERS
+    let builder = users
         .remove()
         .filter(field("id").eq(param()))
         .filter(field("tenant_id").eq(param()));
@@ -710,7 +732,7 @@ fn main() {
     println!("  Delete param count: {}", builder.param_count());
 
     // 3q. UPSERT (ON CONFLICT DO UPDATE)
-    let sql = USERS
+    let sql = users
         .upsert()
         .on_conflict(&["email"])
         .do_update(&["display_name", "status", "updated_at"])
@@ -722,7 +744,7 @@ fn main() {
     assert!(sql.contains("DO UPDATE SET"));
 
     // 3r. UPSERT DO NOTHING
-    let sql = USERS
+    let sql = users
         .upsert()
         .on_conflict(&["email"])
         .do_nothing()
@@ -732,7 +754,7 @@ fn main() {
     assert!(sql.contains("DO NOTHING"));
 
     // 3s. UPSERT with named constraint
-    let sql = USERS
+    let sql = users
         .upsert()
         .on_conflict_constraint("users_email_key")
         .do_update(&["display_name"])
@@ -741,10 +763,10 @@ fn main() {
     println!("  [PG] Upsert on constraint: {}", sql);
 
     // 3t. UPSERT with conflict filter
-    let sql = USERS
+    let sql = users
         .upsert()
         .on_conflict(&["email"])
-        .conflict_filter(field("status").ne(lit("deleted")))
+        .conflict_filter(field("status").ne(string("deleted")))
         .do_update(&["display_name"])
         .render(Some(&pg))
         .unwrap();
@@ -755,13 +777,13 @@ fn main() {
     // ========================================================================
     println!("\n--- 4. DDL ---");
 
-    // 4a. CREATE TABLE from static model metadata
-    let sql = USERS.create().render(Some(&pg)).unwrap();
+    // 4a. CREATE TABLE from model metadata
+    let sql = users.create().render(Some(&pg)).unwrap();
     println!("  [PG] Create table: {}...", &sql[..sql.len().min(100)]);
     assert!(sql.contains("CREATE TABLE users"));
 
     // 4b. CREATE TABLE IF NOT EXISTS
-    let sql = USERS.create().if_not_exists().render(Some(&pg)).unwrap();
+    let sql = users.create().if_not_exists().render(Some(&pg)).unwrap();
     assert!(sql.contains("IF NOT EXISTS"));
     println!(
         "  [PG] Create if not exists: {}...",
@@ -769,41 +791,41 @@ fn main() {
     );
 
     // 4c. CREATE TABLE with constraints (FK, CHECK, composite)
-    let sql = AUDIT_LOG.create().render(Some(&pg)).unwrap();
+    let sql = audit_log.create().render(Some(&pg)).unwrap();
     assert!(sql.contains("REFERENCES"));
     println!("  [PG] Create with FK: {}...", &sql[..sql.len().min(100)]);
 
     // 4d. CREATE TABLE with namespace
-    let sql = AUDIT_LOG.create().render(Some(&pg)).unwrap();
+    let sql = audit_log.create().render(Some(&pg)).unwrap();
     assert!(sql.contains("audit.audit_log"));
     println!("  [PG] Namespace: {}...", &sql[..sql.len().min(100)]);
 
     // 4e. CREATE TABLE with composite PK
-    let sql = ORDER_ITEMS.create().render(Some(&pg)).unwrap();
+    let sql = order_items.create().render(Some(&pg)).unwrap();
     assert!(sql.contains("PRIMARY KEY (order_id, product_id)"));
     println!("  [PG] Composite PK: {}...", &sql[..sql.len().min(100)]);
 
     // 4f. DefineEntityBuilder (runtime-defined schema)
     let sql = DefineEntityBuilder::new("dynamic_table")
-        .field(dol::FieldDef::new("id", FieldType::Uuid).primary_key())
-        .field(dol::FieldDef::new("name", FieldType::Text))
-        .field(dol::FieldDef::new("value", FieldType::Decimal).nullable())
+        .field(dol::FieldDef::new("id", DataType::Uuid).primary_key())
+        .field(dol::FieldDef::new("name", DataType::Text))
+        .field(dol::FieldDef::new("value", DataType::Decimal { precision: None, scale: None }).nullable())
         .if_not_exists()
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Dynamic define: {}", sql);
 
     // 4g. ALTER TABLE — add field (takes a FieldDef)
-    let sql = USERS
+    let sql = users
         .alter()
-        .add_field(dol::FieldDef::new("phone", FieldType::Text).nullable())
+        .add_field(dol::FieldDef::new("phone", DataType::Text).nullable())
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Alter add: {}", sql);
     assert!(sql.contains("ADD COLUMN"));
 
     // 4h. ALTER TABLE — drop column
-    let sql = USERS
+    let sql = users
         .alter()
         .drop_field("profile")
         .render(Some(&pg))
@@ -811,30 +833,30 @@ fn main() {
     println!("  [PG] Alter drop: {}", sql);
 
     // 4i. ALTER TABLE — rename column
-    let sql = USERS
+    let sql = users
         .alter()
         .rename_field("display_name", "full_name")
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Alter rename col: {}", sql);
 
-    // 4j. ALTER TABLE — change column type
-    let sql = USERS
+    // 4j. ALTER TABLE — change field type
+    let sql = users
         .alter()
-        .alter_column_type("login_count", FieldType::BigInt)
+        .alter_field_type("login_count", DataType::Int64)
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Alter column type: {}", sql);
 
     // 4k. ALTER TABLE — set/drop default
-    let sql = USERS
+    let sql = users
         .alter()
         .set_default("status", "'inactive'")
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Set default: {}", sql);
 
-    let sql = USERS
+    let sql = users
         .alter()
         .drop_default("status")
         .render(Some(&pg))
@@ -842,14 +864,14 @@ fn main() {
     println!("  [PG] Drop default: {}", sql);
 
     // 4l. ALTER TABLE — set/drop NOT NULL
-    let sql = USERS
+    let sql = users
         .alter()
         .set_not_null("profile")
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Set NOT NULL: {}", sql);
 
-    let sql = USERS
+    let sql = users
         .alter()
         .drop_not_null("email")
         .render(Some(&pg))
@@ -857,7 +879,7 @@ fn main() {
     println!("  [PG] Drop NOT NULL: {}", sql);
 
     // 4m. ALTER TABLE — rename table
-    let sql = USERS
+    let sql = users
         .alter()
         .rename_model("app_users")
         .render(Some(&pg))
@@ -865,14 +887,14 @@ fn main() {
     println!("  [PG] Rename table: {}", sql);
 
     // 4n. ALTER TABLE — add/drop constraint
-    let sql = USERS
+    let sql = users
         .alter()
         .add_constraint(EntityConstraint::Unique(&["email", "tenant_id"]))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Add constraint: {}", sql);
 
-    let sql = USERS
+    let sql = users
         .alter()
         .drop_constraint("users_email_key")
         .render(Some(&pg))
@@ -880,9 +902,9 @@ fn main() {
     println!("  [PG] Drop constraint: {}", sql);
 
     // 4o. ALTER TABLE — multiple actions
-    let sql = USERS
+    let sql = users
         .alter()
-        .add_field(dol::FieldDef::new("phone", FieldType::Text).nullable())
+        .add_field(dol::FieldDef::new("phone", DataType::Text).nullable())
         .drop_field("profile")
         .set_not_null("display_name")
         .render(Some(&pg))
@@ -890,11 +912,11 @@ fn main() {
     println!("  [PG] Multi alter: {}", sql);
 
     // 4p. DROP TABLE
-    let sql = USERS.drop_entity().render(Some(&pg)).unwrap();
+    let sql = users.drop_entity().render(Some(&pg)).unwrap();
     println!("  [PG] Drop table: {}", sql);
 
     // 4q. DROP TABLE IF EXISTS CASCADE
-    let sql = USERS
+    let sql = users
         .drop_entity()
         .if_exists()
         .cascade()
@@ -955,29 +977,29 @@ fn main() {
     println!("\n--- 5. Expressions ---");
 
     // 5a. Comparison operators
-    let _eq = field("age").eq(lit(18));
-    let _ne = field("age").ne(lit(18));
-    let _lt = field("age").lt(lit(18));
-    let _gt = field("age").gt(lit(18));
-    let _le = field("age").le(lit(18));
-    let _ge = field("age").ge(lit(18));
+    let _eq = field("age").eq(int(18));
+    let _ne = field("age").ne(int(18));
+    let _lt = field("age").lt(int(18));
+    let _gt = field("age").gt(int(18));
+    let _le = field("age").le(int(18));
+    let _ge = field("age").ge(int(18));
     println!("  Comparison ops: eq, ne, lt, gt, le, ge ✓");
 
     // 5b. Boolean composition with & (AND) and | (OR)
-    let _and = field("age").gt(lit(18)) & field("status").eq(lit("active"));
-    let _or = field("role").eq(lit("admin")) | field("role").eq(lit("superadmin"));
+    let _and = field("age").gt(int(18)) & field("status").eq(string("active"));
+    let _or = field("role").eq(string("admin")) | field("role").eq(string("superadmin"));
     println!("  Boolean ops: AND (&), OR (|) ✓");
 
     // 5c. NOT
-    let _not = !field("is_deleted").eq(lit(true));
+    let _not = !field("is_deleted").eq(bool_expr(true));
     println!("  NOT: ! operator ✓");
 
     // 5d. Arithmetic operators (+, -, *, /, %)
     let _add = field("price") + field("tax");
     let _sub = field("total") - field("discount");
     let _mul = field("price") * field("quantity");
-    let _div = field("total") / lit(2);
-    let _rem = field("value") % lit(10);
+    let _div = field("total") / int(2);
+    let _rem = field("value") % int(10);
     println!("  Arithmetic ops: +, -, *, /, %% ✓");
 
     // 5e. Negation
@@ -994,15 +1016,15 @@ fn main() {
 
     // 5h. String concatenation (dialect-aware)
     let _concat = field("first_name")
-        .concat(lit(" "))
+        .concat(string(" "))
         .concat(field("last_name"));
     println!("  Concat: first_name || ' ' || last_name ✓");
 
     // 5i. CASE WHEN expression
     let _case = case()
-        .when(field("status").eq(lit("active")), lit("Active"))
-        .when(field("status").eq(lit("pending")), lit("Pending"))
-        .else_(lit("Unknown"))
+        .when(field("status").eq(string("active")), string("Active"))
+        .when(field("status").eq(string("pending")), string("Pending"))
+        .else_(string("Unknown"))
         .end();
     println!("  CASE WHEN: ✓");
 
@@ -1020,8 +1042,8 @@ fn main() {
     println!("  From &str: \"email\".into() ✓");
 
     // 5m. LIKE / ILIKE
-    let _like = field("email").like(lit("%@example.com"));
-    let _ilike = field("email").ilike(lit("%@example.com"));
+    let _like = field("email").like(string("%@example.com"));
+    let _ilike = field("email").ilike(string("%@example.com"));
     println!("  LIKE / ILIKE ✓");
 
     // 5n. IS NULL / IS NOT NULL
@@ -1030,13 +1052,13 @@ fn main() {
     println!("  IS NULL / IS NOT NULL ✓");
 
     // 5o. BETWEEN / NOT BETWEEN
-    let _between = field("age").between(lit(18), lit(65));
-    let _not_between = field("age").not_between(lit(0), lit(17));
+    let _between = field("age").between(int(18), int(65));
+    let _not_between = field("age").not_between(int(0), int(17));
     println!("  BETWEEN / NOT BETWEEN ✓");
 
     // 5p. IN list / NOT IN list
-    let _in = field("status").in_list(vec![lit("a"), lit("b")]);
-    let _not_in = field("status").not_in_list(vec![lit("x"), lit("y")]);
+    let _in = field("status").in_list(vec![string("a"), string("b")]);
+    let _not_in = field("status").not_in_list(vec![string("x"), string("y")]);
     println!("  IN / NOT IN list ✓");
 
     // 5q. IN / NOT IN subquery
@@ -1049,41 +1071,41 @@ fn main() {
     let _ = func::upper(field("name"));
     let _ = func::trim(field("value"));
     let _ = func::length(field("name"));
-    let _ = func::substr(field("name"), lit(1), lit(10));
-    let _ = func::replace(field("email"), lit("old"), lit("new"));
-    let _ = func::concat_fn(vec![field("a"), lit(" "), field("b")]);
+    let _ = func::substr(field("name"), int(1), int(10));
+    let _ = func::replace(field("email"), string("old"), string("new"));
+    let _ = func::concat_fn(vec![field("a"), string(" "), field("b")]);
     let _ = func::abs(field("diff"));
-    let _ = func::round(field("price"), Some(lit(2)));
+    let _ = func::round(field("price"), Some(int(2)));
     let _ = func::now();
     let _ = func::current_date();
     let _ = func::current_timestamp();
     let _ = func::coalesce(vec![field("name"), field("email")]);
-    let _ = func::nullif(field("value"), lit(0));
+    let _ = func::nullif(field("value"), int(0));
     let _ = func::count(field("id"));
     let _ = func::count_star();
     let _ = func::sum(field("amount"));
     let _ = func::avg(field("score"));
     let _ = func::min(field("created_at"));
     let _ = func::max(field("created_at"));
-    let _ = func::func("CUSTOM_FN", vec![field("x"), lit(42)]);
+    let _ = func::func("CUSTOM_FN", vec![field("x"), int(42)]);
     println!("  All function constructors (22 functions) ✓");
 
     // 5s. All window function constructors
     let _ = func::row_number();
     let _ = func::rank();
     let _ = func::dense_rank();
-    let _ = func::ntile(lit(4));
+    let _ = func::ntile(int(4));
     let _ = func::lag(field("value"), None, None);
-    let _ = func::lag(field("value"), Some(lit(1)), Some(lit(0)));
+    let _ = func::lag(field("value"), Some(int(1)), Some(int(0)));
     let _ = func::lead(field("value"), None, None);
-    let _ = func::lead(field("value"), Some(lit(1)), Some(lit(0)));
+    let _ = func::lead(field("value"), Some(int(1)), Some(int(0)));
     let _ = func::first_value(field("price"));
     let _ = func::last_value(field("price"));
     println!("  All window functions (10 functions) ✓");
 
     // 5t. Object and array literals
-    let _obj = dol::expr::obj(vec![("name", lit("John")), ("age", lit(30))]);
-    let _arr = dol::expr::arr(vec![lit(1), lit(2), lit(3)]);
+    let _obj = dol::expr::obj(vec![("name", string("John")), ("age", int(30))]);
+    let _arr = dol::expr::arr(vec![int(1), int(2), int(3)]);
     println!("  Object/Array literals ✓");
 
     // 5u. Ordering expressions (all 6 variants)
@@ -1110,13 +1132,13 @@ fn main() {
         .build();
     println!("  Window builder: rows_between, range_between ✓");
 
-    // 5w. Literal types
-    let _ = lit("text"); // Literal::Str
-    let _ = lit(42_i64); // Literal::Int
-    let _ = lit(9.99_f64); // Literal::Float
-    let _ = lit(true); // Literal::Bool
-    let _ = dol::expr::Expr::Literal(dol::expr::Literal::Null); // Literal::Null
-    println!("  Literal types: Str, Int, Float, Bool, Null ✓");
+    // 5w. Typed constructors
+    let _ = string("text"); // Literal::Str
+    let _ = int(42_i64); // Literal::Int
+    let _ = float(9.99_f64); // Literal::Float
+    let _ = bool_expr(true); // Literal::Bool
+    let _ = dol::expr::Expr::Value(dol::expr::Literal::Null); // Literal::Null
+    println!("  Typed constructors: string, int, float, bool_expr, Null ✓");
 
     // 5x. Raw expression escape hatch
     let _raw = raw_expr("NOW() - INTERVAL '30 days'");
@@ -1131,12 +1153,12 @@ fn main() {
     // ========================================================================
     println!("\n--- 6. Set Operations ---");
 
-    let q1 = USERS
+    let q1 = users
         .get()
         .fields(&["id", "email"])
         .filter(field("status").eq(param()))
         .build();
-    let q2 = USERS
+    let q2 = users
         .get()
         .fields(&["id", "email"])
         .filter(field("tenant_id").eq(param()))
@@ -1285,7 +1307,7 @@ fn main() {
         ("MariaDB    ", &mariadb),
         ("CockroachDB", &cockroach),
     ] {
-        let sql = USERS
+        let sql = users
             .get()
             .fields(&["id", "email"])
             .filter(field("id").eq(param()))
@@ -1302,7 +1324,7 @@ fn main() {
         ("SQLite     ", &sqlite),
         ("MSSQL      ", &mssql),
     ] {
-        let sql = USERS
+        let sql = users
             .insert()
             .fields(&["id", "email"])
             .returning_all()
@@ -1318,7 +1340,7 @@ fn main() {
         ("MySQL      ", &mysql),
         ("MSSQL      ", &mssql),
     ] {
-        let sql = USERS
+        let sql = users
             .upsert()
             .fields(&["id", "email", "display_name"])
             .on_conflict(&["email"])
@@ -1337,7 +1359,7 @@ fn main() {
         ("MSSQL      ", &mssql),
         ("Oracle     ", &oracle),
     ] {
-        let sql = USERS
+        let sql = users
             .get()
             .order_by_asc("email")
             .limit()
@@ -1354,7 +1376,7 @@ fn main() {
         ("MySQL      ", &mysql),
         ("SQLite     ", &sqlite),
     ] {
-        let sql = PRODUCTS.create().render(Some(d)).unwrap();
+        let sql = products.create().render(Some(d)).unwrap();
         println!("    [{}] {}...", name, &sql[..sql.len().min(120)]);
     }
 
@@ -1365,9 +1387,9 @@ fn main() {
         ("MySQL     ", &mysql),
         ("SQLite    ", &sqlite),
     ] {
-        let sql = PRODUCTS
+        let sql = products
             .get()
-            .filter(field("is_active").eq(lit(true)))
+            .filter(field("is_active").eq(bool_expr(true)))
             .render(Some(d))
             .unwrap();
         println!("    [{}] {}", name, sql);
@@ -1474,10 +1496,10 @@ fn main() {
 
     // 11b. Dialect utilities
     println!("  Quote ident: {}", pg.quote_ident("user name"));
-    println!("  Resolve type UUID: {}", pg.resolve_type(&FieldType::Uuid));
+    println!("  Resolve type UUID: {}", pg.resolve_type(&DataType::Uuid));
     println!(
         "  Resolve type Timestamp: {}",
-        pg.resolve_type(&FieldType::Timestamp)
+        pg.resolve_type(&DataType::TimestampTz { precision: 6 })
     );
     println!("  Bool TRUE: {}, FALSE: {}", pg.bool_true, pg.bool_false);
 
@@ -1564,7 +1586,7 @@ fn migration_examples() {
         InMemoryRegistry, Migration, MigrationDirection, MigrationRegistry, MigrationRunner,
         MigrationState, MigrationStep, MigrationTarget, RenderedStep,
     };
-    use dol::model::FieldType;
+    use dol::model::DataType;
 
     println!("\n--- 12. Migration System ---");
 
@@ -1582,10 +1604,10 @@ fn migration_examples() {
         fn up(&self) -> Vec<MigrationStep> {
             vec![MigrationStep::define_entity(
                 dol::builder::DefineEntityBuilder::new("users")
-                    .field(FieldDef::new("id", FieldType::Uuid).primary_key())
-                    .field(FieldDef::new("email", FieldType::Text).unique())
-                    .field(FieldDef::new("status", FieldType::Text).default("'active'"))
-                    .field(FieldDef::new("created_at", FieldType::Timestamp).default("NOW()"))
+                    .field(FieldDef::new("id", DataType::Uuid).primary_key())
+                    .field(FieldDef::new("email", DataType::Text).unique())
+                    .field(FieldDef::new("status", DataType::Text).default("'active'"))
+                    .field(FieldDef::new("created_at", DataType::TimestampTz { precision: 6 }).default("NOW()"))
                     .if_not_exists()
                     .build(),
             )]
@@ -1636,7 +1658,7 @@ fn migration_examples() {
             vec![MigrationStep::alter_entity(
                 "users",
                 vec![AlterAction::AddField(
-                    FieldDef::new("profile", FieldType::Json).nullable(),
+                    FieldDef::new("profile", DataType::Json).nullable(),
                 )],
             )]
         }
@@ -1821,33 +1843,41 @@ fn schema_diff_examples() {
         EntitySnapshot, create_entity_step, diff_entities, diff_to_steps, drop_entity_step,
         field_to_field_def,
     };
+    use dol::model::DataType;
 
     println!("\n--- 13. Schema Diff & Auto-Discovery ---");
 
     // 13a. Define two versions of a model
-    static USERS_V1: Entity = Entity::new(
-        "users",
-        &[
-            Field::new("id", FieldType::Uuid).primary_key(),
-            Field::new("email", FieldType::Text).unique(),
-            Field::new("status", FieldType::Text).default("'active'"),
-        ],
-    );
+    fn users_v1() -> Entity {
+        Entity::new(
+            "users",
+            vec![
+                Field::new("id", DataType::Uuid).primary_key(),
+                Field::new("email", DataType::Text).unique(),
+                Field::new("status", DataType::Text).default("'active'"),
+            ],
+        )
+    }
 
-    static USERS_V2: Entity = Entity::new(
-        "users",
-        &[
-            Field::new("id", FieldType::Uuid).primary_key(),
-            Field::new("email", FieldType::Text).unique(),
-            Field::new("status", FieldType::Text).default("'active'"),
-            // New field added in V2
-            Field::new("display_name", FieldType::Text).nullable(),
-        ],
-    );
+    fn users_v2() -> Entity {
+        Entity::new(
+            "users",
+            vec![
+                Field::new("id", DataType::Uuid).primary_key(),
+                Field::new("email", DataType::Text).unique(),
+                Field::new("status", DataType::Text).default("'active'"),
+                // New field added in V2
+                Field::new("display_name", DataType::Text).nullable(),
+            ],
+        )
+    }
+
+    let users_v1 = users_v1();
+    let users_v2 = users_v2();
 
     // 13b. Take snapshots and compute diff
-    let v1 = EntitySnapshot::from_entity(&USERS_V1);
-    let v2 = EntitySnapshot::from_entity(&USERS_V2);
+    let v1 = EntitySnapshot::from_entity(&users_v1);
+    let v2 = EntitySnapshot::from_entity(&users_v2);
     let actions = diff_entities(&v1, &v2);
     println!("  Diff V1→V2: {} change(s)", actions.len());
     assert_eq!(actions.len(), 1);
@@ -1866,29 +1896,35 @@ fn schema_diff_examples() {
     println!("  Reverse diff produces DropField");
 
     // 13e. Type change detection
-    static V_INT: Entity = Entity::new("t", &[Field::new("count", FieldType::Int)]);
-    static V_BIGINT: Entity = Entity::new("t", &[Field::new("count", FieldType::BigInt)]);
+    fn v_int() -> Entity {
+        Entity::new("t", vec![Field::new("count", DataType::Int32)])
+    }
+    fn v_bigint() -> Entity {
+        Entity::new("t", vec![Field::new("count", DataType::Int64)])
+    }
+    let v_int = v_int();
+    let v_bigint = v_bigint();
     let type_actions = diff_entities(
-        &EntitySnapshot::from_entity(&V_INT),
-        &EntitySnapshot::from_entity(&V_BIGINT),
+        &EntitySnapshot::from_entity(&v_int),
+        &EntitySnapshot::from_entity(&v_bigint),
     );
     assert_eq!(type_actions.len(), 1);
     assert!(matches!(
         &type_actions[0],
         AlterAction::AlterFieldType { name, new_type }
-            if name == "count" && *new_type == FieldType::BigInt
+            if name == "count" && *new_type == DataType::Int64
     ));
-    println!("  Type change detected: Int → BigInt");
+    println!("  Type change detected: Int32 → Int64");
 
-    // 13f. Create and drop model steps from static definitions
-    let create_step = create_entity_step(&USERS_V1);
+    // 13f. Create and drop model steps from definitions
+    let create_step = create_entity_step(&users_v1);
     assert_eq!(create_step.kind(), "sql");
-    let drop_step = drop_entity_step(&USERS_V1);
+    let drop_step = drop_entity_step(&users_v1);
     assert_eq!(drop_step.kind(), "sql");
-    println!("  Create/drop model steps generated from static Model");
+    println!("  Create/drop model steps generated from Model");
 
     // 13g. Field conversion preserves all attributes
-    let field = Field::new("email", FieldType::Text)
+    let field = Field::new("email", DataType::Text)
         .unique()
         .nullable()
         .default("'test'")
@@ -1919,6 +1955,7 @@ fn config_migration_examples() {
     use dol::migration::{
         InMemoryRegistry, Migration, MigrationRunner, MigrationStep, RenderedStep,
     };
+    use dol::model::DataType;
 
     println!("\n--- 14. Config-Integrated Migrations ---");
 
@@ -1934,8 +1971,8 @@ fn config_migration_examples() {
         fn up(&self) -> Vec<MigrationStep> {
             vec![MigrationStep::define_entity(
                 dol::builder::DefineEntityBuilder::new("orders")
-                    .field(FieldDef::new("id", FieldType::Uuid).primary_key())
-                    .field(FieldDef::new("total", FieldType::Decimal))
+                    .field(FieldDef::new("id", DataType::Uuid).primary_key())
+                    .field(FieldDef::new("total", DataType::Decimal { precision: None, scale: None }))
                     .if_not_exists()
                     .build(),
             )]
@@ -2059,99 +2096,109 @@ mod tests {
 
     #[test]
     fn model_definition_coverage() {
+        let users = users();
+        let audit_log = audit_log();
+        let sessions = sessions();
+
         // Verify all field constraint types are exercised
-        assert!(USERS.field("id").primary_key);
-        assert!(USERS.field("email").unique);
-        assert!(!USERS.field("email").nullable);
-        assert!(USERS.field("profile").nullable);
-        assert_eq!(USERS.field("status").default_expr, Some("'active'"));
-        assert!(USERS.field("tenant_id").indexed);
-        assert!(AUDIT_LOG.field("action").check.is_some());
-        assert!(AUDIT_LOG.field("user_id").references.is_some());
-        assert!(SESSIONS.field("is_expired").generated.is_some());
-        assert!(SESSIONS.field("user_agent").comment.is_some());
-        assert_eq!(AUDIT_LOG.namespace, Some("audit"));
+        assert!(users.field("id").primary_key);
+        assert!(users.field("email").unique);
+        assert!(!users.field("email").nullable);
+        assert!(users.field("profile").nullable);
+        assert_eq!(users.field("status").default_expr, Some("'active'"));
+        assert!(users.field("tenant_id").indexed);
+        assert!(audit_log.field("action").check.is_some());
+        assert!(audit_log.field("user_id").references.is_some());
+        assert!(sessions.field("is_expired").generated.is_some());
+        assert!(sessions.field("user_agent").comment.is_some());
+        assert_eq!(audit_log.namespace, Some("audit"));
     }
 
     #[test]
     fn all_field_types_represented() {
-        // Verify that the models exercise a wide range of FieldType variants
+        let products = products();
+        let audit_log = audit_log();
+        let sessions = sessions();
+
+        // Verify that the models exercise a wide range of DataType variants
         assert!(
-            PRODUCTS
+            products
                 .fields
                 .iter()
-                .any(|f| matches!(f.field_type, FieldType::Varchar(Some(_))))
+                .any(|f| matches!(f.data_type, DataType::Varchar(Some(_))))
         );
         assert!(
-            PRODUCTS
+            products
                 .fields
                 .iter()
-                .any(|f| matches!(f.field_type, FieldType::Char(_)))
+                .any(|f| matches!(f.data_type, DataType::Char(_)))
         );
         assert!(
-            PRODUCTS
+            products
                 .fields
                 .iter()
-                .any(|f| f.field_type == FieldType::Decimal)
+                .any(|f| matches!(f.data_type, DataType::Decimal { .. }))
         );
         assert!(
-            PRODUCTS
+            products
                 .fields
                 .iter()
-                .any(|f| f.field_type == FieldType::Float)
+                .any(|f| f.data_type == DataType::Float32)
         );
         assert!(
-            PRODUCTS
+            products
                 .fields
                 .iter()
-                .any(|f| f.field_type == FieldType::Bool)
+                .any(|f| f.data_type == DataType::Bool)
         );
         assert!(
-            PRODUCTS
+            products
                 .fields
                 .iter()
-                .any(|f| f.field_type == FieldType::TextArray)
+                .any(|f| matches!(f.data_type, DataType::Array(_)))
         );
         assert!(
-            PRODUCTS
+            products
                 .fields
                 .iter()
-                .any(|f| f.field_type == FieldType::Object)
+                .any(|f| f.data_type == DataType::Json)
         );
         assert!(
-            PRODUCTS
+            products
                 .fields
                 .iter()
-                .any(|f| f.field_type == FieldType::Path)
+                .any(|f| f.data_type == DataType::FilePath)
         );
         assert!(
-            PRODUCTS
+            products
                 .fields
                 .iter()
-                .any(|f| f.field_type == FieldType::Mime)
+                .any(|f| f.data_type == DataType::Mime)
         );
         assert!(
-            AUDIT_LOG
+            audit_log
                 .fields
                 .iter()
-                .any(|f| f.field_type == FieldType::BigSerial)
+                .any(|f| f.data_type == DataType::Int64)
         );
         assert!(
-            AUDIT_LOG
+            audit_log
                 .fields
                 .iter()
-                .any(|f| f.field_type == FieldType::Inet)
+                .any(|f| f.data_type == DataType::Inet)
         );
         assert!(
-            SESSIONS
+            sessions
                 .fields
                 .iter()
-                .any(|f| f.field_type == FieldType::Bytes)
+                .any(|f| matches!(f.data_type, DataType::Varbinary(_)))
         );
     }
 
     #[test]
     fn all_dialects_produce_valid_sql() {
+        let users = users();
+
         let dialects = [
             Dialect::postgres(),
             Dialect::mysql(),
@@ -2164,7 +2211,7 @@ mod tests {
 
         for d in &dialects {
             // SELECT
-            let sql = USERS
+            let sql = users
                 .get()
                 .filter(field("id").eq(param()))
                 .render(Some(d))
@@ -2173,11 +2220,11 @@ mod tests {
             assert!(sql.contains("FROM users"), "{}: missing FROM", d.name);
 
             // INSERT
-            let sql = USERS.insert().render(Some(d)).unwrap();
+            let sql = users.insert().render(Some(d)).unwrap();
             assert!(sql.contains("INSERT INTO"), "{}: missing INSERT", d.name);
 
             // UPDATE
-            let sql = USERS
+            let sql = users
                 .update()
                 .set("email")
                 .filter(field("id").eq(param()))
@@ -2186,7 +2233,7 @@ mod tests {
             assert!(sql.contains("UPDATE users"), "{}: missing UPDATE", d.name);
 
             // DELETE
-            let sql = USERS
+            let sql = users
                 .remove()
                 .filter(field("id").eq(param()))
                 .render(Some(d))
@@ -2194,11 +2241,11 @@ mod tests {
             assert!(sql.contains("DELETE FROM"), "{}: missing DELETE", d.name);
 
             // CREATE TABLE
-            let sql = USERS.create().render(Some(d)).unwrap();
+            let sql = users.create().render(Some(d)).unwrap();
             assert!(sql.contains("CREATE TABLE"), "{}: missing CREATE", d.name);
 
             // DROP TABLE
-            let sql = USERS.drop_entity().render(Some(d)).unwrap();
+            let sql = users.drop_entity().render(Some(d)).unwrap();
             assert!(sql.contains("DROP TABLE"), "{}: missing DROP", d.name);
         }
     }

@@ -3,9 +3,9 @@ name = "dol-builder"
 version.workspace = true
 edition.workspace = true
 publish = false
-description = "DOL builder API — composable method-chain builders that produce IR."
+description = "DOL builder API — EntityBuilderExt trait and DDL builders."
 
 [dependencies]
-dol-expr = { path = "../expr" }
+dol-core = { path = "../../../dol-core" }
 dol-entity = { path = "../entity" }
-dol-ir = { path = "../ir" }
+dol-query = { workspace = true }

@@ -1,5 +1,5 @@
 use super::*;
-use dol_core::builder::storage::{GetObjectBuilder, ListObjectsBuilder, PutObjectBuilder};
+use dol_query::builder::storage::{GetObjectBuilder, ListObjectsBuilder, PutObjectBuilder};
 
 #[test]
 fn put_object_renders() {

@@ -1,37 +1,42 @@
 use super::*;
 use control::Privilege;
-use dol_entity::{Field, FieldType};
-use dol_expr::{Direction, Expr, NullsPosition, OrderByExpr, field, param, raw_expr};
-use dol_ir::definition::{AlterAction, FieldDef, IndexMethod};
-use dol_ir::storage::ObjectSource;
-use dol_ir::transaction::TransactionIR;
-use dol_ir::{JoinType, LockMode, OffsetLimit};
+use dol_entity::{Field, DataType};
+use dol_core::expr::{Direction, Expr, NullsPosition, OrderByExpr, field, param, raw_expr};
+use dol_core::ir::definition::{AlterAction, FieldDef, IndexMethod};
+use dol_core::ir::storage::ObjectSource;
+use dol_core::ir::transaction::TransactionIR;
+use dol_core::ir::{JoinType, LockMode, OffsetLimit};
 
-static TEST_MODEL: Entity = Entity::new(
-    "users",
-    &[
-        Field::new("id", FieldType::Uuid).primary_key(),
-        Field::new("email", FieldType::Text).unique(),
-        Field::new("name", FieldType::Text),
-        Field::new("status", FieldType::Text).default("'active'"),
-        Field::new("created_at", FieldType::Timestamp).default("NOW()"),
-    ],
-);
+fn test_model() -> Entity {
+    Entity::new(
+        "users",
+        vec![
+            Field::new("id", DataType::Uuid).primary_key(),
+            Field::new("email", DataType::Text).unique(),
+            Field::new("name", DataType::Text),
+            Field::new("status", DataType::Text).default("'active'"),
+            Field::new("created_at", DataType::TimestampTz { precision: 6 }).default("NOW()"),
+        ],
+    )
+}
 
-static POSTS_MODEL: Entity = Entity::new(
-    "posts",
-    &[
-        Field::new("id", FieldType::Uuid).primary_key(),
-        Field::new("user_id", FieldType::Uuid),
-        Field::new("title", FieldType::Text),
-    ],
-);
+fn posts_model() -> Entity {
+    Entity::new(
+        "posts",
+        vec![
+            Field::new("id", DataType::Uuid).primary_key(),
+            Field::new("user_id", DataType::Uuid),
+            Field::new("title", DataType::Text),
+        ],
+    )
+}
 
 // ── GetBuilder tests ────────────────────────────────────────────────
 
 #[test]
 fn get_minimal_build() {
-    let ir = TEST_MODEL.get().build();
+    let m = test_model();
+    let ir = m.get().build();
     assert_eq!(ir.source.name, "users");
     assert!(ir.source.namespace.is_none());
     assert!(ir.source.alias.is_none());
@@ -51,7 +56,8 @@ fn get_minimal_build() {
 
 #[test]
 fn get_defaults() {
-    let ir = TEST_MODEL.get().build();
+    let m = test_model();
+    let ir = m.get().build();
     assert_eq!(ir.projections.len(), 5);
     assert!(matches!(&ir.projections[0], Expr::Identifier(n) if n == "id"));
     assert!(matches!(&ir.projections[4], Expr::Identifier(n) if n == "created_at"));
@@ -59,7 +65,8 @@ fn get_defaults() {
 
 #[test]
 fn get_selected_columns() {
-    let ir = TEST_MODEL.get().fields(&["id", "email"]).build();
+    let m = test_model();
+    let ir = m.get().fields(&["id", "email"]).build();
     assert_eq!(ir.projections.len(), 2);
     assert!(matches!(&ir.projections[0], Expr::Identifier(n) if n == "id"));
     assert!(matches!(&ir.projections[1], Expr::Identifier(n) if n == "email"));
@@ -67,7 +74,8 @@ fn get_selected_columns() {
 
 #[test]
 fn get_column_as() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .get()
         .field(field("name").alias("user_name"))
         .build();
@@ -77,14 +85,16 @@ fn get_column_as() {
 
 #[test]
 fn get_count_all() {
-    let ir = TEST_MODEL.get().field(Expr::CountStar).build();
+    let m = test_model();
+    let ir = m.get().field(Expr::CountStar).build();
     assert_eq!(ir.projections.len(), 1);
     assert!(matches!(&ir.projections[0], Expr::CountStar));
 }
 
 #[test]
 fn get_count_all_as() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .get()
         .field(Expr::CountStar.alias("total"))
         .build();
@@ -94,27 +104,31 @@ fn get_count_all_as() {
 
 #[test]
 fn get_raw_column() {
-    let ir = TEST_MODEL.get().field(raw_expr("1 + 1")).build();
+    let m = test_model();
+    let ir = m.get().field(raw_expr("1 + 1")).build();
     assert_eq!(ir.projections.len(), 1);
     assert!(matches!(&ir.projections[0], Expr::Raw(s) if s == "1 + 1"));
 }
 
 #[test]
 fn get_alias() {
-    let ir = TEST_MODEL.get().alias("u").build();
+    let m = test_model();
+    let ir = m.get().alias("u").build();
     assert_eq!(ir.source.alias.as_deref(), Some("u"));
 }
 
 #[test]
 fn get_where_eq() {
-    let ir = TEST_MODEL.get().filter(field("id").eq(param())).build();
+    let m = test_model();
+    let ir = m.get().filter(field("id").eq(param())).build();
     assert_eq!(ir.filters.len(), 1);
     assert!(matches!(&ir.filters[0], Expr::BinaryOp { .. }));
 }
 
 #[test]
 fn get_where_eq_literal() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .get()
         .filter(field("status").eq(raw_expr("'active'")))
         .build();
@@ -123,7 +137,8 @@ fn get_where_eq_literal() {
 
 #[test]
 fn get_where_ilike() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .get()
         .filter(field("name").ilike(param()))
         .build();
@@ -132,14 +147,16 @@ fn get_where_ilike() {
 
 #[test]
 fn get_where_raw() {
-    let ir = TEST_MODEL.get().filter(raw_expr("age > 18")).build();
+    let m = test_model();
+    let ir = m.get().filter(raw_expr("age > 18")).build();
     assert_eq!(ir.filters.len(), 1);
     assert!(matches!(&ir.filters[0], Expr::Raw(s) if s == "age > 18"));
 }
 
 #[test]
 fn get_where_exists() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .get()
         .filter(Expr::Exists {
             subquery: "SELECT 1 FROM posts".to_string(),
@@ -154,7 +171,8 @@ fn get_where_exists() {
 
 #[test]
 fn get_where_not_exists() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .get()
         .filter(Expr::Exists {
             subquery: "SELECT 1 FROM bans".to_string(),
@@ -166,7 +184,8 @@ fn get_where_not_exists() {
 
 #[test]
 fn get_where_in_subquery() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .get()
         .filter(Expr::InSubquery {
             expr: Box::new(field("id")),
@@ -180,7 +199,8 @@ fn get_where_in_subquery() {
 
 #[test]
 fn get_where_not_in_subquery() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .get()
         .filter(Expr::InSubquery {
             expr: Box::new(field("id")),
@@ -193,7 +213,8 @@ fn get_where_not_in_subquery() {
 
 #[test]
 fn get_multiple_filters() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .get()
         .filter(field("id").eq(param()))
         .filter(field("status").eq(param()))
@@ -204,9 +225,11 @@ fn get_multiple_filters() {
 
 #[test]
 fn get_inner_join() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let p = posts_model();
+    let ir = m
         .get()
-        .inner_join(&POSTS_MODEL, &[("id", "user_id")])
+        .inner_join(&p, &[("id", "user_id")])
         .build();
     assert_eq!(ir.joins.len(), 1);
     assert_eq!(ir.joins[0].join_type, JoinType::Inner);
@@ -220,43 +243,52 @@ fn get_inner_join() {
 
 #[test]
 fn get_left_join() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let p = posts_model();
+    let ir = m
         .get()
-        .left_join(&POSTS_MODEL, &[("id", "user_id")])
+        .left_join(&p, &[("id", "user_id")])
         .build();
     assert_eq!(ir.joins[0].join_type, JoinType::Left);
 }
 
 #[test]
 fn get_right_join() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let p = posts_model();
+    let ir = m
         .get()
-        .right_join(&POSTS_MODEL, &[("id", "user_id")])
+        .right_join(&p, &[("id", "user_id")])
         .build();
     assert_eq!(ir.joins[0].join_type, JoinType::Right);
 }
 
 #[test]
 fn get_full_join() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let p = posts_model();
+    let ir = m
         .get()
-        .full_join(&POSTS_MODEL, &[("id", "user_id")])
+        .full_join(&p, &[("id", "user_id")])
         .build();
     assert_eq!(ir.joins[0].join_type, JoinType::Full);
 }
 
 #[test]
 fn get_join_aliased() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let p = posts_model();
+    let ir = m
         .get()
-        .join_aliased(JoinType::Left, &POSTS_MODEL, "p", &[("id", "user_id")])
+        .join_aliased(JoinType::Left, &p, "p", &[("id", "user_id")])
         .build();
     assert_eq!(ir.joins[0].target.alias.as_deref(), Some("p"));
 }
 
 #[test]
 fn get_group_by_having() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .get()
         .fields(&["status"])
         .field(Expr::CountStar.alias("cnt"))
@@ -270,21 +302,24 @@ fn get_group_by_having() {
 
 #[test]
 fn get_order_by_asc() {
-    let ir = TEST_MODEL.get().order_by_asc("name").build();
+    let m = test_model();
+    let ir = m.get().order_by_asc("name").build();
     assert_eq!(ir.order_by.len(), 1);
     assert!(matches!(ir.order_by[0].direction, Direction::Asc));
 }
 
 #[test]
 fn get_order_by_desc() {
-    let ir = TEST_MODEL.get().order_by_desc("created_at").build();
+    let m = test_model();
+    let ir = m.get().order_by_desc("created_at").build();
     assert_eq!(ir.order_by.len(), 1);
     assert!(matches!(ir.order_by[0].direction, Direction::Desc));
 }
 
 #[test]
 fn get_order_by_nulls_last() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .get()
         .order_by("name", Direction::Asc, Some(NullsPosition::Last))
         .build();
@@ -293,7 +328,8 @@ fn get_order_by_nulls_last() {
 
 #[test]
 fn get_order_by_nulls_first() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .get()
         .order_by("name", Direction::Desc, Some(NullsPosition::First))
         .build();
@@ -302,57 +338,65 @@ fn get_order_by_nulls_first() {
 
 #[test]
 fn get_order_by_expr() {
+    let m = test_model();
     let obe = OrderByExpr {
         expr: field("email"),
         direction: Direction::Asc,
         nulls: None,
     };
-    let ir = TEST_MODEL.get().order_by_expr(obe).build();
+    let ir = m.get().order_by_expr(obe).build();
     assert_eq!(ir.order_by.len(), 1);
 }
 
 #[test]
 fn get_offset_limit() {
-    let ir = TEST_MODEL.get().offset().limit().build();
+    let m = test_model();
+    let ir = m.get().offset().limit().build();
     assert!(matches!(ir.offset, Some(OffsetLimit::Param)));
     assert!(matches!(ir.limit, Some(OffsetLimit::Param)));
 }
 
 #[test]
 fn get_distinct() {
-    let ir = TEST_MODEL.get().distinct().build();
+    let m = test_model();
+    let ir = m.get().distinct().build();
     assert!(ir.distinct);
     assert!(ir.distinct_on.is_empty());
 }
 
 #[test]
 fn get_distinct_on() {
-    let ir = TEST_MODEL.get().distinct_on(&["email"]).build();
+    let m = test_model();
+    let ir = m.get().distinct_on(&["email"]).build();
     assert!(ir.distinct);
     assert_eq!(ir.distinct_on, vec!["email"]);
 }
 
 #[test]
 fn get_for_update() {
-    let ir = TEST_MODEL.get().for_update().build();
+    let m = test_model();
+    let ir = m.get().for_update().build();
     assert_eq!(ir.lock_mode, Some(LockMode::ForUpdate));
 }
 
 #[test]
 fn get_for_share() {
-    let ir = TEST_MODEL.get().for_share().build();
+    let m = test_model();
+    let ir = m.get().for_share().build();
     assert_eq!(ir.lock_mode, Some(LockMode::ForShare));
 }
 
 #[test]
 fn get_lock_mode() {
-    let ir = TEST_MODEL.get().lock(LockMode::ForUpdateSkipLocked).build();
+    let m = test_model();
+    let ir = m.get().lock(LockMode::ForUpdateSkipLocked).build();
     assert_eq!(ir.lock_mode, Some(LockMode::ForUpdateSkipLocked));
 }
 
 #[test]
 fn get_param_count_basic() {
-    let count = TEST_MODEL
+    let m = test_model();
+    let count = m
         .get()
         .filter(field("id").eq(param()))
         .offset()
@@ -364,11 +408,13 @@ fn get_param_count_basic() {
 
 #[test]
 fn get_complex_query() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let p = posts_model();
+    let ir = m
         .get()
         .alias("u")
         .fields(&["id", "name"])
-        .inner_join(&POSTS_MODEL, &[("id", "user_id")])
+        .inner_join(&p, &[("id", "user_id")])
         .filter(field("status").eq(param()))
         .group_by(&["status"])
         .having(raw_expr("COUNT(*) > 5"))
@@ -397,7 +443,8 @@ fn get_complex_query() {
 
 #[test]
 fn insert_defaults() {
-    let ir = TEST_MODEL.insert().build();
+    let m = test_model();
+    let ir = m.insert().build();
     assert_eq!(ir.target.name, "users");
     assert_eq!(
         ir.fields,
@@ -409,13 +456,15 @@ fn insert_defaults() {
 
 #[test]
 fn insert_selected_columns() {
-    let ir = TEST_MODEL.insert().fields(&["email", "name"]).build();
+    let m = test_model();
+    let ir = m.insert().fields(&["email", "name"]).build();
     assert_eq!(ir.fields, vec!["email", "name"]);
 }
 
 #[test]
 fn insert_multiple_rows() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .insert()
         .fields(&["email", "name"])
         .rows(3)
@@ -425,13 +474,15 @@ fn insert_multiple_rows() {
 
 #[test]
 fn insert_returning_all() {
-    let ir = TEST_MODEL.insert().returning_all().build();
+    let m = test_model();
+    let ir = m.insert().returning_all().build();
     assert_eq!(ir.returning, vec!["*"]);
 }
 
 #[test]
 fn insert_returning_specific() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .insert()
         .fields(&["email", "name"])
         .returning(&["id", "created_at"])
@@ -441,7 +492,8 @@ fn insert_returning_specific() {
 
 #[test]
 fn insert_param_count() {
-    let b = TEST_MODEL.insert().fields(&["email", "name"]).rows(3);
+    let m = test_model();
+    let b = m.insert().fields(&["email", "name"]).rows(3);
     assert_eq!(b.param_count(), 6); // 2 fields * 3 rows
 }
 
@@ -449,7 +501,8 @@ fn insert_param_count() {
 
 #[test]
 fn insert_select_basic() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .insert_select()
         .fields(&["id", "email"])
         .from_select("SELECT id, email FROM temp_users")
@@ -462,7 +515,8 @@ fn insert_select_basic() {
 
 #[test]
 fn insert_select_returning_all() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .insert_select()
         .fields(&["email"])
         .from_select("SELECT email FROM staging")
@@ -473,7 +527,8 @@ fn insert_select_returning_all() {
 
 #[test]
 fn insert_select_returning_specific() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .insert_select()
         .fields(&["email"])
         .from_select("SELECT email FROM staging")
@@ -486,7 +541,8 @@ fn insert_select_returning_specific() {
 
 #[test]
 fn update_set_single() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .update()
         .set("name")
         .filter(field("id").eq(param()))
@@ -499,10 +555,11 @@ fn update_set_single() {
 }
 
 #[test]
-fn update_set_columns() {
-    let ir = TEST_MODEL
+fn update_set_fields() {
+    let m = test_model();
+    let ir = m
         .update()
-        .set_columns(&["name", "email", "status"])
+        .set_fields(&["name", "email", "status"])
         .build();
     assert_eq!(ir.assignments.len(), 3);
     assert_eq!(ir.assignments[0].0, "name");
@@ -512,7 +569,8 @@ fn update_set_columns() {
 
 #[test]
 fn update_set_literal() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .update()
         .set_literal("status", "'inactive'")
         .build();
@@ -522,14 +580,16 @@ fn update_set_literal() {
 
 #[test]
 fn update_set_increment() {
-    let ir = TEST_MODEL.update().set_increment("status").build();
+    let m = test_model();
+    let ir = m.update().set_increment("status").build();
     assert_eq!(ir.assignments[0].0, "status");
     assert!(matches!(&ir.assignments[0].1, Expr::BinaryOp { .. }));
 }
 
 #[test]
 fn update_set_expr() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .update()
         .set_expr("name", raw_expr("UPPER(name)"))
         .build();
@@ -539,7 +599,8 @@ fn update_set_expr() {
 
 #[test]
 fn update_where_eq_literal() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .update()
         .set("name")
         .filter(field("status").eq(raw_expr("'active'")))
@@ -549,7 +610,8 @@ fn update_where_eq_literal() {
 
 #[test]
 fn update_where_raw() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .update()
         .set("name")
         .filter(raw_expr("created_at < NOW() - INTERVAL '1 day'"))
@@ -559,13 +621,15 @@ fn update_where_raw() {
 
 #[test]
 fn update_returning_all() {
-    let ir = TEST_MODEL.update().set("name").returning_all().build();
+    let m = test_model();
+    let ir = m.update().set("name").returning_all().build();
     assert_eq!(ir.returning, vec!["*"]);
 }
 
 #[test]
 fn update_returning_specific() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .update()
         .set("name")
         .returning(&["id", "name"])
@@ -575,7 +639,8 @@ fn update_returning_specific() {
 
 #[test]
 fn update_param_count() {
-    let b = TEST_MODEL
+    let m = test_model();
+    let b = m
         .update()
         .set("name")
         .set("email")
@@ -588,7 +653,8 @@ fn update_param_count() {
 
 #[test]
 fn remove_with_where_eq() {
-    let ir = TEST_MODEL.remove().filter(field("id").eq(param())).build();
+    let m = test_model();
+    let ir = m.remove().filter(field("id").eq(param())).build();
     assert_eq!(ir.target.name, "users");
     assert_eq!(ir.filters.len(), 1);
     assert!(ir.returning.is_empty());
@@ -596,7 +662,8 @@ fn remove_with_where_eq() {
 
 #[test]
 fn remove_with_literal_filter() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .remove()
         .filter(field("status").eq(raw_expr("'deleted'")))
         .build();
@@ -605,7 +672,8 @@ fn remove_with_literal_filter() {
 
 #[test]
 fn remove_with_raw_filter() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .remove()
         .filter(raw_expr("created_at < '2020-01-01'"))
         .build();
@@ -614,13 +682,15 @@ fn remove_with_raw_filter() {
 
 #[test]
 fn remove_with_expr_filter() {
-    let ir = TEST_MODEL.remove().filter(field("id").eq(param())).build();
+    let m = test_model();
+    let ir = m.remove().filter(field("id").eq(param())).build();
     assert_eq!(ir.filters.len(), 1);
 }
 
 #[test]
 fn remove_multiple_filters() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .remove()
         .filter(field("id").eq(param()))
         .filter(field("status").eq(param()))
@@ -630,7 +700,8 @@ fn remove_multiple_filters() {
 
 #[test]
 fn remove_returning_all() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .remove()
         .filter(field("id").eq(param()))
         .returning_all()
@@ -640,7 +711,8 @@ fn remove_returning_all() {
 
 #[test]
 fn remove_returning_specific() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .remove()
         .filter(field("id").eq(param()))
         .returning(&["id", "email"])
@@ -650,7 +722,8 @@ fn remove_returning_specific() {
 
 #[test]
 fn remove_param_count() {
-    let b = TEST_MODEL
+    let m = test_model();
+    let b = m
         .remove()
         .filter(field("id").eq(param()))
         .filter(field("status").eq(param()));
@@ -661,7 +734,8 @@ fn remove_param_count() {
 
 #[test]
 fn upsert_do_update() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .upsert()
         .fields(&["id", "email", "name"])
         .on_conflict(&["id"])
@@ -678,7 +752,8 @@ fn upsert_do_update() {
 
 #[test]
 fn upsert_do_nothing() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .upsert()
         .fields(&["id", "email"])
         .on_conflict(&["email"])
@@ -690,7 +765,8 @@ fn upsert_do_nothing() {
 
 #[test]
 fn upsert_defaults() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .upsert()
         .on_conflict(&["id"])
         .do_update(&["name"])
@@ -700,7 +776,8 @@ fn upsert_defaults() {
 
 #[test]
 fn upsert_on_conflict_constraint() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .upsert()
         .fields(&["id", "email"])
         .on_conflict_constraint("users_email_key")
@@ -712,7 +789,8 @@ fn upsert_on_conflict_constraint() {
 
 #[test]
 fn upsert_returning_all() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .upsert()
         .fields(&["id", "email"])
         .on_conflict(&["id"])
@@ -724,7 +802,8 @@ fn upsert_returning_all() {
 
 #[test]
 fn upsert_returning_specific() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .upsert()
         .fields(&["id", "email"])
         .on_conflict(&["id"])
@@ -736,7 +815,8 @@ fn upsert_returning_specific() {
 
 #[test]
 fn upsert_conflict_filter() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .upsert()
         .fields(&["id", "email"])
         .on_conflict(&["id"])
@@ -748,7 +828,8 @@ fn upsert_conflict_filter() {
 
 #[test]
 fn upsert_conflict_where_eq_literal() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .upsert()
         .fields(&["id", "email"])
         .on_conflict(&["id"])
@@ -760,7 +841,8 @@ fn upsert_conflict_where_eq_literal() {
 
 #[test]
 fn upsert_conflict_filter_expr() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .upsert()
         .fields(&["id", "email"])
         .on_conflict(&["id"])
@@ -772,7 +854,8 @@ fn upsert_conflict_filter_expr() {
 
 #[test]
 fn upsert_param_count() {
-    let b = TEST_MODEL
+    let m = test_model();
+    let b = m
         .upsert()
         .fields(&["id", "email"])
         .on_conflict(&["id"])
@@ -786,9 +869,10 @@ fn upsert_param_count() {
 
 #[test]
 fn alter_add_field() {
+    let m = test_model();
     let fd = FieldDef {
         name: "bio".to_string(),
-        field_type: FieldType::Text,
+        data_type: DataType::Text,
         primary_key: false,
         nullable: true,
         default_expr: None,
@@ -798,9 +882,10 @@ fn alter_add_field() {
         comment: None,
         collation: None,
         generated: None,
+        auto_increment: false,
         indexed: false,
     };
-    let ir = TEST_MODEL.alter().add_field(fd).build();
+    let ir = m.alter().add_field(fd).build();
     assert_eq!(ir.target.name, "users");
     assert_eq!(ir.actions.len(), 1);
     assert!(matches!(&ir.actions[0], AlterAction::AddField(f) if f.name == "bio"));
@@ -808,9 +893,10 @@ fn alter_add_field() {
 
 #[test]
 fn alter_add_field_from_field_def() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .alter()
-        .add_field(FieldDef::new("bio", FieldType::Text).nullable())
+        .add_field(FieldDef::new("bio", DataType::Text).nullable())
         .build();
     assert_eq!(ir.actions.len(), 1);
     assert!(matches!(&ir.actions[0], AlterAction::AddField(f) if f.name == "bio" && f.nullable));
@@ -818,34 +904,38 @@ fn alter_add_field_from_field_def() {
 
 #[test]
 fn alter_drop_field() {
-    let ir = TEST_MODEL.alter().drop_field("status").build();
+    let m = test_model();
+    let ir = m.alter().drop_field("status").build();
     assert!(matches!(&ir.actions[0], AlterAction::DropField(n) if n == "status"));
 }
 
 #[test]
 fn alter_rename_field() {
-    let ir = TEST_MODEL.alter().rename_field("name", "full_name").build();
+    let m = test_model();
+    let ir = m.alter().rename_field("name", "full_name").build();
     assert!(
         matches!(&ir.actions[0], AlterAction::RenameField { from, to } if from == "name" && to == "full_name")
     );
 }
 
 #[test]
-fn alter_column_type() {
-    let ir = TEST_MODEL
+fn alter_field_type() {
+    let m = test_model();
+    let ir = m
         .alter()
-        .alter_column_type("name", FieldType::Varchar(Some(255)))
+        .alter_field_type("name", DataType::Varchar(Some(255)))
         .build();
     assert!(matches!(
         &ir.actions[0],
         AlterAction::AlterFieldType { name, new_type }
-        if name == "name" && matches!(new_type, FieldType::Varchar(Some(255)))
+        if name == "name" && matches!(new_type, DataType::Varchar(Some(255)))
     ));
 }
 
 #[test]
 fn alter_set_default() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .alter()
         .set_default("status", "'pending'")
         .build();
@@ -856,26 +946,30 @@ fn alter_set_default() {
 
 #[test]
 fn alter_drop_default() {
-    let ir = TEST_MODEL.alter().drop_default("status").build();
+    let m = test_model();
+    let ir = m.alter().drop_default("status").build();
     assert!(matches!(&ir.actions[0], AlterAction::DropFieldDefault(n) if n == "status"));
 }
 
 #[test]
 fn alter_set_not_null() {
-    let ir = TEST_MODEL.alter().set_not_null("name").build();
+    let m = test_model();
+    let ir = m.alter().set_not_null("name").build();
     assert!(matches!(&ir.actions[0], AlterAction::SetFieldNotNull(n) if n == "name"));
 }
 
 #[test]
 fn alter_drop_not_null() {
-    let ir = TEST_MODEL.alter().drop_not_null("name").build();
+    let m = test_model();
+    let ir = m.alter().drop_not_null("name").build();
     assert!(matches!(&ir.actions[0], AlterAction::DropFieldNotNull(n) if n == "name"));
 }
 
 #[test]
 fn alter_add_constraint() {
+    let m = test_model();
     use dol_entity::constraint::EntityConstraint;
-    let ir = TEST_MODEL
+    let ir = m
         .alter()
         .add_constraint(EntityConstraint::Unique(&["email", "name"]))
         .build();
@@ -884,7 +978,8 @@ fn alter_add_constraint() {
 
 #[test]
 fn alter_drop_constraint() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .alter()
         .drop_constraint("users_email_key")
         .build();
@@ -893,13 +988,15 @@ fn alter_drop_constraint() {
 
 #[test]
 fn alter_rename_model() {
-    let ir = TEST_MODEL.alter().rename_model("people").build();
+    let m = test_model();
+    let ir = m.alter().rename_model("people").build();
     assert!(matches!(&ir.actions[0], AlterAction::RenameEntity(n) if n == "people"));
 }
 
 #[test]
 fn alter_multiple_actions() {
-    let ir = TEST_MODEL
+    let m = test_model();
+    let ir = m
         .alter()
         .drop_field("status")
         .rename_field("name", "full_name")
@@ -912,7 +1009,8 @@ fn alter_multiple_actions() {
 
 #[test]
 fn drop_model_minimal() {
-    let ir = TEST_MODEL.drop_entity().build();
+    let m = test_model();
+    let ir = m.drop_entity().build();
     assert_eq!(ir.target.name, "users");
     assert!(!ir.if_exists);
     assert!(!ir.cascade);
@@ -920,21 +1018,24 @@ fn drop_model_minimal() {
 
 #[test]
 fn drop_model_if_exists() {
-    let ir = TEST_MODEL.drop_entity().if_exists().build();
+    let m = test_model();
+    let ir = m.drop_entity().if_exists().build();
     assert!(ir.if_exists);
     assert!(!ir.cascade);
 }
 
 #[test]
 fn drop_model_cascade() {
-    let ir = TEST_MODEL.drop_entity().cascade().build();
+    let m = test_model();
+    let ir = m.drop_entity().cascade().build();
     assert!(!ir.if_exists);
     assert!(ir.cascade);
 }
 
 #[test]
 fn drop_model_if_exists_cascade() {
-    let ir = TEST_MODEL.drop_entity().if_exists().cascade().build();
+    let m = test_model();
+    let ir = m.drop_entity().if_exists().cascade().build();
     assert!(ir.if_exists);
     assert!(ir.cascade);
 }
@@ -943,7 +1044,8 @@ fn drop_model_if_exists_cascade() {
 
 #[test]
 fn create_from_meta_basic() {
-    let ir = TEST_MODEL.create().build();
+    let m = test_model();
+    let ir = m.create().build();
     assert_eq!(ir.name, "users");
     assert!(ir.namespace.is_none());
     assert_eq!(ir.fields.len(), 5);
@@ -951,7 +1053,7 @@ fn create_from_meta_basic() {
 
     // Check first field details
     assert_eq!(ir.fields[0].name, "id");
-    assert!(matches!(ir.fields[0].field_type, FieldType::Uuid));
+    assert!(matches!(ir.fields[0].data_type, DataType::Uuid));
     assert!(ir.fields[0].primary_key);
     assert!(!ir.fields[0].nullable);
 
@@ -969,7 +1071,8 @@ fn create_from_meta_basic() {
 
 #[test]
 fn create_from_meta_if_not_exists() {
-    let builder = TEST_MODEL.create().if_not_exists();
+    let m = test_model();
+    let builder = m.create().if_not_exists();
     assert!(builder.has_if_not_exists());
     let ir = builder.build();
     assert!(ir.if_not_exists);
@@ -977,19 +1080,20 @@ fn create_from_meta_if_not_exists() {
 
 #[test]
 fn create_from_meta_get_model() {
-    let builder = TEST_MODEL.create();
+    let m = test_model();
+    let builder = m.create();
     assert_eq!(builder.get_entity().name, "users");
 }
 
 #[test]
 fn create_from_meta_with_namespace() {
-    static NS_MODEL: Entity = Entity::new(
+    let ns_model = Entity::new(
         "accounts",
-        &[Field::new("id", FieldType::Uuid).primary_key()],
+        vec![Field::new("id", DataType::Uuid).primary_key()],
     )
     .with_namespace("public");
 
-    let ir = NS_MODEL.create().build();
+    let ir = ns_model.create().build();
     assert_eq!(ir.name, "accounts");
     assert_eq!(ir.namespace.as_deref(), Some("public"));
 }
@@ -1001,7 +1105,7 @@ fn define_model_basic() {
     let ir = DefineEntityBuilder::new("events")
         .field(FieldDef {
             name: "id".to_string(),
-            field_type: FieldType::Uuid,
+            data_type: DataType::Uuid,
             primary_key: true,
             nullable: false,
             default_expr: None,
@@ -1011,6 +1115,7 @@ fn define_model_basic() {
             comment: None,
             collation: None,
             generated: None,
+            auto_increment: false,
             indexed: false,
         })
         .build();
@@ -1054,7 +1159,7 @@ fn define_model_multiple_fields() {
     let fields = vec![
         FieldDef {
             name: "a".to_string(),
-            field_type: FieldType::Int,
+            data_type: DataType::Int32,
             primary_key: false,
             nullable: false,
             default_expr: None,
@@ -1064,11 +1169,12 @@ fn define_model_multiple_fields() {
             comment: None,
             collation: None,
             generated: None,
+            auto_increment: false,
             indexed: false,
         },
         FieldDef {
             name: "b".to_string(),
-            field_type: FieldType::Text,
+            data_type: DataType::Text,
             primary_key: false,
             nullable: true,
             default_expr: None,
@@ -1078,6 +1184,7 @@ fn define_model_multiple_fields() {
             comment: None,
             collation: None,
             generated: None,
+            auto_increment: false,
             indexed: false,
         },
     ];
@@ -1404,61 +1511,61 @@ fn move_file_basic() {
 
 #[test]
 fn namespace_propagates_to_get_ir() {
-    static NS_MODEL: Entity = Entity::new(
+    let ns_model = Entity::new(
         "accounts",
-        &[Field::new("id", FieldType::Uuid).primary_key()],
+        vec![Field::new("id", DataType::Uuid).primary_key()],
     )
     .with_namespace("auth");
 
-    let ir = NS_MODEL.get().build();
+    let ir = ns_model.get().build();
     assert_eq!(ir.source.namespace.as_deref(), Some("auth"));
 }
 
 #[test]
 fn namespace_propagates_to_insert_ir() {
-    static NS_MODEL: Entity = Entity::new(
+    let ns_model = Entity::new(
         "accounts",
-        &[Field::new("id", FieldType::Uuid).primary_key()],
+        vec![Field::new("id", DataType::Uuid).primary_key()],
     )
     .with_namespace("auth");
 
-    let ir = NS_MODEL.insert().fields(&["id"]).build();
+    let ir = ns_model.insert().fields(&["id"]).build();
     assert_eq!(ir.target.namespace.as_deref(), Some("auth"));
 }
 
 #[test]
 fn namespace_propagates_to_update_ir() {
-    static NS_MODEL: Entity = Entity::new(
+    let ns_model = Entity::new(
         "accounts",
-        &[Field::new("id", FieldType::Uuid).primary_key()],
+        vec![Field::new("id", DataType::Uuid).primary_key()],
     )
     .with_namespace("auth");
 
-    let ir = NS_MODEL.update().set("id").build();
+    let ir = ns_model.update().set("id").build();
     assert_eq!(ir.target.namespace.as_deref(), Some("auth"));
 }
 
 #[test]
 fn namespace_propagates_to_remove_ir() {
-    static NS_MODEL: Entity = Entity::new(
+    let ns_model = Entity::new(
         "accounts",
-        &[Field::new("id", FieldType::Uuid).primary_key()],
+        vec![Field::new("id", DataType::Uuid).primary_key()],
     )
     .with_namespace("auth");
 
-    let ir = NS_MODEL.remove().build();
+    let ir = ns_model.remove().build();
     assert_eq!(ir.target.namespace.as_deref(), Some("auth"));
 }
 
 #[test]
 fn namespace_propagates_to_upsert_ir() {
-    static NS_MODEL: Entity = Entity::new(
+    let ns_model = Entity::new(
         "accounts",
-        &[Field::new("id", FieldType::Uuid).primary_key()],
+        vec![Field::new("id", DataType::Uuid).primary_key()],
     )
     .with_namespace("auth");
 
-    let ir = NS_MODEL
+    let ir = ns_model
         .upsert()
         .fields(&["id"])
         .on_conflict(&["id"])
@@ -1469,36 +1576,36 @@ fn namespace_propagates_to_upsert_ir() {
 
 #[test]
 fn namespace_propagates_to_alter_ir() {
-    static NS_MODEL: Entity = Entity::new(
+    let ns_model = Entity::new(
         "accounts",
-        &[Field::new("id", FieldType::Uuid).primary_key()],
+        vec![Field::new("id", DataType::Uuid).primary_key()],
     )
     .with_namespace("auth");
 
-    let ir = NS_MODEL.alter().drop_field("id").build();
+    let ir = ns_model.alter().drop_field("id").build();
     assert_eq!(ir.target.namespace.as_deref(), Some("auth"));
 }
 
 #[test]
 fn namespace_propagates_to_drop_ir() {
-    static NS_MODEL: Entity = Entity::new(
+    let ns_model = Entity::new(
         "accounts",
-        &[Field::new("id", FieldType::Uuid).primary_key()],
+        vec![Field::new("id", DataType::Uuid).primary_key()],
     )
     .with_namespace("auth");
 
-    let ir = NS_MODEL.drop_entity().build();
+    let ir = ns_model.drop_entity().build();
     assert_eq!(ir.target.namespace.as_deref(), Some("auth"));
 }
 
 #[test]
 fn namespace_propagates_to_create_ir() {
-    static NS_MODEL: Entity = Entity::new(
+    let ns_model = Entity::new(
         "accounts",
-        &[Field::new("id", FieldType::Uuid).primary_key()],
+        vec![Field::new("id", DataType::Uuid).primary_key()],
     )
     .with_namespace("auth");
 
-    let ir = NS_MODEL.create().build();
+    let ir = ns_model.create().build();
     assert_eq!(ir.namespace.as_deref(), Some("auth"));
 }

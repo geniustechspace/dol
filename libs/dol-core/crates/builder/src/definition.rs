@@ -11,9 +11,9 @@
 //!
 //! For SQL rendering, import the extension traits from `dol-sql`.
 
-use dol_entity::{Entity, Field, FieldType};
-use dol_ir::EntityRef;
-use dol_ir::definition::{
+use dol_entity::{Entity, Field, DataType};
+use dol_core::ir::EntityRef;
+use dol_core::ir::definition::{
     AlterAction, AlterEntityIR, DefineEntityIR, DefineIndexIR, DefineTypeIR, DropEntityIR,
     DropIndexIR, DropTypeIR, FieldDef, IndexMethod, OwnedEntityConstraint, OwnedForeignKeyRef,
 };
@@ -26,7 +26,7 @@ use dol_ir::definition::{
 fn field_to_field_def(f: &Field) -> FieldDef {
     FieldDef {
         name: f.name.to_string(),
-        field_type: f.field_type,
+        data_type: f.data_type.clone(),
         primary_key: f.primary_key,
         nullable: f.nullable,
         default_expr: f.default_expr.map(|s| s.to_string()),
@@ -41,6 +41,7 @@ fn field_to_field_def(f: &Field) -> FieldDef {
         comment: f.comment.map(|s| s.to_string()),
         collation: f.collation.map(|s| s.to_string()),
         generated: f.generated.map(|(k, e)| (k, e.to_string())),
+        auto_increment: f.auto_increment,
         indexed: f.indexed,
     }
 }
@@ -215,8 +216,8 @@ impl<'a> AlterEntityBuilder<'a> {
         self
     }
 
-    /// Change a column's type to the given [`FieldType`].
-    pub fn alter_column_type(mut self, name: &str, new_type: FieldType) -> Self {
+    /// Change a field's type to the given [`DataType`].
+    pub fn alter_field_type(mut self, name: &str, new_type: DataType) -> Self {
         self.actions.push(AlterAction::AlterFieldType {
             name: name.to_string(),
             new_type,

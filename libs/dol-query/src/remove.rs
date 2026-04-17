@@ -1,7 +1,7 @@
 //! REMOVE (DELETE) query builder for `dol-query`.
 
-use dol_expr::Expr;
-use dol_ir::{EntityRef, RemoveIR};
+use dol_core::expr::Expr;
+use dol_core::ir::{EntityRef, RemoveIR};
 
 // ===========================================================================
 // RemoveQuery
@@ -15,7 +15,7 @@ use dol_ir::{EntityRef, RemoveIR};
 pub struct RemoveQuery {
     name: String,
     namespace: Option<String>,
-    filters: Vec<Expr>,
+    filters: Vec<Expr<'static>>,
     returning: Vec<String>,
 }
 
@@ -32,7 +32,7 @@ impl RemoveQuery {
     /// Add an arbitrary filter expression to the WHERE clause.
     ///
     /// Multiple filters are AND-joined.
-    pub fn filter(mut self, expr: Expr) -> Self {
+    pub fn filter(mut self, expr: Expr<'static>) -> Self {
         self.filters.push(expr);
         self
     }
@@ -50,7 +50,7 @@ impl RemoveQuery {
     }
 
     /// Build the canonical [`RemoveIR`].
-    pub fn build(self) -> RemoveIR {
+    pub fn build(self) -> RemoveIR<'static> {
         RemoveIR {
             target: EntityRef {
                 name: self.name,

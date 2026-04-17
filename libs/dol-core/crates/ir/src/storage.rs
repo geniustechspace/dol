@@ -5,9 +5,9 @@ use dol_expr::Expr;
 /// Put (upload/write) an object into a bucket/store.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct PutObjectIR {
+pub struct PutObjectIR<'a> {
     pub key: String,
-    pub source: ObjectSource,
+    pub source: ObjectSource<'a>,
     pub bucket: String,
     pub content_type: Option<String>,
     pub metadata: Vec<(String, String)>,
@@ -16,13 +16,13 @@ pub struct PutObjectIR {
 /// Source of data for a storage operation.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum ObjectSource {
+pub enum ObjectSource<'a> {
     /// From a file path.
     FromPath(String),
     /// From a bind parameter (bytes).
     FromBytes,
     /// From an expression.
-    FromExpr(Expr),
+    FromExpr(Expr<'a>),
 }
 
 /// Get (download/read) an object from a bucket/store.
@@ -54,9 +54,9 @@ pub struct ReadFileIR {
 /// Write content to a file.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct WriteFileIR {
+pub struct WriteFileIR<'a> {
     pub path: String,
-    pub source: ObjectSource,
+    pub source: ObjectSource<'a>,
     pub create_dirs: bool,
 }
 

@@ -6,14 +6,14 @@ use dol_expr::{Expr, OrderByExpr};
 /// How to retrieve data from a source.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct QueryIR {
+pub struct QueryIR<'a> {
     pub source: EntityRef,
-    pub projections: Vec<Expr>,
+    pub projections: Vec<Expr<'a>>,
     pub joins: Vec<JoinIR>,
-    pub filters: Vec<Expr>,
-    pub group_by: Vec<Expr>,
-    pub having: Vec<Expr>,
-    pub order_by: Vec<OrderByExpr>,
+    pub filters: Vec<Expr<'a>>,
+    pub group_by: Vec<Expr<'a>>,
+    pub having: Vec<Expr<'a>>,
+    pub order_by: Vec<OrderByExpr<'a>>,
     pub offset: Option<OffsetLimit>,
     pub limit: Option<OffsetLimit>,
     pub distinct: bool,
@@ -78,10 +78,10 @@ pub enum SetOpKind {
 /// A compound query (set operations: UNION, INTERSECT, EXCEPT).
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct CompoundQueryIR {
-    pub base: Box<QueryIR>,
-    pub operations: Vec<(SetOpKind, QueryIR)>,
-    pub order_by: Vec<OrderByExpr>,
+pub struct CompoundQueryIR<'a> {
+    pub base: Box<QueryIR<'a>>,
+    pub operations: Vec<(SetOpKind, QueryIR<'a>)>,
+    pub order_by: Vec<OrderByExpr<'a>>,
     pub offset: Option<OffsetLimit>,
     pub limit: Option<OffsetLimit>,
 }

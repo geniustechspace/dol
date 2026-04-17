@@ -5,10 +5,7 @@ resolver = "2"
 members = [
     "libs/dol",
     "libs/dol-core",
-    "libs/dol-core/crates/expr",
-    "libs/dol-core/crates/entity",
-    "libs/dol-core/crates/ir",
-    "libs/dol-core/crates/builder",
+    "libs/dol-entity",
     "libs/dol-query",
     "libs/dol-sql",
     "libs/dol-kv",
@@ -35,9 +32,10 @@ tokio = { version = "1", features = ["rt", "macros"] }
 
 # Internal crates
 dol-core = { path = "libs/dol-core" }
+dol-entity = { path = "libs/dol-entity" }
+dol-query = { path = "libs/dol-query" }
 dol-sql = { path = "libs/dol-sql" }
 dol-kv = { path = "libs/dol-kv" }
 dol-objects = { path = "libs/dol-objects" }
 dol-migration = { path = "libs/dol-migration" }
 dol-config = { path = "libs/dol-config" }
-dol-query = { path = "libs/dol-query" }

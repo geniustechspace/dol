@@ -1,8 +1,8 @@
 use super::*;
-use dol_core::builder::DefineEntityBuilder;
+use dol_entity::DefineEntityBuilder;
 use dol_core::ir::EntityRef;
 use dol_core::ir::definition::{DefineIndexIR, FieldDef};
-use dol_core::model::FieldType;
+use dol_entity::DataType;
 
 /// Test migration: Create users table.
 pub struct CreateUsersTable;
@@ -17,10 +17,10 @@ impl Migration for CreateUsersTable {
     fn up(&self) -> Vec<MigrationStep> {
         vec![MigrationStep::define_entity(
             DefineEntityBuilder::new("users")
-                .field(FieldDef::new("id", FieldType::Uuid).primary_key())
-                .field(FieldDef::new("email", FieldType::Text).unique())
-                .field(FieldDef::new("status", FieldType::Text).default("'active'"))
-                .field(FieldDef::new("created_at", FieldType::Timestamp).default("NOW()"))
+                .field(FieldDef::new("id", DataType::Uuid).primary_key())
+                .field(FieldDef::new("email", DataType::Text).unique())
+                .field(FieldDef::new("status", DataType::Text).default("'active'"))
+                .field(FieldDef::new("created_at", DataType::TimestampTz { precision: 6 }).default("NOW()"))
                 .if_not_exists()
                 .build(),
         )]
@@ -74,10 +74,10 @@ impl Migration for CreateSessionsTable {
     fn up(&self) -> Vec<MigrationStep> {
         vec![MigrationStep::define_entity(
             DefineEntityBuilder::new("sessions")
-                .field(FieldDef::new("id", FieldType::Uuid).primary_key())
-                .field(FieldDef::new("user_id", FieldType::Uuid))
-                .field(FieldDef::new("token", FieldType::Text))
-                .field(FieldDef::new("expires_at", FieldType::Timestamp))
+                .field(FieldDef::new("id", DataType::Uuid).primary_key())
+                .field(FieldDef::new("user_id", DataType::Uuid))
+                .field(FieldDef::new("token", DataType::Text))
+                .field(FieldDef::new("expires_at", DataType::TimestampTz { precision: 6 }))
                 .if_not_exists()
                 .build(),
         )]

@@ -8,21 +8,14 @@ version = "0.1.0"
 dependencies = [
  "dol-config",
  "dol-core",
+ "dol-entity",
  "dol-kv",
  "dol-migration",
  "dol-objects",
+ "dol-query",
  "dol-sql",
  "serde",
  "toml",
-]
-
-[[package]]
-name = "dol-builder"
-version = "0.1.0"
-dependencies = [
- "dol-entity",
- "dol-expr",
- "dol-ir",
 ]
 
 [[package]]
@@ -40,35 +33,16 @@ dependencies = [
 name = "dol-core"
 version = "0.1.0"
 dependencies = [
- "dol-builder",
- "dol-entity",
- "dol-expr",
- "dol-ir",
- "dol-query",
+ "serde",
 ]
 
 [[package]]
 name = "dol-entity"
 version = "0.1.0"
 dependencies = [
+ "dol-core",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "dol-expr"
-version = "0.1.0"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "dol-ir"
-version = "0.1.0"
-dependencies = [
- "dol-entity",
- "dol-expr",
- "serde",
 ]
 
 [[package]]
@@ -76,6 +50,8 @@ name = "dol-kv"
 version = "0.1.0"
 dependencies = [
  "dol-core",
+ "dol-entity",
+ "dol-query",
 ]
 
 [[package]]
@@ -84,6 +60,8 @@ version = "0.1.0"
 dependencies = [
  "dol-config",
  "dol-core",
+ "dol-entity",
+ "dol-query",
  "dol-sql",
  "serde",
  "tokio",
@@ -95,16 +73,16 @@ name = "dol-objects"
 version = "0.1.0"
 dependencies = [
  "dol-core",
+ "dol-entity",
+ "dol-query",
 ]
 
 [[package]]
 name = "dol-query"
 version = "0.1.0"
 dependencies = [
- "dol-builder",
+ "dol-core",
  "dol-entity",
- "dol-expr",
- "dol-ir",
 ]
 
 [[package]]
@@ -112,6 +90,8 @@ name = "dol-sql"
 version = "0.1.0"
 dependencies = [
  "dol-core",
+ "dol-entity",
+ "dol-query",
  "serde",
  "serde_json",
  "serde_norway",

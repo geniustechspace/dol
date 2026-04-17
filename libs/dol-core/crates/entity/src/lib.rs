@@ -8,9 +8,9 @@
 //! - Object store: bucket schema
 //! - File system: typed resource
 //!
-//! A **Field** is a named property within an Entity (SQL: column).
+//! A **Field** is a named property within an Entity.
 //!
-//! A **FieldType** is the backend-agnostic logical type (SQL: column type).
+//! A **DataType** is the backend-agnostic logical type descriptor.
 
 #![deny(unsafe_code)]
 
@@ -20,52 +20,52 @@ pub mod field_type;
 
 pub use constraint::{EntityConstraint, FkAction, ForeignKeyRef, GeneratedKind};
 pub use field::Field;
-pub use field_type::FieldType;
+pub use field_type::DataType;
 
 use constraint::EntityConstraint as Constraint;
-use field::Field as F;
 
 /// A model definition — the single source of truth for a data shape's schema.
 ///
-/// Define as a `static` in your domain crate:
-/// ```rust
-/// use dol_entity::{Entity, Field, FieldType, FkAction, EntityConstraint};
+/// # Example
 ///
-/// pub static USERS: Entity = Entity::new("users", &[
-///     Field::new("id", FieldType::Uuid).primary_key(),
-///     Field::new("tenant_id", FieldType::Uuid),
-///     Field::new("email", FieldType::Text),
-///     Field::new("status", FieldType::Text).default("'active'"),
-///     Field::new("created_at", FieldType::Timestamp).default("NOW()"),
-/// ]).with_constraints(&[
+/// ```rust
+/// use dol_entity::{Entity, Field, DataType, FkAction, EntityConstraint};
+///
+/// let users = Entity::new("users", vec![
+///     Field::new("id", DataType::Uuid).primary_key(),
+///     Field::new("tenant_id", DataType::Uuid),
+///     Field::new("email", DataType::Text),
+///     Field::new("status", DataType::Text).default("'active'"),
+///     Field::new("seq", DataType::Int32).auto_increment(),
+/// ]).with_constraints(vec![
 ///     EntityConstraint::Unique(&["tenant_id", "email"]),
 /// ]);
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Entity {
     pub name: &'static str,
     pub namespace: Option<&'static str>,
-    pub fields: &'static [F],
-    pub constraints: &'static [Constraint],
+    pub fields: Vec<Field>,
+    pub constraints: Vec<Constraint>,
 }
 
 impl Entity {
-    pub const fn new(name: &'static str, fields: &'static [F]) -> Self {
+    pub fn new(name: &'static str, fields: Vec<Field>) -> Self {
         Self {
             name,
             namespace: None,
             fields,
-            constraints: &[],
+            constraints: Vec::new(),
         }
     }
 
-    pub const fn with_namespace(mut self, namespace: &'static str) -> Self {
+    pub fn with_namespace(mut self, namespace: &'static str) -> Self {
         self.namespace = Some(namespace);
         self
     }
 
-    pub const fn with_constraints(mut self, constraints: &'static [Constraint]) -> Self {
+    pub fn with_constraints(mut self, constraints: Vec<Constraint>) -> Self {
         self.constraints = constraints;
         self
     }
@@ -83,7 +83,7 @@ impl Entity {
         self.fields
             .iter()
             .find(|f| f.name == name)
-            .unwrap_or_else(|| panic!("field '{}' not found in model '{}'", name, self.name))
+            .unwrap_or_else(|| panic!("field '{}' not found in entity '{}'", name, self.name))
     }
 
     /// Look up a field by name, returning `None` if not found.

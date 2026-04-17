@@ -1,7 +1,7 @@
 //! UPDATE query builder for `dol-query`.
 
-use dol_expr::{Expr, field};
-use dol_ir::{EntityRef, UpdateIR};
+use dol_core::expr::{Expr, field};
+use dol_core::ir::{EntityRef, UpdateIR};
 
 // ===========================================================================
 // UpdateQuery
@@ -15,8 +15,8 @@ use dol_ir::{EntityRef, UpdateIR};
 pub struct UpdateQuery {
     name: String,
     namespace: Option<String>,
-    assignments: Vec<(String, Expr)>,
-    filters: Vec<Expr>,
+    assignments: Vec<(String, Expr<'static>)>,
+    filters: Vec<Expr<'static>>,
     returning: Vec<String>,
 }
 
@@ -37,8 +37,8 @@ impl UpdateQuery {
         self
     }
 
-    /// Set multiple columns to bind parameters: `col1 = $N, col2 = $N+1, ...`.
-    pub fn set_columns(mut self, columns: &[&str]) -> Self {
+    /// Set multiple fields to bind parameters: `field1 = $N, field2 = $N+1, ...`.
+    pub fn set_fields(mut self, columns: &[&str]) -> Self {
         for &c in columns {
             self.assignments.push((c.to_string(), Expr::Param));
         }
@@ -48,7 +48,7 @@ impl UpdateQuery {
     /// Set a column to a literal SQL expression: `col = <literal>`.
     pub fn set_literal(mut self, column: &str, literal: &str) -> Self {
         self.assignments
-            .push((column.to_string(), dol_expr::raw_expr(literal)));
+            .push((column.to_string(), dol_core::expr::raw_expr(literal)));
         self
     }
 
@@ -60,7 +60,7 @@ impl UpdateQuery {
     }
 
     /// Set a column to an arbitrary [`Expr`].
-    pub fn set_expr(mut self, column: &str, expr: Expr) -> Self {
+    pub fn set_expr(mut self, column: &str, expr: Expr<'static>) -> Self {
         self.assignments.push((column.to_string(), expr));
         self
     }
@@ -68,7 +68,7 @@ impl UpdateQuery {
     /// Add an arbitrary filter expression to the WHERE clause.
     ///
     /// Multiple filters are AND-joined.
-    pub fn filter(mut self, expr: Expr) -> Self {
+    pub fn filter(mut self, expr: Expr<'static>) -> Self {
         self.filters.push(expr);
         self
     }
@@ -86,7 +86,7 @@ impl UpdateQuery {
     }
 
     /// Build the canonical [`UpdateIR`].
-    pub fn build(self) -> UpdateIR {
+    pub fn build(self) -> UpdateIR<'static> {
         UpdateIR {
             target: EntityRef {
                 name: self.name,

@@ -1,32 +1,36 @@
 use super::*;
-use dol_core::builder::EntityBuilderExt;
+use dol_query::builder::EntityBuilderExt;
 use dol_core::expr::{field, param};
 use dol_core::ir::definition::FieldDef;
-use dol_core::model::{Entity, Field, FieldType};
+use dol_entity::{Entity, Field, DataType};
 
 fn pg() -> Dialect {
     Dialect::postgres()
 }
 
-static TEST_MODEL: Entity = Entity::new(
-    "users",
-    &[
-        Field::new("id", FieldType::Uuid).primary_key(),
-        Field::new("tenant_id", FieldType::Uuid),
-        Field::new("email", FieldType::Text).unique(),
-        Field::new("status", FieldType::Text).default("'active'"),
-        Field::new("created_at", FieldType::Timestamp).default("NOW()"),
-    ],
-);
+fn test_model() -> Entity {
+    Entity::new(
+        "users",
+        vec![
+            Field::new("id", DataType::Uuid).primary_key(),
+            Field::new("tenant_id", DataType::Uuid),
+            Field::new("email", DataType::Text).unique(),
+            Field::new("status", DataType::Text).default("'active'"),
+            Field::new("created_at", DataType::TimestampTz { precision: 6 }).default("NOW()"),
+        ],
+    )
+}
 
-static NS_MODEL: Entity =
-    Entity::new("users", &[Field::new("id", FieldType::Uuid).primary_key()]).with_namespace("auth");
+fn ns_model() -> Entity {
+    Entity::new("users", vec![Field::new("id", DataType::Uuid).primary_key()]).with_namespace("auth")
+}
 
 // -- GetBuilder --
 
 #[test]
 fn get_builder_render() {
-    let sql = TEST_MODEL
+    let model = test_model();
+    let sql = model
         .get()
         .filter(field("status").eq(param()))
         .order_by_desc("email")
@@ -41,14 +45,16 @@ fn get_builder_render() {
 
 #[test]
 fn insert_defaults() {
-    let sql = TEST_MODEL.insert().render(Some(&pg())).unwrap();
+    let model = test_model();
+    let sql = model.insert().render(Some(&pg())).unwrap();
     assert!(sql.contains("INSERT INTO users (id, tenant_id, email, status, created_at)"));
     assert!(sql.contains("VALUES ($1, $2, $3, $4, $5)"));
 }
 
 #[test]
 fn insert_specific_columns() {
-    let sql = TEST_MODEL
+    let model = test_model();
+    let sql = model
         .insert()
         .fields(&["id", "email"])
         .render(Some(&pg()))
@@ -59,7 +65,8 @@ fn insert_specific_columns() {
 
 #[test]
 fn insert_multiple_rows() {
-    let sql = TEST_MODEL
+    let model = test_model();
+    let sql = model
         .insert()
         .fields(&["id", "email"])
         .rows(3)
@@ -70,7 +77,8 @@ fn insert_multiple_rows() {
 
 #[test]
 fn insert_returning_all() {
-    let sql = TEST_MODEL
+    let model = test_model();
+    let sql = model
         .insert()
         .fields(&["id"])
         .returning_all()
@@ -81,7 +89,8 @@ fn insert_returning_all() {
 
 #[test]
 fn insert_with_namespace() {
-    let sql = NS_MODEL.insert().fields(&["id"]).render(None).unwrap();
+    let model = ns_model();
+    let sql = model.insert().fields(&["id"]).render(None).unwrap();
     assert!(sql.contains("INSERT INTO auth.users"));
 }
 
@@ -89,7 +98,8 @@ fn insert_with_namespace() {
 
 #[test]
 fn update_set_and_where() {
-    let sql = TEST_MODEL
+    let model = test_model();
+    let sql = model
         .update()
         .set("email")
         .set("status")
@@ -106,7 +116,8 @@ fn update_set_and_where() {
 
 #[test]
 fn remove_basic() {
-    let sql = TEST_MODEL
+    let model = test_model();
+    let sql = model
         .remove()
         .filter(field("id").eq(param()))
         .render(Some(&pg()))
@@ -119,7 +130,8 @@ fn remove_basic() {
 
 #[test]
 fn upsert_basic() {
-    let sql = TEST_MODEL
+    let model = test_model();
+    let sql = model
         .upsert()
         .fields(&["id", "email", "status"])
         .on_conflict(&["id"])
@@ -135,7 +147,8 @@ fn upsert_basic() {
 
 #[test]
 fn create_from_meta_basic() {
-    let sql = TEST_MODEL.create().render(Some(&pg())).unwrap();
+    let model = test_model();
+    let sql = model.create().render(Some(&pg())).unwrap();
     assert!(sql.starts_with("CREATE TABLE users ("));
     assert!(sql.contains("id UUID NOT NULL"));
     assert!(sql.contains("email TEXT NOT NULL UNIQUE"));
@@ -145,7 +158,8 @@ fn create_from_meta_basic() {
 
 #[test]
 fn create_from_meta_if_not_exists() {
-    let sql = TEST_MODEL.create().if_not_exists().render(None).unwrap();
+    let model = test_model();
+    let sql = model.create().if_not_exists().render(None).unwrap();
     assert!(sql.starts_with("CREATE TABLE IF NOT EXISTS users ("));
 }
 
@@ -153,10 +167,10 @@ fn create_from_meta_if_not_exists() {
 
 #[test]
 fn define_model_builder_basic() {
-    use dol_core::builder::EntityDefineExt;
+    use dol_entity::EntityDefineExt;
     let sql = Entity::define("sessions")
-        .field(FieldDef::new("id", FieldType::Uuid).primary_key())
-        .field(FieldDef::new("user_id", FieldType::Uuid))
+        .field(FieldDef::new("id", DataType::Uuid).primary_key())
+        .field(FieldDef::new("user_id", DataType::Uuid))
         .if_not_exists()
         .render(Some(&pg()))
         .unwrap();
@@ -168,9 +182,10 @@ fn define_model_builder_basic() {
 
 #[test]
 fn alter_model_add_and_drop() {
-    let sql = TEST_MODEL
+    let model = test_model();
+    let sql = model
         .alter()
-        .add_field(FieldDef::new("phone", FieldType::Text).nullable())
+        .add_field(FieldDef::new("phone", DataType::Text).nullable())
         .drop_field("legacy")
         .render(Some(&pg()))
         .unwrap();
@@ -182,13 +197,15 @@ fn alter_model_add_and_drop() {
 
 #[test]
 fn drop_model_basic() {
-    let sql = TEST_MODEL.drop_entity().render(None).unwrap();
+    let model = test_model();
+    let sql = model.drop_entity().render(None).unwrap();
     assert_eq!(sql, "DROP TABLE users");
 }
 
 #[test]
 fn drop_model_if_exists_cascade() {
-    let sql = TEST_MODEL
+    let model = test_model();
+    let sql = model
         .drop_entity()
         .if_exists()
         .cascade()
@@ -201,7 +218,7 @@ fn drop_model_if_exists_cascade() {
 
 #[test]
 fn define_index_basic() {
-    use dol_core::builder::DefineIndexBuilder;
+    use dol_entity::DefineIndexBuilder;
     let sql = DefineIndexBuilder::new("idx_users_email")
         .on("users")
         .columns(&["tenant_id", "email"])
@@ -216,7 +233,7 @@ fn define_index_basic() {
 
 #[test]
 fn drop_index_basic() {
-    use dol_core::builder::DropIndexBuilder;
+    use dol_entity::DropIndexBuilder;
     let sql = DropIndexBuilder::new("idx_users_email")
         .render(None)
         .unwrap();
@@ -227,7 +244,7 @@ fn drop_index_basic() {
 
 #[test]
 fn grant_basic() {
-    use dol_core::builder::control::{GrantBuilder, Privilege};
+    use dol_query::builder::control::{GrantBuilder, Privilege};
     let sql = GrantBuilder::new(Privilege::Select)
         .on("users")
         .to("app_reader")
@@ -240,7 +257,7 @@ fn grant_basic() {
 
 #[test]
 fn revoke_basic() {
-    use dol_core::builder::control::{Privilege, RevokeBuilder};
+    use dol_query::builder::control::{Privilege, RevokeBuilder};
     let sql = RevokeBuilder::new(Privilege::Insert)
         .on("users")
         .from("app_reader")
@@ -253,14 +270,13 @@ fn revoke_basic() {
 
 #[test]
 fn compound_select_params_globally_unique() {
-    // Two sub-queries each with a WHERE param. The compound builder
-    // renders them with a shared counter so params are globally unique.
-    let base_ir = TEST_MODEL
+    let model = test_model();
+    let base_ir = model
         .get()
         .fields(&["id"])
         .filter(field("tenant_id").eq(param()))
         .build();
-    let part_ir = TEST_MODEL
+    let part_ir = model
         .get()
         .fields(&["id"])
         .filter(field("status").eq(param()))
@@ -271,7 +287,6 @@ fn compound_select_params_globally_unique() {
         .offset()
         .render(Some(&pg()))
         .unwrap();
-    // Base uses $1, part uses $2, OFFSET/LIMIT use $3/$4
     assert!(sql.contains("tenant_id = $1"), "base param: {sql}");
     assert!(sql.contains("status = $2"), "part param: {sql}");
     assert!(
@@ -286,9 +301,9 @@ fn compound_select_params_globally_unique() {
 
 #[test]
 fn compound_select_no_params_starts_at_one() {
-    // Sub-queries with no WHERE params → LIMIT gets $1.
-    let base_ir = TEST_MODEL.get().fields(&["id"]).build();
-    let part_ir = TEST_MODEL.get().fields(&["id"]).build();
+    let model = test_model();
+    let base_ir = model.get().fields(&["id"]).build();
+    let part_ir = model.get().fields(&["id"]).build();
     let sql = CompoundSelectBuilder::new(base_ir)
         .union(part_ir)
         .limit()
@@ -301,7 +316,7 @@ fn compound_select_no_params_starts_at_one() {
 
 #[test]
 fn define_type_postgres() {
-    use dol_core::builder::DefineTypeBuilder;
+    use dol_entity::DefineTypeBuilder;
     let sql = DefineTypeBuilder::new("order_status")
         .variant("pending")
         .variant("shipped")
@@ -316,7 +331,7 @@ fn define_type_postgres() {
 
 #[test]
 fn define_type_mysql_is_comment() {
-    use dol_core::builder::DefineTypeBuilder;
+    use dol_entity::DefineTypeBuilder;
     let sql = DefineTypeBuilder::new("order_status")
         .variant("pending")
         .variant("shipped")
@@ -331,7 +346,7 @@ fn define_type_mysql_is_comment() {
 
 #[test]
 fn define_type_sqlite_is_comment() {
-    use dol_core::builder::DefineTypeBuilder;
+    use dol_entity::DefineTypeBuilder;
     let sql = DefineTypeBuilder::new("order_status")
         .variant("pending")
         .render(Some(&Dialect::sqlite()))
@@ -345,7 +360,7 @@ fn define_type_sqlite_is_comment() {
 
 #[test]
 fn define_type_with_namespace() {
-    use dol_core::builder::DefineTypeBuilder;
+    use dol_entity::DefineTypeBuilder;
     let sql = DefineTypeBuilder::new("order_status")
         .namespace("public")
         .variant("pending")
@@ -360,7 +375,7 @@ fn define_type_with_namespace() {
 
 #[test]
 fn define_type_variants_batch() {
-    use dol_core::builder::DefineTypeBuilder;
+    use dol_entity::DefineTypeBuilder;
     let sql = DefineTypeBuilder::new("color")
         .variants(&["red", "green", "blue"])
         .render(Some(&pg()))
@@ -372,7 +387,7 @@ fn define_type_variants_batch() {
 
 #[test]
 fn drop_type_postgres() {
-    use dol_core::builder::DropTypeBuilder;
+    use dol_entity::DropTypeBuilder;
     let sql = DropTypeBuilder::new("order_status")
         .if_exists()
         .render(Some(&pg()))
@@ -382,7 +397,7 @@ fn drop_type_postgres() {
 
 #[test]
 fn drop_type_without_if_exists() {
-    use dol_core::builder::DropTypeBuilder;
+    use dol_entity::DropTypeBuilder;
     let sql = DropTypeBuilder::new("order_status")
         .render(Some(&pg()))
         .unwrap();
@@ -391,7 +406,7 @@ fn drop_type_without_if_exists() {
 
 #[test]
 fn drop_type_mysql_is_comment() {
-    use dol_core::builder::DropTypeBuilder;
+    use dol_entity::DropTypeBuilder;
     let sql = DropTypeBuilder::new("order_status")
         .render(Some(&Dialect::mysql()))
         .unwrap();
@@ -405,7 +420,7 @@ fn drop_type_mysql_is_comment() {
 
 #[test]
 fn define_policy_postgres() {
-    use dol_core::builder::DefinePolicyBuilder;
+    use dol_query::builder::DefinePolicyBuilder;
     use dol_core::expr::{field, param};
     use dol_core::ir::control::PolicyAction;
 
@@ -426,14 +441,14 @@ fn define_policy_postgres() {
 
 #[test]
 fn define_policy_read_only() {
-    use dol_core::builder::DefinePolicyBuilder;
-    use dol_core::expr::{field, lit};
+    use dol_query::builder::DefinePolicyBuilder;
+    use dol_core::expr::{field, bool_expr};
     use dol_core::ir::control::PolicyAction;
 
     let sql = DefinePolicyBuilder::new("public_read")
         .on("posts")
         .for_action(PolicyAction::Read)
-        .using(field("published").eq(lit(true)))
+        .using(field("published").eq(bool_expr(true)))
         .render(Some(&pg()))
         .unwrap();
     assert!(sql.contains("FOR SELECT"), "{sql}");
@@ -446,7 +461,7 @@ fn define_policy_read_only() {
 
 #[test]
 fn define_policy_no_expressions() {
-    use dol_core::builder::DefinePolicyBuilder;
+    use dol_query::builder::DefinePolicyBuilder;
     use dol_core::ir::control::PolicyAction;
 
     let sql = DefinePolicyBuilder::new("allow_all")
@@ -461,9 +476,10 @@ fn define_policy_no_expressions() {
 
 #[test]
 fn transaction_block_postgres() {
-    use dol_core::builder::transaction::TransactionBuilder;
+    use dol_query::builder::transaction::TransactionBuilder;
 
-    let insert_ir = TEST_MODEL.insert().fields(&["id", "email"]).build();
+    let model = test_model();
+    let insert_ir = model.insert().fields(&["id", "email"]).build();
     let stmts = vec![dol_core::ir::Statement::Insert(insert_ir)];
     let ir = TransactionBuilder::block(stmts);
     let sql = TransactionBuilder::render(&ir, Some(&pg())).unwrap();

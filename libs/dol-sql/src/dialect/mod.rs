@@ -45,7 +45,7 @@ pub use pagination::PaginationStyle;
 pub use param::{ParamCounter, ParamStyle};
 pub use quoting::QuoteStyle;
 pub use returning::ReturningStyle;
-pub use types::{LogicalType, TypeMap};
+pub use types::{TypeDialect, render_data_type};
 pub use upsert::UpsertStyle;
 
 /// How nested field / JSON access is rendered in SQL.
@@ -106,8 +106,8 @@ pub struct Dialect {
     pub param_style: ParamStyle,
     /// Identifier quoting style.
     pub quote_style: QuoteStyle,
-    /// Logical-to-physical type mapping.
-    pub type_map: TypeMap,
+    /// Type rendering dialect.
+    pub type_dialect: TypeDialect,
     /// Pagination clause style.
     pub pagination: PaginationStyle,
     /// Upsert (INSERT or UPDATE) style.
@@ -160,9 +160,9 @@ impl Dialect {
         self.quote_style.quote(name)
     }
 
-    /// Resolve a `FieldType` to the physical SQL string for this dialect.
-    pub fn resolve_type(&self, field_type: &dol_core::model::FieldType) -> String {
-        self.type_map.resolve(field_type)
+    /// Resolve a `DataType` to the physical SQL string for this dialect.
+    pub fn resolve_type(&self, data_type: &dol_entity::DataType) -> String {
+        render_data_type(data_type, &self.type_dialect)
     }
 }
 

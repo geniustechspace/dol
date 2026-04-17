@@ -7,6 +7,8 @@ description = "DOL SQL backend — dialect-aware SQL rendering."
 
 [dependencies]
 dol-core = { workspace = true }
+dol-entity = { workspace = true }
+dol-query = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 toml_crate = { workspace = true, optional = true }

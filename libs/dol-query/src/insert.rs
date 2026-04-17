@@ -1,6 +1,6 @@
 //! INSERT query builder for `dol-query`.
 
-use dol_ir::{EntityRef, InsertIR};
+use dol_core::ir::{EntityRef, InsertIR};
 
 // ===========================================================================
 // InsertQuery

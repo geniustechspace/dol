@@ -39,9 +39,9 @@ pub struct EntityRef {
 /// Top-level DOL statement — the universal dispatch enum.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum Statement {
+pub enum Statement<'a> {
     // Definition
-    DefineEntity(DefineEntityIR),
+    DefineEntity(Box<DefineEntityIR>),
     AlterEntity(AlterEntityIR),
     DropEntity(DropEntityIR),
     DefineIndex(DefineIndexIR),
@@ -52,30 +52,30 @@ pub enum Statement {
     // Mutation
     Insert(InsertIR),
     InsertSelect(InsertSelectIR),
-    Update(UpdateIR),
-    Remove(RemoveIR),
-    Upsert(UpsertIR),
+    Update(UpdateIR<'a>),
+    Remove(RemoveIR<'a>),
+    Upsert(Box<UpsertIR<'a>>),
 
     // Query
-    Query(QueryIR),
+    Query(Box<QueryIR<'a>>),
 
     // Compound query (set operations)
-    Compound(CompoundQueryIR),
+    Compound(Box<CompoundQueryIR<'a>>),
 
     // Control
     Grant(GrantIR),
     Revoke(RevokeIR),
-    DefinePolicy(DefinePolicyIR),
+    DefinePolicy(DefinePolicyIR<'a>),
 
     // Transaction
-    Transaction(TransactionIR),
+    Transaction(TransactionIR<'a>),
 
     // Storage
-    PutObject(PutObjectIR),
+    PutObject(PutObjectIR<'a>),
     GetObject(GetObjectIR),
     ListObjects(ListObjectsIR),
     ReadFile(ReadFileIR),
-    WriteFile(WriteFileIR),
+    WriteFile(WriteFileIR<'a>),
     MoveFile(MoveFileIR),
 }
 
@@ -183,7 +183,7 @@ impl std::error::Error for BackendError {}
 
 /// The core backend trait. Each backend renders IR into its output format.
 pub trait Backend {
-    fn render(&self, stmt: &Statement) -> Result<RenderedOutput, BackendError>;
+    fn render(&self, stmt: &Statement<'_>) -> Result<RenderedOutput, BackendError>;
 }
 
 // ---------------------------------------------------------------------------

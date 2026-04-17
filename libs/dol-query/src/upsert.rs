@@ -1,7 +1,7 @@
 //! UPSERT (INSERT ... ON CONFLICT) query builder for `dol-query`.
 
-use dol_expr::Expr;
-use dol_ir::{EntityRef, UpsertIR};
+use dol_core::expr::Expr;
+use dol_core::ir::{EntityRef, UpsertIR};
 
 // ===========================================================================
 // UpsertQuery
@@ -21,7 +21,7 @@ pub struct UpsertQuery {
     conflict_constraint: Option<String>,
     update_fields: Vec<String>,
     do_nothing_flag: bool,
-    conflict_filters: Vec<Expr>,
+    conflict_filters: Vec<Expr<'static>>,
     returning: Vec<String>,
 }
 
@@ -90,7 +90,7 @@ impl UpsertQuery {
     }
 
     /// Add a filter expression to the conflict's WHERE clause.
-    pub fn conflict_filter(mut self, expr: Expr) -> Self {
+    pub fn conflict_filter(mut self, expr: Expr<'static>) -> Self {
         self.conflict_filters.push(expr);
         self
     }
@@ -108,7 +108,7 @@ impl UpsertQuery {
     ///
     /// When no fields have been set (via `.fields()`) and Entity field
     /// metadata is available, all entity fields are included by default.
-    pub fn build(self) -> UpsertIR {
+    pub fn build(self) -> UpsertIR<'static> {
         // Default: include all entity fields when none were specified.
         let fields = if self.fields.is_empty() {
             self.field_names.unwrap_or_default()

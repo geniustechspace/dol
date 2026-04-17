@@ -3,8 +3,8 @@
 //! Mirrors `dol-builder::GetBuilder` but works with owned name/namespace
 //! instead of requiring a static `&Entity` reference.
 
-use dol_expr::{Direction, Expr, NullsPosition, OrderByExpr, field};
-use dol_ir::{EntityRef, JoinIR, JoinType, LockMode, OffsetLimit, QueryIR};
+use dol_core::expr::{Direction, Expr, NullsPosition, OrderByExpr, field};
+use dol_core::ir::{EntityRef, JoinIR, JoinType, LockMode, OffsetLimit, QueryIR};
 
 // ---------------------------------------------------------------------------
 // Private join helper
@@ -33,12 +33,12 @@ pub struct GetQuery {
     namespace: Option<String>,
     field_names: Option<Vec<String>>,
     table_alias: Option<String>,
-    projections: Vec<Expr>,
+    projections: Vec<Expr<'static>>,
     joins: Vec<JoinClause>,
-    filters: Vec<Expr>,
-    group_by: Vec<Expr>,
-    having: Vec<Expr>,
-    order_by: Vec<OrderByExpr>,
+    filters: Vec<Expr<'static>>,
+    group_by: Vec<Expr<'static>>,
+    having: Vec<Expr<'static>>,
+    order_by: Vec<OrderByExpr<'static>>,
     has_offset: bool,
     has_limit: bool,
     distinct: bool,
@@ -99,7 +99,7 @@ impl GetQuery {
     /// .field(func::sum(field("amount")))
     /// .field(raw_expr("COALESCE(name, email)"))
     /// ```
-    pub fn field(mut self, expr: Expr) -> Self {
+    pub fn field(mut self, expr: Expr<'static>) -> Self {
         self.projections.push(expr);
         self
     }
@@ -181,7 +181,7 @@ impl GetQuery {
     /// .filter(field("status").eq(raw_expr("'active'")))
     /// .filter(raw_expr("created_at > NOW() - INTERVAL '30 days'"))
     /// ```
-    pub fn filter(mut self, expr: Expr) -> Self {
+    pub fn filter(mut self, expr: Expr<'static>) -> Self {
         self.filters.push(expr);
         self
     }
@@ -195,7 +195,7 @@ impl GetQuery {
     }
 
     /// Add a HAVING filter expression.
-    pub fn having(mut self, expr: Expr) -> Self {
+    pub fn having(mut self, expr: Expr<'static>) -> Self {
         self.having.push(expr);
         self
     }
@@ -238,7 +238,7 @@ impl GetQuery {
     }
 
     /// Add a fully-constructed [`OrderByExpr`] to the ORDER BY clause.
-    pub fn order_by_expr(mut self, expr: OrderByExpr) -> Self {
+    pub fn order_by_expr(mut self, expr: OrderByExpr<'static>) -> Self {
         self.order_by.push(expr);
         self
     }
@@ -298,7 +298,7 @@ impl GetQuery {
     ///
     /// When no projections have been set and Entity field metadata is
     /// available, all entity fields are selected by default.
-    pub fn build(self) -> QueryIR {
+    pub fn build(self) -> QueryIR<'static> {
         let source = EntityRef {
             name: self.name,
             namespace: self.namespace,

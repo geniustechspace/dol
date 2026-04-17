@@ -14,16 +14,16 @@ use dol_core::ir::BackendError;
 use dol_core::ir::SqlOutput;
 use dol_core::ir::definition::OwnedEntityConstraint;
 use dol_core::ir::*;
-use dol_core::model::Field;
-use dol_core::model::FieldType;
-use dol_core::model::constraint::{FkAction, GeneratedKind};
+use dol_entity::Field;
+use dol_entity::DataType;
+use dol_entity::constraint::{FkAction, GeneratedKind};
 
 // ===========================================================================
 // Expr rendering (the core recursive renderer)
 // ===========================================================================
 
 /// Renders an [`Expr`] tree into a SQL string.
-pub fn render_expr(expr: &Expr, counter: &mut ParamCounter, dialect: &Dialect) -> String {
+pub fn render_expr(expr: &Expr<'_>, counter: &mut ParamCounter, dialect: &Dialect) -> String {
     match expr {
         Expr::Identifier(name) => name.clone(),
 
@@ -47,7 +47,7 @@ pub fn render_expr(expr: &Expr, counter: &mut ParamCounter, dialect: &Dialect) -
 
         Expr::Param => counter.next(),
 
-        Expr::Literal(lit) => render_literal(lit, dialect),
+        Expr::Value(lit) => render_literal(lit, dialect),
 
         Expr::BinaryOp {
             left,
@@ -269,24 +269,83 @@ pub fn render_expr(expr: &Expr, counter: &mut ParamCounter, dialect: &Dialect) -
     }
 }
 
-fn render_literal(lit: &Literal, dialect: &Dialect) -> String {
+fn render_literal(lit: &Literal<'_>, dialect: &Dialect) -> String {
+    use dol_core::expr::Literal as L;
     match lit {
-        Literal::String(s) => format!("'{}'", s),
-        Literal::Int(n) => n.to_string(),
-        Literal::Float(f) => f.to_string(),
-        Literal::Bool(true) => dialect.bool_true.clone(),
-        Literal::Bool(false) => dialect.bool_false.clone(),
-        Literal::Null => "NULL".to_string(),
-        Literal::Uuid(u) => format!("'{}'", u),
-        Literal::Bytes(_) => "?bytes?".to_string(), // placeholder
-        Literal::Decimal(d) => d.clone(),
+        // Primitive
+        L::Null => "NULL".to_string(),
+        L::Bool(true) => dialect.bool_true.clone(),
+        L::Bool(false) => dialect.bool_false.clone(),
+
+        // Text
+        L::String(s) => format!("'{}'", s),
+        L::Json(s) => format!("'{}'", s),
+        L::Xml(s) => format!("'{}'", s),
+        L::Enum(s) => format!("'{}'", s),
+
+        // Binary
+        L::Bytes(b) => {
+            let hex: String = b.iter().map(|byte| format!("{:02x}", byte)).collect();
+            format!("'\\x{}'", hex)
+        }
+        L::Uuid(_bytes) => {
+            // Format as standard UUID string
+            format!("'{}'", lit) // Literal::Display already formats UUIDs correctly
+        }
+        L::BitString(bs) => format!("B'{}'", bs),
+
+        // Integer
+        L::Int8(n) => n.to_string(),
+        L::Int16(n) => n.to_string(),
+        L::Int32(n) => n.to_string(),
+        L::Int64(n) => n.to_string(),
+        L::Int128(n) => n.to_string(),
+        L::UInt8(n) => n.to_string(),
+        L::UInt16(n) => n.to_string(),
+        L::UInt32(n) => n.to_string(),
+        L::UInt64(n) => n.to_string(),
+        L::UInt128(n) => n.to_string(),
+
+        // Float
+        L::Float32(f) => f.to_string(),
+        L::Float64(f) => f.to_string(),
+
+        // Decimal
+        L::Decimal(d) => d.to_string(),
+
+        // Network
+        L::Inet(addr) => format!("'{}'", addr),
+        L::MacAddr(m) => format!("'{}'", m),
+        L::MacAddr8(m) => format!("'{}'", m),
+
+        // Temporal
+        L::Date(d) => format!("'{}'", d),
+        L::Time(t) => format!("'{}'", t),
+        L::DateTime(dt) => format!("'{}'", dt),
+        L::TimestampTz(ts) => format!("'{}'", ts),
+        L::Interval(iv) => format!("'{}'", iv),
+
+        // Geometric
+        L::Point(p) => format!("'{}'", p),
+        L::Line(l) => format!("'{}'", l),
+        L::Segment(s) => format!("'{}'", s),
+        L::Rect(r) => format!("'{}'", r),
+        L::Circle(c) => format!("'{}'", c),
+        L::Path(p) => format!("'{}'", p),
+        L::Polygon(p) => format!("'{}'", p),
+
+        // Composite — render as SQL array/JSON representations
+        L::Array(_) | L::Set(_) | L::Tuple(_) | L::Map(_) | L::Struct(_) | L::Range(_) => {
+            // Fall back to Display format, quoted
+            format!("'{}'", lit)
+        }
     }
 }
 
 fn render_binary_op(
-    left: &Expr,
+    left: &Expr<'_>,
     op: BinOp,
-    right: &Expr,
+    right: &Expr<'_>,
     negated: bool,
     counter: &mut ParamCounter,
     dialect: &Dialect,
@@ -393,7 +452,7 @@ fn render_binop_token(op: BinOp) -> &'static str {
 
 /// Renders an [`OrderByExpr`] into SQL.
 pub fn render_order_by_expr(
-    ob: &OrderByExpr,
+    ob: &OrderByExpr<'_>,
     counter: &mut ParamCounter,
     dialect: &Dialect,
 ) -> String {
@@ -437,7 +496,7 @@ fn render_frame_bound(bound: &FrameBound) -> String {
 // ===========================================================================
 
 /// Renders a `Vec<Expr>` as a WHERE clause (AND-joined).
-pub fn render_filters(filters: &[Expr], counter: &mut ParamCounter, dialect: &Dialect) -> String {
+pub fn render_filters(filters: &[Expr<'_>], counter: &mut ParamCounter, dialect: &Dialect) -> String {
     if filters.is_empty() {
         return String::new();
     }
@@ -450,7 +509,7 @@ pub fn render_filters(filters: &[Expr], counter: &mut ParamCounter, dialect: &Di
 
 /// Renders a `Vec<OrderByExpr>` as an ORDER BY clause.
 pub fn render_order_by_exprs(
-    order_by: &[OrderByExpr],
+    order_by: &[OrderByExpr<'_>],
     counter: &mut ParamCounter,
     dialect: &Dialect,
 ) -> String {
@@ -562,7 +621,7 @@ pub fn render_lock_mode(mode: &LockMode, dialect: &Dialect) -> String {
 
 /// Renders a field definition using the dialect's type map.
 pub fn render_field_def(field: &Field, dialect: &Dialect) -> String {
-    let type_str = dialect.type_map.resolve(&field.field_type);
+    let type_str = dialect.resolve_type(&field.data_type);
     let mut def = format!("{} {}", field.name, type_str);
 
     if let Some(collation) = field.collation {
@@ -608,7 +667,7 @@ pub fn render_field_def(field: &Field, dialect: &Dialect) -> String {
 
 /// Renders a field definition from an owned FieldDef (IR).
 pub fn render_field_def_ir(fd: &dol_core::ir::definition::FieldDef, dialect: &Dialect) -> String {
-    let type_str = dialect.type_map.resolve(&fd.field_type);
+    let type_str = dialect.resolve_type(&fd.data_type);
     let mut def = format!("{} {}", fd.name, type_str);
 
     if let Some(ref collation) = fd.collation {
@@ -652,9 +711,9 @@ pub fn render_field_def_ir(fd: &dol_core::ir::definition::FieldDef, dialect: &Di
     def
 }
 
-/// Renders a FieldType using the dialect's type map.
-pub fn render_type(field_type: &FieldType, dialect: &Dialect) -> String {
-    dialect.type_map.resolve(field_type)
+/// Renders a DataType using the dialect's type rendering.
+pub fn render_type(data_type: &DataType, dialect: &Dialect) -> String {
+    dialect.resolve_type(data_type)
 }
 
 /// Renders a model-level constraint.

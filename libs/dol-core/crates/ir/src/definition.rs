@@ -1,7 +1,7 @@
 //! Definition IR — canonical representation of schema operations.
 
 use super::EntityRef;
-use dol_entity::FieldType;
+use dol_entity::DataType;
 use dol_entity::constraint::{EntityConstraint, FkAction, GeneratedKind};
 
 /// An owned model-level constraint for use in IR and builders (not `'static`).
@@ -74,7 +74,7 @@ pub struct DefineEntityIR {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FieldDef {
     pub name: String,
-    pub field_type: FieldType,
+    pub data_type: DataType,
     pub primary_key: bool,
     pub nullable: bool,
     pub default_expr: Option<String>,
@@ -86,13 +86,15 @@ pub struct FieldDef {
     pub generated: Option<(GeneratedKind, String)>,
     /// Hint that this field should be indexed.
     pub indexed: bool,
+    /// Auto-incrementing field (replaces the old Serial/BigSerial types).
+    pub auto_increment: bool,
 }
 
 impl FieldDef {
-    pub fn new(name: &str, field_type: FieldType) -> Self {
+    pub fn new(name: &str, data_type: DataType) -> Self {
         Self {
             name: name.to_string(),
-            field_type,
+            data_type,
             primary_key: false,
             nullable: false,
             default_expr: None,
@@ -103,6 +105,7 @@ impl FieldDef {
             collation: None,
             generated: None,
             indexed: false,
+            auto_increment: false,
         }
     }
 
@@ -169,6 +172,12 @@ impl FieldDef {
         self.generated = Some((GeneratedKind::Virtual, expr.to_string()));
         self
     }
+
+    /// Mark as auto-incrementing.
+    pub fn auto_increment(mut self) -> Self {
+        self.auto_increment = true;
+        self
+    }
 }
 
 /// An owned foreign key reference (not `'static`).
@@ -217,7 +226,7 @@ pub enum AlterAction {
     AddField(FieldDef),
     DropField(String),
     RenameField { from: String, to: String },
-    AlterFieldType { name: String, new_type: FieldType },
+    AlterFieldType { name: String, new_type: DataType },
     SetFieldDefault { name: String, expr: String },
     DropFieldDefault(String),
     SetFieldNotNull(String),

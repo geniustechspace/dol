@@ -7,22 +7,22 @@
 //! # Usage
 //!
 //! ```rust
-//! use dol_core::model::{Entity, Field, FieldType};
+//! use dol_entity::{Entity, Field, DataType};
 //! use dol_migration::schema_diff::{diff_entities, diff_to_steps, EntitySnapshot};
 //!
-//! static OLD: Entity = Entity::new("users", &[
-//!     Field::new("id", FieldType::Uuid).primary_key(),
-//!     Field::new("email", FieldType::Text).unique(),
+//! let old = Entity::new("users", vec![
+//!     Field::new("id", DataType::Uuid).primary_key(),
+//!     Field::new("email", DataType::Text).unique(),
 //! ]);
 //!
-//! static NEW: Entity = Entity::new("users", &[
-//!     Field::new("id", FieldType::Uuid).primary_key(),
-//!     Field::new("email", FieldType::Text).unique(),
-//!     Field::new("name", FieldType::Text).nullable(),
+//! let new = Entity::new("users", vec![
+//!     Field::new("id", DataType::Uuid).primary_key(),
+//!     Field::new("email", DataType::Text).unique(),
+//!     Field::new("name", DataType::Text).nullable(),
 //! ]);
 //!
-//! let old_snap = EntitySnapshot::from_entity(&OLD);
-//! let new_snap = EntitySnapshot::from_entity(&NEW);
+//! let old_snap = EntitySnapshot::from_entity(&old);
+//! let new_snap = EntitySnapshot::from_entity(&new);
 //! let actions = diff_entities(&old_snap, &new_snap);
 //!
 //! assert_eq!(actions.len(), 1); // AddField("name")
@@ -33,7 +33,7 @@
 
 use dol_core::ir::AlterAction;
 use dol_core::ir::definition::{FieldDef, OwnedForeignKeyRef};
-use dol_core::model::{Entity, Field, FieldType};
+use dol_entity::{Entity, Field, DataType};
 
 use super::MigrationStep;
 
@@ -59,7 +59,7 @@ pub struct EntitySnapshot {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FieldSnapshot {
     pub name: String,
-    pub field_type: FieldType,
+    pub data_type: DataType,
     pub primary_key: bool,
     pub nullable: bool,
     pub has_default: bool,
@@ -91,7 +91,7 @@ impl FieldSnapshot {
     pub fn from_field(field: &Field) -> Self {
         Self {
             name: field.name.to_string(),
-            field_type: field.field_type,
+            data_type: field.data_type.clone(),
             primary_key: field.primary_key,
             nullable: field.nullable,
             has_default: field.has_default,
@@ -105,7 +105,7 @@ impl FieldSnapshot {
     pub fn from_field_def(def: &FieldDef) -> Self {
         Self {
             name: def.name.clone(),
-            field_type: def.field_type,
+            data_type: def.data_type.clone(),
             primary_key: def.primary_key,
             nullable: def.nullable,
             has_default: def.default_expr.is_some(),
@@ -117,7 +117,7 @@ impl FieldSnapshot {
 
     /// Convert to a `FieldDef` for use in migration steps.
     fn to_field_def(&self) -> FieldDef {
-        let mut def = FieldDef::new(&self.name, self.field_type);
+        let mut def = FieldDef::new(&self.name, self.data_type.clone());
         if self.primary_key {
             def = def.primary_key();
         }
@@ -175,10 +175,10 @@ pub fn diff_entities(old: &EntitySnapshot, new: &EntitySnapshot) -> Vec<AlterAct
     for new_field in &new.fields {
         if let Some(old_field) = old_fields.get(new_field.name.as_str()) {
             // Type change
-            if old_field.field_type != new_field.field_type {
+            if old_field.data_type != new_field.data_type {
                 actions.push(AlterAction::AlterFieldType {
                     name: new_field.name.clone(),
-                    new_type: new_field.field_type,
+                    new_type: new_field.data_type.clone(),
                 });
             }
 
@@ -236,13 +236,13 @@ pub fn diff_to_steps(
 ///
 /// Converts a [`Model`] to a `DefineModel` IR step with all its fields.
 pub fn create_entity_step(model: &Entity) -> MigrationStep {
-    use dol_core::builder::DefineEntityBuilder;
+    use dol_entity::DefineEntityBuilder;
 
     let mut builder = DefineEntityBuilder::new(model.name);
     if let Some(ns) = model.namespace {
         builder = builder.namespace(ns);
     }
-    for field in model.fields {
+    for field in &model.fields {
         builder = builder.field(field_to_field_def(field));
     }
     builder = builder.if_not_exists();
@@ -256,7 +256,7 @@ pub fn drop_entity_step(model: &Entity) -> MigrationStep {
 
 /// Convert a static `Field` to an owned `FieldDef`.
 pub fn field_to_field_def(field: &Field) -> FieldDef {
-    let mut def = FieldDef::new(field.name, field.field_type);
+    let mut def = FieldDef::new(field.name, field.data_type.clone());
     if field.primary_key {
         def = def.primary_key();
     }
@@ -290,8 +290,8 @@ pub fn field_to_field_def(field: &Field) -> FieldDef {
     }
     if let Some((kind, expr)) = &field.generated {
         def = match kind {
-            dol_core::model::constraint::GeneratedKind::Stored => def.generated_stored(expr),
-            dol_core::model::constraint::GeneratedKind::Virtual => def.generated_virtual(expr),
+            dol_entity::constraint::GeneratedKind::Stored => def.generated_stored(expr),
+            dol_entity::constraint::GeneratedKind::Virtual => def.generated_virtual(expr),
         };
     }
     def

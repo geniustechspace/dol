@@ -1,21 +1,24 @@
 use super::*;
-use dol_entity::{Field, FieldType};
-use dol_expr::{Expr, field, param};
+use dol_entity::{Field, DataType};
+use dol_core::expr::{Expr, field, param};
 
-static USERS: Entity = Entity::new(
-    "users",
-    &[
-        Field::new("id", FieldType::Uuid).primary_key(),
-        Field::new("email", FieldType::Text).unique(),
-        Field::new("name", FieldType::Text),
-    ],
-);
+fn users_entity() -> Entity {
+    Entity::new(
+        "users",
+        vec![
+            Field::new("id", DataType::Uuid).primary_key(),
+            Field::new("email", DataType::Text).unique(),
+            Field::new("name", DataType::Text),
+        ],
+    )
+}
 
 // ── Query construction ──────────────────────────────────────────
 
 #[test]
 fn from_entity() {
-    let q = Query::from(&USERS);
+    let users = users_entity();
+    let q = Query::from(&users);
     assert_eq!(q.name, "users");
     assert!(q.namespace.is_none());
     assert_eq!(
@@ -144,7 +147,8 @@ fn namespace_propagates_to_upsert_ir() {
 
 #[test]
 fn get_from_entity_defaults() {
-    let ir = Query::from(&USERS).get().build();
+    let users = users_entity();
+    let ir = Query::from(&users).get().build();
     assert_eq!(ir.source.name, "users");
     assert_eq!(ir.projections.len(), 3);
     assert!(matches!(&ir.projections[0], Expr::Identifier(n) if n == "id"));
@@ -153,7 +157,8 @@ fn get_from_entity_defaults() {
 
 #[test]
 fn get_from_entity_filter() {
-    let ir = Query::from(&USERS)
+    let users = users_entity();
+    let ir = Query::from(&users)
         .get()
         .filter(field("id").eq(param()))
         .build();
@@ -186,7 +191,8 @@ fn get_from_namespaced_string() {
 
 #[test]
 fn insert_from_entity_defaults() {
-    let ir = Query::from(&USERS).insert().build();
+    let users = users_entity();
+    let ir = Query::from(&users).insert().build();
     assert_eq!(ir.target.name, "users");
     assert_eq!(ir.fields, ["id", "email", "name"]);
 }

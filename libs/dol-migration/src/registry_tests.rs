@@ -52,9 +52,10 @@ fn in_memory_registry_ordered() {
 
 #[test]
 fn migration_history_entity() {
-    assert_eq!(MIGRATION_HISTORY.name, "_dol_migrations");
-    assert_eq!(MIGRATION_HISTORY.fields.len(), 5);
-    assert!(MIGRATION_HISTORY.field("version").primary_key);
+    let hist = migration_history();
+    assert_eq!(hist.name, "_dol_migrations");
+    assert_eq!(hist.fields.len(), 5);
+    assert!(hist.field("version").primary_key);
 }
 
 #[test]

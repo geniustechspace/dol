@@ -203,15 +203,7 @@ fn dialect_ref_inline_via_json() {
                     "bool_true": "TRUE",
                     "bool_false": "FALSE",
                     "concat_style": "PipeOperator",
-                    "type_map": { "mappings": {
-                        "Uuid": "UUID", "Text": "TEXT", "Integer": "INTEGER",
-                        "Boolean": "BOOLEAN", "Timestamptz": "TIMESTAMPTZ",
-                        "Jsonb": "JSONB", "TextArray": "TEXT[]", "SmallInt": "SMALLINT",
-                        "BigInt": "BIGINT", "Real": "REAL", "DoublePrecision": "DOUBLE PRECISION",
-                        "Numeric": "NUMERIC", "Bytea": "BYTEA", "Date": "DATE",
-                        "Time": "TIME", "Interval": "INTERVAL", "Serial": "SERIAL",
-                        "BigSerial": "BIGSERIAL", "Inet": "INET"
-                    }},
+                    "type_dialect": "Postgres",
                     "locking": { "for_update": true, "for_share": true, "skip_locked": true, "nowait": true, "use_table_hint": false },
                     "ddl": {
                         "create_if_not_exists": true, "drop_if_exists": true,

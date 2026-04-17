@@ -1,5 +1,5 @@
 use super::*;
-use dol_core::builder::storage::{GetObjectBuilder, PutObjectBuilder};
+use dol_query::builder::storage::{GetObjectBuilder, PutObjectBuilder};
 
 #[test]
 fn put_object_as_kv() {

@@ -3,9 +3,10 @@ name = "dol-entity"
 version.workspace = true
 edition.workspace = true
 publish = false
-description = "DOL schema language — Entity, Field, FieldType, and constraints."
+description = "DOL schema language — Entity, Field, DataType, and constraints."
 
 [dependencies]
+dol-core = { path = "../../" }
 serde = { workspace = true, optional = true }
 
 [dev-dependencies]
@@ -13,4 +14,4 @@ serde_json = { workspace = true }
 
 [features]
 default = []
-serde = ["dep:serde"]
+serde = ["dep:serde", "dol-core/serde"]

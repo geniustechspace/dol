@@ -1,7 +1,7 @@
 //! Control builders — GRANT, REVOKE, DEFINE POLICY.
 
-use dol_expr::Expr;
-use dol_ir::control::{DefinePolicyIR, GrantIR, PolicyAction, RevokeIR};
+use dol_core::expr::Expr;
+use dol_core::ir::control::{DefinePolicyIR, GrantIR, PolicyAction, RevokeIR};
 
 /// Builder for `GRANT` statements.
 #[derive(Debug, Clone)]
@@ -41,7 +41,7 @@ impl GrantBuilder {
 }
 
 // Re-export Privilege for convenience
-pub use dol_ir::control::Privilege;
+pub use dol_core::ir::control::Privilege;
 
 /// Builder for `REVOKE` statements.
 #[derive(Debug, Clone)]
@@ -88,8 +88,8 @@ impl RevokeBuilder {
 ///
 /// ```rust
 /// use dol_builder::control::DefinePolicyBuilder;
-/// use dol_expr::{field, param};
-/// use dol_ir::control::PolicyAction;
+/// use dol_core::expr::{field, param};
+/// use dol_core::ir::control::PolicyAction;
 ///
 /// let ir = DefinePolicyBuilder::new("tenant_isolation")
 ///     .on("orders")
@@ -104,8 +104,8 @@ pub struct DefinePolicyBuilder {
     name: String,
     on_model: String,
     action: PolicyAction,
-    using_expr: Option<Expr>,
-    check_expr: Option<Expr>,
+    using_expr: Option<Expr<'static>>,
+    check_expr: Option<Expr<'static>>,
 }
 
 impl DefinePolicyBuilder {
@@ -132,19 +132,19 @@ impl DefinePolicyBuilder {
     }
 
     /// Set the USING expression (filter for which rows are visible).
-    pub fn using(mut self, expr: impl Into<Expr>) -> Self {
+    pub fn using(mut self, expr: impl Into<Expr<'static>>) -> Self {
         self.using_expr = Some(expr.into());
         self
     }
 
     /// Set the WITH CHECK expression (filter for mutations).
-    pub fn check(mut self, expr: impl Into<Expr>) -> Self {
+    pub fn check(mut self, expr: impl Into<Expr<'static>>) -> Self {
         self.check_expr = Some(expr.into());
         self
     }
 
     /// Build the canonical [`DefinePolicyIR`].
-    pub fn build(&self) -> DefinePolicyIR {
+    pub fn build(&self) -> DefinePolicyIR<'static> {
         DefinePolicyIR {
             name: self.name.clone(),
             on_model: self.on_model.clone(),

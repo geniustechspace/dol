@@ -6,16 +6,16 @@
 
 use crate::dialect::{self, Dialect};
 use crate::render;
-use dol_core::builder::control::{DefinePolicyBuilder, GrantBuilder, RevokeBuilder};
-use dol_core::builder::definition::{
+use dol_entity::{
     AlterEntityBuilder, CreateFromMeta, DefineEntityBuilder, DefineIndexBuilder, DefineTypeBuilder,
     DropEntityBuilder, DropIndexBuilder, DropTypeBuilder,
 };
-use dol_core::builder::mutation::{
+use dol_query::builder::control::{DefinePolicyBuilder, GrantBuilder, RevokeBuilder};
+use dol_query::builder::mutation::{
     InsertBuilder, InsertSelectBuilder, RemoveBuilder, UpdateBuilder, UpsertBuilder,
 };
-use dol_core::builder::query::GetBuilder;
-use dol_core::builder::transaction::TransactionBuilder;
+use dol_query::builder::query::GetBuilder;
+use dol_query::builder::transaction::TransactionBuilder;
 use dol_core::expr::{Expr, OrderByExpr};
 use dol_core::ir::BackendError;
 use dol_core::ir::OffsetLimit;
@@ -52,7 +52,7 @@ impl Render for GetBuilder<'_> {
 impl Render for InsertBuilder<'_> {
     fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
-        let ir = self.build();
+        let ir = self.clone().build();
         render::render_insert_ir(&ir, dialect).map(|o| o.sql)
     }
 }
@@ -62,7 +62,7 @@ impl Render for InsertBuilder<'_> {
 impl Render for InsertSelectBuilder<'_> {
     fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
-        let ir = self.build();
+        let ir = self.clone().build();
         render::render_insert_select_ir(&ir, dialect).map(|o| o.sql)
     }
 }
@@ -72,7 +72,7 @@ impl Render for InsertSelectBuilder<'_> {
 impl Render for UpdateBuilder<'_> {
     fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
-        let ir = self.build();
+        let ir = self.clone().build();
         render::render_update_ir(&ir, dialect).map(|o| o.sql)
     }
 }
@@ -82,7 +82,7 @@ impl Render for UpdateBuilder<'_> {
 impl Render for RemoveBuilder<'_> {
     fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
-        let ir = self.build();
+        let ir = self.clone().build();
         render::render_remove_ir(&ir, dialect).map(|o| o.sql)
     }
 }
@@ -92,7 +92,7 @@ impl Render for RemoveBuilder<'_> {
 impl Render for UpsertBuilder<'_> {
     fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
-        let ir = self.build();
+        let ir = self.clone().build();
         render::render_upsert_ir(&ir, dialect).map(|o| o.sql)
     }
 }
@@ -113,8 +113,8 @@ impl Render for CreateFromMeta<'_> {
         let mut parts = Vec::new();
 
         // Field definitions
-        for field in model.fields {
-            parts.push(format!("  {}", render::render_field_def(field, dialect)));
+        for field in &model.fields {
+            parts.push(format!("  {}", render::render_field_def(&field, dialect)));
         }
 
         // Primary key constraint (derived from fields marked as PK)
@@ -129,7 +129,7 @@ impl Render for CreateFromMeta<'_> {
         }
 
         // Model-level constraints
-        for constraint in model.constraints {
+        for constraint in &model.constraints {
             let owned = dol_core::ir::OwnedEntityConstraint::from(constraint);
             parts.push(format!("  {}", render::render_model_constraint(&owned)));
         }
@@ -275,17 +275,17 @@ impl TransactionRender for TransactionBuilder {
 /// dialect.
 #[derive(Debug, Clone)]
 #[must_use = "builders do nothing until rendered via .render()"]
-pub struct CompoundSelectBuilder {
-    base: QueryIR,
-    parts: Vec<(SetOpKind, QueryIR)>,
-    order_by: Vec<OrderByExpr>,
+pub struct CompoundSelectBuilder<'a> {
+    base: QueryIR<'a>,
+    parts: Vec<(SetOpKind, QueryIR<'a>)>,
+    order_by: Vec<OrderByExpr<'a>>,
     has_offset: bool,
     has_limit: bool,
 }
 
-impl CompoundSelectBuilder {
+impl<'a> CompoundSelectBuilder<'a> {
     /// Create from a `QueryIR`.
-    pub fn new(base: QueryIR) -> Self {
+    pub fn new(base: QueryIR<'a>) -> Self {
         Self {
             base,
             parts: Vec::new(),
@@ -295,42 +295,42 @@ impl CompoundSelectBuilder {
         }
     }
 
-    pub fn union(mut self, query: QueryIR) -> Self {
+    pub fn union(mut self, query: QueryIR<'a>) -> Self {
         self.parts.push((SetOpKind::Union, query));
         self
     }
 
-    pub fn union_all(mut self, query: QueryIR) -> Self {
+    pub fn union_all(mut self, query: QueryIR<'a>) -> Self {
         self.parts.push((SetOpKind::UnionAll, query));
         self
     }
 
-    pub fn intersect(mut self, query: QueryIR) -> Self {
+    pub fn intersect(mut self, query: QueryIR<'a>) -> Self {
         self.parts.push((SetOpKind::Intersect, query));
         self
     }
 
-    pub fn intersect_all(mut self, query: QueryIR) -> Self {
+    pub fn intersect_all(mut self, query: QueryIR<'a>) -> Self {
         self.parts.push((SetOpKind::IntersectAll, query));
         self
     }
 
-    pub fn except(mut self, query: QueryIR) -> Self {
+    pub fn except(mut self, query: QueryIR<'a>) -> Self {
         self.parts.push((SetOpKind::Except, query));
         self
     }
 
-    pub fn except_all(mut self, query: QueryIR) -> Self {
+    pub fn except_all(mut self, query: QueryIR<'a>) -> Self {
         self.parts.push((SetOpKind::ExceptAll, query));
         self
     }
 
-    pub fn op(mut self, kind: SetOpKind, query: QueryIR) -> Self {
+    pub fn op(mut self, kind: SetOpKind, query: QueryIR<'a>) -> Self {
         self.parts.push((kind, query));
         self
     }
 
-    pub fn order_by(mut self, exprs: impl IntoIterator<Item = OrderByExpr>) -> Self {
+    pub fn order_by(mut self, exprs: impl IntoIterator<Item = OrderByExpr<'a>>) -> Self {
         self.order_by = exprs.into_iter().collect();
         self
     }
@@ -346,7 +346,7 @@ impl CompoundSelectBuilder {
     }
 }
 
-impl Render for CompoundSelectBuilder {
+impl Render for CompoundSelectBuilder<'_> {
     fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
 
@@ -375,43 +375,43 @@ impl Render for CompoundSelectBuilder {
 // ===========================================================================
 
 /// Extension trait adding compound query and subquery methods to [`GetBuilder`].
-pub trait GetBuilderSqlExt {
+pub trait GetBuilderSqlExt<'a> {
     /// Start a UNION compound query with this builder's SQL as the base.
-    fn union(self, other: GetBuilder<'_>) -> CompoundSelectBuilder;
+    fn union(self, other: GetBuilder<'a>) -> CompoundSelectBuilder<'a>;
     /// Start a UNION ALL compound query.
-    fn union_all(self, other: GetBuilder<'_>) -> CompoundSelectBuilder;
+    fn union_all(self, other: GetBuilder<'a>) -> CompoundSelectBuilder<'a>;
     /// Start an INTERSECT compound query.
-    fn intersect(self, other: GetBuilder<'_>) -> CompoundSelectBuilder;
+    fn intersect(self, other: GetBuilder<'a>) -> CompoundSelectBuilder<'a>;
     /// Start an EXCEPT compound query.
-    fn except(self, other: GetBuilder<'_>) -> CompoundSelectBuilder;
+    fn except(self, other: GetBuilder<'a>) -> CompoundSelectBuilder<'a>;
     /// Render this query as a scalar subquery expression `(SELECT ...)`.
-    fn as_scalar(&self) -> Expr;
+    fn as_scalar(&self) -> Expr<'static>;
     /// Render this query as a scalar subquery expression using a specific dialect.
-    fn as_scalar_with(&self, dialect: &Dialect) -> Expr;
+    fn as_scalar_with(&self, dialect: &Dialect) -> Expr<'static>;
 }
 
-impl GetBuilderSqlExt for GetBuilder<'_> {
-    fn union(self, other: GetBuilder<'_>) -> CompoundSelectBuilder {
+impl<'a> GetBuilderSqlExt<'a> for GetBuilder<'a> {
+    fn union(self, other: GetBuilder<'a>) -> CompoundSelectBuilder<'a> {
         CompoundSelectBuilder::new(self.build()).union(other.build())
     }
 
-    fn union_all(self, other: GetBuilder<'_>) -> CompoundSelectBuilder {
+    fn union_all(self, other: GetBuilder<'a>) -> CompoundSelectBuilder<'a> {
         CompoundSelectBuilder::new(self.build()).union_all(other.build())
     }
 
-    fn intersect(self, other: GetBuilder<'_>) -> CompoundSelectBuilder {
+    fn intersect(self, other: GetBuilder<'a>) -> CompoundSelectBuilder<'a> {
         CompoundSelectBuilder::new(self.build()).intersect(other.build())
     }
 
-    fn except(self, other: GetBuilder<'_>) -> CompoundSelectBuilder {
+    fn except(self, other: GetBuilder<'a>) -> CompoundSelectBuilder<'a> {
         CompoundSelectBuilder::new(self.build()).except(other.build())
     }
 
-    fn as_scalar(&self) -> Expr {
+    fn as_scalar(&self) -> Expr<'static> {
         Expr::Subquery(Render::render(self, None).unwrap_or_default())
     }
 
-    fn as_scalar_with(&self, dialect: &Dialect) -> Expr {
+    fn as_scalar_with(&self, dialect: &Dialect) -> Expr<'static> {
         Expr::Subquery(Render::render(self, Some(dialect)).unwrap_or_default())
     }
 }

@@ -5,10 +5,10 @@
 //! other migration can be recorded.
 
 use crate::{Migration, MigrationStep};
-use dol_core::builder::DefineEntityBuilder;
+use dol_entity::DefineEntityBuilder;
 use dol_core::ir::EntityRef;
 use dol_core::ir::definition::{DefineIndexIR, FieldDef};
-use dol_core::model::FieldType;
+use dol_entity::DataType;
 
 /// Creates the `_dol_migrations` table and an index on the `applied_at` column.
 ///
@@ -37,14 +37,14 @@ impl Migration for CreateMigrationHistory {
             // Create the migration tracking table
             MigrationStep::define_entity(
                 DefineEntityBuilder::new("_dol_migrations")
-                    .field(FieldDef::new("version", FieldType::Varchar(Some(255))).primary_key())
-                    .field(FieldDef::new("description", FieldType::Text))
-                    .field(FieldDef::new("checksum", FieldType::Text))
+                    .field(FieldDef::new("version", DataType::Varchar(Some(255))).primary_key())
+                    .field(FieldDef::new("description", DataType::Text))
+                    .field(FieldDef::new("checksum", DataType::Text))
                     .field(
-                        FieldDef::new("applied_at", FieldType::Timestamp)
+                        FieldDef::new("applied_at", DataType::TimestampTz { precision: 6 })
                             .default("CURRENT_TIMESTAMP"),
                     )
-                    .field(FieldDef::new("execution_time_ms", FieldType::BigInt).default("0"))
+                    .field(FieldDef::new("execution_time_ms", DataType::Int64).default("0"))
                     .if_not_exists()
                     .build(),
             ),

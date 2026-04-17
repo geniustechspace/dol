@@ -3,7 +3,7 @@ use super::{
     ArrayLiteralStyle, Dialect, JsonAccessStyle, StoreKind, concat::ConcatStyle,
     ddl::DdlCapabilities, features::DialectFeatures, locking::LockingCapabilities,
     pagination::PaginationStyle, param::ParamStyle, quoting::QuoteStyle, returning::ReturningStyle,
-    types::TypeMap, upsert::UpsertStyle,
+    types::TypeDialect, upsert::UpsertStyle,
 };
 
 impl Dialect {
@@ -13,7 +13,7 @@ impl Dialect {
             name: "postgresql".into(),
             param_style: ParamStyle::postgres(),
             quote_style: QuoteStyle::DoubleQuote,
-            type_map: TypeMap::postgres(),
+            type_dialect: TypeDialect::Postgres,
             pagination: PaginationStyle::LimitOffset,
             upsert_style: UpsertStyle::OnConflict,
             returning_style: ReturningStyle::Returning,
@@ -46,7 +46,7 @@ impl Dialect {
             name: "mysql".into(),
             param_style: ParamStyle::mysql(),
             quote_style: QuoteStyle::Backtick,
-            type_map: TypeMap::mysql(),
+            type_dialect: TypeDialect::MySQL,
             pagination: PaginationStyle::LimitOffset,
             upsert_style: UpsertStyle::OnDuplicateKey,
             returning_style: ReturningStyle::Unsupported,
@@ -87,7 +87,7 @@ impl Dialect {
             name: "sqlite".into(),
             param_style: ParamStyle::mysql(), // SQLite also uses `?`
             quote_style: QuoteStyle::DoubleQuote,
-            type_map: TypeMap::sqlite(),
+            type_dialect: TypeDialect::SQLite,
             pagination: PaginationStyle::LimitOffset,
             upsert_style: UpsertStyle::OnConflict,
             returning_style: ReturningStyle::Returning,
@@ -120,7 +120,7 @@ impl Dialect {
             name: "mssql".into(),
             param_style: ParamStyle::mssql(),
             quote_style: QuoteStyle::Bracket,
-            type_map: TypeMap::mssql(),
+            type_dialect: TypeDialect::MSSQL,
             pagination: PaginationStyle::OffsetFetch,
             upsert_style: UpsertStyle::Merge,
             returning_style: ReturningStyle::OutputInserted,
@@ -153,7 +153,7 @@ impl Dialect {
             name: "oracle".into(),
             param_style: ParamStyle::oracle(),
             quote_style: QuoteStyle::DoubleQuote,
-            type_map: TypeMap::oracle(),
+            type_dialect: TypeDialect::Oracle,
             pagination: PaginationStyle::OffsetFetch,
             upsert_style: UpsertStyle::Merge,
             returning_style: ReturningStyle::ReturningInto,

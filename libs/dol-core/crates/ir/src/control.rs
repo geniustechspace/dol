@@ -38,14 +38,14 @@ pub enum Privilege {
 /// Define a policy for declarative access control.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct DefinePolicyIR {
+pub struct DefinePolicyIR<'a> {
     pub name: String,
     pub on_model: String,
     pub action: PolicyAction,
     /// Filter expression for which rows are visible.
-    pub using_expr: Option<Expr>,
+    pub using_expr: Option<Expr<'a>>,
     /// Check expression for mutations.
-    pub check_expr: Option<Expr>,
+    pub check_expr: Option<Expr<'a>>,
 }
 
 /// Policy action scope.
