@@ -49,8 +49,8 @@ fn test_float_f64() {
 
 #[test]
 fn test_float_f32() {
-    match float(3.14f32) {
-        Expr::Value(Literal::Float32(v)) => assert!((v - 3.14).abs() < f32::EPSILON),
+    match float(1.23f32) {
+        Expr::Value(Literal::Float32(v)) => assert!((v - 1.23).abs() < f32::EPSILON),
         other => panic!("expected Float32, got {other:?}"),
     }
 }

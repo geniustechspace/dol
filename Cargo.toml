@@ -10,6 +10,7 @@ members = [
     "libs/dol-sql",
     "libs/dol-kv",
     "libs/dol-objects",
+    "libs/dol-spreadsheet",
     "libs/dol-migration",
     "libs/dol-config",
 ]
@@ -37,5 +38,6 @@ dol-query = { path = "libs/dol-query" }
 dol-sql = { path = "libs/dol-sql" }
 dol-kv = { path = "libs/dol-kv" }
 dol-objects = { path = "libs/dol-objects" }
+dol-spreadsheet = { path = "libs/dol-spreadsheet" }
 dol-migration = { path = "libs/dol-migration" }
 dol-config = { path = "libs/dol-config" }

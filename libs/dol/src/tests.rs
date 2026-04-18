@@ -1322,7 +1322,7 @@ fn expr_column_eq_param() {
     let expr = field("email").eq(param());
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
-    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg);
+    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();
     assert_eq!(sql, "email = $1");
 }
 
@@ -1331,7 +1331,7 @@ fn expr_nested_boolean() {
     let expr = field("a").eq(param()) & (field("b").gt(param()) | field("c").lt(param()));
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
-    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg);
+    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();
     assert_eq!(sql, "(a = $1 AND (b > $2 OR c < $3))");
 }
 
@@ -1340,7 +1340,7 @@ fn expr_not() {
     let expr = !field("deleted");
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
-    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg);
+    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();
     assert_eq!(sql, "NOT (deleted)");
 }
 
@@ -1349,7 +1349,7 @@ fn expr_arithmetic() {
     let expr = (field("price") * float(1.1f64)) + int(5i64);
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
-    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg);
+    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();
     assert_eq!(sql, "price * 1.1 + 5");
 }
 
@@ -1357,11 +1357,11 @@ fn expr_arithmetic() {
 fn expr_is_null_is_not_null() {
     let pg = Dialect::postgres();
     let mut c1 = pg.param_counter();
-    let sql1 = crate::backend::sql::render::render_expr(&field("meta").is_null(), &mut c1, &pg);
+    let sql1 = crate::backend::sql::render::render_expr(&field("meta").is_null(), &mut c1, &pg).unwrap();
     assert_eq!(sql1, "meta IS NULL");
 
     let mut c2 = pg.param_counter();
-    let sql2 = crate::backend::sql::render::render_expr(&field("meta").is_not_null(), &mut c2, &pg);
+    let sql2 = crate::backend::sql::render::render_expr(&field("meta").is_not_null(), &mut c2, &pg).unwrap();
     assert_eq!(sql2, "meta IS NOT NULL");
 }
 
@@ -1370,7 +1370,7 @@ fn expr_between() {
     let expr = field("age").between(param(), param());
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
-    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg);
+    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();
     assert_eq!(sql, "age BETWEEN $1 AND $2");
 }
 
@@ -1379,7 +1379,7 @@ fn expr_in_list() {
     let expr = field("status").in_list(vec![param(), param()]);
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
-    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg);
+    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();
     assert_eq!(sql, "status IN ($1, $2)");
 }
 
@@ -1388,7 +1388,7 @@ fn expr_not_in_list() {
     let expr = field("status").not_in_list(vec![param(), param()]);
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
-    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg);
+    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();
     assert_eq!(sql, "status NOT IN ($1, $2)");
 }
 
@@ -1400,12 +1400,12 @@ fn expr_like_ilike() {
     // PG supports ILIKE natively
     let expr = field("name").ilike(param());
     let mut c1 = pg.param_counter();
-    let sql1 = crate::backend::sql::render::render_expr(&expr, &mut c1, &pg);
+    let sql1 = crate::backend::sql::render::render_expr(&expr, &mut c1, &pg).unwrap();
     assert_eq!(sql1, "name ILIKE $1");
 
     // MySQL falls back to LOWER(x) LIKE LOWER(y)
     let mut c2 = mysql.param_counter();
-    let sql2 = crate::backend::sql::render::render_expr(&expr, &mut c2, &mysql);
+    let sql2 = crate::backend::sql::render::render_expr(&expr, &mut c2, &mysql).unwrap();
     assert_eq!(sql2, "LOWER(name) LIKE LOWER(?)");
 }
 
@@ -1414,7 +1414,7 @@ fn expr_cast() {
     let expr = field("price").cast("NUMERIC(10,2)");
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
-    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg);
+    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();
     assert_eq!(sql, "CAST(price AS NUMERIC(10,2))");
 }
 
@@ -1423,7 +1423,7 @@ fn expr_alias() {
     let expr = field("email").alias("e");
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
-    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg);
+    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();
     assert_eq!(sql, "email AS e");
 }
 
@@ -1434,13 +1434,13 @@ fn expr_bool_literal_pg_vs_mysql() {
 
     let mut c1 = pg.param_counter();
     assert_eq!(
-        crate::backend::sql::render::render_expr(&bool_expr(true), &mut c1, &pg),
+        crate::backend::sql::render::render_expr(&bool_expr(true), &mut c1, &pg).unwrap(),
         "TRUE"
     );
 
     let mut c2 = mysql.param_counter();
     assert_eq!(
-        crate::backend::sql::render::render_expr(&bool_expr(true), &mut c2, &mysql),
+        crate::backend::sql::render::render_expr(&bool_expr(true), &mut c2, &mysql).unwrap(),
         "1"
     );
 }
@@ -1454,19 +1454,19 @@ fn expr_concat_pg_pipe_vs_mysql_func() {
 
     let mut c1 = pg.param_counter();
     assert_eq!(
-        crate::backend::sql::render::render_expr(&expr, &mut c1, &pg),
+        crate::backend::sql::render::render_expr(&expr, &mut c1, &pg).unwrap(),
         "first_name || last_name"
     );
 
     let mut c2 = mysql.param_counter();
     assert_eq!(
-        crate::backend::sql::render::render_expr(&expr, &mut c2, &mysql),
+        crate::backend::sql::render::render_expr(&expr, &mut c2, &mysql).unwrap(),
         "CONCAT(first_name, last_name)"
     );
 
     let mut c3 = mssql.param_counter();
     assert_eq!(
-        crate::backend::sql::render::render_expr(&expr, &mut c3, &mssql),
+        crate::backend::sql::render::render_expr(&expr, &mut c3, &mssql).unwrap(),
         "first_name + last_name"
     );
 }
@@ -1480,7 +1480,7 @@ fn expr_case_when() {
         .end();
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
-    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg);
+    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();
     assert_eq!(
         sql,
         "CASE WHEN status = 'active' THEN 'Active' WHEN status = 'disabled' THEN 'Disabled' ELSE 'Unknown' END"
@@ -1507,13 +1507,13 @@ fn func_lower_upper() {
 
     let mut c1 = pg.param_counter();
     assert_eq!(
-        crate::backend::sql::render::render_expr(&func::lower(field("email")), &mut c1, &pg),
+        crate::backend::sql::render::render_expr(&func::lower(field("email")), &mut c1, &pg).unwrap(),
         "LOWER(email)"
     );
 
     let mut c2 = pg.param_counter();
     assert_eq!(
-        crate::backend::sql::render::render_expr(&func::upper(field("name")), &mut c2, &pg),
+        crate::backend::sql::render::render_expr(&func::upper(field("name")), &mut c2, &pg).unwrap(),
         "UPPER(name)"
     );
 }
@@ -1523,7 +1523,7 @@ fn func_coalesce() {
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
     let expr = func::coalesce(vec![field("display_name"), field("email")]);
-    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg);
+    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();
     assert_eq!(sql, "COALESCE(display_name, email)");
 }
 
@@ -1531,7 +1531,7 @@ fn func_coalesce() {
 fn func_count_star() {
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
-    let sql = crate::backend::sql::render::render_expr(&func::count_star(), &mut counter, &pg);
+    let sql = crate::backend::sql::render::render_expr(&func::count_star(), &mut counter, &pg).unwrap();
     assert_eq!(sql, "COUNT(*)");
 }
 
@@ -1549,7 +1549,7 @@ fn func_aggregates() {
     for (expr, expected) in cases {
         let mut c = pg.param_counter();
         assert_eq!(
-            crate::backend::sql::render::render_expr(&expr, &mut c, &pg),
+            crate::backend::sql::render::render_expr(&expr, &mut c, &pg).unwrap(),
             expected
         );
     }
@@ -1561,13 +1561,13 @@ fn func_now_and_dates() {
 
     let mut c1 = pg.param_counter();
     assert_eq!(
-        crate::backend::sql::render::render_expr(&func::now(), &mut c1, &pg),
+        crate::backend::sql::render::render_expr(&func::now(), &mut c1, &pg).unwrap(),
         "NOW()"
     );
 
     let mut c2 = pg.param_counter();
     assert_eq!(
-        crate::backend::sql::render::render_expr(&func::current_timestamp(), &mut c2, &pg),
+        crate::backend::sql::render::render_expr(&func::current_timestamp(), &mut c2, &pg).unwrap(),
         "CURRENT_TIMESTAMP"
     );
 }
@@ -1585,7 +1585,7 @@ fn window_row_number() {
         .build();
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
-    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg);
+    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();
     assert_eq!(
         sql,
         "ROW_NUMBER() OVER (PARTITION BY tenant_id ORDER BY created_at DESC)"
@@ -1601,7 +1601,7 @@ fn window_rank_with_frame() {
         .build();
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
-    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg);
+    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();
     assert_eq!(
         sql,
         "RANK() OVER (ORDER BY score DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)"
@@ -1720,7 +1720,7 @@ fn subquery_exists_expr() {
     };
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
-    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg);
+    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();
     assert_eq!(
         sql,
         "EXISTS (SELECT 1 FROM sessions WHERE sessions.user_id = users.id)"
@@ -2222,11 +2222,10 @@ bool_true = "1"
 bool_false = "0"
 concat_style = "ConcatFunction"
 quote_style = "Backtick"
+type_dialect = "MySQL"
 
 [param_style]
 style = "Positional"
-
-type_dialect = "MySQL"
 
 [locking]
 for_update = true
@@ -2408,7 +2407,7 @@ fn expr_field_access() {
     let expr = field("profile").access("address").access("city");
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
-    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg);
+    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();
     assert_eq!(sql, "profile->>'address'->>'city'");
 }
 
@@ -2418,7 +2417,7 @@ fn expr_object_literal() {
     let expr = obj(vec![("name", string("Alice")), ("age", int(30i64))]);
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
-    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg);
+    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();
     assert!(sql.contains("'name'"));
     assert!(sql.contains("'Alice'"));
 }
@@ -2429,7 +2428,7 @@ fn expr_array_literal() {
     let expr = arr(vec![int(1i64), int(2i64), int(3i64)]);
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
-    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg);
+    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();
     assert!(sql.contains("ARRAY[1, 2, 3]"));
 }
 

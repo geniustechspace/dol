@@ -30,6 +30,7 @@
 //! - **`dol-sql`** — SQL renderer + dialect system
 //! - **`dol-kv`** — Key-value backend
 //! - **`dol-objects`** — Object storage backend
+//! - **`dol-spreadsheet`** — Spreadsheet backend
 //! - **`dol-migration`** — Migration system (feature-gated)
 //! - **`dol-config`** — Unified configuration (feature-gated)
 //!
@@ -66,6 +67,7 @@
 //! - **SQL**: PostgreSQL, MySQL, MariaDB, SQLite, MSSQL, Oracle, CockroachDB
 //! - **Key-Value**: Abstract KV operations (get, put, delete, list)
 //! - **Object Storage**: S3-compatible operations (put, get, list objects)
+//! - **Spreadsheet**: Sheet-based operations (create sheet, read/write rows, filter, sort)
 
 // ── Sub-crate re-exports (preserving the original module paths) ──
 
@@ -100,7 +102,9 @@ pub use dol_query as query;
 pub mod backend {
     /// Backend trait and shared output types (from dol-core::ir).
     pub use dol_core::ir::{
-        Backend, BackendError, KvOp, KvOutput, RenderedOutput, SqlOutput, StorageOp, StorageOutput,
+        Backend, BackendError, KvOp, KvOutput, RenderedOutput, SortDirection, SqlOutput,
+        SpreadsheetColumnDef, SpreadsheetOp, SpreadsheetOutput, SpreadsheetSortSpec, StorageOp,
+        StorageOutput,
     };
 
     /// SQL backend — dialect-aware SQL rendering.
@@ -118,6 +122,11 @@ pub mod backend {
     /// Object storage backend.
     pub mod storage {
         pub use dol_objects::*;
+    }
+
+    /// Spreadsheet backend.
+    pub mod spreadsheet {
+        pub use dol_spreadsheet::*;
     }
 }
 

@@ -1,0 +1,13 @@
+[package]
+name = "dol-spreadsheet"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "DOL spreadsheet backend — renders IR into spreadsheet operation descriptors."
+
+[dependencies]
+dol-core = { workspace = true }
+
+[features]
+default = []
+serde = ["dol-core/serde"]
