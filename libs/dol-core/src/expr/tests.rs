@@ -1,6 +1,4 @@
-#[allow(deprecated)]
 use super::*;
-use super::func::FuncName;
 
 // ── 1. Constructor functions ──
 
@@ -105,37 +103,37 @@ fn test_arr() {
 #[test]
 fn test_eq() {
     let e = field("a").eq(int(1i32));
-    assert!(matches!(e, Expr::BinaryOp { op: BinOp::Eq, .. }));
+    assert!(matches!(e, Expr::BinaryOp { ref op, .. } if op.as_str() == OpId::EQ));
 }
 
 #[test]
 fn test_ne() {
     let e = field("a").ne(int(1i32));
-    assert!(matches!(e, Expr::BinaryOp { op: BinOp::Ne, .. }));
+    assert!(matches!(e, Expr::BinaryOp { ref op, .. } if op.as_str() == OpId::NE));
 }
 
 #[test]
 fn test_lt() {
     let e = field("a").lt(int(1i32));
-    assert!(matches!(e, Expr::BinaryOp { op: BinOp::Lt, .. }));
+    assert!(matches!(e, Expr::BinaryOp { ref op, .. } if op.as_str() == OpId::LT));
 }
 
 #[test]
 fn test_gt() {
     let e = field("a").gt(int(1i32));
-    assert!(matches!(e, Expr::BinaryOp { op: BinOp::Gt, .. }));
+    assert!(matches!(e, Expr::BinaryOp { ref op, .. } if op.as_str() == OpId::GT));
 }
 
 #[test]
 fn test_le() {
     let e = field("a").le(int(1i32));
-    assert!(matches!(e, Expr::BinaryOp { op: BinOp::Le, .. }));
+    assert!(matches!(e, Expr::BinaryOp { ref op, .. } if op.as_str() == OpId::LE));
 }
 
 #[test]
 fn test_ge() {
     let e = field("a").ge(int(1i32));
-    assert!(matches!(e, Expr::BinaryOp { op: BinOp::Ge, .. }));
+    assert!(matches!(e, Expr::BinaryOp { ref op, .. } if op.as_str() == OpId::GE));
 }
 
 // ── 3. Pattern matching ──
@@ -143,13 +141,13 @@ fn test_ge() {
 #[test]
 fn test_like() {
     let e = field("name").like(string("%foo%"));
-    assert!(matches!(e, Expr::BinaryOp { op: BinOp::Like, .. }));
+    assert!(matches!(e, Expr::BinaryOp { ref op, .. } if op.as_str() == OpId::LIKE));
 }
 
 #[test]
 fn test_ilike() {
     let e = field("name").ilike(string("%foo%"));
-    assert!(matches!(e, Expr::BinaryOp { op: BinOp::ILike, .. }));
+    assert!(matches!(e, Expr::BinaryOp { ref op, .. } if op.as_str() == OpId::ILIKE));
 }
 
 // ── 4. Null checks ──
@@ -243,7 +241,7 @@ fn test_alias() {
 #[test]
 fn test_concat() {
     let e = field("first").concat(field("last"));
-    assert!(matches!(e, Expr::BinaryOp { op: BinOp::Concat, .. }));
+    assert!(matches!(e, Expr::BinaryOp { ref op, .. } if op.as_str() == OpId::CONCAT));
 }
 
 // ── 9. Ordering ──
@@ -293,13 +291,13 @@ fn test_over_basic() {
 #[test]
 fn test_bitand_and() {
     let e = field("a").eq(int(1i32)) & field("b").eq(int(2i32));
-    assert!(matches!(e, Expr::BinaryOp { op: BinOp::And, .. }));
+    assert!(matches!(e, Expr::BinaryOp { ref op, .. } if op.as_str() == OpId::AND));
 }
 
 #[test]
 fn test_bitor_or() {
     let e = field("a").eq(int(1i32)) | field("b").eq(int(2i32));
-    assert!(matches!(e, Expr::BinaryOp { op: BinOp::Or, .. }));
+    assert!(matches!(e, Expr::BinaryOp { ref op, .. } if op.as_str() == OpId::OR));
 }
 
 #[test]
@@ -311,31 +309,31 @@ fn test_not() {
 #[test]
 fn test_add() {
     let e = field("a") + field("b");
-    assert!(matches!(e, Expr::BinaryOp { op: BinOp::Add, .. }));
+    assert!(matches!(e, Expr::BinaryOp { ref op, .. } if op.as_str() == OpId::ADD));
 }
 
 #[test]
 fn test_sub() {
     let e = field("a") - field("b");
-    assert!(matches!(e, Expr::BinaryOp { op: BinOp::Sub, .. }));
+    assert!(matches!(e, Expr::BinaryOp { ref op, .. } if op.as_str() == OpId::SUB));
 }
 
 #[test]
 fn test_mul() {
     let e = field("a") * field("b");
-    assert!(matches!(e, Expr::BinaryOp { op: BinOp::Mul, .. }));
+    assert!(matches!(e, Expr::BinaryOp { ref op, .. } if op.as_str() == OpId::MUL));
 }
 
 #[test]
 fn test_div() {
     let e = field("a") / field("b");
-    assert!(matches!(e, Expr::BinaryOp { op: BinOp::Div, .. }));
+    assert!(matches!(e, Expr::BinaryOp { ref op, .. } if op.as_str() == OpId::DIV));
 }
 
 #[test]
 fn test_rem() {
     let e = field("a") % field("b");
-    assert!(matches!(e, Expr::BinaryOp { op: BinOp::Mod, .. }));
+    assert!(matches!(e, Expr::BinaryOp { ref op, .. } if op.as_str() == OpId::MOD));
 }
 
 #[test]
@@ -378,7 +376,7 @@ fn test_nested_field_access() {
 #[test]
 fn test_deep_chain() {
     let e = field("a").gt(int(1i32)) & field("b").lt(int(2i32)) & field("c").eq(int(3i32));
-    assert!(matches!(e, Expr::BinaryOp { op: BinOp::And, .. }));
+    assert!(matches!(e, Expr::BinaryOp { ref op, .. } if op.as_str() == OpId::AND));
 }
 
 #[test]
@@ -417,7 +415,7 @@ fn test_float_variants() {
 #[test]
 fn test_func_count() {
     let e = func::count(field("id"));
-    assert!(matches!(e, Expr::Func { ref name, ref args } if *name == FuncName::Count && args.len() == 1));
+    assert!(matches!(e, Expr::Func { ref name, ref args } if name.as_str() == FuncId::COUNT && args.len() == 1));
 }
 
 #[test]
@@ -428,25 +426,25 @@ fn test_func_count_star() {
 #[test]
 fn test_func_sum() {
     let e = func::sum(field("amount"));
-    assert!(matches!(e, Expr::Func { ref name, ref args } if *name == FuncName::Sum && args.len() == 1));
+    assert!(matches!(e, Expr::Func { ref name, ref args } if name.as_str() == FuncId::SUM && args.len() == 1));
 }
 
 #[test]
 fn test_func_lower() {
     let e = func::lower(field("email"));
-    assert!(matches!(e, Expr::Func { ref name, ref args } if *name == FuncName::Lower && args.len() == 1));
+    assert!(matches!(e, Expr::Func { ref name, ref args } if name.as_str() == FuncId::LOWER && args.len() == 1));
 }
 
 #[test]
 fn test_func_now() {
     let e = func::now();
-    assert!(matches!(e, Expr::Func { ref name, ref args } if *name == FuncName::Now && args.is_empty()));
+    assert!(matches!(e, Expr::Func { ref name, ref args } if name.as_str() == FuncId::NOW && args.is_empty()));
 }
 
 #[test]
 fn test_func_coalesce() {
     let e = func::coalesce(vec![field("a"), field("b"), string("default")]);
-    assert!(matches!(e, Expr::Func { ref name, ref args } if *name == FuncName::Coalesce && args.len() == 3));
+    assert!(matches!(e, Expr::Func { ref name, ref args } if name.as_str() == FuncId::COALESCE && args.len() == 3));
 }
 
 // ── 16. CaseBuilder ──
@@ -551,7 +549,7 @@ fn test_comparison_preserves_operands() {
     match e {
         Expr::BinaryOp { left, op, right, negated } => {
             assert!(matches!(*left, Expr::Identifier(s) if s == "age"));
-            assert_eq!(op, BinOp::Gt);
+            assert!(op.as_str() == OpId::GT);
             assert!(matches!(*right, Expr::Value(Literal::Int64(18))));
             assert!(!negated);
         }
@@ -602,7 +600,7 @@ fn test_eq_with_into_expr() {
     let e = field("status").eq("active");
     match e {
         Expr::BinaryOp { right, op, negated, .. } => {
-            assert_eq!(op, BinOp::Eq);
+            assert!(op.as_str() == OpId::EQ);
             assert!(!negated);
             assert!(matches!(*right, Expr::Identifier(s) if s == "active"));
         }

@@ -29,7 +29,11 @@ pub mod order;
 pub mod window;
 
 pub use literal::{Literal, Value, TypeError};
-pub use ops::{BinOp, Quantifier, TernaryOp, UnaryOp};
+pub use ops::{OpId, Quantifier, UnaryOp};
+#[allow(deprecated)]
+pub use ops::BinOp;
+pub use func::FuncId;
+#[allow(deprecated)]
 pub use func::FuncName;
 pub use order::{Direction, NullsPosition, OrderByExpr};
 pub use window::{CaseBuilder, FrameBound, FrameKind, WindowBuilder, WindowFrame};
@@ -79,36 +83,26 @@ pub enum Expr<'a> {
     /// A binary operation: `left op right`, optionally negated.
     ///
     /// The `negated` flag handles `NOT LIKE`, `NOT SIMILAR TO`, etc. without
-    /// doubling the `BinOp` variant count.
+    /// doubling the operator count.
     BinaryOp {
         left: Box<Expr<'a>>,
-        op: BinOp,
+        op: OpId,
         right: Box<Expr<'a>>,
         negated: bool,
     },
     /// A unary operation: `op expr`.
     UnaryOp { op: UnaryOp, expr: Box<Expr<'a>> },
-    /// A ternary operation: `expr op(operand1, operand2)`.
-    ///
-    /// Canonical example: `expr [NOT] BETWEEN low AND high`.
-    TernaryOp {
-        expr: Box<Expr<'a>>,
-        op: TernaryOp,
-        first: Box<Expr<'a>>,
-        second: Box<Expr<'a>>,
-        negated: bool,
-    },
     /// A quantified comparison: `expr op ANY(subquery)` / `expr op ALL(subquery)`.
     QuantifiedCmp {
         expr: Box<Expr<'a>>,
-        op: BinOp,
+        op: OpId,
         quantifier: Quantifier,
         subquery: String,
     },
 
     // ── Function call ──
     /// A function call: `name(args...)`.
-    Func { name: FuncName, args: Vec<Expr<'a>> },
+    Func { name: FuncId, args: Vec<Expr<'a>> },
 
     // ── Type conversion ──
     /// A type cast: `CAST(expr AS type)`.
@@ -318,20 +312,20 @@ impl<'a> Expr<'a> {
     // ── Helper ──
 
     /// Internal helper to construct a non-negated binary op.
-    fn binop(self, op: BinOp, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
+    fn binop(self, op: &str, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
         Expr::BinaryOp {
             left: Box::new(self),
-            op,
+            op: OpId::new(op),
             right: Box::new(rhs.into()),
             negated: false,
         }
     }
 
     /// Internal helper to construct a negated binary op.
-    fn binop_neg(self, op: BinOp, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
+    fn binop_neg(self, op: &str, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
         Expr::BinaryOp {
             left: Box::new(self),
-            op,
+            op: OpId::new(op),
             right: Box::new(rhs.into()),
             negated: true,
         }
@@ -341,58 +335,58 @@ impl<'a> Expr<'a> {
 
     /// `self == rhs`
     pub fn eq(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(BinOp::Eq, rhs)
+        self.binop(OpId::EQ, rhs)
     }
 
     /// `self != rhs`
     pub fn ne(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(BinOp::Ne, rhs)
+        self.binop(OpId::NE, rhs)
     }
 
     /// `self < rhs`
     pub fn lt(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(BinOp::Lt, rhs)
+        self.binop(OpId::LT, rhs)
     }
 
     /// `self > rhs`
     pub fn gt(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(BinOp::Gt, rhs)
+        self.binop(OpId::GT, rhs)
     }
 
     /// `self <= rhs`
     pub fn le(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(BinOp::Le, rhs)
+        self.binop(OpId::LE, rhs)
     }
 
     /// `self >= rhs`
     pub fn ge(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(BinOp::Ge, rhs)
+        self.binop(OpId::GE, rhs)
     }
 
     // ── Null-safe comparison ──
 
     /// `self IS DISTINCT FROM rhs` (null-safe inequality).
     pub fn is_distinct_from(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(BinOp::IsDistinctFrom, rhs)
+        self.binop(OpId::IS_DISTINCT_FROM, rhs)
     }
 
     /// `self IS NOT DISTINCT FROM rhs` (null-safe equality).
     pub fn is_not_distinct_from(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(BinOp::IsNotDistinctFrom, rhs)
+        self.binop(OpId::IS_NOT_DISTINCT_FROM, rhs)
     }
 
     // ── Pattern matching ──
 
-    pub fn like(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop(BinOp::Like, rhs) }
-    pub fn not_like(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop_neg(BinOp::Like, rhs) }
-    pub fn ilike(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop(BinOp::ILike, rhs) }
-    pub fn not_ilike(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop_neg(BinOp::ILike, rhs) }
-    pub fn similar_to(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop(BinOp::SimilarTo, rhs) }
-    pub fn not_similar_to(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop_neg(BinOp::SimilarTo, rhs) }
-    pub fn regex_match(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop(BinOp::RegexMatch, rhs) }
-    pub fn not_regex_match(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop_neg(BinOp::RegexMatch, rhs) }
-    pub fn regex_match_insensitive(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop(BinOp::RegexMatchInsensitive, rhs) }
-    pub fn not_regex_match_insensitive(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop_neg(BinOp::RegexMatchInsensitive, rhs) }
+    pub fn like(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop(OpId::LIKE, rhs) }
+    pub fn not_like(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop_neg(OpId::LIKE, rhs) }
+    pub fn ilike(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop(OpId::ILIKE, rhs) }
+    pub fn not_ilike(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop_neg(OpId::ILIKE, rhs) }
+    pub fn similar_to(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop(OpId::SIMILAR_TO, rhs) }
+    pub fn not_similar_to(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop_neg(OpId::SIMILAR_TO, rhs) }
+    pub fn regex_match(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop(OpId::REGEX_MATCH, rhs) }
+    pub fn not_regex_match(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop_neg(OpId::REGEX_MATCH, rhs) }
+    pub fn regex_match_insensitive(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop(OpId::REGEX_MATCH_INSENSITIVE, rhs) }
+    pub fn not_regex_match_insensitive(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop_neg(OpId::REGEX_MATCH_INSENSITIVE, rhs) }
 
     // ── Null checks ──
 
@@ -455,7 +449,7 @@ impl<'a> Expr<'a> {
     }
 
     pub fn concat(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(BinOp::Concat, rhs)
+        self.binop(OpId::CONCAT, rhs)
     }
 
     // ── Ordering ──
@@ -498,14 +492,14 @@ impl<'a> Expr<'a> {
 impl<'a> std_ops::BitAnd for Expr<'a> {
     type Output = Expr<'a>;
     fn bitand(self, rhs: Expr<'a>) -> Expr<'a> {
-        Expr::BinaryOp { left: Box::new(self), op: BinOp::And, right: Box::new(rhs), negated: false }
+        Expr::BinaryOp { left: Box::new(self), op: OpId::new(OpId::AND), right: Box::new(rhs), negated: false }
     }
 }
 
 impl<'a> std_ops::BitOr for Expr<'a> {
     type Output = Expr<'a>;
     fn bitor(self, rhs: Expr<'a>) -> Expr<'a> {
-        Expr::BinaryOp { left: Box::new(self), op: BinOp::Or, right: Box::new(rhs), negated: false }
+        Expr::BinaryOp { left: Box::new(self), op: OpId::new(OpId::OR), right: Box::new(rhs), negated: false }
     }
 }
 
@@ -519,35 +513,35 @@ impl<'a> std_ops::Not for Expr<'a> {
 impl<'a> std_ops::Add for Expr<'a> {
     type Output = Expr<'a>;
     fn add(self, rhs: Expr<'a>) -> Expr<'a> {
-        Expr::BinaryOp { left: Box::new(self), op: BinOp::Add, right: Box::new(rhs), negated: false }
+        Expr::BinaryOp { left: Box::new(self), op: OpId::new(OpId::ADD), right: Box::new(rhs), negated: false }
     }
 }
 
 impl<'a> std_ops::Sub for Expr<'a> {
     type Output = Expr<'a>;
     fn sub(self, rhs: Expr<'a>) -> Expr<'a> {
-        Expr::BinaryOp { left: Box::new(self), op: BinOp::Sub, right: Box::new(rhs), negated: false }
+        Expr::BinaryOp { left: Box::new(self), op: OpId::new(OpId::SUB), right: Box::new(rhs), negated: false }
     }
 }
 
 impl<'a> std_ops::Mul for Expr<'a> {
     type Output = Expr<'a>;
     fn mul(self, rhs: Expr<'a>) -> Expr<'a> {
-        Expr::BinaryOp { left: Box::new(self), op: BinOp::Mul, right: Box::new(rhs), negated: false }
+        Expr::BinaryOp { left: Box::new(self), op: OpId::new(OpId::MUL), right: Box::new(rhs), negated: false }
     }
 }
 
 impl<'a> std_ops::Div for Expr<'a> {
     type Output = Expr<'a>;
     fn div(self, rhs: Expr<'a>) -> Expr<'a> {
-        Expr::BinaryOp { left: Box::new(self), op: BinOp::Div, right: Box::new(rhs), negated: false }
+        Expr::BinaryOp { left: Box::new(self), op: OpId::new(OpId::DIV), right: Box::new(rhs), negated: false }
     }
 }
 
 impl<'a> std_ops::Rem for Expr<'a> {
     type Output = Expr<'a>;
     fn rem(self, rhs: Expr<'a>) -> Expr<'a> {
-        Expr::BinaryOp { left: Box::new(self), op: BinOp::Mod, right: Box::new(rhs), negated: false }
+        Expr::BinaryOp { left: Box::new(self), op: OpId::new(OpId::MOD), right: Box::new(rhs), negated: false }
     }
 }
 
