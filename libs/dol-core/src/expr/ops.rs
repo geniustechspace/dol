@@ -75,6 +75,8 @@ pub enum BinOp {
     Like,
     /// `ILIKE` / `NOT ILIKE` (case-insensitive LIKE)
     ILike,
+    /// `SIMILAR TO` / `NOT SIMILAR TO` (SQL-standard regex)
+    SimilarTo,
     /// POSIX regex match (`~` / `!~`)
     RegexMatch,
     /// POSIX regex match, case-insensitive (`~*` / `!~*`)
@@ -118,7 +120,7 @@ pub enum BinOp {
 /// - A dedicated `Expr` variant (`Expr::IsNull`)
 /// - A named function (`FuncName::Abs`, `FuncName::Sqrt`, …)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#  [cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum UnaryOp {
     /// `NOT expr` — boolean negation.
     Not,

@@ -635,7 +635,9 @@ fn alter_action_rename_model() {
 // ======================================================================
 // Additional coverage: remaining Statement variants,
 // compound queries, and IR struct construction
-// ======================================================================#[test]
+// ======================================================================
+
+#[test]
 fn statement_alter_model() {
     let stmt = Statement::AlterEntity(AlterEntityIR {
         target: entity_ref("users"),

@@ -552,7 +552,7 @@ fn render_expr_simple(expr: &Expr<'_>) -> Result<String, BackendError> {
                 .collect::<Result<Vec<_>, BackendError>>()?;
             let func_str = match name {
                 FuncName::Custom(s) => s.clone(),
-                other => spreadsheet_func_name(other).to_string(),
+                other => spreadsheet_func_name(other)?.to_string(),
             };
             Ok(format!("{}({})", func_str, arg_strs.join(", ")))
         }
@@ -676,26 +676,28 @@ fn validate_column_expr(expr: &Expr<'_>, context: &str) -> Result<String, Backen
     }
 }
 
-fn spreadsheet_func_name(name: &dol_core::expr::FuncName) -> &'static str {
+fn spreadsheet_func_name(name: &dol_core::expr::FuncName) -> Result<&'static str, BackendError> {
     use dol_core::expr::FuncName as K;
     match name {
-        K::Count => "COUNT",
-        K::Sum => "SUM",
-        K::Avg => "AVG",
-        K::Min => "MIN",
-        K::Max => "MAX",
-        K::Lower => "LOWER",
-        K::Upper => "UPPER",
-        K::Trim => "TRIM",
-        K::Length => "LEN",
-        K::Coalesce => "COALESCE",
-        K::NullIf | K::IfNull => "IFERROR",
-        K::Now => "NOW",
-        K::CurrentDate => "TODAY",
-        K::Year => "YEAR",
-        K::Month => "MONTH",
-        K::Day => "DAY",
-        _ => "UNSUPPORTED_FUNC",
+        K::Count => Ok("COUNT"),
+        K::Sum => Ok("SUM"),
+        K::Avg => Ok("AVG"),
+        K::Min => Ok("MIN"),
+        K::Max => Ok("MAX"),
+        K::Lower => Ok("LOWER"),
+        K::Upper => Ok("UPPER"),
+        K::Trim => Ok("TRIM"),
+        K::Length => Ok("LEN"),
+        K::Coalesce => Ok("COALESCE"),
+        K::NullIf | K::IfNull => Ok("IFERROR"),
+        K::Now => Ok("NOW"),
+        K::CurrentDate => Ok("TODAY"),
+        K::Year => Ok("YEAR"),
+        K::Month => Ok("MONTH"),
+        K::Day => Ok("DAY"),
+        _ => Err(BackendError::Unsupported(format!(
+            "SpreadsheetBackend does not support function '{:?}'", name
+        ))),
     }
 }
 
