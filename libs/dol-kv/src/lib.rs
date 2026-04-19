@@ -2,7 +2,7 @@
 
 #![deny(unsafe_code)]
 
-use dol_core::ir::Statement;
+use dol_core::ir::{BackendError, Statement};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -21,25 +21,10 @@ pub enum KvOp {
     List { prefix: Option<String>, limit: Option<u64> },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum KvError {
-    Unsupported(String),
-}
-
-impl std::fmt::Display for KvError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Unsupported(msg) => write!(f, "unsupported: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for KvError {}
-
 pub struct KvBackend;
 
 impl KvBackend {
-    pub fn render(&self, stmt: &Statement) -> Result<KvOutput, KvError> {
+    pub fn render(&self, stmt: &Statement) -> Result<KvOutput, BackendError> {
         match stmt {
             Statement::PutObject(ir) => Ok(KvOutput {
                 operation: KvOp::Put,
@@ -74,7 +59,7 @@ impl KvBackend {
                 key: ir.to.clone(),
                 metadata: vec![("moved_from".into(), ir.from.clone())],
             }),
-            _ => Err(KvError::Unsupported(
+            _ => Err(BackendError::Unsupported(
                 "KvBackend only supports storage and file operations".into(),
             )),
         }

@@ -561,9 +561,9 @@ fn query_with_sort() {
             } => {
                 assert_eq!(sort.len(), 2);
                 assert_eq!(sort[0].column, "age");
-                assert_eq!(sort[0].direction, SortDirection::Descending);
+                assert_eq!(sort[0].direction, Direction::Desc);
                 assert_eq!(sort[1].column, "name");
-                assert_eq!(sort[1].direction, SortDirection::Ascending);
+                assert_eq!(sort[1].direction, Direction::Asc);
                 assert_eq!(limit, Some(20));
                 assert_eq!(offset, Some(5));
                 assert!(distinct);

@@ -22,4 +22,4 @@ pub mod constraint;
 
 pub use types::DataType;
 pub use constraint::{EntityConstraint, FkAction, ForeignKeyRef, GeneratedKind};
-pub use ir::Statement;
+pub use ir::{BackendError, Statement};

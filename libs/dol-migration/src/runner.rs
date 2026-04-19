@@ -3,7 +3,7 @@
 use super::plan::{self, MigrationDirection, MigrationPlan, MigrationTarget, PlannedStep};
 use super::registry::{AppliedMigration, MigrationRegistry};
 use super::{KvMigrationOp, Migration, MigrationError, MigrationStep, StorageMigrationOp};
-use dol_sql::RenderError;
+use dol_core::ir::BackendError;
 use dol_core::ir::Statement;
 use dol_sql::dialect::{self, Dialect};
 use dol_sql::render;
@@ -495,7 +495,7 @@ fn render_step(step: &MigrationStep, dialect: &Dialect) -> RenderedStep {
 
 /// Render a SQL statement to a [`RenderedStep`].
 fn render_sql_step(stmt: &Statement, dialect: &Dialect) -> RenderedStep {
-    let result: Result<dol_sql::SqlOutput, RenderError> = match stmt {
+    let result: Result<dol_sql::SqlOutput, BackendError> = match stmt {
         Statement::DefineEntity(ir) => render::render_define_entity_ir(ir, dialect),
         Statement::AlterEntity(ir) => render::render_alter_entity_ir(ir, dialect),
         Statement::DropEntity(ir) => render::render_drop_entity_ir(ir, dialect),
@@ -514,7 +514,7 @@ fn render_sql_step(stmt: &Statement, dialect: &Dialect) -> RenderedStep {
         Statement::Upsert(ir) => render::render_upsert_ir(ir, dialect),
         Statement::Query(ir) => render::render_query_ir(ir, dialect),
         Statement::Compound(ir) => render::render_compound_query_ir(ir, dialect),
-        _ => Err(RenderError::Unsupported(format!(
+        _ => Err(BackendError::Unsupported(format!(
             "unsupported statement in migration: {:?}",
             std::mem::discriminant(stmt)
         ))),

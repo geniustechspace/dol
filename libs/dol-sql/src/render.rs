@@ -10,7 +10,8 @@ use dol_core::expr::window::{FrameBound, FrameKind, WindowFrame};
 use dol_core::expr::{
     BinOp, Direction, Expr, Literal, NullsPosition, OrderByExpr, Quantifier, TernaryOp, UnaryOp,
 };
-use crate::{RenderError, SqlOutput};
+use crate::SqlOutput;
+use dol_core::ir::BackendError;
 use dol_core::ir::definition::OwnedEntityConstraint;
 use dol_core::ir::*;
 use dol_entity::Field;
@@ -29,13 +30,13 @@ const MAX_EXPR_DEPTH: usize = 128;
 
 /// Renders an [`Expr`] tree into a SQL string.
 ///
-/// Returns `Err(RenderError::RenderError)` if expression nesting exceeds
+/// Returns `Err(BackendError::Render)` if expression nesting exceeds
 /// [`MAX_EXPR_DEPTH`].
 pub fn render_expr(
     expr: &Expr<'_>,
     counter: &mut ParamCounter,
     dialect: &Dialect,
-) -> Result<String, RenderError> {
+) -> Result<String, BackendError> {
     render_expr_inner(expr, counter, dialect, 0)
 }
 
@@ -44,9 +45,9 @@ fn render_expr_inner(
     counter: &mut ParamCounter,
     dialect: &Dialect,
     depth: usize,
-) -> Result<String, RenderError> {
+) -> Result<String, BackendError> {
     if depth >= MAX_EXPR_DEPTH {
-        return Err(RenderError::RenderError(
+        return Err(BackendError::Render(
             "expression nesting too deep (exceeded MAX_EXPR_DEPTH)".into(),
         ));
     }
@@ -70,7 +71,7 @@ fn render_expr_inner(
                     format!("JSON_VALUE({}, '$.{}')", base_sql, escaped_field)
                 }
                 JsonAccessStyle::Unsupported => {
-                    return Err(RenderError::Unsupported(format!(
+                    return Err(BackendError::Unsupported(format!(
                         "JSON field access is not supported by this dialect (field '{}')",
                         field
                     )));
@@ -407,7 +408,7 @@ fn render_binary_op(
     counter: &mut ParamCounter,
     dialect: &Dialect,
     depth: usize,
-) -> Result<String, RenderError> {
+) -> Result<String, BackendError> {
     // Special case: ILike on dialects without native ILIKE support
     if op == BinOp::ILike && !dialect.features.ilike {
         let lhs = render_expr_inner(left, counter, dialect, depth)?;
@@ -492,7 +493,7 @@ pub fn render_order_by_expr(
     ob: &OrderByExpr<'_>,
     counter: &mut ParamCounter,
     dialect: &Dialect,
-) -> Result<String, RenderError> {
+) -> Result<String, BackendError> {
     let expr_sql = render_expr(&ob.expr, counter, dialect)?;
     let dir = match ob.direction {
         Direction::Asc => "ASC",
@@ -533,7 +534,7 @@ fn render_frame_bound(bound: &FrameBound) -> String {
 // ===========================================================================
 
 /// Renders a `Vec<Expr>` as a WHERE clause (AND-joined).
-pub fn render_filters(filters: &[Expr<'_>], counter: &mut ParamCounter, dialect: &Dialect) -> Result<String, RenderError> {
+pub fn render_filters(filters: &[Expr<'_>], counter: &mut ParamCounter, dialect: &Dialect) -> Result<String, BackendError> {
     if filters.is_empty() {
         return Ok(String::new());
     }
@@ -549,7 +550,7 @@ pub fn render_order_by_exprs(
     order_by: &[OrderByExpr<'_>],
     counter: &mut ParamCounter,
     dialect: &Dialect,
-) -> Result<String, RenderError> {
+) -> Result<String, BackendError> {
     if order_by.is_empty() {
         return Ok(String::new());
     }
@@ -790,7 +791,7 @@ pub fn render_model_constraint(constraint: &OwnedEntityConstraint) -> String {
 // ===========================================================================
 
 /// Render a QueryIR to SQL.
-pub fn render_query_ir(ir: &QueryIR, dialect: &Dialect) -> Result<SqlOutput, RenderError> {
+pub fn render_query_ir(ir: &QueryIR, dialect: &Dialect) -> Result<SqlOutput, BackendError> {
     let mut counter = ParamCounter::new(&dialect.param_style);
     render_query_ir_with_counter(ir, dialect, &mut counter)
 }
@@ -803,7 +804,7 @@ pub(crate) fn render_query_ir_with_counter(
     ir: &QueryIR,
     dialect: &Dialect,
     counter: &mut ParamCounter,
-) -> Result<SqlOutput, RenderError> {
+) -> Result<SqlOutput, BackendError> {
     let mut sql = String::new();
 
     // SELECT
@@ -894,7 +895,7 @@ pub(crate) fn render_query_ir_with_counter(
 }
 
 /// Render an InsertIR to SQL.
-pub fn render_insert_ir(ir: &InsertIR, dialect: &Dialect) -> Result<SqlOutput, RenderError> {
+pub fn render_insert_ir(ir: &InsertIR, dialect: &Dialect) -> Result<SqlOutput, BackendError> {
     let mut counter = ParamCounter::new(&dialect.param_style);
     let table_name = entity_ref_to_sql(&ir.target, dialect);
 
@@ -924,7 +925,7 @@ pub fn render_insert_ir(ir: &InsertIR, dialect: &Dialect) -> Result<SqlOutput, R
 pub fn render_insert_select_ir(
     ir: &InsertSelectIR,
     dialect: &Dialect,
-) -> Result<SqlOutput, RenderError> {
+) -> Result<SqlOutput, BackendError> {
     let table_name = entity_ref_to_sql(&ir.target, dialect);
     let cols = ir.fields.join(", ");
 
@@ -941,7 +942,7 @@ pub fn render_insert_select_ir(
 }
 
 /// Render an UpdateIR to SQL.
-pub fn render_update_ir(ir: &UpdateIR, dialect: &Dialect) -> Result<SqlOutput, RenderError> {
+pub fn render_update_ir(ir: &UpdateIR, dialect: &Dialect) -> Result<SqlOutput, BackendError> {
     let mut counter = ParamCounter::new(&dialect.param_style);
     let table_name = entity_ref_to_sql(&ir.target, dialect);
 
@@ -952,7 +953,7 @@ pub fn render_update_ir(ir: &UpdateIR, dialect: &Dialect) -> Result<SqlOutput, R
             let val = render_expr(expr, &mut counter, dialect)?;
             Ok(format!("{} = {}", col, val))
         })
-        .collect::<Result<Vec<_>, RenderError>>()?;
+        .collect::<Result<Vec<_>, BackendError>>()?;
 
     let mut sql = format!("UPDATE {} SET {}", table_name, sets.join(", "));
     sql.push_str(&render_filters(&ir.filters, &mut counter, dialect)?);
@@ -965,7 +966,7 @@ pub fn render_update_ir(ir: &UpdateIR, dialect: &Dialect) -> Result<SqlOutput, R
 }
 
 /// Render a RemoveIR to SQL.
-pub fn render_remove_ir(ir: &RemoveIR, dialect: &Dialect) -> Result<SqlOutput, RenderError> {
+pub fn render_remove_ir(ir: &RemoveIR, dialect: &Dialect) -> Result<SqlOutput, BackendError> {
     let mut counter = ParamCounter::new(&dialect.param_style);
     let table_name = entity_ref_to_sql(&ir.target, dialect);
 
@@ -980,7 +981,7 @@ pub fn render_remove_ir(ir: &RemoveIR, dialect: &Dialect) -> Result<SqlOutput, R
 }
 
 /// Render an UpsertIR to SQL.
-pub fn render_upsert_ir(ir: &UpsertIR, dialect: &Dialect) -> Result<SqlOutput, RenderError> {
+pub fn render_upsert_ir(ir: &UpsertIR, dialect: &Dialect) -> Result<SqlOutput, BackendError> {
     let mut counter = ParamCounter::new(&dialect.param_style);
     let table_name = entity_ref_to_sql(&ir.target, dialect);
 
@@ -1034,7 +1035,7 @@ pub fn render_upsert_ir(ir: &UpsertIR, dialect: &Dialect) -> Result<SqlOutput, R
 pub fn render_define_entity_ir(
     ir: &DefineEntityIR,
     dialect: &Dialect,
-) -> Result<SqlOutput, RenderError> {
+) -> Result<SqlOutput, BackendError> {
     let mut sql = String::from("CREATE TABLE ");
     if ir.if_not_exists {
         sql.push_str("IF NOT EXISTS ");
@@ -1069,7 +1070,7 @@ pub fn render_define_entity_ir(
 pub fn render_alter_entity_ir(
     ir: &AlterEntityIR,
     dialect: &Dialect,
-) -> Result<SqlOutput, RenderError> {
+) -> Result<SqlOutput, BackendError> {
     let table_name = entity_ref_to_sql(&ir.target, dialect);
     let mut parts = Vec::new();
 
@@ -1149,7 +1150,7 @@ pub fn render_alter_entity_ir(
 pub fn render_drop_entity_ir(
     ir: &DropEntityIR,
     _dialect: &Dialect,
-) -> Result<SqlOutput, RenderError> {
+) -> Result<SqlOutput, BackendError> {
     let mut sql = String::from("DROP TABLE ");
     if ir.if_exists {
         sql.push_str("IF EXISTS ");
@@ -1174,7 +1175,7 @@ pub fn render_drop_entity_ir(
 pub fn render_define_index_ir(
     ir: &DefineIndexIR,
     _dialect: &Dialect,
-) -> Result<SqlOutput, RenderError> {
+) -> Result<SqlOutput, BackendError> {
     let mut sql = String::from("CREATE ");
     if ir.unique {
         sql.push_str("UNIQUE ");
@@ -1216,7 +1217,7 @@ pub fn render_define_index_ir(
 pub fn render_drop_index_ir(
     ir: &DropIndexIR,
     _dialect: &Dialect,
-) -> Result<SqlOutput, RenderError> {
+) -> Result<SqlOutput, BackendError> {
     let mut sql = String::from("DROP INDEX ");
     if ir.concurrently {
         sql.push_str("CONCURRENTLY ");
@@ -1236,7 +1237,7 @@ pub fn render_drop_index_ir(
 }
 
 /// Render a GrantIR to SQL.
-pub fn render_grant_ir(ir: &GrantIR) -> Result<SqlOutput, RenderError> {
+pub fn render_grant_ir(ir: &GrantIR) -> Result<SqlOutput, BackendError> {
     let priv_str = render_privilege(&ir.privilege);
     let sql = format!("GRANT {} ON {} TO {}", priv_str, ir.on_target, ir.to_role);
     Ok(SqlOutput {
@@ -1246,7 +1247,7 @@ pub fn render_grant_ir(ir: &GrantIR) -> Result<SqlOutput, RenderError> {
 }
 
 /// Render a RevokeIR to SQL.
-pub fn render_revoke_ir(ir: &RevokeIR) -> Result<SqlOutput, RenderError> {
+pub fn render_revoke_ir(ir: &RevokeIR) -> Result<SqlOutput, BackendError> {
     let priv_str = render_privilege(&ir.privilege);
     let sql = format!(
         "REVOKE {} ON {} FROM {}",
@@ -1276,7 +1277,7 @@ fn render_privilege(p: &Privilege) -> String {
 pub fn render_transaction_ir(
     ir: &TransactionIR,
     dialect: &Dialect,
-) -> Result<SqlOutput, RenderError> {
+) -> Result<SqlOutput, BackendError> {
     match ir {
         TransactionIR::Begin => Ok(SqlOutput {
             sql: "BEGIN".to_string(),
@@ -1313,7 +1314,7 @@ pub fn render_transaction_ir(
 fn render_transaction_block(
     stmts: &[Statement],
     dialect: &Dialect,
-) -> Result<SqlOutput, RenderError> {
+) -> Result<SqlOutput, BackendError> {
     let backend = crate::SqlBackend::new(dialect.clone());
     let mut parts = Vec::with_capacity(stmts.len() + 2);
     let mut total_params = 0;
@@ -1352,7 +1353,7 @@ fn render_transaction_block(
 pub fn render_define_type_ir(
     ir: &DefineTypeIR,
     dialect: &Dialect,
-) -> Result<SqlOutput, RenderError> {
+) -> Result<SqlOutput, BackendError> {
     use super::dialect::ddl::EnumStyle;
 
     let qualified_name = if let Some(ref ns) = ir.namespace {
@@ -1411,7 +1412,7 @@ pub fn render_define_type_ir(
 ///
 /// Only meaningful for dialects with `EnumStyle::CreateType` (PostgreSQL,
 /// CockroachDB). For other dialects, returns a comment.
-pub fn render_drop_type_ir(ir: &DropTypeIR, dialect: &Dialect) -> Result<SqlOutput, RenderError> {
+pub fn render_drop_type_ir(ir: &DropTypeIR, dialect: &Dialect) -> Result<SqlOutput, BackendError> {
     use super::dialect::ddl::EnumStyle;
 
     let sql = match dialect.ddl.enum_style {
@@ -1454,7 +1455,7 @@ pub fn render_drop_type_ir(ir: &DropTypeIR, dialect: &Dialect) -> Result<SqlOutp
 pub fn render_define_policy_ir(
     ir: &DefinePolicyIR,
     dialect: &Dialect,
-) -> Result<SqlOutput, RenderError> {
+) -> Result<SqlOutput, BackendError> {
     let mut counter = dialect.param_counter();
 
     let action_str = match ir.action {
@@ -1492,7 +1493,7 @@ pub fn render_define_policy_ir(
 pub fn render_compound_query_ir(
     ir: &CompoundQueryIR,
     dialect: &Dialect,
-) -> Result<SqlOutput, RenderError> {
+) -> Result<SqlOutput, BackendError> {
     let mut counter = dialect.param_counter();
     let base = render_query_ir_with_counter(&ir.base, dialect, &mut counter)?;
 

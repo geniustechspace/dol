@@ -17,7 +17,7 @@ use dol_query::builder::mutation::{
 use dol_query::builder::query::GetBuilder;
 use dol_query::builder::transaction::TransactionBuilder;
 use dol_core::expr::{Expr, OrderByExpr};
-use crate::RenderError;
+use dol_core::ir::BackendError;
 use dol_core::ir::OffsetLimit;
 use dol_core::ir::query::{CompoundQueryIR, QueryIR, SetOpKind};
 use dol_core::ir::transaction::TransactionIR;
@@ -34,13 +34,13 @@ use dol_core::ir::transaction::TransactionIR;
 pub trait Render {
     /// Render to a SQL string for the given dialect.
     /// Pass `None` for the global default dialect.
-    fn render(&self, dialect: Option<&Dialect>) -> Result<String, RenderError>;
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError>;
 }
 
 // ── GetBuilder ──────────────────────────────────────────────────────────
 
 impl Render for GetBuilder<'_> {
-    fn render(&self, dialect: Option<&Dialect>) -> Result<String, RenderError> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.clone().build();
         render::render_query_ir(&ir, dialect).map(|o| o.sql)
@@ -50,7 +50,7 @@ impl Render for GetBuilder<'_> {
 // ── InsertBuilder ───────────────────────────────────────────────────────
 
 impl Render for InsertBuilder<'_> {
-    fn render(&self, dialect: Option<&Dialect>) -> Result<String, RenderError> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.clone().build();
         render::render_insert_ir(&ir, dialect).map(|o| o.sql)
@@ -60,7 +60,7 @@ impl Render for InsertBuilder<'_> {
 // ── InsertSelectBuilder ─────────────────────────────────────────────────
 
 impl Render for InsertSelectBuilder<'_> {
-    fn render(&self, dialect: Option<&Dialect>) -> Result<String, RenderError> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.clone().build();
         render::render_insert_select_ir(&ir, dialect).map(|o| o.sql)
@@ -70,7 +70,7 @@ impl Render for InsertSelectBuilder<'_> {
 // ── UpdateBuilder ───────────────────────────────────────────────────────
 
 impl Render for UpdateBuilder<'_> {
-    fn render(&self, dialect: Option<&Dialect>) -> Result<String, RenderError> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.clone().build();
         render::render_update_ir(&ir, dialect).map(|o| o.sql)
@@ -80,7 +80,7 @@ impl Render for UpdateBuilder<'_> {
 // ── RemoveBuilder ───────────────────────────────────────────────────────
 
 impl Render for RemoveBuilder<'_> {
-    fn render(&self, dialect: Option<&Dialect>) -> Result<String, RenderError> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.clone().build();
         render::render_remove_ir(&ir, dialect).map(|o| o.sql)
@@ -90,7 +90,7 @@ impl Render for RemoveBuilder<'_> {
 // ── UpsertBuilder ───────────────────────────────────────────────────────
 
 impl Render for UpsertBuilder<'_> {
-    fn render(&self, dialect: Option<&Dialect>) -> Result<String, RenderError> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.clone().build();
         render::render_upsert_ir(&ir, dialect).map(|o| o.sql)
@@ -100,7 +100,7 @@ impl Render for UpsertBuilder<'_> {
 // ── CreateFromMeta ──────────────────────────────────────────────────────
 
 impl Render for CreateFromMeta<'_> {
-    fn render(&self, dialect: Option<&Dialect>) -> Result<String, RenderError> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let model = self.get_entity();
         let mut sql = String::from("CREATE TABLE ");
@@ -143,7 +143,7 @@ impl Render for CreateFromMeta<'_> {
 // ── DefineEntityBuilder ──────────────────────────────────────────────────
 
 impl Render for DefineEntityBuilder {
-    fn render(&self, dialect: Option<&Dialect>) -> Result<String, RenderError> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_define_entity_ir(&ir, dialect).map(|o| o.sql)
@@ -153,7 +153,7 @@ impl Render for DefineEntityBuilder {
 // ── AlterEntityBuilder ───────────────────────────────────────────────────
 
 impl Render for AlterEntityBuilder<'_> {
-    fn render(&self, dialect: Option<&Dialect>) -> Result<String, RenderError> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_alter_entity_ir(&ir, dialect).map(|o| o.sql)
@@ -163,7 +163,7 @@ impl Render for AlterEntityBuilder<'_> {
 // ── DropEntityBuilder ────────────────────────────────────────────────────
 
 impl Render for DropEntityBuilder<'_> {
-    fn render(&self, dialect: Option<&Dialect>) -> Result<String, RenderError> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_drop_entity_ir(&ir, dialect).map(|o| o.sql)
@@ -173,7 +173,7 @@ impl Render for DropEntityBuilder<'_> {
 // ── DefineIndexBuilder ──────────────────────────────────────────────────
 
 impl Render for DefineIndexBuilder {
-    fn render(&self, dialect: Option<&Dialect>) -> Result<String, RenderError> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_define_index_ir(&ir, dialect).map(|o| o.sql)
@@ -183,7 +183,7 @@ impl Render for DefineIndexBuilder {
 // ── DropIndexBuilder ────────────────────────────────────────────────────
 
 impl Render for DropIndexBuilder {
-    fn render(&self, dialect: Option<&Dialect>) -> Result<String, RenderError> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_drop_index_ir(&ir, dialect).map(|o| o.sql)
@@ -193,7 +193,7 @@ impl Render for DropIndexBuilder {
 // ── GrantBuilder ────────────────────────────────────────────────────────
 
 impl Render for GrantBuilder {
-    fn render(&self, dialect: Option<&Dialect>) -> Result<String, RenderError> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let _dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_grant_ir(&ir).map(|o| o.sql)
@@ -203,7 +203,7 @@ impl Render for GrantBuilder {
 // ── RevokeBuilder ───────────────────────────────────────────────────────
 
 impl Render for RevokeBuilder {
-    fn render(&self, dialect: Option<&Dialect>) -> Result<String, RenderError> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let _dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_revoke_ir(&ir).map(|o| o.sql)
@@ -213,7 +213,7 @@ impl Render for RevokeBuilder {
 // ── DefineTypeBuilder ──────────────────────────────────────────────────
 
 impl Render for DefineTypeBuilder {
-    fn render(&self, dialect: Option<&Dialect>) -> Result<String, RenderError> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_define_type_ir(&ir, dialect).map(|o| o.sql)
@@ -223,7 +223,7 @@ impl Render for DefineTypeBuilder {
 // ── DropTypeBuilder ────────────────────────────────────────────────────
 
 impl Render for DropTypeBuilder {
-    fn render(&self, dialect: Option<&Dialect>) -> Result<String, RenderError> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_drop_type_ir(&ir, dialect).map(|o| o.sql)
@@ -233,7 +233,7 @@ impl Render for DropTypeBuilder {
 // ── DefinePolicyBuilder ────────────────────────────────────────────────
 
 impl Render for DefinePolicyBuilder {
-    fn render(&self, dialect: Option<&Dialect>) -> Result<String, RenderError> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
         render::render_define_policy_ir(&ir, dialect).map(|o| o.sql)
@@ -250,11 +250,11 @@ impl Render for DefinePolicyBuilder {
 /// (not `self`), so rendering uses associated functions rather than `&self` methods.
 pub trait TransactionRender {
     /// Render a TransactionIR to SQL for the given dialect.
-    fn render(ir: &TransactionIR, dialect: Option<&Dialect>) -> Result<String, RenderError>;
+    fn render(ir: &TransactionIR, dialect: Option<&Dialect>) -> Result<String, BackendError>;
 }
 
 impl TransactionRender for TransactionBuilder {
-    fn render(ir: &TransactionIR, dialect: Option<&Dialect>) -> Result<String, RenderError> {
+    fn render(ir: &TransactionIR, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let d = match dialect {
             Some(d) => d,
             None => dialect::default_dialect(),
@@ -347,7 +347,7 @@ impl<'a> CompoundSelectBuilder<'a> {
 }
 
 impl Render for CompoundSelectBuilder<'_> {
-    fn render(&self, dialect: Option<&Dialect>) -> Result<String, RenderError> {
+    fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
 
         let compound_ir = CompoundQueryIR {

@@ -17,25 +17,6 @@ pub struct SqlOutput {
     pub param_count: usize,
 }
 
-/// Errors that can occur during SQL rendering.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum RenderError {
-    Unsupported(String),
-    RenderError(String),
-}
-
-impl std::fmt::Display for RenderError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Unsupported(msg) => write!(f, "unsupported: {}", msg),
-            Self::RenderError(msg) => write!(f, "render error: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for RenderError {}
-
 /// SQL backend: renders DOL IR into dialect-specific SQL strings.
 pub struct SqlBackend {
     pub dialect: Dialect,
@@ -49,63 +30,63 @@ impl SqlBackend {
     pub fn mssql() -> Self { Self::new(Dialect::mssql()) }
     pub fn oracle() -> Self { Self::new(Dialect::oracle()) }
 
-    pub fn render_query(&self, ir: &QueryIR) -> Result<SqlOutput, RenderError> {
+    pub fn render_query(&self, ir: &QueryIR) -> Result<SqlOutput, BackendError> {
         render::render_query_ir(ir, &self.dialect)
     }
-    pub fn render_insert(&self, ir: &InsertIR) -> Result<SqlOutput, RenderError> {
+    pub fn render_insert(&self, ir: &InsertIR) -> Result<SqlOutput, BackendError> {
         render::render_insert_ir(ir, &self.dialect)
     }
-    pub fn render_insert_select(&self, ir: &InsertSelectIR) -> Result<SqlOutput, RenderError> {
+    pub fn render_insert_select(&self, ir: &InsertSelectIR) -> Result<SqlOutput, BackendError> {
         render::render_insert_select_ir(ir, &self.dialect)
     }
-    pub fn render_update(&self, ir: &UpdateIR) -> Result<SqlOutput, RenderError> {
+    pub fn render_update(&self, ir: &UpdateIR) -> Result<SqlOutput, BackendError> {
         render::render_update_ir(ir, &self.dialect)
     }
-    pub fn render_remove(&self, ir: &RemoveIR) -> Result<SqlOutput, RenderError> {
+    pub fn render_remove(&self, ir: &RemoveIR) -> Result<SqlOutput, BackendError> {
         render::render_remove_ir(ir, &self.dialect)
     }
-    pub fn render_upsert(&self, ir: &UpsertIR) -> Result<SqlOutput, RenderError> {
+    pub fn render_upsert(&self, ir: &UpsertIR) -> Result<SqlOutput, BackendError> {
         render::render_upsert_ir(ir, &self.dialect)
     }
-    pub fn render_define_entity(&self, ir: &DefineEntityIR) -> Result<SqlOutput, RenderError> {
+    pub fn render_define_entity(&self, ir: &DefineEntityIR) -> Result<SqlOutput, BackendError> {
         render::render_define_entity_ir(ir, &self.dialect)
     }
-    pub fn render_alter_entity(&self, ir: &AlterEntityIR) -> Result<SqlOutput, RenderError> {
+    pub fn render_alter_entity(&self, ir: &AlterEntityIR) -> Result<SqlOutput, BackendError> {
         render::render_alter_entity_ir(ir, &self.dialect)
     }
-    pub fn render_drop_entity(&self, ir: &DropEntityIR) -> Result<SqlOutput, RenderError> {
+    pub fn render_drop_entity(&self, ir: &DropEntityIR) -> Result<SqlOutput, BackendError> {
         render::render_drop_entity_ir(ir, &self.dialect)
     }
-    pub fn render_define_index(&self, ir: &DefineIndexIR) -> Result<SqlOutput, RenderError> {
+    pub fn render_define_index(&self, ir: &DefineIndexIR) -> Result<SqlOutput, BackendError> {
         render::render_define_index_ir(ir, &self.dialect)
     }
-    pub fn render_compound(&self, ir: &CompoundQueryIR) -> Result<SqlOutput, RenderError> {
+    pub fn render_compound(&self, ir: &CompoundQueryIR) -> Result<SqlOutput, BackendError> {
         render::render_compound_query_ir(ir, &self.dialect)
     }
-    pub fn render_drop_index(&self, ir: &DropIndexIR) -> Result<SqlOutput, RenderError> {
+    pub fn render_drop_index(&self, ir: &DropIndexIR) -> Result<SqlOutput, BackendError> {
         render::render_drop_index_ir(ir, &self.dialect)
     }
-    pub fn render_grant(&self, ir: &GrantIR) -> Result<SqlOutput, RenderError> {
+    pub fn render_grant(&self, ir: &GrantIR) -> Result<SqlOutput, BackendError> {
         render::render_grant_ir(ir)
     }
-    pub fn render_revoke(&self, ir: &RevokeIR) -> Result<SqlOutput, RenderError> {
+    pub fn render_revoke(&self, ir: &RevokeIR) -> Result<SqlOutput, BackendError> {
         render::render_revoke_ir(ir)
     }
-    pub fn render_transaction(&self, ir: &TransactionIR) -> Result<SqlOutput, RenderError> {
+    pub fn render_transaction(&self, ir: &TransactionIR) -> Result<SqlOutput, BackendError> {
         render::render_transaction_ir(ir, &self.dialect)
     }
-    pub fn render_define_type(&self, ir: &DefineTypeIR) -> Result<SqlOutput, RenderError> {
+    pub fn render_define_type(&self, ir: &DefineTypeIR) -> Result<SqlOutput, BackendError> {
         render::render_define_type_ir(ir, &self.dialect)
     }
-    pub fn render_drop_type(&self, ir: &DropTypeIR) -> Result<SqlOutput, RenderError> {
+    pub fn render_drop_type(&self, ir: &DropTypeIR) -> Result<SqlOutput, BackendError> {
         render::render_drop_type_ir(ir, &self.dialect)
     }
-    pub fn render_define_policy(&self, ir: &DefinePolicyIR) -> Result<SqlOutput, RenderError> {
+    pub fn render_define_policy(&self, ir: &DefinePolicyIR) -> Result<SqlOutput, BackendError> {
         render::render_define_policy_ir(ir, &self.dialect)
     }
 
     /// Render a Statement to SqlOutput (all SQL-supported variants).
-    pub fn render(&self, stmt: &Statement) -> Result<SqlOutput, RenderError> {
+    pub fn render(&self, stmt: &Statement) -> Result<SqlOutput, BackendError> {
         match stmt {
             Statement::Query(ir) => self.render_query(ir),
             Statement::Insert(ir) => self.render_insert(ir),
@@ -130,7 +111,7 @@ impl SqlBackend {
             | Statement::ListObjects(_)
             | Statement::ReadFile(_)
             | Statement::WriteFile(_)
-            | Statement::MoveFile(_) => Err(RenderError::Unsupported(
+            | Statement::MoveFile(_) => Err(BackendError::Unsupported(
                 "storage operations have no SQL equivalent".into(),
             )),
         }
