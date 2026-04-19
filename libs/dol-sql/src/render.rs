@@ -99,23 +99,21 @@ fn render_expr_inner(
         }
 
         Expr::Func { name, args } => {
-            use dol_core::expr::{FuncName, FuncKind};
+            use dol_core::expr::FuncName;
             let rendered_args: Vec<_> = args
                 .iter()
                 .map(|a| render_expr_inner(a, counter, dialect, next))
                 .collect::<Result<Vec<_>, _>>()?;
             let func_sql: std::borrow::Cow<str> = match name {
-                FuncName::Known(kind) => std::borrow::Cow::Borrowed(func_kind_to_sql(kind)),
                 FuncName::Custom(s) => std::borrow::Cow::Owned(s.clone()),
+                other => std::borrow::Cow::Borrowed(func_name_to_sql(other)),
             };
             // SQL reserved keywords that must appear without parentheses
             let no_parens = matches!(
                 name,
-                FuncName::Known(
-                    FuncKind::CurrentDate
-                    | FuncKind::CurrentTime
-                    | FuncKind::CurrentTimestamp
-                )
+                FuncName::CurrentDate
+                    | FuncName::CurrentTime
+                    | FuncName::CurrentTimestamp
             );
             if no_parens && rendered_args.is_empty() {
                 Ok(func_sql.into_owned())
@@ -1549,9 +1547,9 @@ fn entity_ref_to_sql(mref: &EntityRef, _dialect: &Dialect) -> String {
     }
 }
 
-fn func_kind_to_sql(kind: &dol_core::expr::FuncKind) -> &'static str {
-    use dol_core::expr::FuncKind as K;
-    match kind {
+fn func_name_to_sql(name: &dol_core::expr::FuncName) -> &'static str {
+    use dol_core::expr::FuncName as K;
+    match name {
         K::Count | K::CountDistinct => "COUNT",
         K::Sum => "SUM",
         K::Avg => "AVG",

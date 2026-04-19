@@ -30,7 +30,7 @@ pub mod window;
 
 pub use literal::{Literal, Value, TypeError};
 pub use ops::{BinOp, Quantifier, TernaryOp, UnaryOp};
-pub use func::{FuncKind, FuncName};
+pub use func::FuncName;
 pub use order::{Direction, NullsPosition, OrderByExpr};
 pub use window::{CaseBuilder, FrameBound, FrameKind, WindowBuilder, WindowFrame};
 

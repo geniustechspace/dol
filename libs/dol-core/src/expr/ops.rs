@@ -20,7 +20,7 @@
 ///
 /// Only universal, algebraic operators that apply across data systems.
 /// Named operations (JSON navigation, range functions, collection mutation,
-/// geo-distance) have been moved to [`FuncKind`](super::func::FuncKind).
+/// geo-distance) have been moved to [`FuncName`](super::func::FuncName).
 ///
 /// Negatable operators (pattern, similarity) do **not** have `Not*`
 /// counterparts — negation is expressed via `negated: bool` on the enclosing
@@ -114,7 +114,7 @@ pub enum BinOp {
 /// Only three primitive operators remain here — everything else that used to
 /// live here (IsNull, IsTrue, Abs, Sqrt, …) is either:
 /// - A dedicated `Expr` variant (`Expr::IsNull`)  
-/// - A named function (`FuncKind::Abs`, `FuncKind::Sqrt`, …)
+/// - A named function (`FuncName::Abs`, `FuncName::Sqrt`, …)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum UnaryOp {

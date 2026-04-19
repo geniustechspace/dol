@@ -570,8 +570,8 @@ fn render_expr_simple(expr: &Expr<'_>) -> Result<String, SpreadsheetError> {
                 .map(render_expr_simple)
                 .collect::<Result<Vec<_>, SpreadsheetError>>()?;
             let func_str = match name {
-                FuncName::Known(kind) => spreadsheet_func_name(kind).to_string(),
                 FuncName::Custom(s) => s.clone(),
+                other => spreadsheet_func_name(other).to_string(),
             };
             Ok(format!("{}({})", func_str, arg_strs.join(", ")))
         }
@@ -700,9 +700,9 @@ fn validate_column_expr(expr: &Expr<'_>, context: &str) -> Result<String, Spread
     }
 }
 
-fn spreadsheet_func_name(kind: &dol_core::expr::FuncKind) -> &'static str {
-    use dol_core::expr::FuncKind as K;
-    match kind {
+fn spreadsheet_func_name(name: &dol_core::expr::FuncName) -> &'static str {
+    use dol_core::expr::FuncName as K;
+    match name {
         K::Count => "COUNT",
         K::Sum => "SUM",
         K::Avg => "AVG",

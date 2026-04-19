@@ -1,6 +1,6 @@
 #[allow(deprecated)]
 use super::*;
-use super::func::{FuncKind, FuncName};
+use super::func::FuncName;
 
 // ── 1. Constructor functions ──
 
@@ -417,7 +417,7 @@ fn test_float_variants() {
 #[test]
 fn test_func_count() {
     let e = func::count(field("id"));
-    assert!(matches!(e, Expr::Func { ref name, ref args } if *name == FuncName::Known(FuncKind::Count) && args.len() == 1));
+    assert!(matches!(e, Expr::Func { ref name, ref args } if *name == FuncName::Count && args.len() == 1));
 }
 
 #[test]
@@ -428,25 +428,25 @@ fn test_func_count_star() {
 #[test]
 fn test_func_sum() {
     let e = func::sum(field("amount"));
-    assert!(matches!(e, Expr::Func { ref name, ref args } if *name == FuncName::Known(FuncKind::Sum) && args.len() == 1));
+    assert!(matches!(e, Expr::Func { ref name, ref args } if *name == FuncName::Sum && args.len() == 1));
 }
 
 #[test]
 fn test_func_lower() {
     let e = func::lower(field("email"));
-    assert!(matches!(e, Expr::Func { ref name, ref args } if *name == FuncName::Known(FuncKind::Lower) && args.len() == 1));
+    assert!(matches!(e, Expr::Func { ref name, ref args } if *name == FuncName::Lower && args.len() == 1));
 }
 
 #[test]
 fn test_func_now() {
     let e = func::now();
-    assert!(matches!(e, Expr::Func { ref name, ref args } if *name == FuncName::Known(FuncKind::Now) && args.is_empty()));
+    assert!(matches!(e, Expr::Func { ref name, ref args } if *name == FuncName::Now && args.is_empty()));
 }
 
 #[test]
 fn test_func_coalesce() {
     let e = func::coalesce(vec![field("a"), field("b"), string("default")]);
-    assert!(matches!(e, Expr::Func { ref name, ref args } if *name == FuncName::Known(FuncKind::Coalesce) && args.len() == 3));
+    assert!(matches!(e, Expr::Func { ref name, ref args } if *name == FuncName::Coalesce && args.len() == 3));
 }
 
 // ── 16. CaseBuilder ──
