@@ -1,15 +1,15 @@
 use super::*;
-use super::control::{DefinePolicyIR, GrantIR, PolicyAction, Privilege, RevokeIR};
+use super::control::{DefinePolicy, Grant, PolicyAction, Privilege, Revoke};
 use super::definition::{
-    AlterAction, AlterEntityIR, DefineEntityIR, DefineIndexIR, DefineTypeIR, DropEntityIR,
-    DropIndexIR, DropTypeIR, FieldDef, IndexMethod, OwnedForeignKeyRef,
+    AlterAction, AlterEntity, DefineEntity, DefineIndex, DefineType, DropEntity,
+    DropIndex, DropType, FieldDef, IndexMethod, OwnedForeignKeyRef,
 };
-use super::mutation::{InsertIR, InsertSelectIR, RemoveIR, UpdateIR, UpsertIR};
-use super::query::{CompoundQueryIR, JoinIR, JoinType, LockMode, OffsetLimit, QueryIR, SetOpKind};
+use super::mutation::{Insert, InsertSelect, Remove, Update, Upsert};
+use super::query::{CompoundQuery, Join, JoinKind, LockMode, OffsetLimit, Query, SetOp};
 use super::storage::{
-    GetObjectIR, ListObjectsIR, MoveFileIR, ObjectSource, PutObjectIR, ReadFileIR, WriteFileIR,
+    GetObject, ListObjects, MoveFile, ObjectSource, PutObject, ReadFile, WriteFile,
 };
-use super::transaction::TransactionIR;
+use super::transaction::Transaction;
 use crate::types::DataType;
 use crate::constraint::FkAction;
 
@@ -31,8 +31,8 @@ fn entity_ref_full(name: &str, ns: &str, alias: &str) -> EntityRef {
     }
 }
 
-fn simple_query_ir() -> QueryIR<'static> {
-    QueryIR {
+fn simple_query_ir() -> Query<'static> {
+    Query {
         source: entity_ref("users"),
         projections: vec![],
         joins: vec![],
@@ -90,7 +90,7 @@ fn model_ref_clone() {
 
 #[test]
 fn statement_define_model() {
-    let stmt = Statement::DefineEntity(Box::new(DefineEntityIR {
+    let stmt = Statement::DefineEntity(Box::new(DefineEntity {
         name: "users".to_string(),
         namespace: None,
         fields: vec![],
@@ -102,7 +102,7 @@ fn statement_define_model() {
 
 #[test]
 fn statement_drop_model() {
-    let stmt = Statement::DropEntity(DropEntityIR {
+    let stmt = Statement::DropEntity(DropEntity {
         target: entity_ref("users"),
         if_exists: true,
         cascade: false,
@@ -112,7 +112,7 @@ fn statement_drop_model() {
 
 #[test]
 fn statement_insert() {
-    let stmt = Statement::Insert(InsertIR {
+    let stmt = Statement::Insert(Insert {
         target: entity_ref("users"),
         fields: vec!["name".to_string()],
         row_count: 1,
@@ -129,13 +129,13 @@ fn statement_query() {
 
 #[test]
 fn statement_transaction() {
-    let stmt = Statement::Transaction(TransactionIR::Begin);
+    let stmt = Statement::Transaction(Transaction::Begin);
     assert!(matches!(stmt, Statement::Transaction(_)));
 }
 
 #[test]
 fn statement_grant() {
-    let stmt = Statement::Grant(GrantIR {
+    let stmt = Statement::Grant(Grant {
         privilege: Privilege::Select,
         on_target: "users".to_string(),
         to_role: "reader".to_string(),
@@ -145,7 +145,7 @@ fn statement_grant() {
 
 #[test]
 fn statement_put_object() {
-    let stmt = Statement::PutObject(PutObjectIR {
+    let stmt = Statement::PutObject(PutObject {
         key: "file.txt".to_string(),
         source: ObjectSource::FromBytes,
         bucket: "uploads".to_string(),
@@ -157,7 +157,7 @@ fn statement_put_object() {
 
 #[test]
 fn statement_read_file() {
-    let stmt = Statement::ReadFile(ReadFileIR {
+    let stmt = Statement::ReadFile(ReadFile {
         path: "/data/input.csv".to_string(),
         encoding: Some("utf-8".to_string()),
     });
@@ -166,17 +166,17 @@ fn statement_read_file() {
 
 #[test]
 fn statement_clone() {
-    let stmt = Statement::Transaction(TransactionIR::Commit);
+    let stmt = Statement::Transaction(Transaction::Commit);
     let cloned = stmt.clone();
     assert!(matches!(
         cloned,
-        Statement::Transaction(TransactionIR::Commit)
+        Statement::Transaction(Transaction::Commit)
     ));
 }
 
 #[test]
 fn statement_debug() {
-    let stmt = Statement::Transaction(TransactionIR::Rollback);
+    let stmt = Statement::Transaction(Transaction::Rollback);
     let dbg = format!("{:?}", stmt);
     assert!(dbg.contains("Rollback"));
 }
@@ -432,43 +432,43 @@ fn lock_mode_inequality() {
 }
 
 // ======================================================================
-// 14. JoinType
+// 14. JoinKind
 // ======================================================================
 
 #[test]
 fn join_type_equality() {
-    assert_eq!(JoinType::Inner, JoinType::Inner);
-    assert_eq!(JoinType::Left, JoinType::Left);
-    assert_eq!(JoinType::Right, JoinType::Right);
-    assert_eq!(JoinType::Full, JoinType::Full);
-    assert_eq!(JoinType::Cross, JoinType::Cross);
+    assert_eq!(JoinKind::Inner, JoinKind::Inner);
+    assert_eq!(JoinKind::Left, JoinKind::Left);
+    assert_eq!(JoinKind::Right, JoinKind::Right);
+    assert_eq!(JoinKind::Full, JoinKind::Full);
+    assert_eq!(JoinKind::Cross, JoinKind::Cross);
 }
 
 #[test]
 fn join_type_inequality() {
-    assert_ne!(JoinType::Inner, JoinType::Left);
-    assert_ne!(JoinType::Left, JoinType::Right);
-    assert_ne!(JoinType::Full, JoinType::Cross);
+    assert_ne!(JoinKind::Inner, JoinKind::Left);
+    assert_ne!(JoinKind::Left, JoinKind::Right);
+    assert_ne!(JoinKind::Full, JoinKind::Cross);
 }
 
 // ======================================================================
-// 15. SetOpKind
+// 15. SetOp
 // ======================================================================
 
 #[test]
 fn set_op_kind_equality() {
-    assert_eq!(SetOpKind::Union, SetOpKind::Union);
-    assert_eq!(SetOpKind::UnionAll, SetOpKind::UnionAll);
-    assert_eq!(SetOpKind::Intersect, SetOpKind::Intersect);
-    assert_eq!(SetOpKind::IntersectAll, SetOpKind::IntersectAll);
-    assert_eq!(SetOpKind::Except, SetOpKind::Except);
-    assert_eq!(SetOpKind::ExceptAll, SetOpKind::ExceptAll);
+    assert_eq!(SetOp::Union, SetOp::Union);
+    assert_eq!(SetOp::UnionAll, SetOp::UnionAll);
+    assert_eq!(SetOp::Intersect, SetOp::Intersect);
+    assert_eq!(SetOp::IntersectAll, SetOp::IntersectAll);
+    assert_eq!(SetOp::Except, SetOp::Except);
+    assert_eq!(SetOp::ExceptAll, SetOp::ExceptAll);
 }
 
 #[test]
 fn set_op_kind_inequality() {
-    assert_ne!(SetOpKind::Union, SetOpKind::UnionAll);
-    assert_ne!(SetOpKind::Intersect, SetOpKind::Except);
+    assert_ne!(SetOp::Union, SetOp::UnionAll);
+    assert_ne!(SetOp::Intersect, SetOp::Except);
 }
 
 // ======================================================================
@@ -501,52 +501,52 @@ fn offset_limit_clone() {
 }
 
 // ======================================================================
-// 18. TransactionIR
+// 18. Transaction
 // ======================================================================
 
 #[test]
 fn transaction_ir_begin() {
-    assert!(matches!(TransactionIR::Begin, TransactionIR::Begin));
+    assert!(matches!(Transaction::Begin, Transaction::Begin));
 }
 
 #[test]
 fn transaction_ir_commit() {
-    assert!(matches!(TransactionIR::Commit, TransactionIR::Commit));
+    assert!(matches!(Transaction::Commit, Transaction::Commit));
 }
 
 #[test]
 fn transaction_ir_rollback() {
-    assert!(matches!(TransactionIR::Rollback, TransactionIR::Rollback));
+    assert!(matches!(Transaction::Rollback, Transaction::Rollback));
 }
 
 #[test]
 fn transaction_ir_savepoint() {
-    let sp = TransactionIR::Savepoint("sp1".to_string());
-    assert!(matches!(sp, TransactionIR::Savepoint(_)));
-    if let TransactionIR::Savepoint(name) = sp {
+    let sp = Transaction::Savepoint("sp1".to_string());
+    assert!(matches!(sp, Transaction::Savepoint(_)));
+    if let Transaction::Savepoint(name) = sp {
         assert_eq!(name, "sp1");
     }
 }
 
 #[test]
 fn transaction_ir_release_savepoint() {
-    let sp = TransactionIR::ReleaseSavepoint("sp1".to_string());
-    assert!(matches!(sp, TransactionIR::ReleaseSavepoint(_)));
+    let sp = Transaction::ReleaseSavepoint("sp1".to_string());
+    assert!(matches!(sp, Transaction::ReleaseSavepoint(_)));
 }
 
 #[test]
 fn transaction_ir_rollback_to_savepoint() {
-    let sp = TransactionIR::RollbackToSavepoint("sp2".to_string());
-    assert!(matches!(sp, TransactionIR::RollbackToSavepoint(_)));
+    let sp = Transaction::RollbackToSavepoint("sp2".to_string());
+    assert!(matches!(sp, Transaction::RollbackToSavepoint(_)));
 }
 
 #[test]
 fn transaction_ir_block() {
-    let block = TransactionIR::Block(vec![
-        Statement::Transaction(TransactionIR::Begin),
-        Statement::Transaction(TransactionIR::Commit),
+    let block = Transaction::Block(vec![
+        Statement::Transaction(Transaction::Begin),
+        Statement::Transaction(Transaction::Commit),
     ]);
-    if let TransactionIR::Block(stmts) = block {
+    if let Transaction::Block(stmts) = block {
         assert_eq!(stmts.len(), 2);
     } else {
         panic!("expected Block");
@@ -639,7 +639,7 @@ fn alter_action_rename_model() {
 
 #[test]
 fn statement_alter_model() {
-    let stmt = Statement::AlterEntity(AlterEntityIR {
+    let stmt = Statement::AlterEntity(AlterEntity {
         target: entity_ref("users"),
         actions: vec![AlterAction::AddField(FieldDef::new("age", DataType::Int32))],
     });
@@ -648,7 +648,7 @@ fn statement_alter_model() {
 
 #[test]
 fn statement_define_index() {
-    let stmt = Statement::DefineIndex(DefineIndexIR {
+    let stmt = Statement::DefineIndex(DefineIndex {
         name: "idx_email".to_string(),
         target: entity_ref("users"),
         columns: vec!["email".to_string()],
@@ -663,7 +663,7 @@ fn statement_define_index() {
 
 #[test]
 fn statement_drop_index() {
-    let stmt = Statement::DropIndex(DropIndexIR {
+    let stmt = Statement::DropIndex(DropIndex {
         name: "idx_email".to_string(),
         if_exists: true,
         concurrently: false,
@@ -674,7 +674,7 @@ fn statement_drop_index() {
 
 #[test]
 fn statement_define_type() {
-    let stmt = Statement::DefineType(DefineTypeIR {
+    let stmt = Statement::DefineType(DefineType {
         name: "mood".to_string(),
         namespace: None,
         variants: vec!["happy".to_string(), "sad".to_string()],
@@ -684,7 +684,7 @@ fn statement_define_type() {
 
 #[test]
 fn statement_drop_type() {
-    let stmt = Statement::DropType(DropTypeIR {
+    let stmt = Statement::DropType(DropType {
         name: "mood".to_string(),
         if_exists: false,
     });
@@ -693,7 +693,7 @@ fn statement_drop_type() {
 
 #[test]
 fn statement_insert_select() {
-    let stmt = Statement::InsertSelect(InsertSelectIR {
+    let stmt = Statement::InsertSelect(InsertSelect {
         target: entity_ref("archive"),
         fields: vec!["id".to_string(), "name".to_string()],
         source_query: "SELECT id, name FROM users WHERE archived".to_string(),
@@ -704,7 +704,7 @@ fn statement_insert_select() {
 
 #[test]
 fn statement_update() {
-    let stmt = Statement::Update(UpdateIR {
+    let stmt = Statement::Update(Update {
         target: entity_ref("users"),
         assignments: vec![],
         filters: vec![],
@@ -715,7 +715,7 @@ fn statement_update() {
 
 #[test]
 fn statement_remove() {
-    let stmt = Statement::Remove(RemoveIR {
+    let stmt = Statement::Remove(Remove {
         target: entity_ref("users"),
         filters: vec![],
         returning: vec![],
@@ -725,7 +725,7 @@ fn statement_remove() {
 
 #[test]
 fn statement_upsert() {
-    let stmt = Statement::Upsert(Box::new(UpsertIR {
+    let stmt = Statement::Upsert(Box::new(Upsert {
         target: entity_ref("users"),
         fields: vec!["email".to_string()],
         conflict_fields: vec!["email".to_string()],
@@ -740,9 +740,9 @@ fn statement_upsert() {
 
 #[test]
 fn statement_compound() {
-    let stmt = Statement::Compound(Box::new(CompoundQueryIR {
+    let stmt = Statement::Compound(Box::new(CompoundQuery {
         base: Box::new(simple_query_ir()),
-        operations: vec![(SetOpKind::Union, simple_query_ir())],
+        operations: vec![(SetOp::Union, simple_query_ir())],
         order_by: vec![],
         offset: None,
         limit: None,
@@ -752,7 +752,7 @@ fn statement_compound() {
 
 #[test]
 fn statement_revoke() {
-    let stmt = Statement::Revoke(RevokeIR {
+    let stmt = Statement::Revoke(Revoke {
         privilege: Privilege::All,
         on_target: "users".to_string(),
         from_role: "guest".to_string(),
@@ -762,7 +762,7 @@ fn statement_revoke() {
 
 #[test]
 fn statement_define_policy() {
-    let stmt = Statement::DefinePolicy(DefinePolicyIR {
+    let stmt = Statement::DefinePolicy(DefinePolicy {
         name: "tenant_isolation".to_string(),
         on_model: "users".to_string(),
         action: PolicyAction::All,
@@ -774,7 +774,7 @@ fn statement_define_policy() {
 
 #[test]
 fn statement_get_object() {
-    let stmt = Statement::GetObject(GetObjectIR {
+    let stmt = Statement::GetObject(GetObject {
         key: "doc.pdf".to_string(),
         bucket: "docs".to_string(),
     });
@@ -783,7 +783,7 @@ fn statement_get_object() {
 
 #[test]
 fn statement_list_objects() {
-    let stmt = Statement::ListObjects(ListObjectsIR {
+    let stmt = Statement::ListObjects(ListObjects {
         bucket: "uploads".to_string(),
         prefix: Some("img/".to_string()),
         limit: Some(100),
@@ -794,7 +794,7 @@ fn statement_list_objects() {
 
 #[test]
 fn statement_write_file() {
-    let stmt = Statement::WriteFile(WriteFileIR {
+    let stmt = Statement::WriteFile(WriteFile {
         path: "/out/report.csv".to_string(),
         source: ObjectSource::FromBytes,
         create_dirs: true,
@@ -804,7 +804,7 @@ fn statement_write_file() {
 
 #[test]
 fn statement_move_file() {
-    let stmt = Statement::MoveFile(MoveFileIR {
+    let stmt = Statement::MoveFile(MoveFile {
         from: "/a/old.txt".to_string(),
         to: "/b/new.txt".to_string(),
     });
@@ -831,19 +831,19 @@ fn object_source_from_expr() {
 
 #[test]
 fn join_ir_construction() {
-    let join = JoinIR {
-        join_type: JoinType::Left,
+    let join = Join {
+        join_type: JoinKind::Left,
         target: entity_ref("orders"),
         on_conditions: vec![("users.id".to_string(), "orders.user_id".to_string())],
     };
-    assert_eq!(join.join_type, JoinType::Left);
+    assert_eq!(join.join_type, JoinKind::Left);
     assert_eq!(join.target.name, "orders");
     assert_eq!(join.on_conditions.len(), 1);
 }
 
 #[test]
 fn query_ir_with_options() {
-    let q = QueryIR {
+    let q = Query {
         source: entity_ref("users"),
         projections: vec![crate::expr::Expr::Identifier("id".to_string())],
         joins: vec![],
@@ -865,7 +865,7 @@ fn query_ir_with_options() {
 
 #[test]
 fn define_model_ir_with_fields() {
-    let ir = DefineEntityIR {
+    let ir = DefineEntity {
         name: "products".to_string(),
         namespace: Some("shop".to_string()),
         fields: vec![
@@ -884,7 +884,7 @@ fn define_model_ir_with_fields() {
 
 #[test]
 fn define_index_ir_concurrently_with_where() {
-    let ir = DefineIndexIR {
+    let ir = DefineIndex {
         name: "idx_active_users".to_string(),
         target: entity_ref("users"),
         columns: vec!["email".to_string()],

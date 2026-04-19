@@ -1,10 +1,4 @@
-//! # dol-ir — DOL Intermediate Representation
-//!
-//! The canonical, backend-agnostic AST that all DOL builders produce and
-//! all backends consume.
-//!
-//! Also defines the `Backend` trait, output types, and error types shared
-//! across all backend implementations.
+//! Backward compatibility — re-exports from [`crate::op`].
 
 pub mod control;
 pub mod definition;
@@ -13,101 +7,54 @@ pub mod query;
 pub mod storage;
 pub mod transaction;
 
-pub use control::{DefinePolicyIR, GrantIR, PolicyAction, Privilege, RevokeIR};
-pub use definition::{
-    AlterAction, AlterEntityIR, DefineEntityIR, DefineIndexIR, DefineTypeIR, DropEntityIR,
-    DropIndexIR, DropTypeIR, FieldDef, IndexMethod, OwnedEntityConstraint, OwnedForeignKeyRef,
+// ── Re-export every canonical type from `op` ──
+
+pub use crate::op::{EntityRef, BackendError, Statement};
+
+pub use crate::op::{
+    // query
+    Query, CompoundQuery, Join, JoinKind, SetOp, OffsetLimit, LockMode,
+    // mutation
+    Insert, InsertSelect, Update, Remove, Upsert,
+    // definition
+    DefineEntity, AlterEntity, DropEntity, DefineIndex, DropIndex, DefineType, DropType,
+    FieldDef, AlterAction, IndexMethod, OwnedEntityConstraint, OwnedForeignKeyRef,
+    // control
+    Grant, Revoke, DefinePolicy, PolicyAction, Privilege,
+    // storage
+    PutObject, GetObject, ListObjects, ReadFile, WriteFile, MoveFile, ObjectSource,
+    // transaction
+    Transaction,
 };
-pub use mutation::{InsertIR, InsertSelectIR, RemoveIR, UpdateIR, UpsertIR};
-pub use query::{CompoundQueryIR, JoinIR, JoinType, LockMode, OffsetLimit, QueryIR, SetOpKind};
-pub use storage::{
-    GetObjectIR, ListObjectsIR, MoveFileIR, ObjectSource, PutObjectIR, ReadFileIR, WriteFileIR,
-};
-pub use transaction::TransactionIR;
 
-/// A reference to a model (table/collection/bucket), with optional alias.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct EntityRef {
-    pub name: String,
-    pub namespace: Option<String>,
-    pub alias: Option<String>,
-}
+// ── Deprecated type aliases for old IR-suffixed names ──
 
-// ---------------------------------------------------------------------------
-// BackendError — shared error type for all backends
-// ---------------------------------------------------------------------------
+pub type QueryIR<'a> = Query<'a>;
+pub type CompoundQueryIR<'a> = CompoundQuery<'a>;
+pub type JoinIR = Join;
+pub type InsertIR = Insert;
+pub type InsertSelectIR = InsertSelect;
+pub type UpdateIR<'a> = Update<'a>;
+pub type RemoveIR<'a> = Remove<'a>;
+pub type UpsertIR<'a> = Upsert<'a>;
+pub type DefineEntityIR = DefineEntity;
+pub type AlterEntityIR = AlterEntity;
+pub type DropEntityIR = DropEntity;
+pub type DefineIndexIR = DefineIndex;
+pub type DropIndexIR = DropIndex;
+pub type DefineTypeIR = DefineType;
+pub type DropTypeIR = DropType;
+pub type GrantIR = Grant;
+pub type RevokeIR = Revoke;
+pub type DefinePolicyIR<'a> = DefinePolicy<'a>;
+pub type PutObjectIR<'a> = PutObject<'a>;
+pub type GetObjectIR = GetObject;
+pub type ListObjectsIR = ListObjects;
+pub type ReadFileIR = ReadFile;
+pub type WriteFileIR<'a> = WriteFile<'a>;
+pub type MoveFileIR = MoveFile;
+pub type TransactionIR<'a> = Transaction<'a>;
 
-/// Errors that can occur during backend rendering.
-///
-/// Every DOL backend (SQL, spreadsheet, KV, object-storage, …) uses this
-/// shared type so callers can handle errors uniformly.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum BackendError {
-    /// The backend does not support the requested operation or expression.
-    Unsupported(String),
-    /// A rendering error that is not an unsupported-feature issue.
-    Render(String),
-}
-
-impl std::fmt::Display for BackendError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Unsupported(msg) => write!(f, "unsupported: {}", msg),
-            Self::Render(msg) => write!(f, "render error: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for BackendError {}
-
-/// Top-level DOL statement — the universal dispatch enum.
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum Statement<'a> {
-    // Definition
-    DefineEntity(Box<DefineEntityIR>),
-    AlterEntity(AlterEntityIR),
-    DropEntity(DropEntityIR),
-    DefineIndex(DefineIndexIR),
-    DropIndex(DropIndexIR),
-    DefineType(DefineTypeIR),
-    DropType(DropTypeIR),
-
-    // Mutation
-    Insert(InsertIR),
-    InsertSelect(InsertSelectIR),
-    Update(UpdateIR<'a>),
-    Remove(RemoveIR<'a>),
-    Upsert(Box<UpsertIR<'a>>),
-
-    // Query
-    Query(Box<QueryIR<'a>>),
-
-    // Compound query (set operations)
-    Compound(Box<CompoundQueryIR<'a>>),
-
-    // Control
-    Grant(GrantIR),
-    Revoke(RevokeIR),
-    DefinePolicy(DefinePolicyIR<'a>),
-
-    // Transaction
-    Transaction(TransactionIR<'a>),
-
-    // Storage
-    PutObject(PutObjectIR<'a>),
-    GetObject(GetObjectIR),
-    ListObjects(ListObjectsIR),
-    ReadFile(ReadFileIR),
-    WriteFile(WriteFileIR<'a>),
-    MoveFile(MoveFileIR),
-}
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-#[cfg(test)]
-mod tests;
+// Aliases for renamed non-IR types
+pub type JoinType = JoinKind;
+pub type SetOpKind = SetOp;

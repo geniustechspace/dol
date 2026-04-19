@@ -1,57 +1,9 @@
-//! Mutation IR — canonical representation of data modification operations.
+//! Backward compatibility — re-exports from [`crate::op::mutation`].
 
-use super::EntityRef;
-use crate::expr::Expr;
+pub use crate::op::mutation::*;
 
-/// Insert new records into a model.
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct InsertIR {
-    pub target: EntityRef,
-    pub fields: Vec<String>,
-    pub row_count: usize,
-    pub returning: Vec<String>,
-}
-
-/// Insert from a subquery: `INSERT INTO ... SELECT ...`
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct InsertSelectIR {
-    pub target: EntityRef,
-    pub fields: Vec<String>,
-    pub source_query: String,
-    pub returning: Vec<String>,
-}
-
-/// Update existing records in a model.
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct UpdateIR<'a> {
-    pub target: EntityRef,
-    pub assignments: Vec<(String, Expr<'a>)>,
-    pub filters: Vec<Expr<'a>>,
-    pub returning: Vec<String>,
-}
-
-/// Remove records from a model.
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct RemoveIR<'a> {
-    pub target: EntityRef,
-    pub filters: Vec<Expr<'a>>,
-    pub returning: Vec<String>,
-}
-
-/// Upsert (insert or update on conflict).
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct UpsertIR<'a> {
-    pub target: EntityRef,
-    pub fields: Vec<String>,
-    pub conflict_fields: Vec<String>,
-    pub conflict_constraint: Option<String>,
-    pub update_fields: Vec<String>,
-    pub do_nothing: bool,
-    pub conflict_filters: Vec<Expr<'a>>,
-    pub returning: Vec<String>,
-}
+pub type InsertIR = crate::op::Insert;
+pub type InsertSelectIR = crate::op::InsertSelect;
+pub type UpdateIR<'a> = crate::op::Update<'a>;
+pub type RemoveIR<'a> = crate::op::Remove<'a>;
+pub type UpsertIR<'a> = crate::op::Upsert<'a>;
