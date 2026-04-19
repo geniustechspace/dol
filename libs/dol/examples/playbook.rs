@@ -156,8 +156,8 @@ fn products() -> Entity {
             Field::new("quantity", DataType::Int32).default("0"),
             Field::new("weight_kg", DataType::Float32).nullable(),
             Field::new("description", DataType::Text).nullable(),
-            Field::new("image_path", DataType::FilePath).nullable(),
-            Field::new("mime_type", DataType::Mime).nullable(),
+            Field::new("image_path", DataType::Text).nullable(),
+            Field::new("mime_type", DataType::Text).nullable(),
             Field::new("is_active", DataType::Bool).default("TRUE"),
             Field::new("tags", DataType::Array(Box::new(DataType::Text))).nullable(),
             Field::new("metadata", DataType::Json).nullable(),
@@ -1007,7 +1007,7 @@ fn main() {
     println!("  Negation: -expr ✓");
 
     // 5f. CAST
-    let _cast = field("count").cast("BIGINT");
+    let _cast = field("count").cast(DataType::Int64);
     println!("  Cast: CAST(count AS BIGINT) ✓");
 
     // 5g. Alias
@@ -2167,13 +2167,13 @@ mod tests {
             products
                 .fields
                 .iter()
-                .any(|f| f.data_type == DataType::FilePath)
+                .any(|f| f.data_type == DataType::Text)
         );
         assert!(
             products
                 .fields
                 .iter()
-                .any(|f| f.data_type == DataType::Mime)
+                .any(|f| f.data_type == DataType::Text)
         );
         assert!(
             audit_log

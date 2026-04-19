@@ -30,6 +30,7 @@ pub mod window;
 
 pub use literal::{Literal, Value, TypeError};
 pub use ops::{BinOp, Quantifier, TernaryOp, UnaryOp};
+pub use func::FuncName;
 pub use order::{Direction, NullsPosition, OrderByExpr};
 pub use window::{CaseBuilder, FrameBound, FrameKind, WindowBuilder, WindowFrame};
 
@@ -107,11 +108,11 @@ pub enum Expr<'a> {
 
     // ── Function call ──
     /// A function call: `name(args...)`.
-    Func { name: String, args: Vec<Expr<'a>> },
+    Func { name: FuncName, args: Vec<Expr<'a>> },
 
     // ── Type conversion ──
     /// A type cast: `CAST(expr AS type)`.
-    Cast { expr: Box<Expr<'a>>, as_type: String },
+    Cast { expr: Box<Expr<'a>>, as_type: crate::types::DataType },
 
     // ── Conditional ──
     /// A CASE expression: `CASE WHEN ... THEN ... ELSE ... END`.
@@ -231,8 +232,8 @@ pub fn param<'a>() -> Expr<'a> {
 }
 
 /// Create a raw expression string (escape hatch).
-pub fn raw_expr<'a>(sql: &str) -> Expr<'a> {
-    Expr::Raw(sql.to_string())
+pub fn raw_expr<'a>(expr: &str) -> Expr<'a> {
+    Expr::Raw(expr.to_string())
 }
 
 /// Start building a CASE expression.
@@ -443,8 +444,8 @@ impl<'a> Expr<'a> {
 
     // ── Type conversion ──
 
-    pub fn cast(self, as_type: &str) -> Expr<'a> {
-        Expr::Cast { expr: Box::new(self), as_type: as_type.to_string() }
+    pub fn cast(self, as_type: crate::types::DataType) -> Expr<'a> {
+        Expr::Cast { expr: Box::new(self), as_type }
     }
 
     // ── Decoration ──

@@ -495,7 +495,7 @@ fn render_step(step: &MigrationStep, dialect: &Dialect) -> RenderedStep {
 
 /// Render a SQL statement to a [`RenderedStep`].
 fn render_sql_step(stmt: &Statement, dialect: &Dialect) -> RenderedStep {
-    let result: Result<dol_core::ir::SqlOutput, BackendError> = match stmt {
+    let result: Result<dol_sql::SqlOutput, BackendError> = match stmt {
         Statement::DefineEntity(ir) => render::render_define_entity_ir(ir, dialect),
         Statement::AlterEntity(ir) => render::render_alter_entity_ir(ir, dialect),
         Statement::DropEntity(ir) => render::render_drop_entity_ir(ir, dialect),

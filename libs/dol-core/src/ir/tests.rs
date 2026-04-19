@@ -182,242 +182,6 @@ fn statement_debug() {
 }
 
 // ======================================================================
-// 3. SqlOutput
-// ======================================================================
-
-#[test]
-fn sql_output_construction() {
-    let out = SqlOutput {
-        sql: "SELECT * FROM users WHERE id = $1".to_string(),
-        param_count: 1,
-    };
-    assert_eq!(out.sql, "SELECT * FROM users WHERE id = $1");
-    assert_eq!(out.param_count, 1);
-}
-
-#[test]
-fn sql_output_zero_params() {
-    let out = SqlOutput {
-        sql: "SELECT 1".to_string(),
-        param_count: 0,
-    };
-    assert_eq!(out.param_count, 0);
-}
-
-#[test]
-fn sql_output_clone_and_debug() {
-    let out = SqlOutput {
-        sql: "INSERT INTO t VALUES ($1)".to_string(),
-        param_count: 1,
-    };
-    let cloned = out.clone();
-    assert_eq!(cloned.sql, out.sql);
-    let dbg = format!("{:?}", out);
-    assert!(dbg.contains("INSERT"));
-}
-
-// ======================================================================
-// 4. KvOp
-// ======================================================================
-
-#[test]
-fn kv_op_get_eq() {
-    assert_eq!(KvOp::Get, KvOp::Get);
-}
-
-#[test]
-fn kv_op_put_eq() {
-    assert_eq!(KvOp::Put, KvOp::Put);
-}
-
-#[test]
-fn kv_op_delete_eq() {
-    assert_eq!(KvOp::Delete, KvOp::Delete);
-}
-
-#[test]
-fn kv_op_list_eq_no_filters() {
-    assert_eq!(
-        KvOp::List {
-            prefix: None,
-            limit: None,
-        },
-        KvOp::List {
-            prefix: None,
-            limit: None,
-        }
-    );
-}
-
-#[test]
-fn kv_op_list_eq_with_prefix_and_limit() {
-    assert_eq!(
-        KvOp::List {
-            prefix: Some("user:".to_string()),
-            limit: Some(100),
-        },
-        KvOp::List {
-            prefix: Some("user:".to_string()),
-            limit: Some(100),
-        }
-    );
-}
-
-#[test]
-fn kv_op_different_variants_ne() {
-    assert_ne!(KvOp::Get, KvOp::Put);
-    assert_ne!(KvOp::Put, KvOp::Delete);
-    assert_ne!(
-        KvOp::Get,
-        KvOp::List {
-            prefix: None,
-            limit: None
-        }
-    );
-}
-
-// ======================================================================
-// 5. StorageOp
-// ======================================================================
-
-#[test]
-fn storage_op_put_object_eq() {
-    let a = StorageOp::PutObject {
-        bucket: "b".to_string(),
-        key: "k".to_string(),
-        content_type: Some("text/plain".to_string()),
-    };
-    let b = StorageOp::PutObject {
-        bucket: "b".to_string(),
-        key: "k".to_string(),
-        content_type: Some("text/plain".to_string()),
-    };
-    assert_eq!(a, b);
-}
-
-#[test]
-fn storage_op_get_object_eq() {
-    assert_eq!(
-        StorageOp::GetObject {
-            bucket: "bkt".to_string(),
-            key: "obj".to_string(),
-        },
-        StorageOp::GetObject {
-            bucket: "bkt".to_string(),
-            key: "obj".to_string(),
-        }
-    );
-}
-
-#[test]
-fn storage_op_list_objects_eq() {
-    assert_eq!(
-        StorageOp::ListObjects {
-            bucket: "b".to_string(),
-            prefix: Some("img/".to_string()),
-            limit: Some(50),
-        },
-        StorageOp::ListObjects {
-            bucket: "b".to_string(),
-            prefix: Some("img/".to_string()),
-            limit: Some(50),
-        }
-    );
-}
-
-#[test]
-fn storage_op_delete_object_eq() {
-    assert_eq!(
-        StorageOp::DeleteObject {
-            bucket: "b".to_string(),
-            key: "old".to_string(),
-        },
-        StorageOp::DeleteObject {
-            bucket: "b".to_string(),
-            key: "old".to_string(),
-        }
-    );
-}
-
-#[test]
-fn storage_op_different_variants_ne() {
-    let put = StorageOp::PutObject {
-        bucket: "b".to_string(),
-        key: "k".to_string(),
-        content_type: None,
-    };
-    let get = StorageOp::GetObject {
-        bucket: "b".to_string(),
-        key: "k".to_string(),
-    };
-    assert_ne!(put, get);
-}
-
-// ======================================================================
-// 6. BackendError
-// ======================================================================
-
-#[test]
-fn backend_error_unsupported_display() {
-    let err = BackendError::Unsupported("KV insert".to_string());
-    assert_eq!(format!("{}", err), "unsupported: KV insert");
-}
-
-#[test]
-fn backend_error_render_display() {
-    let err = BackendError::RenderError("bad SQL".to_string());
-    assert_eq!(format!("{}", err), "render error: bad SQL");
-}
-
-#[test]
-fn backend_error_implements_error_trait() {
-    let err = BackendError::Unsupported("x".to_string());
-    let _: &dyn std::error::Error = &err;
-}
-
-#[test]
-fn backend_error_debug() {
-    let err = BackendError::RenderError("oops".to_string());
-    let dbg = format!("{:?}", err);
-    assert!(dbg.contains("RenderError"));
-    assert!(dbg.contains("oops"));
-}
-
-// ======================================================================
-// 7. RenderedOutput
-// ======================================================================
-
-#[test]
-fn rendered_output_sql() {
-    let out = RenderedOutput::Sql(SqlOutput {
-        sql: "SELECT 1".to_string(),
-        param_count: 0,
-    });
-    assert!(matches!(out, RenderedOutput::Sql(_)));
-}
-
-#[test]
-fn rendered_output_key_value() {
-    let out = RenderedOutput::KeyValue(KvOutput {
-        operation: KvOp::Get,
-        key: "user:42".to_string(),
-        metadata: vec![],
-    });
-    assert!(matches!(out, RenderedOutput::KeyValue(_)));
-}
-
-#[test]
-fn rendered_output_storage() {
-    let out = RenderedOutput::Storage(StorageOutput {
-        operation: StorageOp::GetObject {
-            bucket: "assets".to_string(),
-            key: "logo.png".to_string(),
-        },
-    });
-    assert!(matches!(out, RenderedOutput::Storage(_)));
-}
-
-// ======================================================================
 // 8. FieldDef builder
 // ======================================================================
 
@@ -585,16 +349,10 @@ fn owned_fk_ref_both_actions() {
 fn index_method_equality() {
     assert_eq!(IndexMethod::BTree, IndexMethod::BTree);
     assert_eq!(IndexMethod::Hash, IndexMethod::Hash);
-    assert_eq!(IndexMethod::Gin, IndexMethod::Gin);
-    assert_eq!(IndexMethod::Gist, IndexMethod::Gist);
-    assert_eq!(IndexMethod::SpGist, IndexMethod::SpGist);
-    assert_eq!(IndexMethod::Brin, IndexMethod::Brin);
-}
-
-#[test]
-fn index_method_inequality() {
+    assert_eq!(IndexMethod::FullText, IndexMethod::FullText);
+    assert_eq!(IndexMethod::Spatial, IndexMethod::Spatial);
     assert_ne!(IndexMethod::BTree, IndexMethod::Hash);
-    assert_ne!(IndexMethod::Gin, IndexMethod::Gist);
+    assert_ne!(IndexMethod::FullText, IndexMethod::Spatial);
 }
 
 // ======================================================================
@@ -711,53 +469,6 @@ fn set_op_kind_equality() {
 fn set_op_kind_inequality() {
     assert_ne!(SetOpKind::Union, SetOpKind::UnionAll);
     assert_ne!(SetOpKind::Intersect, SetOpKind::Except);
-}
-
-// ======================================================================
-// 16. KvOutput
-// ======================================================================
-
-#[test]
-fn kv_output_construction_empty_metadata() {
-    let out = KvOutput {
-        operation: KvOp::Get,
-        key: "user:1".to_string(),
-        metadata: vec![],
-    };
-    assert_eq!(out.operation, KvOp::Get);
-    assert_eq!(out.key, "user:1");
-    assert!(out.metadata.is_empty());
-}
-
-#[test]
-fn kv_output_construction_with_metadata() {
-    let out = KvOutput {
-        operation: KvOp::Put,
-        key: "session:abc".to_string(),
-        metadata: vec![
-            ("ttl".to_string(), "3600".to_string()),
-            ("type".to_string(), "session".to_string()),
-        ],
-    };
-    assert_eq!(out.operation, KvOp::Put);
-    assert_eq!(out.key, "session:abc");
-    assert_eq!(out.metadata.len(), 2);
-    assert_eq!(out.metadata[0], ("ttl".to_string(), "3600".to_string()));
-}
-
-#[test]
-fn kv_output_clone_and_debug() {
-    let out = KvOutput {
-        operation: KvOp::Delete,
-        key: "temp:99".to_string(),
-        metadata: vec![],
-    };
-    let cloned = out.clone();
-    assert_eq!(cloned.operation, KvOp::Delete);
-    assert_eq!(cloned.key, "temp:99");
-    let dbg = format!("{:?}", out);
-    assert!(dbg.contains("Delete"));
-    assert!(dbg.contains("temp:99"));
 }
 
 // ======================================================================
@@ -922,21 +633,9 @@ fn alter_action_rename_model() {
 }
 
 // ======================================================================
-// Additional coverage: StorageOutput, remaining Statement variants,
+// Additional coverage: remaining Statement variants,
 // compound queries, and IR struct construction
 // ======================================================================
-
-#[test]
-fn storage_output_construction() {
-    let out = StorageOutput {
-        operation: StorageOp::PutObject {
-            bucket: "media".to_string(),
-            key: "avatar.jpg".to_string(),
-            content_type: Some("image/jpeg".to_string()),
-        },
-    };
-    assert!(matches!(out.operation, StorageOp::PutObject { .. }));
-}
 
 #[test]
 fn statement_alter_model() {
@@ -1192,10 +891,10 @@ fn define_index_ir_concurrently_with_where() {
         unique: false,
         if_not_exists: true,
         concurrently: true,
-        method: Some(IndexMethod::Gin),
+        method: Some(IndexMethod::FullText),
         where_clause: Some("active = true".to_string()),
     };
     assert!(ir.concurrently);
-    assert_eq!(ir.method, Some(IndexMethod::Gin));
+    assert_eq!(ir.method, Some(IndexMethod::FullText));
     assert_eq!(ir.where_clause.as_deref(), Some("active = true"));
 }

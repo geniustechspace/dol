@@ -10,7 +10,7 @@
 //! |-------|-------|---------|
 //! | **Values** | [`Value`], [`Literal`] | Carry actual data at runtime and in ASTs |
 //! | **Descriptors** | [`DataType`], [`StructField`] | Describe the expected shape of a position |
-//! | **Primitives** | [`Decimal`], [`Date`], [`Time`], [`Interval`], [`IpAddr`], [`MacAddr`], [`MacAddr8`], [`BitString`], [`Point2D`], etc. | Structural sub-types with validated constructors |
+//! | **Primitives** | [`Decimal`], [`Date`], [`Time`], [`Interval`], [`IpAddr`], [`MacAddr`], [`MacAddr8`], [`BitString`], [`geo::Point`], etc. | Structural sub-types with validated constructors |
 //! | **Errors** | [`TypeError`] | All validation and conformance errors |
 //!
 //! # The `DataType` / `Value` contract
@@ -30,12 +30,11 @@
 //! | Decimal    | `Decimal { precision, scale }` | `Decimal` |
 //! | Text       | `Char`, `Varchar`, `Text`, `Json`, `Xml` | `String`, `Json`, `Xml`, `Enum` |
 //! | Binary     | `Binary`, `Varbinary`, `Uuid`, `Bit`, `Varbit` | `Bytes`, `Uuid`, `BitString` |
-//! | Temporal   | `Date`, `Time`, `DateTime`, `TimestampTz`, `Interval` | same |
+//! | Datetime   | `Date`, `Time`, `DateTime`, `TimestampTz`, `Interval` | same |
 //! | Network    | `Inet`, `Cidr`, `MacAddr`, `MacAddr8` | `Inet`, `MacAddr`, `MacAddr8` |
 //! | Geometric  | `Point`–`Polygon` | `Point`–`Polygon` |
 //! | Composite  | `Array`, `Set`, `Map`, `Range`, `Tuple`, `Struct`, `Enum` | same + `Range` |
-//! | Semantic   | `Url`, `Mime`, `Path`, `Version` | (use `String` values) |
-//! | Meta       | `Named` | — |
+//! | Meta       | `TypeRef` | — |
 //!
 //! # Size guarantees (64-bit targets)
 //!
@@ -47,35 +46,24 @@
 //! These are enforced by tests in [`value`] and must not regress.
 
 pub mod error;
-pub mod primitive;
-pub mod datatype;
+pub mod datetime;
+pub mod network;
+pub mod geo;
+pub mod numeric;
+pub mod binary;
+pub mod descriptor;
 pub mod value;
 
 // ─── Re-exports ───────────────────────────────────────────────────────────────
 
 pub use error::TypeError;
 
-pub use primitive::{
-    BitString,
-    Circle2D,
-    Date,
-    DateTime,
-    Decimal,
-    Interval,
-    IpAddr,
-    Line2D,
-    MacAddr,
-    MacAddr8,
-    Offset,
-    Path2D,
-    Point2D,
-    Polygon2D,
-    Rect2D,
-    Segment2D,
-    Time,
-    TimestampTz,
-};
+pub use datetime::{Date, DateTime, Interval, Offset, Time, TimestampTz};
+pub use network::{IpAddr, MacAddr, MacAddr8};
+pub use geo::{Circle, Line, Path, Point, Polygon, Rect, Segment};
+pub use numeric::Decimal;
+pub use binary::BitString;
 
-pub use datatype::{DataType, StructField};
+pub use descriptor::{DataType, StructField};
 
 pub use value::{Literal, LiteralRange, Value, ValueRange};

@@ -7,11 +7,11 @@ use core::fmt;
 use std::borrow::Cow;
 use std::ops::Bound;
 
-use super::primitive::{
-    BitString, Circle2D, Date, DateTime, Decimal, IpAddr, Interval, Line2D,
-    MacAddr, MacAddr8, Offset, Path2D, Point2D, Polygon2D, Rect2D, Segment2D,
-    Time, TimestampTz,
-};
+use super::datetime::{Date, DateTime, Interval, Offset, Time, TimestampTz};
+use super::network::{IpAddr, MacAddr, MacAddr8};
+use super::geo::{Circle, Line, Path, Point, Polygon, Rect, Segment};
+use super::numeric::Decimal;
+use super::binary::BitString;
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -145,15 +145,15 @@ pub enum Value {
     Interval(Interval),
 
     // ── Geometric ──
-    // Point2D is 16 bytes — fits unboxed.
-    Point(Point2D),
+    // Point is 16 bytes — fits unboxed.
+    Point(Point),
     // All other geometry types are ≥ 24 bytes — boxed to stay within budget.
-    Line(Box<Line2D>),
-    Segment(Box<Segment2D>),
-    Rect(Box<Rect2D>),
-    Circle(Box<Circle2D>),
-    Path(Box<Path2D>),
-    Polygon(Box<Polygon2D>),
+    Line(Box<Line>),
+    Segment(Box<Segment>),
+    Rect(Box<Rect>),
+    Circle(Box<Circle>),
+    Path(Box<Path>),
+    Polygon(Box<Polygon>),
 
     // ── Composite ──
     /// Ordered, homogeneous-by-convention sequence.
@@ -175,7 +175,7 @@ impl Value {
     pub fn is_integer(&self) -> bool  { matches!(self, Self::Int8(_) | Self::Int16(_) | Self::Int32(_) | Self::Int64(_) | Self::Int128(_) | Self::UInt8(_) | Self::UInt16(_) | Self::UInt32(_) | Self::UInt64(_) | Self::UInt128(_)) }
     pub fn is_float(&self) -> bool    { matches!(self, Self::Float32(_) | Self::Float64(_)) }
     pub fn is_numeric(&self) -> bool  { self.is_integer() || self.is_float() || matches!(self, Self::Decimal(_)) }
-    pub fn is_temporal(&self) -> bool { matches!(self, Self::Date(_) | Self::Time(_) | Self::DateTime(_) | Self::TimestampTz(_) | Self::Interval(_)) }
+    pub fn is_datetime(&self) -> bool { matches!(self, Self::Date(_) | Self::Time(_) | Self::DateTime(_) | Self::TimestampTz(_) | Self::Interval(_)) }
     pub fn is_textual(&self) -> bool  { matches!(self, Self::String(_) | Self::Json(_) | Self::Xml(_) | Self::Enum(_)) }
 
     pub fn type_name(&self) -> &'static str {
@@ -250,7 +250,7 @@ impl Value {
     pub fn as_inet(&self)        -> Option<IpAddr>      { if let Self::Inet(v)        = self { Some(*v) } else { None } }
     pub fn as_macaddr(&self)     -> Option<MacAddr>     { if let Self::MacAddr(v)     = self { Some(*v) } else { None } }
     pub fn as_macaddr8(&self)    -> Option<MacAddr8>    { if let Self::MacAddr8(v)    = self { Some(*v) } else { None } }
-    pub fn as_point(&self)       -> Option<Point2D>     { if let Self::Point(v)       = self { Some(*v) } else { None } }
+    pub fn as_point(&self)       -> Option<Point>     { if let Self::Point(v)       = self { Some(*v) } else { None } }
     pub fn as_bitstring(&self)   -> Option<&BitString>  { if let Self::BitString(v)   = self { Some(v)  } else { None } }
     pub fn as_array(&self)       -> Option<&[Value]>    { if let Self::Array(v)       = self { Some(v)  } else { None } }
     pub fn as_set(&self)         -> Option<&[Value]>    { if let Self::Set(v)         = self { Some(v)  } else { None } }
@@ -355,7 +355,7 @@ impl From<Interval>   for Value { fn from(v: Interval)  -> Self { Self::Interval
 impl From<IpAddr>     for Value { fn from(v: IpAddr)    -> Self { Self::Inet(v) } }
 impl From<MacAddr>    for Value { fn from(v: MacAddr)   -> Self { Self::MacAddr(v) } }
 impl From<MacAddr8>   for Value { fn from(v: MacAddr8)  -> Self { Self::MacAddr8(v) } }
-impl From<Point2D>    for Value { fn from(v: Point2D)   -> Self { Self::Point(v) } }
+impl From<Point>    for Value { fn from(v: Point)   -> Self { Self::Point(v) } }
 
 // ─── Literal<'a> ─────────────────────────────────────────────────────────────
 
@@ -411,13 +411,13 @@ pub enum Literal<'a> {
     Interval(Interval),
 
     // ── Geometric ──
-    Point(Point2D),
-    Line(Box<Line2D>),
-    Segment(Box<Segment2D>),
-    Rect(Box<Rect2D>),
-    Circle(Box<Circle2D>),
-    Path(Box<Path2D>),
-    Polygon(Box<Polygon2D>),
+    Point(Point),
+    Line(Box<Line>),
+    Segment(Box<Segment>),
+    Rect(Box<Rect>),
+    Circle(Box<Circle>),
+    Path(Box<Path>),
+    Polygon(Box<Polygon>),
 
     // ── Composite ──
     Array(Box<[Literal<'a>]>),
@@ -514,7 +514,7 @@ impl<'a> Literal<'a> {
     // ── Geometric constructors ──
 
     pub fn point(x: f64, y: f64) -> Result<Self, super::TypeError> {
-        Ok(Self::Point(Point2D::try_new(x, y)?))
+        Ok(Self::Point(Point::try_new(x, y)?))
     }
 
     // ── Composite constructors ──
@@ -548,7 +548,7 @@ impl<'a> Literal<'a> {
     pub fn is_null(&self)     -> bool { matches!(self, Self::Null) }
     pub fn is_integer(&self)  -> bool { matches!(self, Self::Int8(_)|Self::Int16(_)|Self::Int32(_)|Self::Int64(_)|Self::Int128(_)|Self::UInt8(_)|Self::UInt16(_)|Self::UInt32(_)|Self::UInt64(_)|Self::UInt128(_)) }
     pub fn is_textual(&self)  -> bool { matches!(self, Self::String(_)|Self::Json(_)|Self::Xml(_)|Self::Enum(_)) }
-    pub fn is_temporal(&self) -> bool { matches!(self, Self::Date(_)|Self::Time(_)|Self::DateTime(_)|Self::TimestampTz(_)|Self::Interval(_)) }
+    pub fn is_datetime(&self) -> bool { matches!(self, Self::Date(_)|Self::Time(_)|Self::DateTime(_)|Self::TimestampTz(_)|Self::Interval(_)) }
     pub fn is_geometric(&self)-> bool { matches!(self, Self::Point(_)|Self::Line(_)|Self::Segment(_)|Self::Rect(_)|Self::Circle(_)|Self::Path(_)|Self::Polygon(_)) }
 
     // ── Accessors ──
@@ -745,13 +745,14 @@ impl<'a> From<Interval> for Literal<'a> { fn from(v: Interval) -> Self { Self::I
 impl<'a> From<IpAddr>   for Literal<'a> { fn from(v: IpAddr)   -> Self { Self::Inet(v) } }
 impl<'a> From<MacAddr>  for Literal<'a> { fn from(v: MacAddr)  -> Self { Self::MacAddr(v) } }
 impl<'a> From<MacAddr8> for Literal<'a> { fn from(v: MacAddr8) -> Self { Self::MacAddr8(v) } }
-impl<'a> From<Point2D>  for Literal<'a> { fn from(v: Point2D)  -> Self { Self::Point(v) } }
+impl<'a> From<Point>  for Literal<'a> { fn from(v: Point)  -> Self { Self::Point(v) } }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::geo::Point;
     use std::mem::size_of;
 
     #[test]
@@ -818,7 +819,7 @@ mod tests {
 
     #[test]
     fn point_display() {
-        let p = Point2D::new_unchecked(1.5, 2.5);
+        let p = Point::new_unchecked(1.5, 2.5);
         assert_eq!(p.to_string(), "(1.5,2.5)");
     }
 
@@ -852,7 +853,7 @@ mod tests {
             Literal::macaddr([0; 6]),
             Literal::macaddr8([0; 8]),
             Literal::inet_v4(127, 0, 0, 1),
-            Literal::from(Point2D::new_unchecked(0.0, 0.0)),
+            Literal::from(Point::new_unchecked(0.0, 0.0)),
         ];
         for lit in cases {
             let _: Value = lit.into();

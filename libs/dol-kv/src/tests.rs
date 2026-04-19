@@ -1,40 +1,36 @@
 use super::*;
-use dol_query::builder::storage::{GetObjectBuilder, PutObjectBuilder};
+use dol_core::ir::{Statement, TransactionIR};
+use dol_core::ir::storage::{GetObjectIR, PutObjectIR, ObjectSource};
 
 #[test]
 fn put_object_as_kv() {
-    let ir = PutObjectBuilder::new("key/path")
-        .into_bucket("bucket")
-        .build();
+    let ir = PutObjectIR {
+        key: "key/path".to_string(),
+        source: ObjectSource::FromBytes,
+        bucket: "bucket".to_string(),
+        content_type: None,
+        metadata: vec![],
+    };
     let stmt = Statement::PutObject(ir);
     let result = KvBackend.render(&stmt).unwrap();
-    match result {
-        RenderedOutput::KeyValue(out) => {
-            assert_eq!(out.operation, KvOp::Put);
-            assert_eq!(out.key, "bucket/key/path");
-        }
-        _ => panic!("expected KeyValue output"),
-    }
+    assert_eq!(result.operation, KvOp::Put);
+    assert_eq!(result.key, "bucket/key/path");
 }
 
 #[test]
 fn get_object_as_kv() {
-    let ir = GetObjectBuilder::new("key/path")
-        .from_bucket("bucket")
-        .build();
+    let ir = GetObjectIR {
+        key: "key/path".to_string(),
+        bucket: "bucket".to_string(),
+    };
     let stmt = Statement::GetObject(ir);
     let result = KvBackend.render(&stmt).unwrap();
-    match result {
-        RenderedOutput::KeyValue(out) => {
-            assert_eq!(out.operation, KvOp::Get);
-            assert_eq!(out.key, "bucket/key/path");
-        }
-        _ => panic!("expected KeyValue output"),
-    }
+    assert_eq!(result.operation, KvOp::Get);
+    assert_eq!(result.key, "bucket/key/path");
 }
 
 #[test]
 fn sql_statement_unsupported() {
-    let stmt = Statement::Transaction(dol_core::ir::TransactionIR::Begin);
+    let stmt = Statement::Transaction(TransactionIR::Begin);
     assert!(KvBackend.render(&stmt).is_err());
 }

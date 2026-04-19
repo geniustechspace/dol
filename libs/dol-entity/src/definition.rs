@@ -441,7 +441,7 @@ impl DefineIndexBuilder {
             unique: self.unique,
             if_not_exists: self.if_not_exists,
             concurrently: self.concurrently,
-            method: self.method,
+            method: self.method.clone(),
             where_clause: self.where_clause.clone(),
         }
     }

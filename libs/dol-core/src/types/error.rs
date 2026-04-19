@@ -40,7 +40,7 @@ pub enum TypeError {
     ///
     /// `ceil(declared / 8)` bytes are required.
     BitLengthMismatch { declared: u32, byte_count: usize },
-    /// A `Point2D` had a non-finite coordinate.
+    /// A geometric coordinate was non-finite.
     NonFiniteCoordinate,
 
     // ── Type conformance ──────────────────────────────────────────────────

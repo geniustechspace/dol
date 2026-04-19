@@ -18,7 +18,11 @@
 
 /// Binary operators for expression composition.
 ///
-/// Negatable operators (pattern, similarity, range) do **not** have `Not*`
+/// Only universal, algebraic operators that apply across data systems.
+/// Named operations (JSON navigation, range functions, collection mutation,
+/// geo-distance) have been moved to [`FuncName`](super::func::FuncName).
+///
+/// Negatable operators (pattern, similarity) do **not** have `Not*`
 /// counterparts — negation is expressed via `negated: bool` on the enclosing
 /// `Expr::BinaryOp` node.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -55,34 +59,34 @@ pub enum BinOp {
     Div,
     /// `%` / `MOD`
     Mod,
+    /// `^` / `**` / `POWER`
+    // Pow,
 
     // ── Logical ─────────────────────────────────────────────────────────
     /// `AND`
     And,
     /// `OR`
     Or,
+    /// `XOR`
+    // Xor,
 
     // ── Pattern matching (negation via `negated: bool`) ─────────────────
     /// `LIKE` / `NOT LIKE`
     Like,
-    /// `ILIKE` / `NOT ILIKE` (case-insensitive)
+    /// `ILIKE` / `NOT ILIKE` (case-insensitive LIKE)
     ILike,
     /// `SIMILAR TO` / `NOT SIMILAR TO` (SQL-standard regex)
     SimilarTo,
-    /// `~` / `!~` (POSIX regex match)
+    /// POSIX regex match (`~` / `!~`)
     RegexMatch,
-    /// `~*` / `!~*` (POSIX regex match, case-insensitive)
+    /// POSIX regex match, case-insensitive (`~*` / `!~*`)
     RegexMatchInsensitive,
-    /// Glob-style pattern match (SQLite `GLOB`, or lowered to `LIKE`)
+    /// Glob-style pattern match (SQLite `GLOB`)
     Glob,
 
     // ── String ──────────────────────────────────────────────────────────
-    /// `||` / `CONCAT()` / `+` depending on dialect.
+    /// String concatenation (`||` / `CONCAT()` / `+` depending on dialect).
     Concat,
-    /// `STARTS WITH` / `^@` — prefix match.
-    StartsWith,
-    /// `CONTAINS` — substring containment.
-    Contains,
 
     // ── Bitwise ─────────────────────────────────────────────────────────
     /// `&` — bitwise AND.
@@ -96,51 +100,13 @@ pub enum BinOp {
     /// `>>` — bit shift right.
     ShiftRight,
 
-    // ── Array / Collection ──────────────────────────────────────────────
-    /// `@>` — array/jsonb contains.
-    ArrayContains,
-    /// `<@` — array/jsonb contained-by.
-    ArrayContainedBy,
-    /// `&&` — array overlap (share elements).
-    ArrayOverlap,
-
-    // ── JSON / Document ─────────────────────────────────────────────────
-    /// `->` — JSON field access (returns JSON).
-    JsonGet,
-    /// `->>` — JSON field access (returns text).
-    JsonGetText,
-    /// `#>` — JSON path access (returns JSON).
-    JsonPath,
-    /// `#>>` — JSON path access (returns text).
-    JsonPathText,
-    /// `?` — JSON key exists (negation via `negated`).
-    JsonHasKey,
-    /// `?|` — JSON has any of the keys.
-    JsonHasAnyKey,
-    /// `?&` — JSON has all of the keys.
-    JsonHasAllKeys,
-
-    // ── Range ───────────────────────────────────────────────────────────
-    /// `@>` on range types — range contains element/range.
-    RangeContains,
-    /// `<@` on range types — range is contained by.
-    RangeContainedBy,
-    /// `&&` on range types — ranges overlap.
-    RangeOverlap,
-
-    // ── Set / Collection ops (value-level, not query-level) ─────────────
-    /// `MERGE` — deep-merge two structured values.
-    Merge,
-    /// `APPEND` — append to array/list.
-    Append,
-    /// `PREPEND` — prepend to array/list.
-    Prepend,
-    /// `REMOVE` — remove key/element from collection.
-    RemoveKey,
-
-    // ── Geo / Spatial ───────────────────────────────────────────────────
-    /// Distance operator (`<->` in PostGIS).
-    Distance,
+    // ── Collection containment predicates ───────────────────────────────
+    /// Array/collection contains element or sub-collection.
+    Contains,
+    /// Array/collection is contained by another.
+    ContainedBy,
+    /// Arrays/collections share at least one element.
+    Overlap,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -148,46 +114,20 @@ pub enum BinOp {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /// Unary operators for expression composition.
+///
+/// Only three primitive operators remain here — everything else that used to
+/// live here (IsNull, IsTrue, Abs, Sqrt, …) is either:
+/// - A dedicated `Expr` variant (`Expr::IsNull`)
+/// - A named function (`FuncName::Abs`, `FuncName::Sqrt`, …)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum UnaryOp {
-    // ── Logical ─────────────────────────────────────────────────────────
-    /// `NOT expr`
+    /// `NOT expr` — boolean negation.
     Not,
     /// `-expr` — arithmetic negation.
     Neg,
-
-    // ── Boolean tests (IS …) ────────────────────────────────────────────
-    /// `IS NULL`
-    IsNull,
-    /// `IS NOT NULL`
-    IsNotNull,
-    /// `IS TRUE`
-    IsTrue,
-    /// `IS NOT TRUE`
-    IsNotTrue,
-    /// `IS FALSE`
-    IsFalse,
-    /// `IS NOT FALSE`
-    IsNotFalse,
-    /// `IS UNKNOWN`
-    IsUnknown,
-    /// `IS NOT UNKNOWN`
-    IsNotUnknown,
-
-    // ── Bitwise ─────────────────────────────────────────────────────────
-    /// `~` — bitwise NOT.
+    /// `~expr` — bitwise complement.
     BitNot,
-
-    // ── Math ────────────────────────────────────────────────────────────
-    /// `|/` — square root (Postgres).
-    Sqrt,
-    /// `||/` — cube root (Postgres).
-    CubeRoot,
-    /// `@` — absolute value (Postgres).
-    Abs,
-    /// `!` — factorial (Postgres).
-    Factorial,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

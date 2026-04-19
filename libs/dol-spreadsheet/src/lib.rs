@@ -20,10 +20,48 @@
 #![deny(unsafe_code)]
 
 use dol_core::expr::{BinOp, Direction, Expr, Literal, OrderByExpr, UnaryOp};
-use dol_core::ir::{
-    Backend, BackendError, RenderedOutput, SortDirection, SpreadsheetColumnDef, SpreadsheetOp,
-    SpreadsheetOutput, SpreadsheetSortSpec, Statement,
-};
+use dol_core::ir::Statement;
+
+
+/// A column definition for spreadsheet sheet creation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SpreadsheetColumnDef {
+    pub name: String,
+    pub data_type: dol_core::types::DataType,
+}
+
+/// A sort specification for spreadsheet read operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SpreadsheetSortSpec {
+    pub column: String,
+    pub direction: Direction,
+}
+
+/// A spreadsheet operation descriptor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SpreadsheetOutput {
+    pub operation: SpreadsheetOp,
+    pub sheet: String,
+    pub workbook: Option<String>,
+}
+
+/// Spreadsheet operation kinds.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum SpreadsheetOp {
+    CreateSheet { columns: Vec<SpreadsheetColumnDef>, if_not_exists: bool },
+    AppendRows { columns: Vec<String>, row_count: usize },
+    UpdateRows { assignments: Vec<(String, String)>, filter: Option<String> },
+    DeleteRows { filter: Option<String> },
+    ReadRows { columns: Vec<String>, filter: Option<String>, sort: Vec<SpreadsheetSortSpec>, limit: Option<u64>, offset: Option<u64>, distinct: bool },
+    RenameSheet { new_name: String },
+    DropSheet { if_exists: bool },
+}
+
+use dol_core::ir::BackendError;
 
 /// Backend that renders DOL IR statements into [`SpreadsheetOutput`] descriptors.
 ///
@@ -42,8 +80,8 @@ use dol_core::ir::{
 /// All other statements return [`BackendError::Unsupported`].
 pub struct SpreadsheetBackend;
 
-impl Backend for SpreadsheetBackend {
-    fn render(&self, stmt: &Statement<'_>) -> Result<RenderedOutput, BackendError> {
+impl SpreadsheetBackend {
+    pub fn render(&self, stmt: &Statement<'_>) -> Result<SpreadsheetOutput, BackendError> {
         match stmt {
             // ── Definition ──────────────────────────────────────────────
             Statement::DefineEntity(ir) => {
@@ -99,14 +137,14 @@ impl Backend for SpreadsheetBackend {
 
                 let sheet = qualified_name(&ir.namespace, &ir.name);
 
-                Ok(RenderedOutput::Spreadsheet(SpreadsheetOutput {
+                Ok(SpreadsheetOutput {
                     operation: SpreadsheetOp::CreateSheet {
                         columns,
                         if_not_exists: ir.if_not_exists,
                     },
                     sheet,
                     workbook: None,
-                }))
+                })
             }
 
             Statement::DropEntity(ir) => {
@@ -118,13 +156,13 @@ impl Backend for SpreadsheetBackend {
 
                 let sheet = qualified_name(&ir.target.namespace, &ir.target.name);
 
-                Ok(RenderedOutput::Spreadsheet(SpreadsheetOutput {
+                Ok(SpreadsheetOutput {
                     operation: SpreadsheetOp::DropSheet {
                         if_exists: ir.if_exists,
                     },
                     sheet,
                     workbook: None,
-                }))
+                })
             }
 
             Statement::AlterEntity(ir) => {
@@ -134,13 +172,13 @@ impl Backend for SpreadsheetBackend {
                         let sheet =
                             qualified_name(&ir.target.namespace, &ir.target.name);
 
-                        Ok(RenderedOutput::Spreadsheet(SpreadsheetOutput {
+                        Ok(SpreadsheetOutput {
                             operation: SpreadsheetOp::RenameSheet {
                                 new_name: qualified_name(&ir.target.namespace, new_name),
                             },
                             sheet,
                             workbook: None,
-                        }))
+                        })
                     }
                     [] => Err(BackendError::Unsupported(
                         "SpreadsheetBackend requires exactly one AlterEntity action, \
@@ -172,14 +210,14 @@ impl Backend for SpreadsheetBackend {
 
                 let sheet = qualified_name(&ir.target.namespace, &ir.target.name);
 
-                Ok(RenderedOutput::Spreadsheet(SpreadsheetOutput {
+                Ok(SpreadsheetOutput {
                     operation: SpreadsheetOp::AppendRows {
                         columns: ir.fields.clone(),
                         row_count: ir.row_count,
                     },
                     sheet,
                     workbook: None,
-                }))
+                })
             }
 
             Statement::Update(ir) => {
@@ -199,14 +237,14 @@ impl Backend for SpreadsheetBackend {
 
                 let filter = render_filter_list(&ir.filters)?;
 
-                Ok(RenderedOutput::Spreadsheet(SpreadsheetOutput {
+                Ok(SpreadsheetOutput {
                     operation: SpreadsheetOp::UpdateRows {
                         assignments,
                         filter,
                     },
                     sheet,
                     workbook: None,
-                }))
+                })
             }
 
             Statement::Remove(ir) => {
@@ -220,11 +258,11 @@ impl Backend for SpreadsheetBackend {
 
                 let filter = render_filter_list(&ir.filters)?;
 
-                Ok(RenderedOutput::Spreadsheet(SpreadsheetOutput {
+                Ok(SpreadsheetOutput {
                     operation: SpreadsheetOp::DeleteRows { filter },
                     sheet,
                     workbook: None,
-                }))
+                })
             }
 
             // ── Query ───────────────────────────────────────────────────
@@ -294,7 +332,7 @@ impl Backend for SpreadsheetBackend {
                     None => None,
                 };
 
-                Ok(RenderedOutput::Spreadsheet(SpreadsheetOutput {
+                Ok(SpreadsheetOutput {
                     operation: SpreadsheetOp::ReadRows {
                         columns,
                         filter,
@@ -305,7 +343,7 @@ impl Backend for SpreadsheetBackend {
                     },
                     sheet,
                     workbook: None,
-                }))
+                })
             }
 
             // ── Unsupported ─────────────────────────────────────────────
@@ -502,31 +540,24 @@ fn render_expr_simple(expr: &Expr<'_>) -> Result<String, BackendError> {
             let op_str = match op {
                 UnaryOp::Not => "NOT",
                 UnaryOp::Neg => "-",
-                UnaryOp::IsNull => "IS NULL",
-                UnaryOp::IsNotNull => "IS NOT NULL",
-                other => {
-                    return Err(BackendError::Unsupported(format!(
-                        "SpreadsheetBackend does not support unary operator {:?}",
-                        other,
-                    )));
-                }
+                UnaryOp::BitNot => "~",
             };
-            match op {
-                UnaryOp::IsNull | UnaryOp::IsNotNull => {
-                    Ok(format!("({} {})", render_expr_simple(inner)?, op_str))
-                }
-                _ => Ok(format!("({} {})", op_str, render_expr_simple(inner)?)),
-            }
+            Ok(format!("({} {})", op_str, render_expr_simple(inner)?))
         }
         Expr::Func { name, args } => {
+            use dol_core::expr::FuncName;
             let arg_strs = args
                 .iter()
                 .map(render_expr_simple)
                 .collect::<Result<Vec<_>, BackendError>>()?;
-            Ok(format!("{}({})", name, arg_strs.join(", ")))
+            let func_str = match name {
+                FuncName::Custom(s) => s.clone(),
+                other => spreadsheet_func_name(other)?.to_string(),
+            };
+            Ok(format!("{}({})", func_str, arg_strs.join(", ")))
         }
         Expr::Cast { expr: inner, as_type } => {
-            Ok(format!("CAST({} AS {})", render_expr_simple(inner)?, as_type))
+            Ok(format!("CAST({} AS {})", render_expr_simple(inner)?, render_spreadsheet_type(as_type)))
         }
         Expr::Between {
             expr: inner,
@@ -615,12 +646,7 @@ fn render_sort_spec(order: &OrderByExpr<'_>) -> Result<SpreadsheetSortSpec, Back
         ));
     }
     let column = validate_column_expr(&order.expr, "ORDER BY")?;
-    let direction = if order.direction == Direction::Desc {
-        SortDirection::Descending
-    } else {
-        SortDirection::Ascending
-    };
-    Ok(SpreadsheetSortSpec { column, direction })
+    Ok(SpreadsheetSortSpec { column, direction: order.direction })
 }
 
 /// Validate that an expression is a supported column expression, returning the
@@ -647,6 +673,45 @@ fn validate_column_expr(expr: &Expr<'_>, context: &str) -> Result<String, Backen
              *, and COUNT(*) in {}; got unsupported expression: {:?}",
             context, other,
         ))),
+    }
+}
+
+fn spreadsheet_func_name(name: &dol_core::expr::FuncName) -> Result<&'static str, BackendError> {
+    use dol_core::expr::FuncName as K;
+    match name {
+        K::Count => Ok("COUNT"),
+        K::Sum => Ok("SUM"),
+        K::Avg => Ok("AVG"),
+        K::Min => Ok("MIN"),
+        K::Max => Ok("MAX"),
+        K::Lower => Ok("LOWER"),
+        K::Upper => Ok("UPPER"),
+        K::Trim => Ok("TRIM"),
+        K::Length => Ok("LEN"),
+        K::Coalesce => Ok("COALESCE"),
+        K::NullIf | K::IfNull => Ok("IFERROR"),
+        K::Now => Ok("NOW"),
+        K::CurrentDate => Ok("TODAY"),
+        K::Year => Ok("YEAR"),
+        K::Month => Ok("MONTH"),
+        K::Day => Ok("DAY"),
+        _ => Err(BackendError::Unsupported(format!(
+            "SpreadsheetBackend does not support function '{:?}'", name
+        ))),
+    }
+}
+
+fn render_spreadsheet_type(dt: &dol_core::types::DataType) -> &'static str {
+    use dol_core::types::DataType as D;
+    match dt {
+        D::Int8 | D::Int16 | D::Int32 | D::Int64 | D::Int128
+        | D::UInt8 | D::UInt16 | D::UInt32 | D::UInt64 | D::UInt128 => "NUMBER",
+        D::Float32 | D::Float64 | D::Decimal { .. } => "DECIMAL",
+        D::Text | D::Varchar(_) | D::Char(_) => "TEXT",
+        D::Bool => "BOOLEAN",
+        D::Date => "DATE",
+        D::Time { .. } | D::DateTime { .. } | D::TimestampTz { .. } => "DATETIME",
+        _ => "TEXT",
     }
 }
 

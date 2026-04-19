@@ -114,11 +114,9 @@ fn render_postgres(dt: &DataType) -> String {
         DataType::Enum(_)     => "TEXT".into(), // Enums are rendered via CREATE TYPE separately
 
         // Meta
-        DataType::Named(name) => name.to_string(),
+        DataType::TypeRef(name) => name.to_string(),
 
         // Semantic — stored as text in PG
-        DataType::Url | DataType::Mime | DataType::FilePath | DataType::Version
-            => "TEXT".into(),
     }
 }
 
@@ -170,9 +168,7 @@ fn render_mysql(dt: &DataType) -> String {
             let vs: Vec<String> = variants.iter().map(|v| format!("'{}'", v)).collect();
             format!("ENUM({})", vs.join(", "))
         }
-        DataType::Named(name) => name.to_string(),
-        DataType::Url | DataType::Mime | DataType::FilePath | DataType::Version
-            => "TEXT".into(),
+        DataType::TypeRef(name) => name.to_string(),
     }
 }
 
@@ -202,9 +198,7 @@ fn render_sqlite(dt: &DataType) -> String {
         DataType::Array(_) | DataType::Set(_) | DataType::Map { .. }
         | DataType::Range(_) | DataType::Tuple(_) | DataType::Struct(_) => "TEXT".into(),
         DataType::Enum(_) => "TEXT".into(),
-        DataType::Named(name) => name.to_string(),
-        DataType::Url | DataType::Mime | DataType::FilePath | DataType::Version
-            => "TEXT".into(),
+        DataType::TypeRef(name) => name.to_string(),
     }
 }
 
@@ -252,9 +246,7 @@ fn render_mssql(dt: &DataType) -> String {
         DataType::Array(_) | DataType::Set(_) | DataType::Map { .. }
         | DataType::Range(_) | DataType::Tuple(_) | DataType::Struct(_) => "NVARCHAR(MAX)".into(),
         DataType::Enum(_)  => "NVARCHAR(100)".into(),
-        DataType::Named(name) => name.to_string(),
-        DataType::Url | DataType::Mime | DataType::FilePath | DataType::Version
-            => "NVARCHAR(MAX)".into(),
+        DataType::TypeRef(name) => name.to_string(),
     }
 }
 
@@ -301,8 +293,6 @@ fn render_oracle(dt: &DataType) -> String {
         DataType::Array(_) | DataType::Set(_) | DataType::Map { .. }
         | DataType::Range(_) | DataType::Tuple(_) | DataType::Struct(_) => "CLOB".into(),
         DataType::Enum(_)  => "VARCHAR2(100)".into(),
-        DataType::Named(name) => name.to_string(),
-        DataType::Url | DataType::Mime | DataType::FilePath | DataType::Version
-            => "CLOB".into(),
+        DataType::TypeRef(name) => name.to_string(),
     }
 }

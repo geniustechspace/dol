@@ -998,7 +998,7 @@ fn custom_field_type() {
         "items",
         vec![
             Field::new("id", DataType::Uuid).primary_key(),
-            Field::new("status", DataType::Named("item_status".into())),
+            Field::new("status", DataType::TypeRef("item_status".into())),
         ],
     );
     let sql = t.create().render(Some(&pg())).unwrap();
@@ -1052,7 +1052,7 @@ fn alter_table_alter_field_type() {
     let u = users();
     let sql = u
         .alter()
-        .alter_field_type("status", DataType::Named("VARCHAR(50)".into()))
+        .alter_field_type("status", DataType::TypeRef("VARCHAR(50)".into()))
         .render(Some(&pg()))
         .unwrap();
     assert_eq!(
@@ -1411,7 +1411,7 @@ fn expr_like_ilike() {
 
 #[test]
 fn expr_cast() {
-    let expr = field("price").cast("NUMERIC(10,2)");
+    let expr = field("price").cast(DataType::Decimal { precision: Some(10), scale: Some(2) });
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
     let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();

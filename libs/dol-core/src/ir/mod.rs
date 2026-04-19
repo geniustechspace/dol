@@ -34,6 +34,34 @@ pub struct EntityRef {
     pub alias: Option<String>,
 }
 
+// ---------------------------------------------------------------------------
+// BackendError — shared error type for all backends
+// ---------------------------------------------------------------------------
+
+/// Errors that can occur during backend rendering.
+///
+/// Every DOL backend (SQL, spreadsheet, KV, object-storage, …) uses this
+/// shared type so callers can handle errors uniformly.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum BackendError {
+    /// The backend does not support the requested operation or expression.
+    Unsupported(String),
+    /// A rendering error that is not an unsupported-feature issue.
+    Render(String),
+}
+
+impl std::fmt::Display for BackendError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Unsupported(msg) => write!(f, "unsupported: {}", msg),
+            Self::Render(msg) => write!(f, "render error: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for BackendError {}
+
 /// Top-level DOL statement — the universal dispatch enum.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -75,204 +103,6 @@ pub enum Statement<'a> {
     ReadFile(ReadFileIR),
     WriteFile(WriteFileIR<'a>),
     MoveFile(MoveFileIR),
-}
-
-// ---------------------------------------------------------------------------
-// Backend trait + output types (shared across all backends)
-// ---------------------------------------------------------------------------
-
-/// SQL output (text + parameter count).
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SqlOutput {
-    pub sql: String,
-    pub param_count: usize,
-}
-
-/// A key-value operation descriptor.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct KvOutput {
-    /// The operation to perform.
-    pub operation: KvOp,
-    /// The key to operate on.
-    pub key: String,
-    /// Optional metadata (key-value pairs).
-    pub metadata: Vec<(String, String)>,
-}
-
-/// Key-value operation kinds.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum KvOp {
-    Get,
-    Put,
-    Delete,
-    List {
-        prefix: Option<String>,
-        limit: Option<u64>,
-    },
-}
-
-/// An object storage operation descriptor.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct StorageOutput {
-    /// The operation to perform.
-    pub operation: StorageOp,
-}
-
-/// Object storage operation kinds.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum StorageOp {
-    PutObject {
-        bucket: String,
-        key: String,
-        content_type: Option<String>,
-    },
-    GetObject {
-        bucket: String,
-        key: String,
-    },
-    ListObjects {
-        bucket: String,
-        prefix: Option<String>,
-        limit: Option<u64>,
-    },
-    DeleteObject {
-        bucket: String,
-        key: String,
-    },
-}
-
-/// A spreadsheet operation descriptor.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SpreadsheetOutput {
-    /// The operation to perform.
-    pub operation: SpreadsheetOp,
-    /// Target sheet (tab) name.
-    pub sheet: String,
-    /// Optional workbook name / path.
-    pub workbook: Option<String>,
-}
-
-/// A column definition for spreadsheet sheet creation.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SpreadsheetColumnDef {
-    /// Column header name.
-    pub name: String,
-    /// Data type for cell formatting.
-    pub data_type: crate::types::DataType,
-}
-
-/// Direction indicator for spreadsheet sort specifications.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum SortDirection {
-    Ascending,
-    Descending,
-}
-
-/// A sort specification for spreadsheet read operations.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SpreadsheetSortSpec {
-    /// Column name to sort by.
-    pub column: String,
-    /// Sort direction.
-    pub direction: SortDirection,
-}
-
-/// Spreadsheet operation kinds.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum SpreadsheetOp {
-    /// Create a new sheet with typed columns.
-    CreateSheet {
-        columns: Vec<SpreadsheetColumnDef>,
-        if_not_exists: bool,
-    },
-    /// Append rows to a sheet.
-    AppendRows {
-        columns: Vec<String>,
-        row_count: usize,
-    },
-    /// Update rows matching a filter.
-    UpdateRows {
-        /// Column name → new value expression pairs.
-        assignments: Vec<(String, String)>,
-        /// Optional filter expression (human-readable).
-        filter: Option<String>,
-    },
-    /// Delete rows matching a filter.
-    DeleteRows {
-        /// Optional filter expression (human-readable).
-        filter: Option<String>,
-    },
-    /// Read rows from a sheet with optional filtering, sorting, and pagination.
-    ReadRows {
-        /// Source column names to read. Plain identifiers, qualified identifiers
-        /// (`scope.col`), `*`, and `COUNT(*)` are accepted. Aliases and other
-        /// non-column expressions are rejected by the backend at render time to
-        /// preserve the underlying sheet column identity.
-        columns: Vec<String>,
-        filter: Option<String>,
-        sort: Vec<SpreadsheetSortSpec>,
-        limit: Option<u64>,
-        offset: Option<u64>,
-        distinct: bool,
-    },
-    /// Rename a sheet.
-    RenameSheet {
-        new_name: String,
-    },
-    /// Drop (delete) a sheet.
-    DropSheet {
-        if_exists: bool,
-    },
-}
-
-/// The rendered output of a backend.
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum RenderedOutput {
-    /// SQL text + parameter count.
-    Sql(SqlOutput),
-    /// Key-value operation descriptor.
-    KeyValue(KvOutput),
-    /// Object storage operation descriptor.
-    Storage(StorageOutput),
-    /// Spreadsheet operation descriptor.
-    Spreadsheet(SpreadsheetOutput),
-}
-
-/// Backend rendering errors.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum BackendError {
-    /// This backend does not support this statement kind.
-    Unsupported(String),
-    /// Rendering failed.
-    RenderError(String),
-}
-
-impl std::fmt::Display for BackendError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Unsupported(msg) => write!(f, "unsupported: {}", msg),
-            Self::RenderError(msg) => write!(f, "render error: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for BackendError {}
-
-/// The core backend trait. Each backend renders IR into its output format.
-pub trait Backend {
-    fn render(&self, stmt: &Statement<'_>) -> Result<RenderedOutput, BackendError>;
 }
 
 // ---------------------------------------------------------------------------

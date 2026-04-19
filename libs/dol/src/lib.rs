@@ -100,18 +100,9 @@ pub use dol_query as query;
 
 /// Backend implementations.
 pub mod backend {
-    /// Backend trait and shared output types (from dol-core::ir).
-    pub use dol_core::ir::{
-        Backend, BackendError, KvOp, KvOutput, RenderedOutput, SortDirection, SqlOutput,
-        SpreadsheetColumnDef, SpreadsheetOp, SpreadsheetOutput, SpreadsheetSortSpec, StorageOp,
-        StorageOutput,
-    };
-
     /// SQL backend — dialect-aware SQL rendering.
     pub mod sql {
         pub use dol_sql::*;
-
-        pub use dol_core::ir::SqlOutput;
     }
 
     /// Key-value backend.
