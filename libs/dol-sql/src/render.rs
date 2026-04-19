@@ -482,8 +482,8 @@ fn render_binop_token(op: BinOp) -> &'static str {
         BinOp::ShiftLeft => "<<",
         BinOp::ShiftRight => ">>",
         // Array / Collection
-        BinOp::ArrayContains => "@>",
-        BinOp::ArrayContainedBy => "<@",
+        BinOp::Contains => "@>",
+        BinOp::ContainedBy => "<@",
         BinOp::ArrayOverlap => "&&",
     }
 }

@@ -59,20 +59,22 @@ pub enum BinOp {
     Div,
     /// `%` / `MOD`
     Mod,
+    /// `^` / `**` / `POWER`
+    // Pow,
 
     // ── Logical ─────────────────────────────────────────────────────────
     /// `AND`
     And,
     /// `OR`
     Or,
+    /// `XOR`
+    // Xor,
 
     // ── Pattern matching (negation via `negated: bool`) ─────────────────
     /// `LIKE` / `NOT LIKE`
     Like,
     /// `ILIKE` / `NOT ILIKE` (case-insensitive LIKE)
     ILike,
-    /// `SIMILAR TO` / `NOT SIMILAR TO` (SQL-standard regex)
-    SimilarTo,
     /// POSIX regex match (`~` / `!~`)
     RegexMatch,
     /// POSIX regex match, case-insensitive (`~*` / `!~*`)
@@ -98,11 +100,11 @@ pub enum BinOp {
 
     // ── Collection containment predicates ───────────────────────────────
     /// Array/collection contains element or sub-collection.
-    ArrayContains,
+    Contains,
     /// Array/collection is contained by another.
-    ArrayContainedBy,
+    ContainedBy,
     /// Arrays/collections share at least one element.
-    ArrayOverlap,
+    Overlap,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -113,10 +115,10 @@ pub enum BinOp {
 ///
 /// Only three primitive operators remain here — everything else that used to
 /// live here (IsNull, IsTrue, Abs, Sqrt, …) is either:
-/// - A dedicated `Expr` variant (`Expr::IsNull`)  
+/// - A dedicated `Expr` variant (`Expr::IsNull`)
 /// - A named function (`FuncName::Abs`, `FuncName::Sqrt`, …)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#  [cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum UnaryOp {
     /// `NOT expr` — boolean negation.
     Not,
