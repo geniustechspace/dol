@@ -8,7 +8,7 @@ use super::dialect::{
 };
 use dol_core::expr::window::{FrameBound, FrameKind, WindowFrame};
 use dol_core::expr::{
-    BinOp, Direction, Expr, Literal, NullsPosition, OrderByExpr, Quantifier, TernaryOp, UnaryOp,
+    Direction, Expr, FuncId, Literal, NullsPosition, OpId, OrderByExpr, Quantifier, UnaryOp,
 };
 use crate::SqlOutput;
 use dol_core::ir::BackendError;
@@ -88,7 +88,7 @@ fn render_expr_inner(
             op,
             right,
             negated,
-        } => render_binary_op(left, *op, right, *negated, counter, dialect, next),
+        } => render_binary_op(left, op, right, *negated, counter, dialect, next),
 
         Expr::UnaryOp { op, expr } => {
             let inner = render_expr_inner(expr, counter, dialect, next)?;
@@ -100,23 +100,15 @@ fn render_expr_inner(
         }
 
         Expr::Func { name, args } => {
-            use dol_core::expr::FuncName;
             let rendered_args: Vec<_> = args
                 .iter()
                 .map(|a| render_expr_inner(a, counter, dialect, next))
                 .collect::<Result<Vec<_>, _>>()?;
-            let func_sql: std::borrow::Cow<str> = match name {
-                FuncName::Custom(s) => std::borrow::Cow::Owned(s.clone()),
-                other => std::borrow::Cow::Borrowed(func_name_to_sql(other)?),
+            let func_sql: std::borrow::Cow<str> = match func_id_to_sql(name) {
+                Ok(s) => std::borrow::Cow::Borrowed(s),
+                Err(_) => std::borrow::Cow::Borrowed(name.as_str()),
             };
-            // SQL reserved keywords that must appear without parentheses
-            let no_parens = matches!(
-                name,
-                FuncName::CurrentDate
-                    | FuncName::CurrentTime
-                    | FuncName::CurrentTimestamp
-            );
-            if no_parens && rendered_args.is_empty() {
+            if name.is_no_parens_keyword() && rendered_args.is_empty() {
                 Ok(func_sql.into_owned())
             } else {
                 Ok(format!("{}({})", func_sql, rendered_args.join(", ")))
@@ -270,27 +262,6 @@ fn render_expr_inner(
             Ok(format!("{} OVER ({})", func_sql, over_parts.join(" ")))
         }
 
-        Expr::TernaryOp {
-            expr,
-            op,
-            first,
-            second,
-            negated,
-        } => {
-            let expr_sql = render_expr_inner(expr, counter, dialect, next)?;
-            let first_sql = render_expr_inner(first, counter, dialect, next)?;
-            let second_sql = render_expr_inner(second, counter, dialect, next)?;
-            let not = if *negated { " NOT" } else { "" };
-            Ok(match op {
-                TernaryOp::Between => {
-                    format!(
-                        "{}{} BETWEEN {} AND {}",
-                        expr_sql, not, first_sql, second_sql
-                    )
-                }
-            })
-        }
-
         Expr::QuantifiedCmp {
             expr,
             op,
@@ -298,7 +269,7 @@ fn render_expr_inner(
             subquery,
         } => {
             let lhs = render_expr_inner(expr, counter, dialect, next)?;
-            let op_str = render_binop_token(*op);
+            let op_str = render_binop_token(op);
             let quant = match quantifier {
                 Quantifier::Any => "ANY",
                 Quantifier::All => "ALL",
@@ -402,7 +373,7 @@ fn render_literal(lit: &Literal<'_>, dialect: &Dialect) -> String {
 
 fn render_binary_op(
     left: &Expr<'_>,
-    op: BinOp,
+    op: &OpId,
     right: &Expr<'_>,
     negated: bool,
     counter: &mut ParamCounter,
@@ -410,7 +381,7 @@ fn render_binary_op(
     depth: usize,
 ) -> Result<String, BackendError> {
     // Special case: ILike on dialects without native ILIKE support
-    if op == BinOp::ILike && !dialect.features.ilike {
+    if *op == OpId::ILIKE && !dialect.features.ilike {
         let lhs = render_expr_inner(left, counter, dialect, depth)?;
         let rhs = render_expr_inner(right, counter, dialect, depth)?;
         let not = if negated { "NOT " } else { "" };
@@ -418,7 +389,7 @@ fn render_binary_op(
     }
 
     // Special case: Concat dispatches on dialect.concat_style
-    if op == BinOp::Concat {
+    if *op == OpId::CONCAT {
         let lhs = render_expr_inner(left, counter, dialect, depth)?;
         let rhs = render_expr_inner(right, counter, dialect, depth)?;
         return Ok(match &dialect.concat_style {
@@ -432,9 +403,10 @@ fn render_binary_op(
     let rhs = render_expr_inner(right, counter, dialect, depth)?;
     let op_str = render_binop_token(op);
 
-    let base = match op {
-        BinOp::And | BinOp::Or => format!("({} {} {})", lhs, op_str, rhs),
-        _ => format!("{} {} {}", lhs, op_str, rhs),
+    let base = if *op == OpId::AND || *op == OpId::OR {
+        format!("({} {} {})", lhs, op_str, rhs)
+    } else {
+        format!("{} {} {}", lhs, op_str, rhs)
     };
 
     Ok(if negated {
@@ -444,47 +416,48 @@ fn render_binary_op(
     })
 }
 
-/// Map a [`BinOp`] to its SQL token string.
-fn render_binop_token(op: BinOp) -> &'static str {
-    match op {
+/// Map an [`OpId`] to its SQL token string.
+fn render_binop_token(op: &OpId) -> &'static str {
+    match op.as_str() {
         // Comparison
-        BinOp::Eq => "=",
-        BinOp::Ne => "!=",
-        BinOp::Lt => "<",
-        BinOp::Gt => ">",
-        BinOp::Le => "<=",
-        BinOp::Ge => ">=",
+        OpId::EQ => "=",
+        OpId::NE => "!=",
+        OpId::LT => "<",
+        OpId::GT => ">",
+        OpId::LE => "<=",
+        OpId::GE => ">=",
         // Null-safe comparison
-        BinOp::IsDistinctFrom => "IS DISTINCT FROM",
-        BinOp::IsNotDistinctFrom => "IS NOT DISTINCT FROM",
+        OpId::IS_DISTINCT_FROM => "IS DISTINCT FROM",
+        OpId::IS_NOT_DISTINCT_FROM => "IS NOT DISTINCT FROM",
         // Arithmetic
-        BinOp::Add => "+",
-        BinOp::Sub => "-",
-        BinOp::Mul => "*",
-        BinOp::Div => "/",
-        BinOp::Mod => "%",
+        OpId::ADD => "+",
+        OpId::SUB => "-",
+        OpId::MUL => "*",
+        OpId::DIV => "/",
+        OpId::MOD => "%",
         // Logical
-        BinOp::And => "AND",
-        BinOp::Or => "OR",
+        OpId::AND => "AND",
+        OpId::OR => "OR",
         // Pattern
-        BinOp::Like => "LIKE",
-        BinOp::ILike => "ILIKE",
-        BinOp::SimilarTo => "SIMILAR TO",
-        BinOp::RegexMatch => "~",
-        BinOp::RegexMatchInsensitive => "~*",
-        BinOp::Glob => "GLOB",
+        OpId::LIKE => "LIKE",
+        OpId::ILIKE => "ILIKE",
+        OpId::SIMILAR_TO => "SIMILAR TO",
+        OpId::REGEX_MATCH => "~",
+        OpId::REGEX_MATCH_INSENSITIVE => "~*",
+        OpId::GLOB => "GLOB",
         // String
-        BinOp::Concat => "||",
+        OpId::CONCAT => "||",
         // Bitwise
-        BinOp::BitAnd => "&",
-        BinOp::BitOr => "|",
-        BinOp::BitXor => "#",
-        BinOp::ShiftLeft => "<<",
-        BinOp::ShiftRight => ">>",
+        OpId::BIT_AND => "&",
+        OpId::BIT_OR => "|",
+        OpId::BIT_XOR => "#",
+        OpId::SHIFT_LEFT => "<<",
+        OpId::SHIFT_RIGHT => ">>",
         // Array / Collection
-        BinOp::Contains => "@>",
-        BinOp::ContainedBy => "<@",
-        BinOp::Overlap => "&&",
+        OpId::CONTAINS => "@>",
+        OpId::CONTAINED_BY => "<@",
+        OpId::OVERLAP => "&&",
+        _ => "???",
     }
 }
 
@@ -1548,195 +1521,195 @@ fn entity_ref_to_sql(mref: &EntityRef, _dialect: &Dialect) -> String {
     }
 }
 
-fn func_name_to_sql(name: &dol_core::expr::FuncName) -> Result<&'static str, BackendError> {
-    use dol_core::expr::FuncName as K;
-    match name {
-        K::Count | K::CountDistinct => Ok("COUNT"),
-        K::Sum => Ok("SUM"),
-        K::Avg => Ok("AVG"),
-        K::Min => Ok("MIN"),
-        K::Max => Ok("MAX"),
-        K::Median => Ok("MEDIAN"),
-        K::StdDev => Ok("STDDEV"),
-        K::Variance => Ok("VARIANCE"),
-        K::ArrayAgg => Ok("ARRAY_AGG"),
-        K::StringAgg => Ok("STRING_AGG"),
-        K::JsonAgg => Ok("JSON_AGG"),
-        K::BoolAnd => Ok("BOOL_AND"),
-        K::BoolOr => Ok("BOOL_OR"),
-        K::First => Ok("FIRST"),
-        K::Last => Ok("LAST"),
-        K::Lower => Ok("LOWER"),
-        K::Upper => Ok("UPPER"),
-        K::Trim => Ok("TRIM"),
-        K::LTrim => Ok("LTRIM"),
-        K::RTrim => Ok("RTRIM"),
-        K::Length => Ok("LENGTH"),
-        K::CharLength => Ok("CHAR_LENGTH"),
-        K::OctetLength => Ok("OCTET_LENGTH"),
-        K::Substr => Ok("SUBSTR"),
-        K::Left => Ok("LEFT"),
-        K::Right => Ok("RIGHT"),
-        K::Concat => Ok("CONCAT"),
-        K::ConcatWs => Ok("CONCAT_WS"),
-        K::Replace => Ok("REPLACE"),
-        K::Reverse => Ok("REVERSE"),
-        K::Repeat => Ok("REPEAT"),
-        K::PadLeft => Ok("LPAD"),
-        K::PadRight => Ok("RPAD"),
-        K::Position => Ok("POSITION"),
-        K::Initcap => Ok("INITCAP"),
-        K::Ascii => Ok("ASCII"),
-        K::Chr => Ok("CHR"),
-        K::Md5 => Ok("MD5"),
-        K::Sha256 => Ok("SHA256"),
-        K::Base64Encode => Ok("ENCODE"),
-        K::Base64Decode => Ok("DECODE"),
-        K::RegexReplace => Ok("REGEXP_REPLACE"),
-        K::RegexExtract => Ok("REGEXP_MATCH"),
-        K::Split => Ok("STRING_TO_ARRAY"),
-        K::SplitPart => Ok("SPLIT_PART"),
-        K::Format => Ok("FORMAT"),
-        K::StartsWith => Ok("STARTS_WITH"),
-        K::Contains => Ok("CONTAINS"),
-        K::ToHex => Ok("TO_HEX"),
-        K::Abs => Ok("ABS"),
-        K::Ceil => Ok("CEIL"),
-        K::Floor => Ok("FLOOR"),
-        K::Round => Ok("ROUND"),
-        K::Trunc => Ok("TRUNC"),
-        K::Sign => Ok("SIGN"),
-        K::Power => Ok("POWER"),
-        K::Sqrt => Ok("SQRT"),
-        K::Cbrt => Ok("CBRT"),
-        K::Exp => Ok("EXP"),
-        K::Ln => Ok("LN"),
-        K::Log => Ok("LOG"),
-        K::Log2 => Ok("LOG2"),
-        K::Log10 => Ok("LOG10"),
-        K::Pi => Ok("PI"),
-        K::Degrees => Ok("DEGREES"),
-        K::Radians => Ok("RADIANS"),
-        K::Sin => Ok("SIN"),
-        K::Cos => Ok("COS"),
-        K::Tan => Ok("TAN"),
-        K::Asin => Ok("ASIN"),
-        K::Acos => Ok("ACOS"),
-        K::Atan => Ok("ATAN"),
-        K::Atan2 => Ok("ATAN2"),
-        K::Sinh => Ok("SINH"),
-        K::Cosh => Ok("COSH"),
-        K::Tanh => Ok("TANH"),
-        K::Factorial => Ok("FACTORIAL"),
-        K::Gcd => Ok("GCD"),
-        K::Lcm => Ok("LCM"),
-        K::Random => Ok("RANDOM"),
-        K::Greatest => Ok("GREATEST"),
-        K::Least => Ok("LEAST"),
-        K::Now => Ok("NOW"),
-        K::CurrentDate => Ok("CURRENT_DATE"),
-        K::CurrentTime => Ok("CURRENT_TIME"),
-        K::CurrentTimestamp => Ok("CURRENT_TIMESTAMP"),
-        K::DatePart => Ok("DATE_PART"),
-        K::DateTrunc => Ok("DATE_TRUNC"),
-        K::Extract => Ok("EXTRACT"),
-        K::DateAdd => Ok("DATE_ADD"),
-        K::DateSub => Ok("DATE_SUB"),
-        K::DateDiff => Ok("DATE_DIFF"),
-        K::Age => Ok("AGE"),
-        K::ToDate => Ok("TO_DATE"),
-        K::ToTimestamp => Ok("TO_TIMESTAMP"),
-        K::Year => Ok("YEAR"),
-        K::Month => Ok("MONTH"),
-        K::Day => Ok("DAY"),
-        K::Hour => Ok("HOUR"),
-        K::Minute => Ok("MINUTE"),
-        K::Second => Ok("SECOND"),
-        K::DayOfWeek => Ok("DAYOFWEEK"),
-        K::DayOfYear => Ok("DAYOFYEAR"),
-        K::WeekOfYear => Ok("WEEKOFYEAR"),
-        K::Quarter => Ok("QUARTER"),
-        K::MakeDate => Ok("MAKE_DATE"),
-        K::MakeTime => Ok("MAKE_TIME"),
-        K::MakeTimestamp => Ok("MAKE_TIMESTAMP"),
-        K::EpochToTimestamp | K::TimestampToEpoch => Ok("TO_TIMESTAMP"),
-        K::Coalesce => Ok("COALESCE"),
-        K::NullIf => Ok("NULLIF"),
-        K::IfNull => Ok("IFNULL"),
-        K::TypeOf => Ok("TYPEOF"),
-        K::ToText | K::ToInt | K::ToFloat | K::ToBool => Ok("CAST"),
-        K::JsonGet => Ok("jsonb_extract_path"),
-        K::JsonGetText => Ok("jsonb_extract_path_text"),
-        K::JsonPath => Ok("jsonb_extract_path"),
-        K::JsonPathText => Ok("jsonb_extract_path_text"),
-        K::JsonHasKey => Ok("jsonb_exists"),
-        K::JsonHasAnyKey => Ok("jsonb_exists_any"),
-        K::JsonHasAllKeys => Ok("jsonb_exists_all"),
-        K::JsonSet => Ok("jsonb_set"),
-        K::JsonInsert => Ok("jsonb_insert"),
-        K::JsonRemove => Ok("jsonb_delete"),
-        K::JsonReplace => Ok("jsonb_set"),
-        K::JsonMergePatch => Ok("jsonb_merge_patch"),
-        K::JsonArray => Ok("jsonb_build_array"),
-        K::JsonObject => Ok("jsonb_build_object"),
-        K::JsonArrayLength => Ok("jsonb_array_length"),
-        K::JsonKeys => Ok("jsonb_object_keys"),
-        K::JsonValues => Ok("jsonb_each"),
-        K::JsonTypeof => Ok("jsonb_typeof"),
-        K::ArrayLength => Ok("ARRAY_LENGTH"),
-        K::ArrayPosition => Ok("ARRAY_POSITION"),
-        K::ArrayAppend => Ok("ARRAY_APPEND"),
-        K::ArrayPrepend => Ok("ARRAY_PREPEND"),
-        K::ArrayRemove => Ok("ARRAY_REMOVE"),
-        K::ArrayCat => Ok("ARRAY_CAT"),
-        K::ArrayDistinct => Ok("ARRAY_DISTINCT"),
-        K::ArraySort => Ok("ARRAY_SORT"),
-        K::ArrayReverse => Ok("ARRAY_REVERSE"),
-        K::ArraySlice => Ok("ARRAY_SLICE"),
-        K::ArrayFlatten => Ok("ARRAY_FLATTEN"),
-        K::Unnest => Ok("UNNEST"),
-        K::ArrayToString => Ok("ARRAY_TO_STRING"),
-        K::StringToArray => Ok("STRING_TO_ARRAY"),
-        K::MapMerge => Ok("jsonb_merge_patch"),
-        K::MapGet => Ok("jsonb_extract_path"),
-        K::MapKeys => Ok("jsonb_object_keys"),
-        K::MapValues => Ok("jsonb_each"),
-        K::MapContainsKey => Ok("jsonb_exists"),
-        K::MapRemoveKey => Ok("jsonb_delete"),
-        K::RangeContains => Ok("RANGE_CONTAINS"),
-        K::RangeContainedBy => Ok("RANGE_CONTAINED_BY"),
-        K::RangeOverlap => Ok("RANGE_OVERLAP"),
-        K::RangeLower => Ok("LOWER"),
-        K::RangeUpper => Ok("UPPER"),
-        K::RangeIsEmpty => Ok("ISEMPTY"),
-        K::RowNumber => Ok("ROW_NUMBER"),
-        K::Rank => Ok("RANK"),
-        K::DenseRank => Ok("DENSE_RANK"),
-        K::NTile => Ok("NTILE"),
-        K::Lag => Ok("LAG"),
-        K::Lead => Ok("LEAD"),
-        K::FirstValue => Ok("FIRST_VALUE"),
-        K::LastValue => Ok("LAST_VALUE"),
-        K::NthValue => Ok("NTH_VALUE"),
-        K::CumeDist => Ok("CUME_DIST"),
-        K::PercentRank => Ok("PERCENT_RANK"),
-        K::GenRandomUuid => Ok("GEN_RANDOM_UUID"),
-        K::StContains => Ok("ST_Contains"),
-        K::StIntersects => Ok("ST_Intersects"),
-        K::StWithin => Ok("ST_Within"),
-        K::StArea => Ok("ST_Area"),
-        K::StLength => Ok("ST_Length"),
-        K::StDistance => Ok("ST_Distance"),
-        K::StBuffer => Ok("ST_Buffer"),
-        K::StCentroid => Ok("ST_Centroid"),
-        K::StAsText => Ok("ST_AsText"),
-        K::StGeomFromText => Ok("ST_GeomFromText"),
-        K::Hash => Ok("HASH"),
-        K::Crc32 => Ok("CRC32"),
-        K::HexEncode => Ok("ENCODE"),
-        K::HexDecode => Ok("DECODE"),
+fn func_id_to_sql(name: &FuncId) -> Result<&'static str, BackendError> {
+    use dol_core::expr::FuncId as K;
+    match name.as_str() {
+        K::COUNT | K::COUNT_DISTINCT => Ok("COUNT"),
+        K::SUM => Ok("SUM"),
+        K::AVG => Ok("AVG"),
+        K::MIN => Ok("MIN"),
+        K::MAX => Ok("MAX"),
+        K::MEDIAN => Ok("MEDIAN"),
+        K::STDDEV => Ok("STDDEV"),
+        K::VARIANCE => Ok("VARIANCE"),
+        K::ARRAY_AGG => Ok("ARRAY_AGG"),
+        K::STRING_AGG => Ok("STRING_AGG"),
+        K::JSON_AGG => Ok("JSON_AGG"),
+        K::BOOL_AND => Ok("BOOL_AND"),
+        K::BOOL_OR => Ok("BOOL_OR"),
+        K::FIRST => Ok("FIRST"),
+        K::LAST => Ok("LAST"),
+        K::LOWER => Ok("LOWER"),
+        K::UPPER => Ok("UPPER"),
+        K::TRIM => Ok("TRIM"),
+        K::LTRIM => Ok("LTRIM"),
+        K::RTRIM => Ok("RTRIM"),
+        K::LENGTH => Ok("LENGTH"),
+        K::CHAR_LENGTH => Ok("CHAR_LENGTH"),
+        K::OCTET_LENGTH => Ok("OCTET_LENGTH"),
+        K::SUBSTR => Ok("SUBSTR"),
+        K::LEFT => Ok("LEFT"),
+        K::RIGHT => Ok("RIGHT"),
+        K::CONCAT => Ok("CONCAT"),
+        K::CONCAT_WS => Ok("CONCAT_WS"),
+        K::REPLACE => Ok("REPLACE"),
+        K::REVERSE => Ok("REVERSE"),
+        K::REPEAT => Ok("REPEAT"),
+        K::PAD_LEFT => Ok("LPAD"),
+        K::PAD_RIGHT => Ok("RPAD"),
+        K::POSITION => Ok("POSITION"),
+        K::INITCAP => Ok("INITCAP"),
+        K::ASCII => Ok("ASCII"),
+        K::CHR => Ok("CHR"),
+        K::MD5 => Ok("MD5"),
+        K::SHA256 => Ok("SHA256"),
+        K::BASE64_ENCODE => Ok("ENCODE"),
+        K::BASE64_DECODE => Ok("DECODE"),
+        K::REGEX_REPLACE => Ok("REGEXP_REPLACE"),
+        K::REGEX_EXTRACT => Ok("REGEXP_MATCH"),
+        K::SPLIT => Ok("STRING_TO_ARRAY"),
+        K::SPLIT_PART => Ok("SPLIT_PART"),
+        K::FORMAT => Ok("FORMAT"),
+        K::STARTS_WITH => Ok("STARTS_WITH"),
+        K::CONTAINS => Ok("CONTAINS"),
+        K::TO_HEX => Ok("TO_HEX"),
+        K::ABS => Ok("ABS"),
+        K::CEIL => Ok("CEIL"),
+        K::FLOOR => Ok("FLOOR"),
+        K::ROUND => Ok("ROUND"),
+        K::TRUNC => Ok("TRUNC"),
+        K::SIGN => Ok("SIGN"),
+        K::POWER => Ok("POWER"),
+        K::SQRT => Ok("SQRT"),
+        K::CBRT => Ok("CBRT"),
+        K::EXP => Ok("EXP"),
+        K::LN => Ok("LN"),
+        K::LOG => Ok("LOG"),
+        K::LOG2 => Ok("LOG2"),
+        K::LOG10 => Ok("LOG10"),
+        K::PI => Ok("PI"),
+        K::DEGREES => Ok("DEGREES"),
+        K::RADIANS => Ok("RADIANS"),
+        K::SIN => Ok("SIN"),
+        K::COS => Ok("COS"),
+        K::TAN => Ok("TAN"),
+        K::ASIN => Ok("ASIN"),
+        K::ACOS => Ok("ACOS"),
+        K::ATAN => Ok("ATAN"),
+        K::ATAN2 => Ok("ATAN2"),
+        K::SINH => Ok("SINH"),
+        K::COSH => Ok("COSH"),
+        K::TANH => Ok("TANH"),
+        K::FACTORIAL => Ok("FACTORIAL"),
+        K::GCD => Ok("GCD"),
+        K::LCM => Ok("LCM"),
+        K::RANDOM => Ok("RANDOM"),
+        K::GREATEST => Ok("GREATEST"),
+        K::LEAST => Ok("LEAST"),
+        K::NOW => Ok("NOW"),
+        K::CURRENT_DATE => Ok("CURRENT_DATE"),
+        K::CURRENT_TIME => Ok("CURRENT_TIME"),
+        K::CURRENT_TIMESTAMP => Ok("CURRENT_TIMESTAMP"),
+        K::DATE_PART => Ok("DATE_PART"),
+        K::DATE_TRUNC => Ok("DATE_TRUNC"),
+        K::EXTRACT => Ok("EXTRACT"),
+        K::DATE_ADD => Ok("DATE_ADD"),
+        K::DATE_SUB => Ok("DATE_SUB"),
+        K::DATE_DIFF => Ok("DATE_DIFF"),
+        K::AGE => Ok("AGE"),
+        K::TO_DATE => Ok("TO_DATE"),
+        K::TO_TIMESTAMP => Ok("TO_TIMESTAMP"),
+        K::YEAR => Ok("YEAR"),
+        K::MONTH => Ok("MONTH"),
+        K::DAY => Ok("DAY"),
+        K::HOUR => Ok("HOUR"),
+        K::MINUTE => Ok("MINUTE"),
+        K::SECOND => Ok("SECOND"),
+        K::DAY_OF_WEEK => Ok("DAYOFWEEK"),
+        K::DAY_OF_YEAR => Ok("DAYOFYEAR"),
+        K::WEEK_OF_YEAR => Ok("WEEKOFYEAR"),
+        K::QUARTER => Ok("QUARTER"),
+        K::MAKE_DATE => Ok("MAKE_DATE"),
+        K::MAKE_TIME => Ok("MAKE_TIME"),
+        K::MAKE_TIMESTAMP => Ok("MAKE_TIMESTAMP"),
+        K::EPOCH_TO_TIMESTAMP | K::TIMESTAMP_TO_EPOCH => Ok("TO_TIMESTAMP"),
+        K::COALESCE => Ok("COALESCE"),
+        K::NULLIF => Ok("NULLIF"),
+        K::IFNULL => Ok("IFNULL"),
+        K::TYPEOF => Ok("TYPEOF"),
+        K::TO_TEXT | K::TO_INT | K::TO_FLOAT | K::TO_BOOL => Ok("CAST"),
+        K::JSON_GET => Ok("jsonb_extract_path"),
+        K::JSON_GET_TEXT => Ok("jsonb_extract_path_text"),
+        K::JSON_PATH => Ok("jsonb_extract_path"),
+        K::JSON_PATH_TEXT => Ok("jsonb_extract_path_text"),
+        K::JSON_HAS_KEY => Ok("jsonb_exists"),
+        K::JSON_HAS_ANY_KEY => Ok("jsonb_exists_any"),
+        K::JSON_HAS_ALL_KEYS => Ok("jsonb_exists_all"),
+        K::JSON_SET => Ok("jsonb_set"),
+        K::JSON_INSERT => Ok("jsonb_insert"),
+        K::JSON_REMOVE => Ok("jsonb_delete"),
+        K::JSON_REPLACE => Ok("jsonb_set"),
+        K::JSON_MERGE_PATCH => Ok("jsonb_merge_patch"),
+        K::JSON_ARRAY => Ok("jsonb_build_array"),
+        K::JSON_OBJECT => Ok("jsonb_build_object"),
+        K::JSON_ARRAY_LENGTH => Ok("jsonb_array_length"),
+        K::JSON_KEYS => Ok("jsonb_object_keys"),
+        K::JSON_VALUES => Ok("jsonb_each"),
+        K::JSON_TYPEOF => Ok("jsonb_typeof"),
+        K::ARRAY_LENGTH => Ok("ARRAY_LENGTH"),
+        K::ARRAY_POSITION => Ok("ARRAY_POSITION"),
+        K::ARRAY_APPEND => Ok("ARRAY_APPEND"),
+        K::ARRAY_PREPEND => Ok("ARRAY_PREPEND"),
+        K::ARRAY_REMOVE => Ok("ARRAY_REMOVE"),
+        K::ARRAY_CAT => Ok("ARRAY_CAT"),
+        K::ARRAY_DISTINCT => Ok("ARRAY_DISTINCT"),
+        K::ARRAY_SORT => Ok("ARRAY_SORT"),
+        K::ARRAY_REVERSE => Ok("ARRAY_REVERSE"),
+        K::ARRAY_SLICE => Ok("ARRAY_SLICE"),
+        K::ARRAY_FLATTEN => Ok("ARRAY_FLATTEN"),
+        K::UNNEST => Ok("UNNEST"),
+        K::ARRAY_TO_STRING => Ok("ARRAY_TO_STRING"),
+        K::STRING_TO_ARRAY => Ok("STRING_TO_ARRAY"),
+        K::MAP_MERGE => Ok("jsonb_merge_patch"),
+        K::MAP_GET => Ok("jsonb_extract_path"),
+        K::MAP_KEYS => Ok("jsonb_object_keys"),
+        K::MAP_VALUES => Ok("jsonb_each"),
+        K::MAP_CONTAINS_KEY => Ok("jsonb_exists"),
+        K::MAP_REMOVE_KEY => Ok("jsonb_delete"),
+        K::RANGE_CONTAINS => Ok("RANGE_CONTAINS"),
+        K::RANGE_CONTAINED_BY => Ok("RANGE_CONTAINED_BY"),
+        K::RANGE_OVERLAP => Ok("RANGE_OVERLAP"),
+        K::RANGE_LOWER => Ok("LOWER"),
+        K::RANGE_UPPER => Ok("UPPER"),
+        K::RANGE_IS_EMPTY => Ok("ISEMPTY"),
+        K::ROW_NUMBER => Ok("ROW_NUMBER"),
+        K::RANK => Ok("RANK"),
+        K::DENSE_RANK => Ok("DENSE_RANK"),
+        K::NTILE => Ok("NTILE"),
+        K::LAG => Ok("LAG"),
+        K::LEAD => Ok("LEAD"),
+        K::FIRST_VALUE => Ok("FIRST_VALUE"),
+        K::LAST_VALUE => Ok("LAST_VALUE"),
+        K::NTH_VALUE => Ok("NTH_VALUE"),
+        K::CUME_DIST => Ok("CUME_DIST"),
+        K::PERCENT_RANK => Ok("PERCENT_RANK"),
+        K::GEN_RANDOM_UUID => Ok("GEN_RANDOM_UUID"),
+        K::ST_CONTAINS => Ok("ST_Contains"),
+        K::ST_INTERSECTS => Ok("ST_Intersects"),
+        K::ST_WITHIN => Ok("ST_Within"),
+        K::ST_AREA => Ok("ST_Area"),
+        K::ST_LENGTH => Ok("ST_Length"),
+        K::ST_DISTANCE => Ok("ST_Distance"),
+        K::ST_BUFFER => Ok("ST_Buffer"),
+        K::ST_CENTROID => Ok("ST_Centroid"),
+        K::ST_AS_TEXT => Ok("ST_AsText"),
+        K::ST_GEOM_FROM_TEXT => Ok("ST_GeomFromText"),
+        K::HASH => Ok("HASH"),
+        K::CRC32 => Ok("CRC32"),
+        K::HEX_ENCODE => Ok("ENCODE"),
+        K::HEX_DECODE => Ok("DECODE"),
         _ => Err(BackendError::Unsupported(format!(
-            "SQL backend does not support function '{:?}'", name
+            "SQL backend does not support function '{}'", name
         ))),
     }
 }
