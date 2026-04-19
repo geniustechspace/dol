@@ -53,9 +53,9 @@ impl StructField {
 /// Composite variants are heap-allocated (`Box<DataType>`, `Vec<StructField>`)
 /// to keep `DataType` a reasonable size on the stack.
 ///
-/// # Named types
+/// # Type references
 ///
-/// [`DataType::Named`] acts as a symbolic reference to a type defined elsewhere
+/// [`DataType::TypeRef`] is a symbolic reference to a type defined elsewhere
 /// in the schema (e.g., a user-defined SQL type, an Avro named type, a Protobuf
 /// message). Resolution happens at the schema layer.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -152,18 +152,7 @@ pub enum DataType {
     // ── Meta ──
     /// A symbolic reference to a named type defined elsewhere (user-defined
     /// types, Avro named types, Protobuf message types, etc.).
-    Named(Box<str>),
-
-    // ── Semantic ──
-    /// A URL/URI string. Backends typically store as text; distinct variant
-    /// enables validation and semantic tooling.
-    Url,
-    /// A MIME type string (e.g., `"application/json"`).
-    Mime,
-    /// A file-system path string.
-    FilePath,
-    /// A semantic version string (e.g., `"1.2.3"`).
-    Version,
+    TypeRef(Box<str>),
 }
 
 impl DataType {
@@ -191,7 +180,7 @@ impl DataType {
         matches!(self, Self::Binary(_) | Self::Varbinary(_) | Self::Uuid | Self::Bit(_) | Self::Varbit(_))
     }
 
-    pub const fn is_temporal(&self) -> bool {
+    pub const fn is_datetime(&self) -> bool {
         matches!(self, Self::Date | Self::Time { .. } | Self::DateTime { .. }
                      | Self::TimestampTz { .. } | Self::Interval)
     }
@@ -208,10 +197,6 @@ impl DataType {
     pub const fn is_composite(&self) -> bool {
         matches!(self, Self::Array(_) | Self::Set(_) | Self::Map { .. }
                      | Self::Range(_) | Self::Tuple(_) | Self::Struct(_) | Self::Enum(_))
-    }
-
-    pub const fn is_semantic(&self) -> bool {
-        matches!(self, Self::Url | Self::Mime | Self::FilePath | Self::Version)
     }
 
     // ── Conformance ───────────────────────────────────────────────────────
@@ -510,13 +495,8 @@ impl DataType {
                 Ok(())
             }
 
-            // Named: cannot validate structurally; resolution is schema-layer concern
-            Self::Named(_) => Ok(()),
-
-            // Semantic: stored as strings, validated by higher layers
-            Self::Url | Self::Mime | Self::FilePath | Self::Version => {
-                kind_check!(V::String(_))
-            }
+            // TypeRef: cannot validate structurally; resolution is schema-layer concern
+            Self::TypeRef(_) => Ok(()),
         }
     }
 
@@ -572,11 +552,7 @@ impl DataType {
             Self::Tuple(_)    => "tuple",
             Self::Struct(_)   => "struct",
             Self::Enum(_)     => "enum",
-            Self::Named(_)    => "named",
-            Self::Url         => "url",
-            Self::Mime        => "mime",
-            Self::FilePath    => "filepath",
-            Self::Version     => "version",
+            Self::TypeRef(_)    => "typeref",
         }
     }
 }
@@ -637,7 +613,7 @@ impl fmt::Display for DataType {
                 }
                 write!(f, ")")
             }
-            Self::Named(name)     => write!(f, "{name}"),
+            Self::TypeRef(name)     => write!(f, "{name}"),
             other => f.write_str(other.type_name().to_ascii_uppercase().as_str()),
         }
     }
@@ -647,7 +623,7 @@ impl fmt::Display for DataType {
 mod tests {
     use super::*;
     use super::Value;
-    use crate::types::primitive::Decimal;
+    use crate::types::numeric::Decimal;
 
     #[test]
     fn varchar_accepts_string_within_length() {
