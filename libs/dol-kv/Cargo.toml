@@ -7,6 +7,7 @@ description = "DOL key-value backend — renders IR into KV operation descriptor
 
 [dependencies]
 dol-core = { workspace = true }
+serde = { workspace = true, optional = true }
 dol-entity = { workspace = true }
 
 [features]

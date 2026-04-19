@@ -7,6 +7,7 @@ description = "DOL object storage backend — renders IR into storage operation 
 
 [dependencies]
 dol-core = { workspace = true }
+serde = { workspace = true, optional = true }
 dol-entity = { workspace = true }
 
 [features]
