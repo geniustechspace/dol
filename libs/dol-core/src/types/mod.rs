@@ -51,7 +51,7 @@ pub mod network;
 pub mod geo;
 pub mod numeric;
 pub mod binary;
-pub mod datatype;
+pub mod descriptor;
 pub mod value;
 
 // ─── Re-exports ───────────────────────────────────────────────────────────────
@@ -64,6 +64,6 @@ pub use geo::{Circle, Line, Path, Point, Polygon, Rect, Segment};
 pub use numeric::Decimal;
 pub use binary::BitString;
 
-pub use datatype::{DataType, StructField};
+pub use descriptor::{DataType, StructField};
 
 pub use value::{Literal, LiteralRange, Value, ValueRange};

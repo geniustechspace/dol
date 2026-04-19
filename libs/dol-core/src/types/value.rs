@@ -175,7 +175,7 @@ impl Value {
     pub fn is_integer(&self) -> bool  { matches!(self, Self::Int8(_) | Self::Int16(_) | Self::Int32(_) | Self::Int64(_) | Self::Int128(_) | Self::UInt8(_) | Self::UInt16(_) | Self::UInt32(_) | Self::UInt64(_) | Self::UInt128(_)) }
     pub fn is_float(&self) -> bool    { matches!(self, Self::Float32(_) | Self::Float64(_)) }
     pub fn is_numeric(&self) -> bool  { self.is_integer() || self.is_float() || matches!(self, Self::Decimal(_)) }
-    pub fn is_temporal(&self) -> bool { matches!(self, Self::Date(_) | Self::Time(_) | Self::DateTime(_) | Self::TimestampTz(_) | Self::Interval(_)) }
+    pub fn is_datetime(&self) -> bool { matches!(self, Self::Date(_) | Self::Time(_) | Self::DateTime(_) | Self::TimestampTz(_) | Self::Interval(_)) }
     pub fn is_textual(&self) -> bool  { matches!(self, Self::String(_) | Self::Json(_) | Self::Xml(_) | Self::Enum(_)) }
 
     pub fn type_name(&self) -> &'static str {
@@ -548,7 +548,7 @@ impl<'a> Literal<'a> {
     pub fn is_null(&self)     -> bool { matches!(self, Self::Null) }
     pub fn is_integer(&self)  -> bool { matches!(self, Self::Int8(_)|Self::Int16(_)|Self::Int32(_)|Self::Int64(_)|Self::Int128(_)|Self::UInt8(_)|Self::UInt16(_)|Self::UInt32(_)|Self::UInt64(_)|Self::UInt128(_)) }
     pub fn is_textual(&self)  -> bool { matches!(self, Self::String(_)|Self::Json(_)|Self::Xml(_)|Self::Enum(_)) }
-    pub fn is_temporal(&self) -> bool { matches!(self, Self::Date(_)|Self::Time(_)|Self::DateTime(_)|Self::TimestampTz(_)|Self::Interval(_)) }
+    pub fn is_datetime(&self) -> bool { matches!(self, Self::Date(_)|Self::Time(_)|Self::DateTime(_)|Self::TimestampTz(_)|Self::Interval(_)) }
     pub fn is_geometric(&self)-> bool { matches!(self, Self::Point(_)|Self::Line(_)|Self::Segment(_)|Self::Rect(_)|Self::Circle(_)|Self::Path(_)|Self::Polygon(_)) }
 
     // ── Accessors ──
