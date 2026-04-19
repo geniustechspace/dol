@@ -19,7 +19,7 @@
 
 #![deny(unsafe_code)]
 
-use dol_core::expr::{BinOp, Direction, Expr, Literal, OrderByExpr, UnaryOp};
+use dol_core::expr::{Direction, Expr, Literal, OpId, OrderByExpr, UnaryOp};
 use dol_core::ir::Statement;
 
 
@@ -500,26 +500,26 @@ fn render_expr_simple(expr: &Expr<'_>) -> Result<String, BackendError> {
             right,
             negated,
         } => {
-            let op_str = match op {
-                BinOp::Eq => "=",
-                BinOp::Ne => "!=",
-                BinOp::Lt => "<",
-                BinOp::Le => "<=",
-                BinOp::Gt => ">",
-                BinOp::Ge => ">=",
-                BinOp::And => "AND",
-                BinOp::Or => "OR",
-                BinOp::Add => "+",
-                BinOp::Sub => "-",
-                BinOp::Mul => "*",
-                BinOp::Div => "/",
-                BinOp::Mod => "%",
-                BinOp::Like => "LIKE",
-                BinOp::ILike => "ILIKE",
-                BinOp::Concat => "||",
+            let op_str = match op.as_str() {
+                OpId::EQ => "=",
+                OpId::NE => "!=",
+                OpId::LT => "<",
+                OpId::LE => "<=",
+                OpId::GT => ">",
+                OpId::GE => ">=",
+                OpId::AND => "AND",
+                OpId::OR => "OR",
+                OpId::ADD => "+",
+                OpId::SUB => "-",
+                OpId::MUL => "*",
+                OpId::DIV => "/",
+                OpId::MOD => "%",
+                OpId::LIKE => "LIKE",
+                OpId::ILIKE => "ILIKE",
+                OpId::CONCAT => "||",
                 other => {
                     return Err(BackendError::Unsupported(format!(
-                        "SpreadsheetBackend does not support binary operator {:?}",
+                        "SpreadsheetBackend does not support binary operator '{}'",
                         other,
                     )));
                 }
@@ -545,14 +545,13 @@ fn render_expr_simple(expr: &Expr<'_>) -> Result<String, BackendError> {
             Ok(format!("({} {})", op_str, render_expr_simple(inner)?))
         }
         Expr::Func { name, args } => {
-            use dol_core::expr::FuncName;
             let arg_strs = args
                 .iter()
                 .map(render_expr_simple)
                 .collect::<Result<Vec<_>, BackendError>>()?;
-            let func_str = match name {
-                FuncName::Custom(s) => s.clone(),
-                other => spreadsheet_func_name(other)?.to_string(),
+            let func_str = match spreadsheet_func_name(name) {
+                Ok(s) => s.to_string(),
+                Err(_) => name.as_str().to_uppercase(),
             };
             Ok(format!("{}({})", func_str, arg_strs.join(", ")))
         }
@@ -626,9 +625,6 @@ fn render_expr_simple(expr: &Expr<'_>) -> Result<String, BackendError> {
         Expr::Case { .. } => Err(BackendError::Unsupported(
             "SpreadsheetBackend does not support CASE expressions".into(),
         )),
-        Expr::TernaryOp { .. } => Err(BackendError::Unsupported(
-            "SpreadsheetBackend does not support ternary operator expressions".into(),
-        )),
         Expr::ObjectLiteral(_) => Err(BackendError::Unsupported(
             "SpreadsheetBackend does not support object literal expressions".into(),
         )),
@@ -676,27 +672,27 @@ fn validate_column_expr(expr: &Expr<'_>, context: &str) -> Result<String, Backen
     }
 }
 
-fn spreadsheet_func_name(name: &dol_core::expr::FuncName) -> Result<&'static str, BackendError> {
-    use dol_core::expr::FuncName as K;
-    match name {
-        K::Count => Ok("COUNT"),
-        K::Sum => Ok("SUM"),
-        K::Avg => Ok("AVG"),
-        K::Min => Ok("MIN"),
-        K::Max => Ok("MAX"),
-        K::Lower => Ok("LOWER"),
-        K::Upper => Ok("UPPER"),
-        K::Trim => Ok("TRIM"),
-        K::Length => Ok("LEN"),
-        K::Coalesce => Ok("COALESCE"),
-        K::NullIf | K::IfNull => Ok("IFERROR"),
-        K::Now => Ok("NOW"),
-        K::CurrentDate => Ok("TODAY"),
-        K::Year => Ok("YEAR"),
-        K::Month => Ok("MONTH"),
-        K::Day => Ok("DAY"),
-        _ => Err(BackendError::Unsupported(format!(
-            "SpreadsheetBackend does not support function '{:?}'", name
+fn spreadsheet_func_name(name: &dol_core::expr::FuncId) -> Result<&'static str, BackendError> {
+    use dol_core::expr::FuncId as K;
+    match name.as_str() {
+        K::COUNT => Ok("COUNT"),
+        K::SUM => Ok("SUM"),
+        K::AVG => Ok("AVG"),
+        K::MIN => Ok("MIN"),
+        K::MAX => Ok("MAX"),
+        K::LOWER => Ok("LOWER"),
+        K::UPPER => Ok("UPPER"),
+        K::TRIM => Ok("TRIM"),
+        K::LENGTH => Ok("LEN"),
+        K::COALESCE => Ok("COALESCE"),
+        K::NULLIF | K::IFNULL => Ok("IFERROR"),
+        K::NOW => Ok("NOW"),
+        K::CURRENT_DATE => Ok("TODAY"),
+        K::YEAR => Ok("YEAR"),
+        K::MONTH => Ok("MONTH"),
+        K::DAY => Ok("DAY"),
+        other => Err(BackendError::Unsupported(format!(
+            "SpreadsheetBackend does not support function '{}'", other
         ))),
     }
 }
