@@ -1,5 +1,6 @@
 #[allow(deprecated)]
 use super::*;
+use super::func::{FuncKind, FuncName};
 
 // ── 1. Constructor functions ──
 
@@ -221,10 +222,10 @@ fn test_not_in_subquery() {
 
 #[test]
 fn test_cast() {
-    let e = field("price").cast("INTEGER");
+    let e = field("price").cast(crate::types::DataType::Int32);
     assert!(matches!(
         e,
-        Expr::Cast { as_type, .. } if as_type == "INTEGER"
+        Expr::Cast { ref as_type, .. } if *as_type == crate::types::DataType::Int32
     ));
 }
 
@@ -416,7 +417,7 @@ fn test_float_variants() {
 #[test]
 fn test_func_count() {
     let e = func::count(field("id"));
-    assert!(matches!(e, Expr::Func { name, args } if name == "COUNT" && args.len() == 1));
+    assert!(matches!(e, Expr::Func { ref name, ref args } if *name == FuncName::Known(FuncKind::Count) && args.len() == 1));
 }
 
 #[test]
@@ -427,25 +428,25 @@ fn test_func_count_star() {
 #[test]
 fn test_func_sum() {
     let e = func::sum(field("amount"));
-    assert!(matches!(e, Expr::Func { name, args } if name == "SUM" && args.len() == 1));
+    assert!(matches!(e, Expr::Func { ref name, ref args } if *name == FuncName::Known(FuncKind::Sum) && args.len() == 1));
 }
 
 #[test]
 fn test_func_lower() {
     let e = func::lower(field("email"));
-    assert!(matches!(e, Expr::Func { name, args } if name == "LOWER" && args.len() == 1));
+    assert!(matches!(e, Expr::Func { ref name, ref args } if *name == FuncName::Known(FuncKind::Lower) && args.len() == 1));
 }
 
 #[test]
 fn test_func_now() {
     let e = func::now();
-    assert!(matches!(e, Expr::Func { name, args } if name == "NOW" && args.is_empty()));
+    assert!(matches!(e, Expr::Func { ref name, ref args } if *name == FuncName::Known(FuncKind::Now) && args.is_empty()));
 }
 
 #[test]
 fn test_func_coalesce() {
     let e = func::coalesce(vec![field("a"), field("b"), string("default")]);
-    assert!(matches!(e, Expr::Func { name, args } if name == "COALESCE" && args.len() == 3));
+    assert!(matches!(e, Expr::Func { ref name, ref args } if *name == FuncName::Known(FuncKind::Coalesce) && args.len() == 3));
 }
 
 // ── 16. CaseBuilder ──
@@ -572,11 +573,11 @@ fn test_alias_preserves_inner() {
 
 #[test]
 fn test_cast_preserves_inner() {
-    let e = string("123").cast("INT");
+    let e = string("123").cast(crate::types::DataType::Int32);
     match e {
         Expr::Cast { expr, as_type } => {
             assert!(matches!(*expr, Expr::Value(Literal::String(ref s)) if s == "123"));
-            assert_eq!(as_type, "INT");
+            assert_eq!(as_type, crate::types::DataType::Int32);
         }
         other => panic!("expected Cast, got {other:?}"),
     }

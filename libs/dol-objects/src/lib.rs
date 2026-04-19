@@ -1,46 +1,39 @@
 //! # dol-objects — DOL Object Storage Backend
-//!
-//! Renders DOL IR into storage operation descriptors.
-
 #![deny(unsafe_code)]
+use dol_core::ir::Statement;
 
-use dol_core::ir::{Backend, BackendError, RenderedOutput, Statement, StorageOp, StorageOutput};
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct StorageOutput { pub operation: StorageOp }
 
-/// Backend that renders storage IR statements into [`StorageOutput`] descriptors.
-///
-/// Supports `PutObject`, `GetObject`, and `ListObjects` statements.
-/// Returns [`BackendError::Unsupported`] for SQL or other non-storage statements.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum StorageOp {
+    PutObject { bucket: String, key: String, content_type: Option<String> },
+    GetObject { bucket: String, key: String },
+    ListObjects { bucket: String, prefix: Option<String>, limit: Option<u64> },
+    DeleteObject { bucket: String, key: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StorageError { Unsupported(String) }
+impl std::fmt::Display for StorageError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self { Self::Unsupported(msg) => write!(f, "unsupported: {}", msg) }
+    }
+}
+impl std::error::Error for StorageError {}
+
 pub struct ObjectStorageBackend;
-
-impl Backend for ObjectStorageBackend {
-    fn render(&self, stmt: &Statement) -> Result<RenderedOutput, BackendError> {
+impl ObjectStorageBackend {
+    pub fn render(&self, stmt: &Statement) -> Result<StorageOutput, StorageError> {
         match stmt {
-            Statement::PutObject(ir) => Ok(RenderedOutput::Storage(StorageOutput {
-                operation: StorageOp::PutObject {
-                    bucket: ir.bucket.clone(),
-                    key: ir.key.clone(),
-                    content_type: ir.content_type.clone(),
-                },
-            })),
-            Statement::GetObject(ir) => Ok(RenderedOutput::Storage(StorageOutput {
-                operation: StorageOp::GetObject {
-                    bucket: ir.bucket.clone(),
-                    key: ir.key.clone(),
-                },
-            })),
-            Statement::ListObjects(ir) => Ok(RenderedOutput::Storage(StorageOutput {
-                operation: StorageOp::ListObjects {
-                    bucket: ir.bucket.clone(),
-                    prefix: ir.prefix.clone(),
-                    limit: ir.limit,
-                },
-            })),
-            _ => Err(BackendError::Unsupported(
-                "ObjectStorageBackend only supports storage operations".into(),
-            )),
+            Statement::PutObject(ir) => Ok(StorageOutput { operation: StorageOp::PutObject { bucket: ir.bucket.clone(), key: ir.key.clone(), content_type: ir.content_type.clone() } }),
+            Statement::GetObject(ir) => Ok(StorageOutput { operation: StorageOp::GetObject { bucket: ir.bucket.clone(), key: ir.key.clone() } }),
+            Statement::ListObjects(ir) => Ok(StorageOutput { operation: StorageOp::ListObjects { bucket: ir.bucket.clone(), prefix: ir.prefix.clone(), limit: ir.limit } }),
+            _ => Err(StorageError::Unsupported("ObjectStorageBackend only supports storage operations".into())),
         }
     }
 }
-
 #[cfg(test)]
 mod tests;

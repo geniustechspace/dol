@@ -259,16 +259,24 @@ pub struct DefineIndexIR {
     pub where_clause: Option<String>,
 }
 
-/// Index method (B-tree, Hash, GIN, GiST, etc.).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Index access method — backend-agnostic.
+///
+/// Each variant expresses a *semantic* index capability. Backends map these
+/// to their native access-method names (e.g. SQL/Postgres maps `FullText` →
+/// `GIN`, `Spatial` → `GiST`).
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum IndexMethod {
+    /// Ordered B-tree index — universal (range queries, sorting).
     BTree,
+    /// Hash index — equality lookups.
     Hash,
-    Gin,
-    Gist,
-    SpGist,
-    Brin,
+    /// Full-text search index (Postgres: GIN).
+    FullText,
+    /// Geospatial / range-type index (Postgres: GiST).
+    Spatial,
+    /// Backend-specific method not captured by the above variants.
+    Custom(String),
 }
 
 /// Drop an index.

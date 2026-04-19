@@ -10,8 +10,7 @@ use dol_core::expr::window::{FrameBound, FrameKind, WindowFrame};
 use dol_core::expr::{
     BinOp, Direction, Expr, Literal, NullsPosition, OrderByExpr, Quantifier, TernaryOp, UnaryOp,
 };
-use dol_core::ir::BackendError;
-use dol_core::ir::SqlOutput;
+use crate::{RenderError, SqlOutput};
 use dol_core::ir::definition::OwnedEntityConstraint;
 use dol_core::ir::*;
 use dol_entity::Field;
@@ -30,13 +29,13 @@ const MAX_EXPR_DEPTH: usize = 128;
 
 /// Renders an [`Expr`] tree into a SQL string.
 ///
-/// Returns `Err(BackendError::RenderError)` if expression nesting exceeds
+/// Returns `Err(RenderError::RenderError)` if expression nesting exceeds
 /// [`MAX_EXPR_DEPTH`].
 pub fn render_expr(
     expr: &Expr<'_>,
     counter: &mut ParamCounter,
     dialect: &Dialect,
-) -> Result<String, BackendError> {
+) -> Result<String, RenderError> {
     render_expr_inner(expr, counter, dialect, 0)
 }
 
@@ -45,9 +44,9 @@ fn render_expr_inner(
     counter: &mut ParamCounter,
     dialect: &Dialect,
     depth: usize,
-) -> Result<String, BackendError> {
+) -> Result<String, RenderError> {
     if depth >= MAX_EXPR_DEPTH {
-        return Err(BackendError::RenderError(
+        return Err(RenderError::RenderError(
             "expression nesting too deep (exceeded MAX_EXPR_DEPTH)".into(),
         ));
     }
@@ -71,7 +70,7 @@ fn render_expr_inner(
                     format!("JSON_VALUE({}, '$.{}')", base_sql, escaped_field)
                 }
                 JsonAccessStyle::Unsupported => {
-                    return Err(BackendError::Unsupported(format!(
+                    return Err(RenderError::Unsupported(format!(
                         "JSON field access is not supported by this dialect (field '{}')",
                         field
                     )));
@@ -95,33 +94,26 @@ fn render_expr_inner(
             Ok(match op {
                 UnaryOp::Not => format!("NOT ({})", inner),
                 UnaryOp::Neg => format!("-({})", inner),
-                UnaryOp::IsNull => format!("{} IS NULL", inner),
-                UnaryOp::IsNotNull => format!("{} IS NOT NULL", inner),
-                UnaryOp::IsTrue => format!("{} IS TRUE", inner),
-                UnaryOp::IsNotTrue => format!("{} IS NOT TRUE", inner),
-                UnaryOp::IsFalse => format!("{} IS FALSE", inner),
-                UnaryOp::IsNotFalse => format!("{} IS NOT FALSE", inner),
-                UnaryOp::IsUnknown => format!("{} IS UNKNOWN", inner),
-                UnaryOp::IsNotUnknown => format!("{} IS NOT UNKNOWN", inner),
                 UnaryOp::BitNot => format!("~({})", inner),
-                UnaryOp::Sqrt => format!("|/({})", inner),
-                UnaryOp::CubeRoot => format!("||/({})", inner),
-                UnaryOp::Abs => format!("@({})", inner),
-                UnaryOp::Factorial => format!("({}!)", inner),
             })
         }
 
         Expr::Func { name, args } => {
+            use dol_core::expr::FuncName;
             let rendered_args: Vec<_> = args
                 .iter()
                 .map(|a| render_expr_inner(a, counter, dialect, next))
                 .collect::<Result<Vec<_>, _>>()?;
-            Ok(format!("{}({})", name, rendered_args.join(", ")))
+            let func_sql: std::borrow::Cow<str> = match name {
+                FuncName::Known(kind) => std::borrow::Cow::Borrowed(func_kind_to_sql(kind)),
+                FuncName::Custom(s) => std::borrow::Cow::Owned(s.clone()),
+            };
+            Ok(format!("{}({})", func_sql, rendered_args.join(", ")))
         }
 
         Expr::Cast { expr, as_type } => {
             let inner = render_expr_inner(expr, counter, dialect, next)?;
-            Ok(format!("CAST({} AS {})", inner, as_type))
+            Ok(format!("CAST({} AS {})", inner, render_type(as_type, dialect)))
         }
 
         Expr::Case { whens, else_expr } => {
@@ -404,7 +396,7 @@ fn render_binary_op(
     counter: &mut ParamCounter,
     dialect: &Dialect,
     depth: usize,
-) -> Result<String, BackendError> {
+) -> Result<String, RenderError> {
     // Special case: ILike on dialects without native ILIKE support
     if op == BinOp::ILike && !dialect.features.ilike {
         let lhs = render_expr_inner(left, counter, dialect, depth)?;
@@ -471,8 +463,6 @@ fn render_binop_token(op: BinOp) -> &'static str {
         BinOp::Glob => "GLOB",
         // String
         BinOp::Concat => "||",
-        BinOp::StartsWith => "^@",
-        BinOp::Contains => "LIKE", // lowered by backend
         // Bitwise
         BinOp::BitAnd => "&",
         BinOp::BitOr => "|",
@@ -483,25 +473,6 @@ fn render_binop_token(op: BinOp) -> &'static str {
         BinOp::ArrayContains => "@>",
         BinOp::ArrayContainedBy => "<@",
         BinOp::ArrayOverlap => "&&",
-        // JSON / Document
-        BinOp::JsonGet => "->",
-        BinOp::JsonGetText => "->>",
-        BinOp::JsonPath => "#>",
-        BinOp::JsonPathText => "#>>",
-        BinOp::JsonHasKey => "?",
-        BinOp::JsonHasAnyKey => "?|",
-        BinOp::JsonHasAllKeys => "?&",
-        // Range
-        BinOp::RangeContains => "@>",
-        BinOp::RangeContainedBy => "<@",
-        BinOp::RangeOverlap => "&&",
-        // Collection ops (value-level)
-        BinOp::Merge => "MERGE",
-        BinOp::Append => "APPEND",
-        BinOp::Prepend => "PREPEND",
-        BinOp::RemoveKey => "REMOVE",
-        // Spatial
-        BinOp::Distance => "<->",
     }
 }
 
@@ -510,7 +481,7 @@ pub fn render_order_by_expr(
     ob: &OrderByExpr<'_>,
     counter: &mut ParamCounter,
     dialect: &Dialect,
-) -> Result<String, BackendError> {
+) -> Result<String, RenderError> {
     let expr_sql = render_expr(&ob.expr, counter, dialect)?;
     let dir = match ob.direction {
         Direction::Asc => "ASC",
@@ -551,7 +522,7 @@ fn render_frame_bound(bound: &FrameBound) -> String {
 // ===========================================================================
 
 /// Renders a `Vec<Expr>` as a WHERE clause (AND-joined).
-pub fn render_filters(filters: &[Expr<'_>], counter: &mut ParamCounter, dialect: &Dialect) -> Result<String, BackendError> {
+pub fn render_filters(filters: &[Expr<'_>], counter: &mut ParamCounter, dialect: &Dialect) -> Result<String, RenderError> {
     if filters.is_empty() {
         return Ok(String::new());
     }
@@ -567,7 +538,7 @@ pub fn render_order_by_exprs(
     order_by: &[OrderByExpr<'_>],
     counter: &mut ParamCounter,
     dialect: &Dialect,
-) -> Result<String, BackendError> {
+) -> Result<String, RenderError> {
     if order_by.is_empty() {
         return Ok(String::new());
     }
@@ -808,7 +779,7 @@ pub fn render_model_constraint(constraint: &OwnedEntityConstraint) -> String {
 // ===========================================================================
 
 /// Render a QueryIR to SQL.
-pub fn render_query_ir(ir: &QueryIR, dialect: &Dialect) -> Result<SqlOutput, BackendError> {
+pub fn render_query_ir(ir: &QueryIR, dialect: &Dialect) -> Result<SqlOutput, RenderError> {
     let mut counter = ParamCounter::new(&dialect.param_style);
     render_query_ir_with_counter(ir, dialect, &mut counter)
 }
@@ -821,7 +792,7 @@ pub(crate) fn render_query_ir_with_counter(
     ir: &QueryIR,
     dialect: &Dialect,
     counter: &mut ParamCounter,
-) -> Result<SqlOutput, BackendError> {
+) -> Result<SqlOutput, RenderError> {
     let mut sql = String::new();
 
     // SELECT
@@ -912,7 +883,7 @@ pub(crate) fn render_query_ir_with_counter(
 }
 
 /// Render an InsertIR to SQL.
-pub fn render_insert_ir(ir: &InsertIR, dialect: &Dialect) -> Result<SqlOutput, BackendError> {
+pub fn render_insert_ir(ir: &InsertIR, dialect: &Dialect) -> Result<SqlOutput, RenderError> {
     let mut counter = ParamCounter::new(&dialect.param_style);
     let table_name = entity_ref_to_sql(&ir.target, dialect);
 
@@ -942,7 +913,7 @@ pub fn render_insert_ir(ir: &InsertIR, dialect: &Dialect) -> Result<SqlOutput, B
 pub fn render_insert_select_ir(
     ir: &InsertSelectIR,
     dialect: &Dialect,
-) -> Result<SqlOutput, BackendError> {
+) -> Result<SqlOutput, RenderError> {
     let table_name = entity_ref_to_sql(&ir.target, dialect);
     let cols = ir.fields.join(", ");
 
@@ -959,7 +930,7 @@ pub fn render_insert_select_ir(
 }
 
 /// Render an UpdateIR to SQL.
-pub fn render_update_ir(ir: &UpdateIR, dialect: &Dialect) -> Result<SqlOutput, BackendError> {
+pub fn render_update_ir(ir: &UpdateIR, dialect: &Dialect) -> Result<SqlOutput, RenderError> {
     let mut counter = ParamCounter::new(&dialect.param_style);
     let table_name = entity_ref_to_sql(&ir.target, dialect);
 
@@ -970,7 +941,7 @@ pub fn render_update_ir(ir: &UpdateIR, dialect: &Dialect) -> Result<SqlOutput, B
             let val = render_expr(expr, &mut counter, dialect)?;
             Ok(format!("{} = {}", col, val))
         })
-        .collect::<Result<Vec<_>, BackendError>>()?;
+        .collect::<Result<Vec<_>, RenderError>>()?;
 
     let mut sql = format!("UPDATE {} SET {}", table_name, sets.join(", "));
     sql.push_str(&render_filters(&ir.filters, &mut counter, dialect)?);
@@ -983,7 +954,7 @@ pub fn render_update_ir(ir: &UpdateIR, dialect: &Dialect) -> Result<SqlOutput, B
 }
 
 /// Render a RemoveIR to SQL.
-pub fn render_remove_ir(ir: &RemoveIR, dialect: &Dialect) -> Result<SqlOutput, BackendError> {
+pub fn render_remove_ir(ir: &RemoveIR, dialect: &Dialect) -> Result<SqlOutput, RenderError> {
     let mut counter = ParamCounter::new(&dialect.param_style);
     let table_name = entity_ref_to_sql(&ir.target, dialect);
 
@@ -998,7 +969,7 @@ pub fn render_remove_ir(ir: &RemoveIR, dialect: &Dialect) -> Result<SqlOutput, B
 }
 
 /// Render an UpsertIR to SQL.
-pub fn render_upsert_ir(ir: &UpsertIR, dialect: &Dialect) -> Result<SqlOutput, BackendError> {
+pub fn render_upsert_ir(ir: &UpsertIR, dialect: &Dialect) -> Result<SqlOutput, RenderError> {
     let mut counter = ParamCounter::new(&dialect.param_style);
     let table_name = entity_ref_to_sql(&ir.target, dialect);
 
@@ -1052,7 +1023,7 @@ pub fn render_upsert_ir(ir: &UpsertIR, dialect: &Dialect) -> Result<SqlOutput, B
 pub fn render_define_entity_ir(
     ir: &DefineEntityIR,
     dialect: &Dialect,
-) -> Result<SqlOutput, BackendError> {
+) -> Result<SqlOutput, RenderError> {
     let mut sql = String::from("CREATE TABLE ");
     if ir.if_not_exists {
         sql.push_str("IF NOT EXISTS ");
@@ -1087,7 +1058,7 @@ pub fn render_define_entity_ir(
 pub fn render_alter_entity_ir(
     ir: &AlterEntityIR,
     dialect: &Dialect,
-) -> Result<SqlOutput, BackendError> {
+) -> Result<SqlOutput, RenderError> {
     let table_name = entity_ref_to_sql(&ir.target, dialect);
     let mut parts = Vec::new();
 
@@ -1167,7 +1138,7 @@ pub fn render_alter_entity_ir(
 pub fn render_drop_entity_ir(
     ir: &DropEntityIR,
     _dialect: &Dialect,
-) -> Result<SqlOutput, BackendError> {
+) -> Result<SqlOutput, RenderError> {
     let mut sql = String::from("DROP TABLE ");
     if ir.if_exists {
         sql.push_str("IF EXISTS ");
@@ -1192,7 +1163,7 @@ pub fn render_drop_entity_ir(
 pub fn render_define_index_ir(
     ir: &DefineIndexIR,
     _dialect: &Dialect,
-) -> Result<SqlOutput, BackendError> {
+) -> Result<SqlOutput, RenderError> {
     let mut sql = String::from("CREATE ");
     if ir.unique {
         sql.push_str("UNIQUE ");
@@ -1211,10 +1182,9 @@ pub fn render_define_index_ir(
         let m = match method {
             IndexMethod::BTree => "btree",
             IndexMethod::Hash => "hash",
-            IndexMethod::Gin => "gin",
-            IndexMethod::Gist => "gist",
-            IndexMethod::SpGist => "spgist",
-            IndexMethod::Brin => "brin",
+            IndexMethod::FullText => "gin",
+            IndexMethod::Spatial => "gist",
+            IndexMethod::Custom(s) => s.as_str(),
         };
         sql.push_str(&format!(" USING {}", m));
     }
@@ -1235,7 +1205,7 @@ pub fn render_define_index_ir(
 pub fn render_drop_index_ir(
     ir: &DropIndexIR,
     _dialect: &Dialect,
-) -> Result<SqlOutput, BackendError> {
+) -> Result<SqlOutput, RenderError> {
     let mut sql = String::from("DROP INDEX ");
     if ir.concurrently {
         sql.push_str("CONCURRENTLY ");
@@ -1255,7 +1225,7 @@ pub fn render_drop_index_ir(
 }
 
 /// Render a GrantIR to SQL.
-pub fn render_grant_ir(ir: &GrantIR) -> Result<SqlOutput, BackendError> {
+pub fn render_grant_ir(ir: &GrantIR) -> Result<SqlOutput, RenderError> {
     let priv_str = render_privilege(&ir.privilege);
     let sql = format!("GRANT {} ON {} TO {}", priv_str, ir.on_target, ir.to_role);
     Ok(SqlOutput {
@@ -1265,7 +1235,7 @@ pub fn render_grant_ir(ir: &GrantIR) -> Result<SqlOutput, BackendError> {
 }
 
 /// Render a RevokeIR to SQL.
-pub fn render_revoke_ir(ir: &RevokeIR) -> Result<SqlOutput, BackendError> {
+pub fn render_revoke_ir(ir: &RevokeIR) -> Result<SqlOutput, RenderError> {
     let priv_str = render_privilege(&ir.privilege);
     let sql = format!(
         "REVOKE {} ON {} FROM {}",
@@ -1295,7 +1265,7 @@ fn render_privilege(p: &Privilege) -> String {
 pub fn render_transaction_ir(
     ir: &TransactionIR,
     dialect: &Dialect,
-) -> Result<SqlOutput, BackendError> {
+) -> Result<SqlOutput, RenderError> {
     match ir {
         TransactionIR::Begin => Ok(SqlOutput {
             sql: "BEGIN".to_string(),
@@ -1332,7 +1302,7 @@ pub fn render_transaction_ir(
 fn render_transaction_block(
     stmts: &[Statement],
     dialect: &Dialect,
-) -> Result<SqlOutput, BackendError> {
+) -> Result<SqlOutput, RenderError> {
     let backend = crate::SqlBackend::new(dialect.clone());
     let mut parts = Vec::with_capacity(stmts.len() + 2);
     let mut total_params = 0;
@@ -1340,18 +1310,9 @@ fn render_transaction_block(
     parts.push("BEGIN".to_string());
 
     for stmt in stmts {
-        let output = backend.render(stmt)?;
-        match output {
-            RenderedOutput::Sql(sql_out) => {
-                total_params += sql_out.param_count;
-                parts.push(sql_out.sql);
-            }
-            _ => {
-                return Err(BackendError::RenderError(
-                    "transaction block contains non-SQL statement".into(),
-                ));
-            }
-        }
+        let sql_out = backend.render(stmt)?;
+        total_params += sql_out.param_count;
+        parts.push(sql_out.sql);
     }
 
     parts.push("COMMIT".to_string());
@@ -1380,7 +1341,7 @@ fn render_transaction_block(
 pub fn render_define_type_ir(
     ir: &DefineTypeIR,
     dialect: &Dialect,
-) -> Result<SqlOutput, BackendError> {
+) -> Result<SqlOutput, RenderError> {
     use super::dialect::ddl::EnumStyle;
 
     let qualified_name = if let Some(ref ns) = ir.namespace {
@@ -1439,7 +1400,7 @@ pub fn render_define_type_ir(
 ///
 /// Only meaningful for dialects with `EnumStyle::CreateType` (PostgreSQL,
 /// CockroachDB). For other dialects, returns a comment.
-pub fn render_drop_type_ir(ir: &DropTypeIR, dialect: &Dialect) -> Result<SqlOutput, BackendError> {
+pub fn render_drop_type_ir(ir: &DropTypeIR, dialect: &Dialect) -> Result<SqlOutput, RenderError> {
     use super::dialect::ddl::EnumStyle;
 
     let sql = match dialect.ddl.enum_style {
@@ -1482,7 +1443,7 @@ pub fn render_drop_type_ir(ir: &DropTypeIR, dialect: &Dialect) -> Result<SqlOutp
 pub fn render_define_policy_ir(
     ir: &DefinePolicyIR,
     dialect: &Dialect,
-) -> Result<SqlOutput, BackendError> {
+) -> Result<SqlOutput, RenderError> {
     let mut counter = dialect.param_counter();
 
     let action_str = match ir.action {
@@ -1520,7 +1481,7 @@ pub fn render_define_policy_ir(
 pub fn render_compound_query_ir(
     ir: &CompoundQueryIR,
     dialect: &Dialect,
-) -> Result<SqlOutput, BackendError> {
+) -> Result<SqlOutput, RenderError> {
     let mut counter = dialect.param_counter();
     let base = render_query_ir_with_counter(&ir.base, dialect, &mut counter)?;
 
@@ -1572,6 +1533,197 @@ fn entity_ref_to_sql(mref: &EntityRef, _dialect: &Dialect) -> String {
         format!("{} AS {}", name, alias)
     } else {
         name
+    }
+}
+
+fn func_kind_to_sql(kind: &dol_core::expr::FuncKind) -> &'static str {
+    use dol_core::expr::FuncKind as K;
+    match kind {
+        K::Count | K::CountDistinct => "COUNT",
+        K::Sum => "SUM",
+        K::Avg => "AVG",
+        K::Min => "MIN",
+        K::Max => "MAX",
+        K::Median => "MEDIAN",
+        K::StdDev => "STDDEV",
+        K::Variance => "VARIANCE",
+        K::ArrayAgg => "ARRAY_AGG",
+        K::StringAgg => "STRING_AGG",
+        K::JsonAgg => "JSON_AGG",
+        K::BoolAnd => "BOOL_AND",
+        K::BoolOr => "BOOL_OR",
+        K::First => "FIRST",
+        K::Last => "LAST",
+        K::Lower => "LOWER",
+        K::Upper => "UPPER",
+        K::Trim => "TRIM",
+        K::LTrim => "LTRIM",
+        K::RTrim => "RTRIM",
+        K::Length => "LENGTH",
+        K::CharLength => "CHAR_LENGTH",
+        K::OctetLength => "OCTET_LENGTH",
+        K::Substr => "SUBSTR",
+        K::Left => "LEFT",
+        K::Right => "RIGHT",
+        K::Concat => "CONCAT",
+        K::ConcatWs => "CONCAT_WS",
+        K::Replace => "REPLACE",
+        K::Reverse => "REVERSE",
+        K::Repeat => "REPEAT",
+        K::PadLeft => "LPAD",
+        K::PadRight => "RPAD",
+        K::Position => "POSITION",
+        K::Initcap => "INITCAP",
+        K::Ascii => "ASCII",
+        K::Chr => "CHR",
+        K::Md5 => "MD5",
+        K::Sha256 => "SHA256",
+        K::Base64Encode => "ENCODE",
+        K::Base64Decode => "DECODE",
+        K::RegexReplace => "REGEXP_REPLACE",
+        K::RegexExtract => "REGEXP_MATCH",
+        K::Split => "STRING_TO_ARRAY",
+        K::SplitPart => "SPLIT_PART",
+        K::Format => "FORMAT",
+        K::StartsWith => "STARTS_WITH",
+        K::Contains => "CONTAINS",
+        K::ToHex => "TO_HEX",
+        K::Abs => "ABS",
+        K::Ceil => "CEIL",
+        K::Floor => "FLOOR",
+        K::Round => "ROUND",
+        K::Trunc => "TRUNC",
+        K::Sign => "SIGN",
+        K::Power => "POWER",
+        K::Sqrt => "SQRT",
+        K::Cbrt => "CBRT",
+        K::Exp => "EXP",
+        K::Ln => "LN",
+        K::Log => "LOG",
+        K::Log2 => "LOG2",
+        K::Log10 => "LOG10",
+        K::Pi => "PI",
+        K::Degrees => "DEGREES",
+        K::Radians => "RADIANS",
+        K::Sin => "SIN",
+        K::Cos => "COS",
+        K::Tan => "TAN",
+        K::Asin => "ASIN",
+        K::Acos => "ACOS",
+        K::Atan => "ATAN",
+        K::Atan2 => "ATAN2",
+        K::Sinh => "SINH",
+        K::Cosh => "COSH",
+        K::Tanh => "TANH",
+        K::Factorial => "FACTORIAL",
+        K::Gcd => "GCD",
+        K::Lcm => "LCM",
+        K::Random => "RANDOM",
+        K::Greatest => "GREATEST",
+        K::Least => "LEAST",
+        K::Now => "NOW",
+        K::CurrentDate => "CURRENT_DATE",
+        K::CurrentTime => "CURRENT_TIME",
+        K::CurrentTimestamp => "CURRENT_TIMESTAMP",
+        K::DatePart => "DATE_PART",
+        K::DateTrunc => "DATE_TRUNC",
+        K::Extract => "EXTRACT",
+        K::DateAdd => "DATE_ADD",
+        K::DateSub => "DATE_SUB",
+        K::DateDiff => "DATE_DIFF",
+        K::Age => "AGE",
+        K::ToDate => "TO_DATE",
+        K::ToTimestamp => "TO_TIMESTAMP",
+        K::Year => "YEAR",
+        K::Month => "MONTH",
+        K::Day => "DAY",
+        K::Hour => "HOUR",
+        K::Minute => "MINUTE",
+        K::Second => "SECOND",
+        K::DayOfWeek => "DAYOFWEEK",
+        K::DayOfYear => "DAYOFYEAR",
+        K::WeekOfYear => "WEEKOFYEAR",
+        K::Quarter => "QUARTER",
+        K::MakeDate => "MAKE_DATE",
+        K::MakeTime => "MAKE_TIME",
+        K::MakeTimestamp => "MAKE_TIMESTAMP",
+        K::EpochToTimestamp | K::TimestampToEpoch => "TO_TIMESTAMP",
+        K::Coalesce => "COALESCE",
+        K::NullIf => "NULLIF",
+        K::IfNull => "IFNULL",
+        K::TypeOf => "TYPEOF",
+        K::ToText | K::ToInt | K::ToFloat | K::ToBool => "CAST",
+        K::JsonGet => "jsonb_extract_path",
+        K::JsonGetText => "jsonb_extract_path_text",
+        K::JsonPath => "jsonb_extract_path",
+        K::JsonPathText => "jsonb_extract_path_text",
+        K::JsonHasKey => "jsonb_exists",
+        K::JsonHasAnyKey => "jsonb_exists_any",
+        K::JsonHasAllKeys => "jsonb_exists_all",
+        K::JsonSet => "jsonb_set",
+        K::JsonInsert => "jsonb_insert",
+        K::JsonRemove => "jsonb_delete",
+        K::JsonReplace => "jsonb_set",
+        K::JsonMergePatch => "jsonb_merge_patch",
+        K::JsonArray => "jsonb_build_array",
+        K::JsonObject => "jsonb_build_object",
+        K::JsonArrayLength => "jsonb_array_length",
+        K::JsonKeys => "jsonb_object_keys",
+        K::JsonValues => "jsonb_each",
+        K::JsonTypeof => "jsonb_typeof",
+        K::ArrayLength => "ARRAY_LENGTH",
+        K::ArrayPosition => "ARRAY_POSITION",
+        K::ArrayAppend => "ARRAY_APPEND",
+        K::ArrayPrepend => "ARRAY_PREPEND",
+        K::ArrayRemove => "ARRAY_REMOVE",
+        K::ArrayCat => "ARRAY_CAT",
+        K::ArrayDistinct => "ARRAY_DISTINCT",
+        K::ArraySort => "ARRAY_SORT",
+        K::ArrayReverse => "ARRAY_REVERSE",
+        K::ArraySlice => "ARRAY_SLICE",
+        K::ArrayFlatten => "ARRAY_FLATTEN",
+        K::Unnest => "UNNEST",
+        K::ArrayToString => "ARRAY_TO_STRING",
+        K::StringToArray => "STRING_TO_ARRAY",
+        K::MapMerge => "jsonb_merge_patch",
+        K::MapGet => "jsonb_extract_path",
+        K::MapKeys => "jsonb_object_keys",
+        K::MapValues => "jsonb_each",
+        K::MapContainsKey => "jsonb_exists",
+        K::MapRemoveKey => "jsonb_delete",
+        K::RangeContains => "RANGE_CONTAINS",
+        K::RangeContainedBy => "RANGE_CONTAINED_BY",
+        K::RangeOverlap => "RANGE_OVERLAP",
+        K::RangeLower => "LOWER",
+        K::RangeUpper => "UPPER",
+        K::RangeIsEmpty => "ISEMPTY",
+        K::RowNumber => "ROW_NUMBER",
+        K::Rank => "RANK",
+        K::DenseRank => "DENSE_RANK",
+        K::NTile => "NTILE",
+        K::Lag => "LAG",
+        K::Lead => "LEAD",
+        K::FirstValue => "FIRST_VALUE",
+        K::LastValue => "LAST_VALUE",
+        K::NthValue => "NTH_VALUE",
+        K::CumeDist => "CUME_DIST",
+        K::PercentRank => "PERCENT_RANK",
+        K::GenRandomUuid => "GEN_RANDOM_UUID",
+        K::StContains => "ST_Contains",
+        K::StIntersects => "ST_Intersects",
+        K::StWithin => "ST_Within",
+        K::StArea => "ST_Area",
+        K::StLength => "ST_Length",
+        K::StDistance => "ST_Distance",
+        K::StBuffer => "ST_Buffer",
+        K::StCentroid => "ST_Centroid",
+        K::StAsText => "ST_AsText",
+        K::StGeomFromText => "ST_GeomFromText",
+        K::Hash => "HASH",
+        K::Crc32 => "CRC32",
+        K::HexEncode => "ENCODE",
+        K::HexDecode => "DECODE",
+        _ => "UNSUPPORTED_FUNC",
     }
 }
 

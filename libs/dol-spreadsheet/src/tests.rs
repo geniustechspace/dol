@@ -41,8 +41,7 @@ fn define_entity_creates_sheet() {
     let stmt = Statement::DefineEntity(Box::new(ir));
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    match result {
-        RenderedOutput::Spreadsheet(out) => {
+    { let out = result; {
             assert_eq!(out.sheet, "users");
             assert!(out.workbook.is_none());
             match out.operation {
@@ -77,8 +76,7 @@ fn define_entity_with_namespace() {
     let stmt = Statement::DefineEntity(Box::new(ir));
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    match result {
-        RenderedOutput::Spreadsheet(out) => {
+    { let out = result; {
             assert_eq!(out.sheet, "hr.users");
             match out.operation {
                 SpreadsheetOp::CreateSheet { if_not_exists, .. } => {
@@ -201,8 +199,7 @@ fn drop_entity_drops_sheet() {
     let stmt = Statement::DropEntity(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    match result {
-        RenderedOutput::Spreadsheet(out) => {
+    { let out = result; {
             assert_eq!(out.sheet, "users");
             match out.operation {
                 SpreadsheetOp::DropSheet { if_exists } => {
@@ -238,8 +235,7 @@ fn alter_entity_rename_to_rename_sheet() {
     let stmt = Statement::AlterEntity(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    match result {
-        RenderedOutput::Spreadsheet(out) => {
+    { let out = result; {
             assert_eq!(out.sheet, "users");
             match out.operation {
                 SpreadsheetOp::RenameSheet { new_name } => {
@@ -301,8 +297,7 @@ fn insert_appends_rows() {
     let stmt = Statement::Insert(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    match result {
-        RenderedOutput::Spreadsheet(out) => {
+    { let out = result; {
             assert_eq!(out.sheet, "users");
             match out.operation {
                 SpreadsheetOp::AppendRows {
@@ -345,8 +340,7 @@ fn update_with_filter() {
     let stmt = Statement::Update(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    match result {
-        RenderedOutput::Spreadsheet(out) => {
+    { let out = result; {
             assert_eq!(out.sheet, "users");
             match out.operation {
                 SpreadsheetOp::UpdateRows {
@@ -379,8 +373,7 @@ fn update_without_filter() {
     let stmt = Statement::Update(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    match result {
-        RenderedOutput::Spreadsheet(out) => match out.operation {
+    match result.operation {
             SpreadsheetOp::UpdateRows { filter, .. } => {
                 assert!(filter.is_none());
             }
@@ -415,8 +408,7 @@ fn remove_with_filter() {
     let stmt = Statement::Remove(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    match result {
-        RenderedOutput::Spreadsheet(out) => {
+    { let out = result; {
             assert_eq!(out.sheet, "users");
             match out.operation {
                 SpreadsheetOp::DeleteRows { filter } => {
@@ -442,8 +434,7 @@ fn remove_without_filter() {
     let stmt = Statement::Remove(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    match result {
-        RenderedOutput::Spreadsheet(out) => match out.operation {
+    match result.operation {
             SpreadsheetOp::DeleteRows { filter } => {
                 assert!(filter.is_none());
             }
@@ -486,8 +477,7 @@ fn query_read_rows_basic() {
     let stmt = Statement::Query(Box::new(ir));
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    match result {
-        RenderedOutput::Spreadsheet(out) => {
+    { let out = result; {
             assert_eq!(out.sheet, "users");
             match out.operation {
                 SpreadsheetOp::ReadRows {
@@ -532,8 +522,7 @@ fn query_with_filter_and_limit() {
     let stmt = Statement::Query(Box::new(ir));
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    match result {
-        RenderedOutput::Spreadsheet(out) => match out.operation {
+    match result.operation {
             SpreadsheetOp::ReadRows {
                 columns,
                 filter,
@@ -584,8 +573,7 @@ fn query_with_sort() {
     let stmt = Statement::Query(Box::new(ir));
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    match result {
-        RenderedOutput::Spreadsheet(out) => match out.operation {
+    match result.operation {
             SpreadsheetOp::ReadRows {
                 sort,
                 limit,
@@ -847,8 +835,7 @@ fn alter_entity_rename_qualifies_new_name_with_namespace() {
     let stmt = Statement::AlterEntity(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    match result {
-        RenderedOutput::Spreadsheet(out) => {
+    { let out = result; {
             assert_eq!(out.sheet, "hr.users");
             match out.operation {
                 SpreadsheetOp::RenameSheet { new_name } => {

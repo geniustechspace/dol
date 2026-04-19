@@ -1,7 +1,4 @@
 //! # dol-sql — DOL SQL Backend
-//!
-//! Dialect-aware SQL rendering engine for DOL. Renders DOL IR into SQL strings
-//! targeting PostgreSQL, MySQL, SQLite, MSSQL, Oracle, CockroachDB, and more.
 
 #![deny(unsafe_code)]
 
@@ -12,159 +9,130 @@ pub mod render;
 use dialect::Dialect;
 use dol_core::ir::*;
 
+/// SQL output: rendered SQL text plus the number of bind parameters.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SqlOutput {
+    pub sql: String,
+    pub param_count: usize,
+}
+
+/// Errors that can occur during SQL rendering.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum RenderError {
+    Unsupported(String),
+    RenderError(String),
+}
+
+impl std::fmt::Display for RenderError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Unsupported(msg) => write!(f, "unsupported: {}", msg),
+            Self::RenderError(msg) => write!(f, "render error: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for RenderError {}
+
 /// SQL backend: renders DOL IR into dialect-specific SQL strings.
 pub struct SqlBackend {
     pub dialect: Dialect,
 }
 
 impl SqlBackend {
-    pub fn new(dialect: Dialect) -> Self {
-        Self { dialect }
-    }
+    pub fn new(dialect: Dialect) -> Self { Self { dialect } }
+    pub fn postgres() -> Self { Self::new(Dialect::postgres()) }
+    pub fn mysql() -> Self { Self::new(Dialect::mysql()) }
+    pub fn sqlite() -> Self { Self::new(Dialect::sqlite()) }
+    pub fn mssql() -> Self { Self::new(Dialect::mssql()) }
+    pub fn oracle() -> Self { Self::new(Dialect::oracle()) }
 
-    pub fn postgres() -> Self {
-        Self::new(Dialect::postgres())
-    }
-
-    pub fn mysql() -> Self {
-        Self::new(Dialect::mysql())
-    }
-
-    pub fn sqlite() -> Self {
-        Self::new(Dialect::sqlite())
-    }
-
-    pub fn mssql() -> Self {
-        Self::new(Dialect::mssql())
-    }
-
-    pub fn oracle() -> Self {
-        Self::new(Dialect::oracle())
-    }
-
-    /// Render a QueryIR to SQL.
-    pub fn render_query(&self, ir: &QueryIR) -> Result<SqlOutput, BackendError> {
+    pub fn render_query(&self, ir: &QueryIR) -> Result<SqlOutput, RenderError> {
         render::render_query_ir(ir, &self.dialect)
     }
-
-    /// Render an InsertIR to SQL.
-    pub fn render_insert(&self, ir: &InsertIR) -> Result<SqlOutput, BackendError> {
+    pub fn render_insert(&self, ir: &InsertIR) -> Result<SqlOutput, RenderError> {
         render::render_insert_ir(ir, &self.dialect)
     }
-
-    /// Render an InsertSelectIR to SQL.
-    pub fn render_insert_select(&self, ir: &InsertSelectIR) -> Result<SqlOutput, BackendError> {
+    pub fn render_insert_select(&self, ir: &InsertSelectIR) -> Result<SqlOutput, RenderError> {
         render::render_insert_select_ir(ir, &self.dialect)
     }
-
-    /// Render an UpdateIR to SQL.
-    pub fn render_update(&self, ir: &UpdateIR) -> Result<SqlOutput, BackendError> {
+    pub fn render_update(&self, ir: &UpdateIR) -> Result<SqlOutput, RenderError> {
         render::render_update_ir(ir, &self.dialect)
     }
-
-    /// Render a RemoveIR to SQL.
-    pub fn render_remove(&self, ir: &RemoveIR) -> Result<SqlOutput, BackendError> {
+    pub fn render_remove(&self, ir: &RemoveIR) -> Result<SqlOutput, RenderError> {
         render::render_remove_ir(ir, &self.dialect)
     }
-
-    /// Render an UpsertIR to SQL.
-    pub fn render_upsert(&self, ir: &UpsertIR) -> Result<SqlOutput, BackendError> {
+    pub fn render_upsert(&self, ir: &UpsertIR) -> Result<SqlOutput, RenderError> {
         render::render_upsert_ir(ir, &self.dialect)
     }
-
-    /// Render a DefineEntityIR to SQL.
-    pub fn render_define_entity(&self, ir: &DefineEntityIR) -> Result<SqlOutput, BackendError> {
+    pub fn render_define_entity(&self, ir: &DefineEntityIR) -> Result<SqlOutput, RenderError> {
         render::render_define_entity_ir(ir, &self.dialect)
     }
-
-    /// Render an AlterEntityIR to SQL.
-    pub fn render_alter_entity(&self, ir: &AlterEntityIR) -> Result<SqlOutput, BackendError> {
+    pub fn render_alter_entity(&self, ir: &AlterEntityIR) -> Result<SqlOutput, RenderError> {
         render::render_alter_entity_ir(ir, &self.dialect)
     }
-
-    /// Render a DropEntityIR to SQL.
-    pub fn render_drop_entity(&self, ir: &DropEntityIR) -> Result<SqlOutput, BackendError> {
+    pub fn render_drop_entity(&self, ir: &DropEntityIR) -> Result<SqlOutput, RenderError> {
         render::render_drop_entity_ir(ir, &self.dialect)
     }
-
-    /// Render a DefineIndexIR to SQL.
-    pub fn render_define_index(&self, ir: &DefineIndexIR) -> Result<SqlOutput, BackendError> {
+    pub fn render_define_index(&self, ir: &DefineIndexIR) -> Result<SqlOutput, RenderError> {
         render::render_define_index_ir(ir, &self.dialect)
     }
-
-    /// Render a CompoundQueryIR to SQL.
-    pub fn render_compound(&self, ir: &CompoundQueryIR) -> Result<SqlOutput, BackendError> {
+    pub fn render_compound(&self, ir: &CompoundQueryIR) -> Result<SqlOutput, RenderError> {
         render::render_compound_query_ir(ir, &self.dialect)
     }
-
-    /// Render a DropIndexIR to SQL.
-    pub fn render_drop_index(&self, ir: &DropIndexIR) -> Result<SqlOutput, BackendError> {
+    pub fn render_drop_index(&self, ir: &DropIndexIR) -> Result<SqlOutput, RenderError> {
         render::render_drop_index_ir(ir, &self.dialect)
     }
-
-    /// Render a GrantIR to SQL.
-    pub fn render_grant(&self, ir: &GrantIR) -> Result<SqlOutput, BackendError> {
+    pub fn render_grant(&self, ir: &GrantIR) -> Result<SqlOutput, RenderError> {
         render::render_grant_ir(ir)
     }
-
-    /// Render a RevokeIR to SQL.
-    pub fn render_revoke(&self, ir: &RevokeIR) -> Result<SqlOutput, BackendError> {
+    pub fn render_revoke(&self, ir: &RevokeIR) -> Result<SqlOutput, RenderError> {
         render::render_revoke_ir(ir)
     }
-
-    /// Render a TransactionIR to SQL.
-    pub fn render_transaction(&self, ir: &TransactionIR) -> Result<SqlOutput, BackendError> {
+    pub fn render_transaction(&self, ir: &TransactionIR) -> Result<SqlOutput, RenderError> {
         render::render_transaction_ir(ir, &self.dialect)
     }
-
-    /// Render a DefineTypeIR to SQL.
-    pub fn render_define_type(&self, ir: &DefineTypeIR) -> Result<SqlOutput, BackendError> {
+    pub fn render_define_type(&self, ir: &DefineTypeIR) -> Result<SqlOutput, RenderError> {
         render::render_define_type_ir(ir, &self.dialect)
     }
-
-    /// Render a DropTypeIR to SQL.
-    pub fn render_drop_type(&self, ir: &DropTypeIR) -> Result<SqlOutput, BackendError> {
+    pub fn render_drop_type(&self, ir: &DropTypeIR) -> Result<SqlOutput, RenderError> {
         render::render_drop_type_ir(ir, &self.dialect)
     }
-
-    /// Render a DefinePolicyIR to SQL.
-    pub fn render_define_policy(&self, ir: &DefinePolicyIR) -> Result<SqlOutput, BackendError> {
+    pub fn render_define_policy(&self, ir: &DefinePolicyIR) -> Result<SqlOutput, RenderError> {
         render::render_define_policy_ir(ir, &self.dialect)
     }
-}
 
-impl Backend for SqlBackend {
-    fn render(&self, stmt: &Statement) -> Result<RenderedOutput, BackendError> {
-        let output = match stmt {
-            Statement::Query(ir) => self.render_query(ir)?,
-            Statement::Insert(ir) => self.render_insert(ir)?,
-            Statement::InsertSelect(ir) => self.render_insert_select(ir)?,
-            Statement::Update(ir) => self.render_update(ir)?,
-            Statement::Remove(ir) => self.render_remove(ir)?,
-            Statement::Upsert(ir) => self.render_upsert(ir)?,
-            Statement::DefineEntity(ir) => self.render_define_entity(ir)?,
-            Statement::AlterEntity(ir) => self.render_alter_entity(ir)?,
-            Statement::DropEntity(ir) => self.render_drop_entity(ir)?,
-            Statement::DefineIndex(ir) => self.render_define_index(ir)?,
-            Statement::DropIndex(ir) => self.render_drop_index(ir)?,
-            Statement::Grant(ir) => self.render_grant(ir)?,
-            Statement::Revoke(ir) => self.render_revoke(ir)?,
-            Statement::Transaction(ir) => self.render_transaction(ir)?,
-            Statement::DefineType(ir) => self.render_define_type(ir)?,
-            Statement::DropType(ir) => self.render_drop_type(ir)?,
-            Statement::Compound(ir) => self.render_compound(ir)?,
-            Statement::DefinePolicy(ir) => self.render_define_policy(ir)?,
+    /// Render a Statement to SqlOutput (all SQL-supported variants).
+    pub fn render(&self, stmt: &Statement) -> Result<SqlOutput, RenderError> {
+        match stmt {
+            Statement::Query(ir) => self.render_query(ir),
+            Statement::Insert(ir) => self.render_insert(ir),
+            Statement::InsertSelect(ir) => self.render_insert_select(ir),
+            Statement::Update(ir) => self.render_update(ir),
+            Statement::Remove(ir) => self.render_remove(ir),
+            Statement::Upsert(ir) => self.render_upsert(ir),
+            Statement::DefineEntity(ir) => self.render_define_entity(ir),
+            Statement::AlterEntity(ir) => self.render_alter_entity(ir),
+            Statement::DropEntity(ir) => self.render_drop_entity(ir),
+            Statement::DefineIndex(ir) => self.render_define_index(ir),
+            Statement::DropIndex(ir) => self.render_drop_index(ir),
+            Statement::Grant(ir) => self.render_grant(ir),
+            Statement::Revoke(ir) => self.render_revoke(ir),
+            Statement::Transaction(ir) => self.render_transaction(ir),
+            Statement::DefineType(ir) => self.render_define_type(ir),
+            Statement::DropType(ir) => self.render_drop_type(ir),
+            Statement::Compound(ir) => self.render_compound(ir),
+            Statement::DefinePolicy(ir) => self.render_define_policy(ir),
             Statement::PutObject(_)
             | Statement::GetObject(_)
             | Statement::ListObjects(_)
             | Statement::ReadFile(_)
             | Statement::WriteFile(_)
-            | Statement::MoveFile(_) => {
-                return Err(BackendError::Unsupported(
-                    "storage operations have no SQL equivalent".into(),
-                ));
-            }
-        };
-        Ok(RenderedOutput::Sql(output))
+            | Statement::MoveFile(_) => Err(RenderError::Unsupported(
+                "storage operations have no SQL equivalent".into(),
+            )),
+        }
     }
 }
