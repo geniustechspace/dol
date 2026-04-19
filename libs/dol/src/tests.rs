@@ -1411,7 +1411,7 @@ fn expr_like_ilike() {
 
 #[test]
 fn expr_cast() {
-    let expr = field("price").cast("NUMERIC(10,2)");
+    let expr = field("price").cast(DataType::Decimal { precision: Some(10), scale: Some(2) });
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
     let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();

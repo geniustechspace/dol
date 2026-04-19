@@ -99,7 +99,7 @@ fn render_expr_inner(
         }
 
         Expr::Func { name, args } => {
-            use dol_core::expr::FuncName;
+            use dol_core::expr::{FuncName, FuncKind};
             let rendered_args: Vec<_> = args
                 .iter()
                 .map(|a| render_expr_inner(a, counter, dialect, next))
@@ -108,7 +108,20 @@ fn render_expr_inner(
                 FuncName::Known(kind) => std::borrow::Cow::Borrowed(func_kind_to_sql(kind)),
                 FuncName::Custom(s) => std::borrow::Cow::Owned(s.clone()),
             };
-            Ok(format!("{}({})", func_sql, rendered_args.join(", ")))
+            // SQL reserved keywords that must appear without parentheses
+            let no_parens = matches!(
+                name,
+                FuncName::Known(
+                    FuncKind::CurrentDate
+                    | FuncKind::CurrentTime
+                    | FuncKind::CurrentTimestamp
+                )
+            );
+            if no_parens && rendered_args.is_empty() {
+                Ok(func_sql.into_owned())
+            } else {
+                Ok(format!("{}({})", func_sql, rendered_args.join(", ")))
+            }
         }
 
         Expr::Cast { expr, as_type } => {

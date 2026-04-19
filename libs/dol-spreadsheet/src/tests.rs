@@ -41,7 +41,7 @@ fn define_entity_creates_sheet() {
     let stmt = Statement::DefineEntity(Box::new(ir));
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result; {
+    { let out = result;
             assert_eq!(out.sheet, "users");
             assert!(out.workbook.is_none());
             match out.operation {
@@ -58,8 +58,6 @@ fn define_entity_creates_sheet() {
                 }
                 _ => panic!("expected CreateSheet"),
             }
-        }
-        _ => panic!("expected Spreadsheet output"),
     }
 }
 
@@ -76,7 +74,7 @@ fn define_entity_with_namespace() {
     let stmt = Statement::DefineEntity(Box::new(ir));
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result; {
+    { let out = result;
             assert_eq!(out.sheet, "hr.users");
             match out.operation {
                 SpreadsheetOp::CreateSheet { if_not_exists, .. } => {
@@ -84,8 +82,6 @@ fn define_entity_with_namespace() {
                 }
                 _ => panic!("expected CreateSheet"),
             }
-        }
-        _ => panic!("expected Spreadsheet output"),
     }
 }
 
@@ -199,7 +195,7 @@ fn drop_entity_drops_sheet() {
     let stmt = Statement::DropEntity(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result; {
+    { let out = result;
             assert_eq!(out.sheet, "users");
             match out.operation {
                 SpreadsheetOp::DropSheet { if_exists } => {
@@ -207,8 +203,6 @@ fn drop_entity_drops_sheet() {
                 }
                 _ => panic!("expected DropSheet"),
             }
-        }
-        _ => panic!("expected Spreadsheet output"),
     }
 }
 
@@ -235,7 +229,7 @@ fn alter_entity_rename_to_rename_sheet() {
     let stmt = Statement::AlterEntity(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result; {
+    { let out = result;
             assert_eq!(out.sheet, "users");
             match out.operation {
                 SpreadsheetOp::RenameSheet { new_name } => {
@@ -243,8 +237,6 @@ fn alter_entity_rename_to_rename_sheet() {
                 }
                 _ => panic!("expected RenameSheet"),
             }
-        }
-        _ => panic!("expected Spreadsheet output"),
     }
 }
 
@@ -297,7 +289,7 @@ fn insert_appends_rows() {
     let stmt = Statement::Insert(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result; {
+    { let out = result;
             assert_eq!(out.sheet, "users");
             match out.operation {
                 SpreadsheetOp::AppendRows {
@@ -309,8 +301,6 @@ fn insert_appends_rows() {
                 }
                 _ => panic!("expected AppendRows"),
             }
-        }
-        _ => panic!("expected Spreadsheet output"),
     }
 }
 
@@ -340,7 +330,7 @@ fn update_with_filter() {
     let stmt = Statement::Update(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result; {
+    { let out = result;
             assert_eq!(out.sheet, "users");
             match out.operation {
                 SpreadsheetOp::UpdateRows {
@@ -356,8 +346,6 @@ fn update_with_filter() {
                 }
                 _ => panic!("expected UpdateRows"),
             }
-        }
-        _ => panic!("expected Spreadsheet output"),
     }
 }
 
@@ -378,8 +366,6 @@ fn update_without_filter() {
                 assert!(filter.is_none());
             }
             _ => panic!("expected UpdateRows"),
-        },
-        _ => panic!("expected Spreadsheet output"),
     }
 }
 
@@ -408,7 +394,7 @@ fn remove_with_filter() {
     let stmt = Statement::Remove(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result; {
+    { let out = result;
             assert_eq!(out.sheet, "users");
             match out.operation {
                 SpreadsheetOp::DeleteRows { filter } => {
@@ -418,8 +404,6 @@ fn remove_with_filter() {
                 }
                 _ => panic!("expected DeleteRows"),
             }
-        }
-        _ => panic!("expected Spreadsheet output"),
     }
 }
 
@@ -439,8 +423,6 @@ fn remove_without_filter() {
                 assert!(filter.is_none());
             }
             _ => panic!("expected DeleteRows"),
-        },
-        _ => panic!("expected Spreadsheet output"),
     }
 }
 
@@ -477,7 +459,7 @@ fn query_read_rows_basic() {
     let stmt = Statement::Query(Box::new(ir));
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result; {
+    { let out = result;
             assert_eq!(out.sheet, "users");
             match out.operation {
                 SpreadsheetOp::ReadRows {
@@ -497,8 +479,6 @@ fn query_read_rows_basic() {
                 }
                 _ => panic!("expected ReadRows"),
             }
-        }
-        _ => panic!("expected Spreadsheet output"),
     }
 }
 
@@ -537,8 +517,6 @@ fn query_with_filter_and_limit() {
                 assert_eq!(limit, Some(10));
             }
             _ => panic!("expected ReadRows"),
-        },
-        _ => panic!("expected Spreadsheet output"),
     }
 }
 
@@ -591,8 +569,6 @@ fn query_with_sort() {
                 assert!(distinct);
             }
             _ => panic!("expected ReadRows"),
-        },
-        _ => panic!("expected Spreadsheet output"),
     }
 }
 
@@ -835,7 +811,7 @@ fn alter_entity_rename_qualifies_new_name_with_namespace() {
     let stmt = Statement::AlterEntity(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result; {
+    { let out = result;
             assert_eq!(out.sheet, "hr.users");
             match out.operation {
                 SpreadsheetOp::RenameSheet { new_name } => {
@@ -843,8 +819,6 @@ fn alter_entity_rename_qualifies_new_name_with_namespace() {
                 }
                 _ => panic!("expected RenameSheet"),
             }
-        }
-        _ => panic!("expected Spreadsheet output"),
     }
 }
 
@@ -932,7 +906,7 @@ fn query_rejects_non_column_sort_expr() {
         having: vec![],
         order_by: vec![OrderByExpr {
             expr: Expr::Func {
-                name: "UPPER".into(),
+                name: dol_core::expr::FuncName::Custom("UPPER".to_string()),
                 args: vec![field("name")],
             },
             direction: dol_core::expr::Direction::Asc,

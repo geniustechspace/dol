@@ -1007,7 +1007,7 @@ fn main() {
     println!("  Negation: -expr ✓");
 
     // 5f. CAST
-    let _cast = field("count").cast("BIGINT");
+    let _cast = field("count").cast(DataType::Int64);
     println!("  Cast: CAST(count AS BIGINT) ✓");
 
     // 5g. Alias

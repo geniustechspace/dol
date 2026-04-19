@@ -53,6 +53,7 @@ dependencies = [
  "dol-core",
  "dol-entity",
  "dol-query",
+ "serde",
 ]
 
 [[package]]
@@ -76,6 +77,7 @@ dependencies = [
  "dol-core",
  "dol-entity",
  "dol-query",
+ "serde",
 ]
 
 [[package]]
@@ -91,6 +93,7 @@ name = "dol-spreadsheet"
 version = "0.1.0"
 dependencies = [
  "dol-core",
+ "serde",
 ]
 
 [[package]]

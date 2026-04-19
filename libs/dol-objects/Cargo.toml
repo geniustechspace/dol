@@ -12,7 +12,7 @@ dol-entity = { workspace = true }
 
 [features]
 default = []
-serde = ["dol-core/serde"]
+serde = ["dep:serde", "dol-core/serde"]
 
 [dev-dependencies]
 dol-query = { workspace = true }

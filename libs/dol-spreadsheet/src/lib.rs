@@ -75,6 +75,8 @@ pub enum SpreadsheetError {
 impl std::fmt::Display for SpreadsheetError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Unsupported(msg) => write!(f, "unsupported: {}", msg),
+            Self::RenderError(msg) => write!(f, "render error: {}", msg),
         }
     }
 }
@@ -562,7 +564,7 @@ fn render_expr_simple(expr: &Expr<'_>) -> Result<String, SpreadsheetError> {
             Ok(format!("({} {})", op_str, render_expr_simple(inner)?))
         }
         Expr::Func { name, args } => {
-            use dol_core::expr::{FuncName, FuncKind};
+            use dol_core::expr::FuncName;
             let arg_strs = args
                 .iter()
                 .map(render_expr_simple)
@@ -730,7 +732,7 @@ fn render_spreadsheet_type(dt: &dol_core::types::DataType) -> &'static str {
         D::Text | D::Varchar(_) | D::Char(_) => "TEXT",
         D::Bool => "BOOLEAN",
         D::Date => "DATE",
-        D::Time | D::DateTime | D::TimestampTz { .. } => "DATETIME",
+        D::Time { .. } | D::DateTime { .. } | D::TimestampTz { .. } => "DATETIME",
         _ => "TEXT",
     }
 }
