@@ -9,7 +9,7 @@ pub mod transaction;
 
 // ── Re-export every canonical type from `op` ──
 
-pub use crate::op::{EntityRef, BackendError, Statement};
+pub use crate::op::{EntityRef, BackendError, Operation, Statement};
 
 pub use crate::op::{
     // query
@@ -19,6 +19,7 @@ pub use crate::op::{
     // definition
     DefineEntity, AlterEntity, DropEntity, DefineIndex, DropIndex, DefineType, DropType,
     FieldDef, AlterAction, IndexMethod, OwnedEntityConstraint, OwnedForeignKeyRef,
+    Constraint, ForeignKeyDef,
     // control
     Grant, Revoke, DefinePolicy, PolicyAction, Privilege,
     // storage

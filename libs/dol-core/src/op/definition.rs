@@ -58,6 +58,12 @@ impl From<EntityConstraint> for OwnedEntityConstraint {
     }
 }
 
+/// Preferred alias for [`OwnedEntityConstraint`].
+pub type Constraint = OwnedEntityConstraint;
+
+/// Preferred alias for [`OwnedForeignKeyRef`].
+pub type ForeignKeyDef = OwnedForeignKeyRef;
+
 /// Define (create) a new model.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

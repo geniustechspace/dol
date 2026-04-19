@@ -153,6 +153,14 @@ pub enum DataType {
     /// A symbolic reference to a named type defined elsewhere (user-defined
     /// types, Avro named types, Protobuf message types, etc.).
     TypeRef(Box<str>),
+    /// A domain-specific extension type not covered by the well-known variants.
+    ///
+    /// `name` identifies the type (e.g. `"vector"`, `"tsquery"`),
+    /// `params` carries type parameters (e.g. element type, dimension).
+    Extension {
+        name: Box<str>,
+        params: Vec<DataType>,
+    },
 }
 
 impl DataType {
@@ -497,6 +505,9 @@ impl DataType {
 
             // TypeRef: cannot validate structurally; resolution is schema-layer concern
             Self::TypeRef(_) => Ok(()),
+
+            // Extension: cannot validate structurally; semantics are domain-specific
+            Self::Extension { .. } => Ok(()),
         }
     }
 
@@ -553,6 +564,7 @@ impl DataType {
             Self::Struct(_)   => "struct",
             Self::Enum(_)     => "enum",
             Self::TypeRef(_)    => "typeref",
+            Self::Extension { .. } => "extension",
         }
     }
 }
@@ -614,6 +626,18 @@ impl fmt::Display for DataType {
                 write!(f, ")")
             }
             Self::TypeRef(name)     => write!(f, "{name}"),
+            Self::Extension { name, params } => {
+                write!(f, "{name}")?;
+                if !params.is_empty() {
+                    write!(f, "(")?;
+                    for (i, p) in params.iter().enumerate() {
+                        if i > 0 { write!(f, ", ")?; }
+                        write!(f, "{p}")?;
+                    }
+                    write!(f, ")")?;
+                }
+                Ok(())
+            }
             other => f.write_str(other.type_name().to_ascii_uppercase().as_str()),
         }
     }

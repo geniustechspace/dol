@@ -168,6 +168,13 @@ pub enum Value {
     Struct(Box<[(Box<str>, Value)]>),
     /// Bounded range.
     Range(Box<ValueRange>),
+
+    // ── Extension ──
+    /// A domain-specific extension value not covered by the well-known variants.
+    Extension {
+        type_name: Box<str>,
+        data: Box<[u8]>,
+    },
 }
 
 impl Value {
@@ -223,6 +230,7 @@ impl Value {
             Self::Map(_)      => "map",
             Self::Struct(_)   => "struct",
             Self::Range(_)    => "range",
+            Self::Extension { .. } => "extension",
         }
     }
 
@@ -320,6 +328,7 @@ impl fmt::Display for Value {
                 f.write_str("}")
             }
             Self::Range(r) => write!(f, "{r}"),
+            Self::Extension { type_name, data } => write!(f, "ext:{}(len={})", type_name, data.len()),
         }
     }
 }
@@ -426,6 +435,13 @@ pub enum Literal<'a> {
     Map(Box<[(Cow<'a, str>, Literal<'a>)]>),
     Struct(Box<[(Cow<'a, str>, Literal<'a>)]>),
     Range(Box<LiteralRange<'a>>),
+
+    // ── Extension ──
+    /// A domain-specific extension value not covered by the well-known variants.
+    Extension {
+        type_name: Box<str>,
+        data: Box<[u8]>,
+    },
 }
 
 impl<'a> Literal<'a> {
@@ -635,6 +651,7 @@ impl<'a> fmt::Display for Literal<'a> {
                 f.write_str("}")
             }
             Self::Range(r) => write!(f, "{r}"),
+            Self::Extension { type_name, data } => write!(f, "ext:{}(len={})", type_name, data.len()),
         }
     }
 }
@@ -687,6 +704,7 @@ impl<'a> From<Literal<'a>> for Value {
             Literal::Map(entries)    => Self::Map(own_kv_slice(entries)),
             Literal::Struct(entries) => Self::Struct(own_kv_slice(entries)),
             Literal::Range(r)        => Self::Range(convert_range(*r)),
+            Literal::Extension { type_name, data } => Self::Extension { type_name, data },
         }
     }
 }

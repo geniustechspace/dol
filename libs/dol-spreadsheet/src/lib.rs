@@ -468,6 +468,12 @@ fn render_literal(lit: &Literal<'_>) -> Result<String, BackendError> {
                 "SpreadsheetBackend does not support composite literal types (array, set, tuple, map, struct, range)".into(),
             ))
         }
+        // Extension types are not supported.
+        L::Extension { .. } => {
+            Err(BackendError::Unsupported(
+                "SpreadsheetBackend does not support extension literal types".into(),
+            ))
+        }
     }
 }
 

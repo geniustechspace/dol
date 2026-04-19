@@ -368,6 +368,9 @@ fn render_literal(lit: &Literal<'_>, dialect: &Dialect) -> String {
             // Fall back to Display format, quoted
             format!("'{}'", lit)
         }
+
+        // Extension — render as quoted Display representation
+        L::Extension { .. } => format!("'{}'", lit),
     }
 }
 
