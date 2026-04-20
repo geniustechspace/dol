@@ -1,7 +1,7 @@
 //! REMOVE (DELETE) query builder for `dol-query`.
 
 use dol_core::expr::Expr;
-use dol_core::ir::{EntityRef, RemoveIR};
+use dol_core::op::{EntityRef, Remove};
 
 // ===========================================================================
 // RemoveQuery
@@ -49,9 +49,9 @@ impl RemoveQuery {
         self
     }
 
-    /// Build the canonical [`RemoveIR`].
-    pub fn build(self) -> RemoveIR<'static> {
-        RemoveIR {
+    /// Build the canonical [`Remove`].
+    pub fn build(self) -> Remove<'static> {
+        Remove {
             target: EntityRef {
                 name: self.name,
                 namespace: self.namespace,

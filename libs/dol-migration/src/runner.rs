@@ -3,8 +3,8 @@
 use super::plan::{self, MigrationDirection, MigrationPlan, MigrationTarget, PlannedStep};
 use super::registry::{AppliedMigration, MigrationRegistry};
 use super::{KvMigrationOp, Migration, MigrationError, MigrationStep, StorageMigrationOp};
-use dol_core::ir::BackendError;
-use dol_core::ir::Statement;
+use dol_core::op::BackendError;
+use dol_core::op::Statement;
 use dol_sql::dialect::{self, Dialect};
 use dol_sql::render;
 
@@ -118,7 +118,7 @@ pub struct RenderedMigration {
 ///     Migration, MigrationStep, MigrationRunner, MigrationTarget,
 ///     InMemoryRegistry, MigrationRegistry,
 /// };
-/// use dol_core::ir::definition::FieldDef;
+/// use dol_core::op::definition::FieldDef;
 /// use dol_entity::DataType;
 ///
 /// struct CreateUsers;

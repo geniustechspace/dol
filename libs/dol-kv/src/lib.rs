@@ -2,7 +2,7 @@
 
 #![deny(unsafe_code)]
 
-use dol_core::ir::{BackendError, Statement};
+use dol_core::op::{BackendError, Statement};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

@@ -1,6 +1,6 @@
 //! Definition builders — CREATE, ALTER, DROP for models, indexes, and types.
 //!
-//! - [`CreateFromMeta`]: builds a `DefineEntityIR` from static [`Model`] metadata.
+//! - [`CreateFromMeta`]: builds a `DefineEntity` from static [`Model`] metadata.
 //! - [`DefineEntityBuilder`]: builds a CREATE TABLE from owned [`FieldDef`]s (runtime-defined).
 //! - [`AlterEntityBuilder`]: builds ALTER TABLE statements from a Model reference.
 //! - [`DropEntityBuilder`]: builds DROP TABLE from a Model reference.
@@ -12,10 +12,10 @@
 //! For SQL rendering, import the extension traits from `dol-sql`.
 
 use crate::{Entity, Field, DataType};
-use dol_core::ir::EntityRef;
-use dol_core::ir::definition::{
-    AlterAction, AlterEntityIR, DefineEntityIR, DefineIndexIR, DefineTypeIR, DropEntityIR,
-    DropIndexIR, DropTypeIR, FieldDef, IndexMethod, OwnedEntityConstraint, OwnedForeignKeyRef,
+use dol_core::op::EntityRef;
+use dol_core::op::definition::{
+    AlterAction, AlterEntity, DefineEntity, DefineIndex, DefineType, DropEntity,
+    DropIndex, DropType, FieldDef, IndexMethod, OwnedEntityConstraint, OwnedForeignKeyRef,
 };
 
 // ---------------------------------------------------------------------------
@@ -50,7 +50,7 @@ fn field_to_field_def(f: &Field) -> FieldDef {
 // CreateFromMeta — renders CREATE TABLE from static Model metadata
 // ===========================================================================
 
-/// Builds a `DefineEntityIR` from a static [`Model`]'s metadata.
+/// Builds a `DefineEntity` from a static [`Model`]'s metadata.
 ///
 /// Converts the model's static field definitions to owned [`FieldDef`]s and
 /// includes model-level constraints.
@@ -84,15 +84,15 @@ impl<'a> CreateFromMeta<'a> {
         self.if_not_exists
     }
 
-    /// Build the canonical [`DefineEntityIR`].
+    /// Build the canonical [`DefineEntity`].
     ///
     /// Converts static `Field`s to owned `FieldDef`s and copies model
     /// constraints. Note: primary-key constraints derived from fields
     /// are included in the model's `constraints` array when present;
     /// otherwise renderers should extract PKs from `FieldDef::primary_key`.
-    pub fn build(&self) -> DefineEntityIR {
+    pub fn build(&self) -> DefineEntity {
         let fields = self.model.fields.iter().map(field_to_field_def).collect();
-        DefineEntityIR {
+        DefineEntity {
             name: self.model.name.to_string(),
             namespace: self.model.namespace.map(|s| s.to_string()),
             fields,
@@ -161,9 +161,9 @@ impl DefineEntityBuilder {
         self
     }
 
-    /// Build the canonical [`DefineEntityIR`].
-    pub fn build(&self) -> DefineEntityIR {
-        DefineEntityIR {
+    /// Build the canonical [`DefineEntity`].
+    pub fn build(&self) -> DefineEntity {
+        DefineEntity {
             name: self.name.clone(),
             namespace: self.namespace.clone(),
             fields: self.fields.clone(),
@@ -285,9 +285,9 @@ impl<'a> AlterEntityBuilder<'a> {
 
     // -- Build / render --
 
-    /// Build the canonical [`AlterEntityIR`].
-    pub fn build(&self) -> AlterEntityIR {
-        AlterEntityIR {
+    /// Build the canonical [`AlterEntity`].
+    pub fn build(&self) -> AlterEntity {
+        AlterEntity {
             target: EntityRef {
                 name: self.model.name.to_string(),
                 namespace: self.model.namespace.map(|s| s.to_string()),
@@ -330,9 +330,9 @@ impl<'a> DropEntityBuilder<'a> {
         self
     }
 
-    /// Build the canonical [`DropEntityIR`].
-    pub fn build(&self) -> DropEntityIR {
-        DropEntityIR {
+    /// Build the canonical [`DropEntity`].
+    pub fn build(&self) -> DropEntity {
+        DropEntity {
             target: EntityRef {
                 name: self.model.name.to_string(),
                 namespace: self.model.namespace.map(|s| s.to_string()),
@@ -428,9 +428,9 @@ impl DefineIndexBuilder {
         self
     }
 
-    /// Build the canonical [`DefineIndexIR`].
-    pub fn build(&self) -> DefineIndexIR {
-        DefineIndexIR {
+    /// Build the canonical [`DefineIndex`].
+    pub fn build(&self) -> DefineIndex {
+        DefineIndex {
             name: self.name.clone(),
             target: EntityRef {
                 name: self.target_name.clone(),
@@ -486,9 +486,9 @@ impl DropIndexBuilder {
         self
     }
 
-    /// Build the canonical [`DropIndexIR`].
-    pub fn build(&self) -> DropIndexIR {
-        DropIndexIR {
+    /// Build the canonical [`DropIndex`].
+    pub fn build(&self) -> DropIndex {
+        DropIndex {
             name: self.name.clone(),
             if_exists: self.if_exists,
             concurrently: self.concurrently,
@@ -566,9 +566,9 @@ impl DefineTypeBuilder {
         self
     }
 
-    /// Build the canonical [`DefineTypeIR`].
-    pub fn build(&self) -> DefineTypeIR {
-        DefineTypeIR {
+    /// Build the canonical [`DefineType`].
+    pub fn build(&self) -> DefineType {
+        DefineType {
             name: self.name.clone(),
             namespace: self.namespace.clone(),
             variants: self.variants.clone(),
@@ -609,9 +609,9 @@ impl DropTypeBuilder {
         self
     }
 
-    /// Build the canonical [`DropTypeIR`].
-    pub fn build(&self) -> DropTypeIR {
-        DropTypeIR {
+    /// Build the canonical [`DropType`].
+    pub fn build(&self) -> DropType {
+        DropType {
             name: self.name.clone(),
             if_exists: self.if_exists,
         }

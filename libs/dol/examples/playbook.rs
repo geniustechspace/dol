@@ -38,7 +38,7 @@ use dol::builder::storage::{
 use dol::builder::transaction::TransactionBuilder;
 use dol::expr::window::FrameBound;
 use dol::expr::{Direction, Expr, bool_expr, case, field, float, func, int, param, raw_expr, string};
-use dol::ir::LockMode;
+use dol::op::LockMode;
 use dol::model::{DataType, Entity, EntityConstraint, Field, FkAction};
 
 // ============================================================================
@@ -948,7 +948,7 @@ fn main() {
     let sql = DefineIndexBuilder::new("idx_users_active_email")
         .on("users")
         .columns(&["email"])
-        .method(dol::ir::definition::IndexMethod::Hash)
+        .method(dol::op::definition::IndexMethod::Hash)
         .where_clause("status = 'active'")
         .render(Some(&pg))
         .unwrap();
@@ -1580,8 +1580,8 @@ fn main() {
 /// Separate function for migration examples (feature-gated).
 #[cfg(feature = "migration")]
 fn migration_examples() {
-    use dol::ir::definition::{DefineIndexIR, FieldDef};
-    use dol::ir::{AlterAction, EntityRef};
+    use dol::op::definition::{DefineIndex, FieldDef};
+    use dol::op::{AlterAction, EntityRef};
     use dol::migration::{
         InMemoryRegistry, Migration, MigrationDirection, MigrationRegistry, MigrationRunner,
         MigrationState, MigrationStep, MigrationTarget, RenderedStep,
@@ -1626,7 +1626,7 @@ fn migration_examples() {
             "Add unique index on users.email"
         }
         fn up(&self) -> Vec<MigrationStep> {
-            vec![MigrationStep::define_index(DefineIndexIR {
+            vec![MigrationStep::define_index(DefineIndex {
                 name: "idx_users_email".into(),
                 target: EntityRef {
                     name: "users".into(),
@@ -1838,7 +1838,7 @@ fn migration_examples() {
 /// Schema diff examples: comparing model versions and generating alter steps.
 #[cfg(feature = "migration")]
 fn schema_diff_examples() {
-    use dol::ir::AlterAction;
+    use dol::op::AlterAction;
     use dol::migration::schema_diff::{
         EntitySnapshot, create_entity_step, diff_entities, diff_to_steps, drop_entity_step,
         field_to_field_def,
@@ -1951,7 +1951,7 @@ fn schema_diff_examples() {
 /// Config-integrated migration examples.
 #[cfg(all(feature = "migration", feature = "config"))]
 fn config_migration_examples() {
-    use dol::ir::definition::FieldDef;
+    use dol::op::definition::FieldDef;
     use dol::migration::{
         InMemoryRegistry, Migration, MigrationRunner, MigrationStep, RenderedStep,
     };

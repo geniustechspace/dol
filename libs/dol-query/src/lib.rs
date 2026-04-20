@@ -58,7 +58,7 @@
 //!
 //! # Backend Neutrality
 //!
-//! `dol-query` produces backend-agnostic IR types (`QueryIR`, `InsertIR`, etc.)
+//! `dol-query` produces backend-agnostic IR types (`Query`, `Insert`, etc.)
 //! from `dol-ir`. These can be rendered by **any** backend — SQL, key-value,
 //! file system, API, or custom engines.
 

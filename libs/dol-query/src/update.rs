@@ -1,7 +1,7 @@
 //! UPDATE query builder for `dol-query`.
 
 use dol_core::expr::{Expr, field};
-use dol_core::ir::{EntityRef, UpdateIR};
+use dol_core::op::{EntityRef, Update};
 
 // ===========================================================================
 // UpdateQuery
@@ -85,9 +85,9 @@ impl UpdateQuery {
         self
     }
 
-    /// Build the canonical [`UpdateIR`].
-    pub fn build(self) -> UpdateIR<'static> {
-        UpdateIR {
+    /// Build the canonical [`Update`].
+    pub fn build(self) -> Update<'static> {
+        Update {
             target: EntityRef {
                 name: self.name,
                 namespace: self.namespace,

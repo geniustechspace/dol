@@ -24,7 +24,7 @@ use dol_core::expr::window::WindowFrame;
 use dol_core::expr::{
     Direction, Expr, FuncDef, Literal, OpDef, OrderByExpr, Quantifier, UnaryOp,
 };
-use dol_core::ir::Statement;
+use dol_core::op::Statement;
 use dol_core::types::DataType;
 
 /// A column definition for spreadsheet sheet creation.
@@ -87,7 +87,7 @@ pub enum SpreadsheetOp {
     },
 }
 
-use dol_core::ir::BackendError;
+use dol_core::op::BackendError;
 
 /// Backend that renders DOL IR statements into [`SpreadsheetOutput`] descriptors.
 ///
@@ -200,7 +200,7 @@ impl SpreadsheetBackend {
             Statement::AlterEntity(ir) => {
                 // Only a single rename action is supported in spreadsheets.
                 match ir.actions.as_slice() {
-                    [dol_core::ir::AlterAction::RenameEntity(new_name)] => {
+                    [dol_core::op::AlterAction::RenameEntity(new_name)] => {
                         let sheet = qualified_name(&ir.target.namespace, &ir.target.name);
 
                         Ok(SpreadsheetOutput {
@@ -340,8 +340,8 @@ impl SpreadsheetBackend {
                     .collect::<Result<Vec<_>, BackendError>>()?;
 
                 let limit = match &ir.limit {
-                    Some(dol_core::ir::OffsetLimit::Value(v)) => Some(*v),
-                    Some(dol_core::ir::OffsetLimit::Param) => {
+                    Some(dol_core::op::OffsetLimit::Value(v)) => Some(*v),
+                    Some(dol_core::op::OffsetLimit::Param) => {
                         // Reject parameterized LIMIT here explicitly, matching
                         // the OFFSET handling below.
                         return Err(BackendError::Unsupported(
@@ -352,8 +352,8 @@ impl SpreadsheetBackend {
                 };
 
                 let offset = match &ir.offset {
-                    Some(dol_core::ir::OffsetLimit::Value(v)) => Some(*v),
-                    Some(dol_core::ir::OffsetLimit::Param) => {
+                    Some(dol_core::op::OffsetLimit::Value(v)) => Some(*v),
+                    Some(dol_core::op::OffsetLimit::Param) => {
                         return Err(BackendError::Unsupported(
                             "SpreadsheetBackend does not support parameterized OFFSET".into(),
                         ));

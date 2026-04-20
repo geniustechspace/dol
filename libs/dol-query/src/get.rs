@@ -4,7 +4,7 @@
 //! instead of requiring a static `&Entity` reference.
 
 use dol_core::expr::{Direction, Expr, NullsPosition, OrderByExpr, field};
-use dol_core::ir::{EntityRef, JoinIR, JoinType, LockMode, OffsetLimit, QueryIR};
+use dol_core::op::{EntityRef, Join, JoinKind, LockMode, OffsetLimit, Query};
 
 // ---------------------------------------------------------------------------
 // Private join helper
@@ -12,7 +12,7 @@ use dol_core::ir::{EntityRef, JoinIR, JoinType, LockMode, OffsetLimit, QueryIR};
 
 #[derive(Debug, Clone)]
 struct JoinClause {
-    join_type: JoinType,
+    join_type: JoinKind,
     target_name: String,
     target_namespace: Option<String>,
     alias: Option<String>,
@@ -109,7 +109,7 @@ impl GetQuery {
     /// Add a JOIN of the specified type on another entity by name.
     pub fn join(
         mut self,
-        join_type: JoinType,
+        join_type: JoinKind,
         target: &str,
         on_conditions: &[(&str, &str)],
     ) -> Self {
@@ -130,7 +130,7 @@ impl GetQuery {
     /// Add a JOIN with an explicit alias for the target table.
     pub fn join_aliased(
         mut self,
-        join_type: JoinType,
+        join_type: JoinKind,
         target: &str,
         alias: &str,
         on_conditions: &[(&str, &str)],
@@ -151,22 +151,22 @@ impl GetQuery {
 
     /// Shorthand for `INNER JOIN`.
     pub fn inner_join(self, target: &str, on_conditions: &[(&str, &str)]) -> Self {
-        self.join(JoinType::Inner, target, on_conditions)
+        self.join(JoinKind::Inner, target, on_conditions)
     }
 
     /// Shorthand for `LEFT JOIN`.
     pub fn left_join(self, target: &str, on_conditions: &[(&str, &str)]) -> Self {
-        self.join(JoinType::Left, target, on_conditions)
+        self.join(JoinKind::Left, target, on_conditions)
     }
 
     /// Shorthand for `RIGHT JOIN`.
     pub fn right_join(self, target: &str, on_conditions: &[(&str, &str)]) -> Self {
-        self.join(JoinType::Right, target, on_conditions)
+        self.join(JoinKind::Right, target, on_conditions)
     }
 
     /// Shorthand for `FULL OUTER JOIN`.
     pub fn full_join(self, target: &str, on_conditions: &[(&str, &str)]) -> Self {
-        self.join(JoinType::Full, target, on_conditions)
+        self.join(JoinKind::Full, target, on_conditions)
     }
 
     // ── Filter methods ──────────────────────────────────────────────────
@@ -294,11 +294,11 @@ impl GetQuery {
 
     // ── Build to IR ─────────────────────────────────────────────────────
 
-    /// Consume the builder and produce a [`QueryIR`].
+    /// Consume the builder and produce a [`Query`].
     ///
     /// When no projections have been set and Entity field metadata is
     /// available, all entity fields are selected by default.
-    pub fn build(self) -> QueryIR<'static> {
+    pub fn build(self) -> Query<'static> {
         let source = EntityRef {
             name: self.name,
             namespace: self.namespace,
@@ -308,7 +308,7 @@ impl GetQuery {
         let joins = self
             .joins
             .into_iter()
-            .map(|jc| JoinIR {
+            .map(|jc| Join {
                 join_type: jc.join_type,
                 target: EntityRef {
                     name: jc.target_name,
@@ -343,7 +343,7 @@ impl GetQuery {
             self.projections
         };
 
-        QueryIR {
+        Query {
             source,
             projections,
             joins,

@@ -1,7 +1,7 @@
 use super::*;
 use dol_entity::DefineEntityBuilder;
-use dol_core::ir::EntityRef;
-use dol_core::ir::definition::{DefineIndexIR, FieldDef};
+use dol_core::op::EntityRef;
+use dol_core::op::definition::{DefineIndex, FieldDef};
 use dol_entity::DataType;
 
 /// Test migration: Create users table.
@@ -41,7 +41,7 @@ impl Migration for AddEmailIndex {
         "Add unique index on users.email"
     }
     fn up(&self) -> Vec<MigrationStep> {
-        vec![MigrationStep::define_index(DefineIndexIR {
+        vec![MigrationStep::define_index(DefineIndex {
             name: "idx_users_email".to_string(),
             target: EntityRef {
                 name: "users".to_string(),

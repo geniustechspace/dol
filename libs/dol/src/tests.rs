@@ -13,7 +13,7 @@ use crate::builder::transaction::TransactionBuilder;
 use crate::expr::func;
 use crate::expr::window::FrameBound;
 use crate::expr::{Direction, Expr, NullsPosition, bool_expr, case, field, float, int, param, raw_expr, string};
-use crate::ir::LockMode;
+use crate::op::LockMode;
 use crate::model::{DataType, Entity, EntityConstraint, Field, FkAction};
 
 fn pg() -> Dialect {
@@ -2438,7 +2438,7 @@ fn expr_array_literal() {
 
 #[test]
 fn define_model_via_static_method() {
-    use crate::ir::definition::FieldDef;
+    use crate::op::definition::FieldDef;
 
     let ir = Entity::define("users")
         .field(FieldDef::new("id", DataType::Uuid).primary_key())

@@ -31,8 +31,8 @@
 //! assert_eq!(steps.len(), 1);
 //! ```
 
-use dol_core::ir::AlterAction;
-use dol_core::ir::definition::{FieldDef, OwnedForeignKeyRef};
+use dol_core::op::AlterAction;
+use dol_core::op::definition::{FieldDef, OwnedForeignKeyRef};
 use dol_entity::{Entity, Field, DataType};
 
 use super::MigrationStep;

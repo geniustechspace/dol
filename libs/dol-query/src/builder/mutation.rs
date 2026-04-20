@@ -7,7 +7,7 @@
 
 use dol_entity::Entity;
 use dol_core::expr::{Expr, field, raw_expr};
-use dol_core::ir::{EntityRef, InsertIR, InsertSelectIR, RemoveIR, UpdateIR, UpsertIR};
+use dol_core::op::{EntityRef, Insert, InsertSelect, Remove, Update, Upsert};
 
 use super::query::count_single_expr_params;
 
@@ -82,11 +82,11 @@ impl<'a> InsertBuilder<'a> {
         field_count * self.row_count
     }
 
-    /// Build the canonical [`InsertIR`].
+    /// Build the canonical [`Insert`].
     ///
     /// When no fields have been set (via `.fields()`), all entity fields
     /// are included by default.
-    pub fn build(self) -> InsertIR {
+    pub fn build(self) -> Insert {
         // Default: include all entity fields when none were specified.
         let fields = if self.fields.is_empty() {
             self.model.field_names().map(|s| s.to_string()).collect()
@@ -94,7 +94,7 @@ impl<'a> InsertBuilder<'a> {
             self.fields
         };
 
-        InsertIR {
+        Insert {
             target: entity_ref(self.model),
             fields,
             row_count: self.row_count,
@@ -151,9 +151,9 @@ impl<'a> InsertSelectBuilder<'a> {
         self
     }
 
-    /// Build the canonical [`InsertSelectIR`].
-    pub fn build(self) -> InsertSelectIR {
-        InsertSelectIR {
+    /// Build the canonical [`InsertSelect`].
+    pub fn build(self) -> InsertSelect {
+        InsertSelect {
             target: entity_ref(self.model),
             fields: self.fields,
             source_query: self.source_query,
@@ -253,9 +253,9 @@ impl<'a> UpdateBuilder<'a> {
         set_params + filter_params
     }
 
-    /// Build the canonical [`UpdateIR`].
-    pub fn build(self) -> UpdateIR<'static> {
-        UpdateIR {
+    /// Build the canonical [`Update`].
+    pub fn build(self) -> Update<'static> {
+        Update {
             target: entity_ref(self.model),
             assignments: self.assignments,
             filters: self.filters,
@@ -311,9 +311,9 @@ impl<'a> RemoveBuilder<'a> {
         self.filters.iter().map(count_single_expr_params).sum()
     }
 
-    /// Build the canonical [`RemoveIR`].
-    pub fn build(self) -> RemoveIR<'static> {
-        RemoveIR {
+    /// Build the canonical [`Remove`].
+    pub fn build(self) -> Remove<'static> {
+        Remove {
             target: entity_ref(self.model),
             filters: self.filters,
             returning: self.returning,
@@ -422,11 +422,11 @@ impl<'a> UpsertBuilder<'a> {
         insert_params + conflict_params
     }
 
-    /// Build the canonical [`UpsertIR`].
+    /// Build the canonical [`Upsert`].
     ///
     /// When no fields have been set (via `.fields()`), all entity fields
     /// are included by default.
-    pub fn build(self) -> UpsertIR<'static> {
+    pub fn build(self) -> Upsert<'static> {
         // Default: include all entity fields when none were specified.
         let fields = if self.fields.is_empty() {
             self.model.field_names().map(|s| s.to_string()).collect()
@@ -434,7 +434,7 @@ impl<'a> UpsertBuilder<'a> {
             self.fields
         };
 
-        UpsertIR {
+        Upsert {
             target: entity_ref(self.model),
             fields,
             conflict_fields: self.conflict_fields,

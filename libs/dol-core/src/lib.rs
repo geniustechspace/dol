@@ -9,7 +9,6 @@
 //! - **`types`** — `DataType` descriptors, `Value`/`Literal` data carriers
 //! - **`expr`** — Composable, backend-agnostic expression AST
 //! - **`op`** — Statement enum, all operation types, Backend trait, output types
-//! - **`ir`** — Backward-compatibility re-exports from `op`
 //! - **`constraint`** — Constraint types shared between entity definitions and operations
 
 #![deny(unsafe_code)]
@@ -17,7 +16,6 @@
 pub mod types;
 pub mod expr;
 pub mod op;
-pub mod ir;
 pub mod constraint;
 
 // ── Top-level convenience re-exports ──

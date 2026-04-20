@@ -81,8 +81,8 @@ pub use dol_core::expr;
 /// Schema language — Entity, Field, DataType, and constraints.
 pub use dol_entity as model;
 
-/// Intermediate representation — backend-agnostic AST.
-pub use dol_core::ir;
+/// Backend-agnostic AST — operations, statements, and error types.
+pub use dol_core::op;
 
 /// Builder API — composable method-chain builders that produce IR.
 pub mod builder {
@@ -131,8 +131,8 @@ pub use dol_config as config;
 
 // ── Top-level re-exports for ergonomic use ──
 
-pub use dol_core::ir::definition::FieldDef;
-pub use dol_core::ir::definition::OwnedEntityConstraint;
+pub use dol_core::op::definition::FieldDef;
+pub use dol_core::op::definition::OwnedEntityConstraint;
 pub use dol_core::constraint::{EntityConstraint, FkAction, ForeignKeyRef, GeneratedKind};
 pub use dol_entity::{Entity, Field, DataType};
 pub use dol_sql::dialect::Dialect;
