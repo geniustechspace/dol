@@ -22,6 +22,7 @@
 //! let expr = field("age").gt(int(18i32)) & field("status").eq(string("active"));
 //! ```
 
+pub mod compiler;
 pub mod func;
 pub mod func_def;
 pub mod func_registry;
@@ -38,6 +39,7 @@ pub use func_def::{
 };
 pub use order::{Direction, NullsPosition, OrderByExpr};
 pub use window::{CaseBuilder, FrameBound, FrameKind, WindowBuilder, WindowFrame};
+pub use compiler::{ExprRenderer, compile_expr, MAX_EXPR_DEPTH};
 
 use std::ops as std_ops;
 
