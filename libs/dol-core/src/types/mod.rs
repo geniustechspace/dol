@@ -45,24 +45,24 @@
 //!
 //! These are enforced by tests in [`value`] and must not regress.
 
-pub mod error;
-pub mod datetime;
-pub mod network;
-pub mod geo;
-pub mod numeric;
 pub mod binary;
+pub mod datetime;
 pub mod descriptor;
+pub mod error;
+pub mod geo;
+pub mod network;
+pub mod numeric;
 pub mod value;
 
 // ─── Re-exports ───────────────────────────────────────────────────────────────
 
 pub use error::TypeError;
 
-pub use datetime::{Date, DateTime, Interval, Offset, Time, TimestampTz};
-pub use network::{IpAddr, MacAddr, MacAddr8};
-pub use geo::{Circle, Line, Path, Point, Polygon, Rect, Segment};
-pub use numeric::Decimal;
 pub use binary::BitString;
+pub use datetime::{Date, DateTime, Interval, Offset, Time, TimestampTz};
+pub use geo::{Circle, Line, Path, Point, Polygon, Rect, Segment};
+pub use network::{IpAddr, MacAddr, MacAddr8};
+pub use numeric::Decimal;
 
 pub use descriptor::{DataType, StructField};
 

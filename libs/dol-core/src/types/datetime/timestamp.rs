@@ -1,5 +1,5 @@
+use super::{super::error::TypeError, DateTime};
 use core::fmt;
-use super::{DateTime, super::error::TypeError};
 
 /// A fixed UTC offset in whole seconds. Valid range: `−86_399..=86_399`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -20,13 +20,19 @@ impl Offset {
         Self::try_from_seconds((sign as i32) * ((h as i32) * 3600 + (m as i32) * 60))
     }
 
-    pub const fn new_unchecked(seconds: i32) -> Self { Self(seconds) }
-    pub const fn as_seconds(self) -> i32 { self.0 }
+    pub const fn new_unchecked(seconds: i32) -> Self {
+        Self(seconds)
+    }
+    pub const fn as_seconds(self) -> i32 {
+        self.0
+    }
 }
 
 impl fmt::Display for Offset {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.0 == 0 { return f.write_str("Z"); }
+        if self.0 == 0 {
+            return f.write_str("Z");
+        }
         let sign = if self.0 < 0 { '-' } else { '+' };
         let abs = self.0.unsigned_abs();
         write!(f, "{sign}{:02}:{:02}", abs / 3600, (abs % 3600) / 60)
@@ -47,7 +53,10 @@ impl TimestampTz {
     }
 
     pub const fn utc(datetime: DateTime) -> Self {
-        Self { datetime, offset: Offset::UTC }
+        Self {
+            datetime,
+            offset: Offset::UTC,
+        }
     }
 }
 

@@ -17,7 +17,6 @@ use core::fmt;
 #[non_exhaustive]
 pub enum TypeError {
     // ── Value construction ────────────────────────────────────────────────
-
     /// Month must be `1–12`.
     InvalidMonth(u8),
     /// Day must be `1–31`.
@@ -44,7 +43,6 @@ pub enum TypeError {
     NonFiniteCoordinate,
 
     // ── Type conformance ──────────────────────────────────────────────────
-
     /// A `null` value was provided for a non-nullable field.
     NullNotAllowed,
 
@@ -76,16 +74,25 @@ pub enum TypeError {
     TupleLengthMismatch { expected: usize, got: usize },
 
     /// An element of an `Array`, `Set`, or `Tuple` failed validation.
-    ElementInvalid { index: usize, source: Box<TypeError> },
+    ElementInvalid {
+        index: usize,
+        source: Box<TypeError>,
+    },
 
     /// A value for a `Map` key failed validation.
-    MapValueInvalid { key: Box<str>, source: Box<TypeError> },
+    MapValueInvalid {
+        key: Box<str>,
+        source: Box<TypeError>,
+    },
 
     /// A required `Struct` field was absent from the value.
     StructFieldMissing(Box<str>),
 
     /// A `Struct` field's value failed validation against its declared type.
-    StructFieldInvalid { field: Box<str>, source: Box<TypeError> },
+    StructFieldInvalid {
+        field: Box<str>,
+        source: Box<TypeError>,
+    },
 
     /// A `Struct` value contained a field not declared in the type.
     StructUnexpectedField(Box<str>),
@@ -101,54 +108,78 @@ impl fmt::Display for TypeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             // Construction
-            Self::InvalidMonth(m)    => write!(f, "invalid month {m}: must be 1–12"),
-            Self::InvalidDay(d)      => write!(f, "invalid day {d}: must be 1–31"),
-            Self::InvalidHour(h)     => write!(f, "invalid hour {h}: must be 0–23"),
-            Self::InvalidMinute(m)   => write!(f, "invalid minute {m}: must be 0–59"),
-            Self::InvalidSecond(s)   => write!(f, "invalid second {s}: must be 0–60"),
-            Self::InvalidNanosecond(n) => write!(f, "invalid nanosecond {n}: must be 0–999_999_999"),
-            Self::TimezoneOffsetOutOfRange(o) =>
-                write!(f, "timezone offset {o}s out of ±86_399 range"),
-            Self::DecimalScaleTooLarge { scale } =>
-                write!(f, "decimal scale {scale} exceeds maximum {}", super::Decimal::MAX_SCALE),
-            Self::NonFiniteFloat  => write!(f, "float value must be finite (not NaN or infinite)"),
-            Self::BitLengthMismatch { declared, byte_count } =>
-                write!(f, "bit-string declared {declared} bits but buffer has {byte_count} bytes (need {})", declared.div_ceil(8)),
+            Self::InvalidMonth(m) => write!(f, "invalid month {m}: must be 1–12"),
+            Self::InvalidDay(d) => write!(f, "invalid day {d}: must be 1–31"),
+            Self::InvalidHour(h) => write!(f, "invalid hour {h}: must be 0–23"),
+            Self::InvalidMinute(m) => write!(f, "invalid minute {m}: must be 0–59"),
+            Self::InvalidSecond(s) => write!(f, "invalid second {s}: must be 0–60"),
+            Self::InvalidNanosecond(n) => {
+                write!(f, "invalid nanosecond {n}: must be 0–999_999_999")
+            }
+            Self::TimezoneOffsetOutOfRange(o) => {
+                write!(f, "timezone offset {o}s out of ±86_399 range")
+            }
+            Self::DecimalScaleTooLarge { scale } => write!(
+                f,
+                "decimal scale {scale} exceeds maximum {}",
+                super::Decimal::MAX_SCALE
+            ),
+            Self::NonFiniteFloat => write!(f, "float value must be finite (not NaN or infinite)"),
+            Self::BitLengthMismatch {
+                declared,
+                byte_count,
+            } => write!(
+                f,
+                "bit-string declared {declared} bits but buffer has {byte_count} bytes (need {})",
+                declared.div_ceil(8)
+            ),
             Self::NonFiniteCoordinate => write!(f, "geometric coordinate must be finite"),
 
             // Conformance
-            Self::NullNotAllowed =>
-                write!(f, "null value is not allowed for a non-nullable type"),
-            Self::KindMismatch { expected, got } =>
-                write!(f, "type mismatch: expected {expected}, got {got}"),
-            Self::StringTooLong { max, got } =>
-                write!(f, "string length {got} exceeds maximum {max}"),
-            Self::BytesTooLong { max, got } =>
-                write!(f, "byte length {got} exceeds maximum {max}"),
-            Self::BitsTooLong { max, got } =>
-                write!(f, "bit-string length {got} exceeds maximum {max}"),
-            Self::BitsLengthMismatch { expected, got } =>
-                write!(f, "bit-string length {got} does not match declared {expected}"),
-            Self::PrecisionExceeded { max, got } =>
-                write!(f, "decimal has {got} significant digits but type allows {max}"),
-            Self::ScaleExceeded { max, got } =>
-                write!(f, "decimal scale {got} exceeds declared {max}"),
-            Self::TupleLengthMismatch { expected, got } =>
-                write!(f, "tuple has {got} elements but type expects {expected}"),
-            Self::ElementInvalid { index, source } =>
-                write!(f, "element at index {index} is invalid: {source}"),
-            Self::MapValueInvalid { key, source } =>
-                write!(f, "map value for key \"{key}\" is invalid: {source}"),
-            Self::StructFieldMissing(field) =>
-                write!(f, "required struct field \"{field}\" is missing"),
-            Self::StructFieldInvalid { field, source } =>
-                write!(f, "struct field \"{field}\" is invalid: {source}"),
-            Self::StructUnexpectedField(field) =>
-                write!(f, "struct contains undeclared field \"{field}\""),
-            Self::EnumVariantUnknown { variant } =>
-                write!(f, "enum variant \"{variant}\" is not declared in the type"),
-            Self::RangeBoundsMismatch =>
-                write!(f, "range bounds have incompatible kinds"),
+            Self::NullNotAllowed => write!(f, "null value is not allowed for a non-nullable type"),
+            Self::KindMismatch { expected, got } => {
+                write!(f, "type mismatch: expected {expected}, got {got}")
+            }
+            Self::StringTooLong { max, got } => {
+                write!(f, "string length {got} exceeds maximum {max}")
+            }
+            Self::BytesTooLong { max, got } => write!(f, "byte length {got} exceeds maximum {max}"),
+            Self::BitsTooLong { max, got } => {
+                write!(f, "bit-string length {got} exceeds maximum {max}")
+            }
+            Self::BitsLengthMismatch { expected, got } => write!(
+                f,
+                "bit-string length {got} does not match declared {expected}"
+            ),
+            Self::PrecisionExceeded { max, got } => write!(
+                f,
+                "decimal has {got} significant digits but type allows {max}"
+            ),
+            Self::ScaleExceeded { max, got } => {
+                write!(f, "decimal scale {got} exceeds declared {max}")
+            }
+            Self::TupleLengthMismatch { expected, got } => {
+                write!(f, "tuple has {got} elements but type expects {expected}")
+            }
+            Self::ElementInvalid { index, source } => {
+                write!(f, "element at index {index} is invalid: {source}")
+            }
+            Self::MapValueInvalid { key, source } => {
+                write!(f, "map value for key \"{key}\" is invalid: {source}")
+            }
+            Self::StructFieldMissing(field) => {
+                write!(f, "required struct field \"{field}\" is missing")
+            }
+            Self::StructFieldInvalid { field, source } => {
+                write!(f, "struct field \"{field}\" is invalid: {source}")
+            }
+            Self::StructUnexpectedField(field) => {
+                write!(f, "struct contains undeclared field \"{field}\"")
+            }
+            Self::EnumVariantUnknown { variant } => {
+                write!(f, "enum variant \"{variant}\" is not declared in the type")
+            }
+            Self::RangeBoundsMismatch => write!(f, "range bounds have incompatible kinds"),
         }
     }
 }

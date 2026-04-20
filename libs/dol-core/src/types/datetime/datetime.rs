@@ -1,5 +1,5 @@
-use core::fmt;
 use super::{Date, Time};
+use core::fmt;
 
 /// Naive datetime: date + time, no timezone.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

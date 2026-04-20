@@ -7,10 +7,8 @@
 //!
 //! Backends implement [`ExprRenderer`] to produce their output format.
 
-use super::{
-    Expr, FuncDef, Literal, OpDef, OrderByExpr, Quantifier, UnaryOp,
-};
 use super::window::{FrameBound, FrameKind, WindowFrame};
+use super::{Expr, FuncDef, Literal, OpDef, OrderByExpr, Quantifier, UnaryOp};
 use crate::op::BackendError;
 use crate::types::DataType;
 
@@ -43,7 +41,11 @@ pub trait ExprRenderer {
     /// Render a qualified identifier: `scope.name`.
     ///
     /// Default: `scope.name`.
-    fn render_qualified_identifier(&mut self, scope: &str, name: &str) -> Result<String, BackendError> {
+    fn render_qualified_identifier(
+        &mut self,
+        scope: &str,
+        name: &str,
+    ) -> Result<String, BackendError> {
         Ok(format!("{}.{}", scope, name))
     }
 
@@ -104,7 +106,11 @@ pub trait ExprRenderer {
     ///
     /// Default: `NAME(arg1, arg2, …)`. No-parens keywords
     /// (e.g. `CURRENT_DATE`) are emitted without parentheses.
-    fn render_func(&mut self, def: &FuncDef, rendered_args: &[String]) -> Result<String, BackendError> {
+    fn render_func(
+        &mut self,
+        def: &FuncDef,
+        rendered_args: &[String],
+    ) -> Result<String, BackendError> {
         if def.is_no_parens_keyword() && rendered_args.is_empty() {
             Ok(def.name().to_owned())
         } else {
@@ -207,7 +213,8 @@ pub trait ExprRenderer {
     /// Render an object literal: `{ key: value, ... }`.
     ///
     /// **Required** — representation is highly backend-specific.
-    fn render_object_literal(&mut self, pairs: &[(String, String)]) -> Result<String, BackendError>;
+    fn render_object_literal(&mut self, pairs: &[(String, String)])
+    -> Result<String, BackendError>;
 
     /// Render an array literal: `[elem, ...]`.
     ///
@@ -269,7 +276,11 @@ pub trait ExprRenderer {
     /// Render an ORDER BY expression (used within window functions).
     ///
     /// Default: `expr ASC/DESC`.
-    fn render_order_by_expr(&mut self, expr: &OrderByExpr<'_>, depth: usize) -> Result<String, BackendError> {
+    fn render_order_by_expr(
+        &mut self,
+        expr: &OrderByExpr<'_>,
+        depth: usize,
+    ) -> Result<String, BackendError> {
         let rendered = compile_expr(self, &expr.expr, depth)?;
         let dir = match expr.direction {
             super::Direction::Asc => "ASC",
@@ -313,7 +324,12 @@ pub fn compile_expr<R: ExprRenderer + ?Sized>(
 
         Expr::Value(lit) => renderer.render_literal(lit),
 
-        Expr::BinaryOp { left, op, right, negated } => {
+        Expr::BinaryOp {
+            left,
+            op,
+            right,
+            negated,
+        } => {
             let lhs = compile_expr(renderer, left, next)?;
             let rhs = compile_expr(renderer, right, next)?;
             renderer.render_binary_op(&lhs, op, &rhs, *negated)
@@ -324,7 +340,12 @@ pub fn compile_expr<R: ExprRenderer + ?Sized>(
             renderer.render_unary_op(*op, &inner_str)
         }
 
-        Expr::QuantifiedCmp { expr: inner, op, quantifier, subquery } => {
+        Expr::QuantifiedCmp {
+            expr: inner,
+            op,
+            quantifier,
+            subquery,
+        } => {
             let lhs = compile_expr(renderer, inner, next)?;
             renderer.render_quantified_cmp(&lhs, op, *quantifier, subquery)
         }
@@ -341,7 +362,10 @@ pub fn compile_expr<R: ExprRenderer + ?Sized>(
             renderer.render_func(name, &rendered_args)
         }
 
-        Expr::Cast { expr: inner, as_type } => {
+        Expr::Cast {
+            expr: inner,
+            as_type,
+        } => {
             let inner_str = compile_expr(renderer, inner, next)?;
             renderer.render_cast(&inner_str, as_type)
         }
@@ -364,7 +388,11 @@ pub fn compile_expr<R: ExprRenderer + ?Sized>(
 
         Expr::Subquery(sql) => renderer.render_subquery(sql),
 
-        Expr::InList { expr: inner, list, negated } => {
+        Expr::InList {
+            expr: inner,
+            list,
+            negated,
+        } => {
             let lhs = compile_expr(renderer, inner, next)?;
             let items: Vec<String> = list
                 .iter()
@@ -373,23 +401,33 @@ pub fn compile_expr<R: ExprRenderer + ?Sized>(
             renderer.render_in_list(&lhs, &items, *negated)
         }
 
-        Expr::InSubquery { expr: inner, subquery, negated } => {
+        Expr::InSubquery {
+            expr: inner,
+            subquery,
+            negated,
+        } => {
             let lhs = compile_expr(renderer, inner, next)?;
             renderer.render_in_subquery(&lhs, subquery, *negated)
         }
 
-        Expr::Between { expr: inner, low, high, negated } => {
+        Expr::Between {
+            expr: inner,
+            low,
+            high,
+            negated,
+        } => {
             let lhs = compile_expr(renderer, inner, next)?;
             let low_str = compile_expr(renderer, low, next)?;
             let high_str = compile_expr(renderer, high, next)?;
             renderer.render_between(&lhs, &low_str, &high_str, *negated)
         }
 
-        Expr::Exists { subquery, negated } => {
-            renderer.render_exists(subquery, *negated)
-        }
+        Expr::Exists { subquery, negated } => renderer.render_exists(subquery, *negated),
 
-        Expr::IsNull { expr: inner, negated } => {
+        Expr::IsNull {
+            expr: inner,
+            negated,
+        } => {
             let inner_str = compile_expr(renderer, inner, next)?;
             renderer.render_is_null(&inner_str, *negated)
         }
@@ -424,7 +462,12 @@ pub fn compile_expr<R: ExprRenderer + ?Sized>(
 
         Expr::CountStar => renderer.render_count_star(),
 
-        Expr::Window { func, partition_by, order_by, frame } => {
+        Expr::Window {
+            func,
+            partition_by,
+            order_by,
+            frame,
+        } => {
             let func_str = compile_expr(renderer, func, next)?;
             let part_strs: Vec<String> = partition_by
                 .iter()

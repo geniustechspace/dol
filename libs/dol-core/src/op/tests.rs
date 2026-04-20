@@ -1,8 +1,7 @@
-use super::*;
 use super::control::{DefinePolicy, Grant, PolicyAction, Privilege, Revoke};
 use super::definition::{
-    AlterAction, AlterEntity, DefineEntity, DefineIndex, DefineType, DropEntity,
-    DropIndex, DropType, FieldDef, IndexMethod, OwnedForeignKeyRef,
+    AlterAction, AlterEntity, DefineEntity, DefineIndex, DefineType, DropEntity, DropIndex,
+    DropType, FieldDef, IndexMethod, OwnedForeignKeyRef,
 };
 use super::mutation::{Insert, InsertSelect, Remove, Update, Upsert};
 use super::query::{CompoundQuery, Join, JoinKind, LockMode, OffsetLimit, Query, SetOp};
@@ -10,8 +9,9 @@ use super::storage::{
     GetObject, ListObjects, MoveFile, ObjectSource, PutObject, ReadFile, WriteFile,
 };
 use super::transaction::Transaction;
-use crate::types::DataType;
+use super::*;
 use crate::constraint::FkAction;
+use crate::types::DataType;
 
 // -- helpers --
 
@@ -616,7 +616,8 @@ fn alter_action_drop_field_not_null() {
 
 #[test]
 fn alter_action_add_constraint() {
-    let action = AlterAction::AddConstraint(crate::constraint::EntityConstraint::Check("age > 0").into());
+    let action =
+        AlterAction::AddConstraint(crate::constraint::EntityConstraint::Check("age > 0").into());
     assert!(matches!(action, AlterAction::AddConstraint(_)));
 }
 
@@ -871,7 +872,13 @@ fn define_model_ir_with_fields() {
         fields: vec![
             FieldDef::new("id", DataType::Uuid).primary_key(),
             FieldDef::new("name", DataType::Text),
-            FieldDef::new("price", DataType::Decimal { precision: None, scale: None }),
+            FieldDef::new(
+                "price",
+                DataType::Decimal {
+                    precision: None,
+                    scale: None,
+                },
+            ),
         ],
         constraints: vec![],
         if_not_exists: true,

@@ -21,18 +21,18 @@
 pub mod date;
 #[allow(clippy::module_inception)]
 pub mod datetime;
-pub mod timestamp;
 pub mod interval;
 pub mod time;
+pub mod timestamp;
 
 pub use date::Date;
-pub use time::Time;
 pub use datetime::DateTime;
-pub use timestamp::{Offset, TimestampTz};
 pub use interval::Interval;
+pub use time::Time;
+pub use timestamp::{Offset, TimestampTz};
 
-use super::value::Value;
 use super::error::TypeError;
+use super::value::Value;
 
 // ─── Factory functions ────────────────────────────────────────────────────────
 
@@ -55,7 +55,7 @@ pub fn now_tz() -> Value {
     let (year, month, day, hour, minute, second, nano) = utc_datetime_parts();
     let date = Date::new_unchecked(year, month, day);
     let time = Time::new_unchecked(hour, minute, second, nano);
-    let dt   = DateTime::new(date, time);
+    let dt = DateTime::new(date, time);
     Value::TimestampTz(TimestampTz::utc(dt))
 }
 
@@ -126,7 +126,7 @@ fn utc_datetime_parts() -> (i32, u8, u8, u8, u8, u8, u32) {
     let secs_of_day = (total_secs % 86_400) as u32;
     let days = total_secs / 86_400;
     let (year, month, day) = days_to_ymd(days);
-    let hour   = (secs_of_day / 3600) as u8;
+    let hour = (secs_of_day / 3600) as u8;
     let minute = ((secs_of_day % 3600) / 60) as u8;
     let second = (secs_of_day % 60) as u8;
     (year, month, day, hour, minute, second, nanosecond)

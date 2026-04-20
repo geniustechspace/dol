@@ -1,5 +1,5 @@
+use super::{super::error::TypeError, Point};
 use core::fmt;
-use super::{Point, super::error::TypeError};
 
 /// An infinite 2D line defined by `ax + by + c = 0`.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -18,7 +18,9 @@ impl Line {
         Ok(Self { a, b, c })
     }
 
-    pub const fn new_unchecked(a: f64, b: f64, c: f64) -> Self { Self { a, b, c } }
+    pub const fn new_unchecked(a: f64, b: f64, c: f64) -> Self {
+        Self { a, b, c }
+    }
 }
 
 impl fmt::Display for Line {
@@ -36,7 +38,9 @@ pub struct Segment {
 }
 
 impl Segment {
-    pub const fn new(start: Point, end: Point) -> Self { Self { start, end } }
+    pub const fn new(start: Point, end: Point) -> Self {
+        Self { start, end }
+    }
 }
 
 impl fmt::Display for Segment {

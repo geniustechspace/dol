@@ -57,7 +57,10 @@ fn test_float_f32() {
 #[test]
 fn test_bool() {
     assert!(matches!(bool_expr(true), Expr::Value(Literal::Bool(true))));
-    assert!(matches!(bool_expr(false), Expr::Value(Literal::Bool(false))));
+    assert!(matches!(
+        bool_expr(false),
+        Expr::Value(Literal::Bool(false))
+    ));
 }
 
 #[test]
@@ -303,7 +306,13 @@ fn test_bitor_or() {
 #[test]
 fn test_not() {
     let e = !field("active");
-    assert!(matches!(e, Expr::UnaryOp { op: UnaryOp::Not, .. }));
+    assert!(matches!(
+        e,
+        Expr::UnaryOp {
+            op: UnaryOp::Not,
+            ..
+        }
+    ));
 }
 
 #[test]
@@ -339,7 +348,13 @@ fn test_rem() {
 #[test]
 fn test_neg() {
     let e = -field("a");
-    assert!(matches!(e, Expr::UnaryOp { op: UnaryOp::Neg, .. }));
+    assert!(matches!(
+        e,
+        Expr::UnaryOp {
+            op: UnaryOp::Neg,
+            ..
+        }
+    ));
 }
 
 // ── 12. From impls ──
@@ -415,7 +430,9 @@ fn test_float_variants() {
 #[test]
 fn test_func_count() {
     let e = func::count(field("id"));
-    assert!(matches!(e, Expr::Func { ref name, ref args } if name.name() == FuncDef::COUNT && args.len() == 1));
+    assert!(
+        matches!(e, Expr::Func { ref name, ref args } if name.name() == FuncDef::COUNT && args.len() == 1)
+    );
 }
 
 #[test]
@@ -426,25 +443,33 @@ fn test_func_count_star() {
 #[test]
 fn test_func_sum() {
     let e = func::sum(field("amount"));
-    assert!(matches!(e, Expr::Func { ref name, ref args } if name.name() == FuncDef::SUM && args.len() == 1));
+    assert!(
+        matches!(e, Expr::Func { ref name, ref args } if name.name() == FuncDef::SUM && args.len() == 1)
+    );
 }
 
 #[test]
 fn test_func_lower() {
     let e = func::lower(field("email"));
-    assert!(matches!(e, Expr::Func { ref name, ref args } if name.name() == FuncDef::LOWER && args.len() == 1));
+    assert!(
+        matches!(e, Expr::Func { ref name, ref args } if name.name() == FuncDef::LOWER && args.len() == 1)
+    );
 }
 
 #[test]
 fn test_func_now() {
     let e = func::now();
-    assert!(matches!(e, Expr::Func { ref name, ref args } if name.name() == FuncDef::NOW && args.is_empty()));
+    assert!(
+        matches!(e, Expr::Func { ref name, ref args } if name.name() == FuncDef::NOW && args.is_empty())
+    );
 }
 
 #[test]
 fn test_func_coalesce() {
     let e = func::coalesce(vec![field("a"), field("b"), string("default")]);
-    assert!(matches!(e, Expr::Func { ref name, ref args } if name.name() == FuncDef::COALESCE && args.len() == 3));
+    assert!(
+        matches!(e, Expr::Func { ref name, ref args } if name.name() == FuncDef::COALESCE && args.len() == 3)
+    );
 }
 
 // ── 16. CaseBuilder ──
@@ -529,10 +554,18 @@ fn test_window_full_chain() {
         .over()
         .partition_by(vec![field("dept"), field("team")])
         .order_by(vec![field("hire_date").asc()])
-        .rows_between(FrameBound::UnboundedPreceding, FrameBound::UnboundedFollowing)
+        .rows_between(
+            FrameBound::UnboundedPreceding,
+            FrameBound::UnboundedFollowing,
+        )
         .build();
     match e {
-        Expr::Window { partition_by, order_by, frame: Some(f), .. } => {
+        Expr::Window {
+            partition_by,
+            order_by,
+            frame: Some(f),
+            ..
+        } => {
             assert_eq!(partition_by.len(), 2);
             assert_eq!(order_by.len(), 1);
             assert_eq!(f.kind, FrameKind::Rows);
@@ -547,7 +580,12 @@ fn test_window_full_chain() {
 fn test_comparison_preserves_operands() {
     let e = field("age").gt(int(18i64));
     match e {
-        Expr::BinaryOp { left, op, right, negated } => {
+        Expr::BinaryOp {
+            left,
+            op,
+            right,
+            negated,
+        } => {
             assert!(matches!(*left, Expr::Identifier(s) if s == "age"));
             assert!(op.name() == OpDef::GT);
             assert!(matches!(*right, Expr::Value(Literal::Int64(18))));
@@ -585,7 +623,12 @@ fn test_cast_preserves_inner() {
 fn test_between_preserves_bounds() {
     let e = field("score").between(int(0i64), int(100i64));
     match e {
-        Expr::Between { expr, low, high, negated } => {
+        Expr::Between {
+            expr,
+            low,
+            high,
+            negated,
+        } => {
             assert!(matches!(*expr, Expr::Identifier(s) if s == "score"));
             assert!(matches!(*low, Expr::Value(Literal::Int64(0))));
             assert!(matches!(*high, Expr::Value(Literal::Int64(100))));
@@ -599,7 +642,9 @@ fn test_between_preserves_bounds() {
 fn test_eq_with_into_expr() {
     let e = field("status").eq("active");
     match e {
-        Expr::BinaryOp { right, op, negated, .. } => {
+        Expr::BinaryOp {
+            right, op, negated, ..
+        } => {
             assert!(op.name() == OpDef::EQ);
             assert!(!negated);
             assert!(matches!(*right, Expr::Identifier(s) if s == "active"));

@@ -1,7 +1,7 @@
 //! Function builders — ergonomic constructors for well-known DOL functions.
 
 use super::Expr;
-use super::func_def::DolFunc;
+use super::func_meta::DolFunc;
 
 // ---------------------------------------------------------------------------
 // Generic function builders
@@ -74,7 +74,10 @@ pub fn substr<'a>(
     start: impl Into<Expr<'a>>,
     len: impl Into<Expr<'a>>,
 ) -> Expr<'a> {
-    known_def(super::func_registry::Substr::def(), vec![expr.into(), start.into(), len.into()])
+    known_def(
+        super::func_registry::Substr::def(),
+        vec![expr.into(), start.into(), len.into()],
+    )
 }
 
 pub fn concat_fn<'a>(args: Vec<Expr<'a>>) -> Expr<'a> {
@@ -86,7 +89,10 @@ pub fn replace<'a>(
     from: impl Into<Expr<'a>>,
     to: impl Into<Expr<'a>>,
 ) -> Expr<'a> {
-    known_def(super::func_registry::Replace::def(), vec![expr.into(), from.into(), to.into()])
+    known_def(
+        super::func_registry::Replace::def(),
+        vec![expr.into(), from.into(), to.into()],
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -114,7 +120,10 @@ pub fn coalesce<'a>(args: Vec<Expr<'a>>) -> Expr<'a> {
 }
 
 pub fn nullif<'a>(expr1: impl Into<Expr<'a>>, expr2: impl Into<Expr<'a>>) -> Expr<'a> {
-    known_def(super::func_registry::Nullif::def(), vec![expr1.into(), expr2.into()])
+    known_def(
+        super::func_registry::Nullif::def(),
+        vec![expr1.into(), expr2.into()],
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -216,11 +225,17 @@ pub fn least<'a>(args: Vec<Expr<'a>>) -> Expr<'a> {
 // ---------------------------------------------------------------------------
 
 pub fn json_get<'a>(doc: impl Into<Expr<'a>>, key: impl Into<Expr<'a>>) -> Expr<'a> {
-    known_def(super::func_registry::JsonGet::def(), vec![doc.into(), key.into()])
+    known_def(
+        super::func_registry::JsonGet::def(),
+        vec![doc.into(), key.into()],
+    )
 }
 
 pub fn json_has_key<'a>(doc: impl Into<Expr<'a>>, key: impl Into<Expr<'a>>) -> Expr<'a> {
-    known_def(super::func_registry::JsonHasKey::def(), vec![doc.into(), key.into()])
+    known_def(
+        super::func_registry::JsonHasKey::def(),
+        vec![doc.into(), key.into()],
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -228,11 +243,17 @@ pub fn json_has_key<'a>(doc: impl Into<Expr<'a>>, key: impl Into<Expr<'a>>) -> E
 // ---------------------------------------------------------------------------
 
 pub fn array_append<'a>(arr: impl Into<Expr<'a>>, elem: impl Into<Expr<'a>>) -> Expr<'a> {
-    known_def(super::func_registry::ArrayAppend::def(), vec![arr.into(), elem.into()])
+    known_def(
+        super::func_registry::ArrayAppend::def(),
+        vec![arr.into(), elem.into()],
+    )
 }
 
 pub fn array_prepend<'a>(elem: impl Into<Expr<'a>>, arr: impl Into<Expr<'a>>) -> Expr<'a> {
-    known_def(super::func_registry::ArrayPrepend::def(), vec![elem.into(), arr.into()])
+    known_def(
+        super::func_registry::ArrayPrepend::def(),
+        vec![elem.into(), arr.into()],
+    )
 }
 
 pub fn array_length<'a>(arr: impl Into<Expr<'a>>) -> Expr<'a> {
@@ -248,5 +269,8 @@ pub fn unnest<'a>(arr: impl Into<Expr<'a>>) -> Expr<'a> {
 // ---------------------------------------------------------------------------
 
 pub fn st_distance<'a>(a: impl Into<Expr<'a>>, b: impl Into<Expr<'a>>) -> Expr<'a> {
-    known_def(super::func_registry::StDistance::def(), vec![a.into(), b.into()])
+    known_def(
+        super::func_registry::StDistance::def(),
+        vec![a.into(), b.into()],
+    )
 }

@@ -13,13 +13,13 @@
 
 #![deny(unsafe_code)]
 
-pub mod types;
+pub mod constraint;
 pub mod expr;
 pub mod op;
-pub mod constraint;
+pub mod types;
 
 // ── Top-level convenience re-exports ──
 
-pub use types::DataType;
 pub use constraint::{EntityConstraint, FkAction, ForeignKeyRef, GeneratedKind};
 pub use op::{BackendError, Statement};
+pub use types::DataType;

@@ -21,9 +21,7 @@ pub use definition::{
 };
 pub use mutation::{Insert, InsertSelect, Remove, Update, Upsert};
 pub use query::{CompoundQuery, Join, JoinKind, LockMode, OffsetLimit, Query, SetOp};
-pub use storage::{
-    GetObject, ListObjects, MoveFile, ObjectSource, PutObject, ReadFile, WriteFile,
-};
+pub use storage::{GetObject, ListObjects, MoveFile, ObjectSource, PutObject, ReadFile, WriteFile};
 pub use transaction::Transaction;
 
 use std::any::Any;
@@ -70,78 +68,138 @@ pub trait Operation: fmt::Debug + Any {
 // -- Operation implementations for all operation structs --
 
 impl Operation for DefineEntity {
-    fn kind(&self) -> &str { "define_entity" }
-    fn as_any(&self) -> &dyn Any { self }
+    fn kind(&self) -> &str {
+        "define_entity"
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl Operation for AlterEntity {
-    fn kind(&self) -> &str { "alter_entity" }
-    fn as_any(&self) -> &dyn Any { self }
+    fn kind(&self) -> &str {
+        "alter_entity"
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl Operation for DropEntity {
-    fn kind(&self) -> &str { "drop_entity" }
-    fn as_any(&self) -> &dyn Any { self }
+    fn kind(&self) -> &str {
+        "drop_entity"
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl Operation for DefineIndex {
-    fn kind(&self) -> &str { "define_index" }
-    fn as_any(&self) -> &dyn Any { self }
+    fn kind(&self) -> &str {
+        "define_index"
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl Operation for DropIndex {
-    fn kind(&self) -> &str { "drop_index" }
-    fn as_any(&self) -> &dyn Any { self }
+    fn kind(&self) -> &str {
+        "drop_index"
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl Operation for DefineType {
-    fn kind(&self) -> &str { "define_type" }
-    fn as_any(&self) -> &dyn Any { self }
+    fn kind(&self) -> &str {
+        "define_type"
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl Operation for DropType {
-    fn kind(&self) -> &str { "drop_type" }
-    fn as_any(&self) -> &dyn Any { self }
+    fn kind(&self) -> &str {
+        "drop_type"
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl Operation for Insert {
-    fn kind(&self) -> &str { "insert" }
-    fn as_any(&self) -> &dyn Any { self }
+    fn kind(&self) -> &str {
+        "insert"
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl Operation for InsertSelect {
-    fn kind(&self) -> &str { "insert_select" }
-    fn as_any(&self) -> &dyn Any { self }
+    fn kind(&self) -> &str {
+        "insert_select"
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl Operation for Grant {
-    fn kind(&self) -> &str { "grant" }
-    fn as_any(&self) -> &dyn Any { self }
+    fn kind(&self) -> &str {
+        "grant"
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl Operation for Revoke {
-    fn kind(&self) -> &str { "revoke" }
-    fn as_any(&self) -> &dyn Any { self }
+    fn kind(&self) -> &str {
+        "revoke"
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl Operation for GetObject {
-    fn kind(&self) -> &str { "get_object" }
-    fn as_any(&self) -> &dyn Any { self }
+    fn kind(&self) -> &str {
+        "get_object"
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl Operation for ListObjects {
-    fn kind(&self) -> &str { "list_objects" }
-    fn as_any(&self) -> &dyn Any { self }
+    fn kind(&self) -> &str {
+        "list_objects"
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl Operation for ReadFile {
-    fn kind(&self) -> &str { "read_file" }
-    fn as_any(&self) -> &dyn Any { self }
+    fn kind(&self) -> &str {
+        "read_file"
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl Operation for MoveFile {
-    fn kind(&self) -> &str { "move_file" }
-    fn as_any(&self) -> &dyn Any { self }
+    fn kind(&self) -> &str {
+        "move_file"
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 // ---------------------------------------------------------------------------

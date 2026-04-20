@@ -1,7 +1,7 @@
 //! Fixed-point decimal type.
 
-use core::fmt;
 use super::error::TypeError;
+use core::fmt;
 
 /// Fixed-point decimal: `real = unscaled × 10^−scale`.
 ///
@@ -44,7 +44,10 @@ impl fmt::Display for Decimal {
         }
         let split = digits.len() - scale;
         let (int_part, frac_part) = digits.split_at(split);
-        if negative { write!(f, "-{int_part}.{frac_part}") }
-        else        { write!(f, "{int_part}.{frac_part}") }
+        if negative {
+            write!(f, "-{int_part}.{frac_part}")
+        } else {
+            write!(f, "{int_part}.{frac_part}")
+        }
     }
 }

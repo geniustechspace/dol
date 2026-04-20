@@ -1,8 +1,8 @@
 //! Definition operations — canonical representation of schema operations.
 
 use super::EntityRef;
-use crate::types::DataType;
 use crate::constraint::{EntityConstraint, FkAction, GeneratedKind};
+use crate::types::DataType;
 
 /// An owned model-level constraint for use in operations and builders (not `'static`).
 ///

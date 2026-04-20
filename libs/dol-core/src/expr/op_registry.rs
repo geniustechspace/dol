@@ -3,7 +3,7 @@
 //! Each struct implements [`DolOp`] via the [`define_op!`] macro,
 //! providing a canonical name and operator kind.
 
-use super::func_def::OpKind;
+use super::op_meta::OpKind;
 use crate::define_op;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -22,7 +22,11 @@ define_op!(OpGe, "GE", OpKind::Comparison);
 // ═══════════════════════════════════════════════════════════════════════════
 
 define_op!(OpIsDistinctFrom, "IS_DISTINCT_FROM", OpKind::NullSafe);
-define_op!(OpIsNotDistinctFrom, "IS_NOT_DISTINCT_FROM", OpKind::NullSafe);
+define_op!(
+    OpIsNotDistinctFrom,
+    "IS_NOT_DISTINCT_FROM",
+    OpKind::NullSafe
+);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Arithmetic operators
@@ -49,7 +53,11 @@ define_op!(OpLike, "LIKE", OpKind::Pattern);
 define_op!(OpIlike, "ILIKE", OpKind::Pattern);
 define_op!(OpSimilarTo, "SIMILAR_TO", OpKind::Pattern);
 define_op!(OpRegexMatch, "REGEX_MATCH", OpKind::Pattern);
-define_op!(OpRegexMatchInsensitive, "REGEX_MATCH_INSENSITIVE", OpKind::Pattern);
+define_op!(
+    OpRegexMatchInsensitive,
+    "REGEX_MATCH_INSENSITIVE",
+    OpKind::Pattern
+);
 define_op!(OpGlob, "GLOB", OpKind::Pattern);
 
 // ═══════════════════════════════════════════════════════════════════════════
