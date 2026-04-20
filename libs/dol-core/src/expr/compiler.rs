@@ -10,7 +10,7 @@
 use super::{
     Expr, FuncDef, Literal, OpDef, OrderByExpr, Quantifier, UnaryOp,
 };
-use super::window::WindowFrame;
+use super::window::{FrameBound, FrameKind, WindowFrame};
 use crate::op::BackendError;
 use crate::types::DataType;
 
@@ -34,21 +34,42 @@ pub const MAX_EXPR_DEPTH: usize = 128;
 /// ```
 pub trait ExprRenderer {
     /// Render a bare identifier (field reference).
-    fn render_identifier(&mut self, name: &str) -> Result<String, BackendError>;
+    ///
+    /// Default: returns the name unchanged.
+    fn render_identifier(&mut self, name: &str) -> Result<String, BackendError> {
+        Ok(name.to_owned())
+    }
 
     /// Render a qualified identifier: `scope.name`.
-    fn render_qualified_identifier(&mut self, scope: &str, name: &str) -> Result<String, BackendError>;
+    ///
+    /// Default: `scope.name`.
+    fn render_qualified_identifier(&mut self, scope: &str, name: &str) -> Result<String, BackendError> {
+        Ok(format!("{}.{}", scope, name))
+    }
 
     /// Render field access: `base.field` (e.g., JSON access).
-    fn render_field_access(&mut self, base: &str, field: &str) -> Result<String, BackendError>;
+    ///
+    /// Default: `base.field`.
+    fn render_field_access(&mut self, base: &str, field: &str) -> Result<String, BackendError> {
+        Ok(format!("{}.{}", base, field))
+    }
 
     /// Render a bind parameter placeholder.
-    fn render_param(&mut self) -> Result<String, BackendError>;
+    ///
+    /// Default: `?`.
+    fn render_param(&mut self) -> Result<String, BackendError> {
+        Ok("?".into())
+    }
 
     /// Render a literal value.
+    ///
+    /// **Required** — no sensible universal default; escaping and formatting
+    /// rules vary between backends.
     fn render_literal(&mut self, lit: &Literal<'_>) -> Result<String, BackendError>;
 
     /// Render a binary operation: `lhs op rhs`, optionally negated.
+    ///
+    /// **Required** — operator-to-token mapping is backend-specific.
     fn render_binary_op(
         &mut self,
         lhs: &str,
@@ -58,9 +79,19 @@ pub trait ExprRenderer {
     ) -> Result<String, BackendError>;
 
     /// Render a unary operation: `op expr`.
-    fn render_unary_op(&mut self, op: UnaryOp, inner: &str) -> Result<String, BackendError>;
+    ///
+    /// Default: SQL-standard `NOT (expr)` / `-(expr)` / `~(expr)`.
+    fn render_unary_op(&mut self, op: UnaryOp, inner: &str) -> Result<String, BackendError> {
+        Ok(match op {
+            UnaryOp::Not => format!("NOT ({})", inner),
+            UnaryOp::Neg => format!("-({})", inner),
+            UnaryOp::BitNot => format!("~({})", inner),
+        })
+    }
 
     /// Render a quantified comparison: `expr op ANY/ALL (subquery)`.
+    ///
+    /// **Required** — operator-to-token mapping is backend-specific.
     fn render_quantified_cmp(
         &mut self,
         lhs: &str,
@@ -70,87 +101,180 @@ pub trait ExprRenderer {
     ) -> Result<String, BackendError>;
 
     /// Render a function call: `name(args...)`.
-    fn render_func(&mut self, def: &FuncDef, rendered_args: &[String]) -> Result<String, BackendError>;
+    ///
+    /// Default: `NAME(arg1, arg2, …)`. No-parens keywords
+    /// (e.g. `CURRENT_DATE`) are emitted without parentheses.
+    fn render_func(&mut self, def: &FuncDef, rendered_args: &[String]) -> Result<String, BackendError> {
+        if def.is_no_parens_keyword() && rendered_args.is_empty() {
+            Ok(def.name().to_owned())
+        } else {
+            Ok(format!("{}({})", def.name(), rendered_args.join(", ")))
+        }
+    }
 
     /// Render a type cast: `CAST(inner AS type)`.
-    fn render_cast(&mut self, inner: &str, as_type: &DataType) -> Result<String, BackendError>;
+    ///
+    /// Default: `CAST(inner AS <DataType Display>)`.
+    fn render_cast(&mut self, inner: &str, as_type: &DataType) -> Result<String, BackendError> {
+        Ok(format!("CAST({} AS {})", inner, as_type))
+    }
 
     /// Render a CASE expression.
+    ///
+    /// Default: SQL-standard `CASE WHEN … THEN … ELSE … END`.
     fn render_case(
         &mut self,
         whens: &[(String, String)],
         else_expr: Option<&str>,
-    ) -> Result<String, BackendError>;
+    ) -> Result<String, BackendError> {
+        let mut sql = String::from("CASE");
+        for (cond, then) in whens {
+            sql.push_str(&format!(" WHEN {} THEN {}", cond, then));
+        }
+        if let Some(else_val) = else_expr {
+            sql.push_str(&format!(" ELSE {}", else_val));
+        }
+        sql.push_str(" END");
+        Ok(sql)
+    }
 
     /// Render a subquery: `(SELECT ...)`.
-    fn render_subquery(&mut self, sql: &str) -> Result<String, BackendError>;
+    ///
+    /// Default: wraps in parentheses.
+    fn render_subquery(&mut self, sql: &str) -> Result<String, BackendError> {
+        Ok(format!("({})", sql))
+    }
 
     /// Render `expr [NOT] IN (list)`.
+    ///
+    /// Default: `lhs [NOT] IN (a, b, c)`.
     fn render_in_list(
         &mut self,
         lhs: &str,
         list: &[String],
         negated: bool,
-    ) -> Result<String, BackendError>;
+    ) -> Result<String, BackendError> {
+        let not = if negated { " NOT" } else { "" };
+        Ok(format!("{}{} IN ({})", lhs, not, list.join(", ")))
+    }
 
     /// Render `expr [NOT] IN (subquery)`.
+    ///
+    /// Default: `lhs [NOT] IN (subquery)`.
     fn render_in_subquery(
         &mut self,
         lhs: &str,
         subquery: &str,
         negated: bool,
-    ) -> Result<String, BackendError>;
+    ) -> Result<String, BackendError> {
+        let not = if negated { " NOT" } else { "" };
+        Ok(format!("{}{} IN ({})", lhs, not, subquery))
+    }
 
     /// Render `expr [NOT] BETWEEN low AND high`.
+    ///
+    /// Default: `lhs [NOT] BETWEEN low AND high`.
     fn render_between(
         &mut self,
         lhs: &str,
         low: &str,
         high: &str,
         negated: bool,
-    ) -> Result<String, BackendError>;
+    ) -> Result<String, BackendError> {
+        let not = if negated { " NOT" } else { "" };
+        Ok(format!("{}{} BETWEEN {} AND {}", lhs, not, low, high))
+    }
 
     /// Render `[NOT] EXISTS (subquery)`.
-    fn render_exists(&mut self, subquery: &str, negated: bool) -> Result<String, BackendError>;
+    ///
+    /// Default: `[NOT] EXISTS (subquery)`.
+    fn render_exists(&mut self, subquery: &str, negated: bool) -> Result<String, BackendError> {
+        let not = if negated { "NOT " } else { "" };
+        Ok(format!("{}EXISTS ({})", not, subquery))
+    }
 
     /// Render `expr IS [NOT] NULL`.
-    fn render_is_null(&mut self, inner: &str, negated: bool) -> Result<String, BackendError>;
+    ///
+    /// Default: `inner IS [NOT] NULL`.
+    fn render_is_null(&mut self, inner: &str, negated: bool) -> Result<String, BackendError> {
+        Ok(if negated {
+            format!("{} IS NOT NULL", inner)
+        } else {
+            format!("{} IS NULL", inner)
+        })
+    }
 
     /// Render an object literal: `{ key: value, ... }`.
+    ///
+    /// **Required** — representation is highly backend-specific.
     fn render_object_literal(&mut self, pairs: &[(String, String)]) -> Result<String, BackendError>;
 
     /// Render an array literal: `[elem, ...]`.
+    ///
+    /// **Required** — representation is highly backend-specific.
     fn render_array_literal(&mut self, elements: &[String]) -> Result<String, BackendError>;
 
     /// Render a raw expression string (escape hatch).
-    fn render_raw(&mut self, sql: &str) -> Result<String, BackendError>;
+    ///
+    /// Default: returns the string unchanged.
+    fn render_raw(&mut self, sql: &str) -> Result<String, BackendError> {
+        Ok(sql.to_owned())
+    }
 
     /// Render `expr AS alias`.
-    fn render_alias(&mut self, inner: &str, alias: &str) -> Result<String, BackendError>;
+    ///
+    /// Default: `inner AS alias`.
+    fn render_alias(&mut self, inner: &str, alias: &str) -> Result<String, BackendError> {
+        Ok(format!("{} AS {}", inner, alias))
+    }
 
     /// Render `*` (all fields).
-    fn render_star(&mut self) -> Result<String, BackendError>;
+    ///
+    /// Default: `*`.
+    fn render_star(&mut self) -> Result<String, BackendError> {
+        Ok("*".into())
+    }
 
     /// Render `COUNT(*)`.
-    fn render_count_star(&mut self) -> Result<String, BackendError>;
+    ///
+    /// Default: `COUNT(*)`.
+    fn render_count_star(&mut self) -> Result<String, BackendError> {
+        Ok("COUNT(*)".into())
+    }
 
     /// Render a window function: `func OVER (...)`.
+    ///
+    /// Default: SQL-standard `func OVER (PARTITION BY … ORDER BY … frame)`.
     fn render_window(
         &mut self,
         func: &str,
         partition_by: &[String],
         order_by: &[String],
         frame: Option<&WindowFrame>,
-    ) -> Result<String, BackendError>;
+    ) -> Result<String, BackendError> {
+        let mut over_parts = Vec::new();
+
+        if !partition_by.is_empty() {
+            over_parts.push(format!("PARTITION BY {}", partition_by.join(", ")));
+        }
+        if !order_by.is_empty() {
+            over_parts.push(format!("ORDER BY {}", order_by.join(", ")));
+        }
+        if let Some(f) = frame {
+            over_parts.push(render_window_frame(f));
+        }
+        Ok(format!("{} OVER ({})", func, over_parts.join(" ")))
+    }
 
     /// Render an ORDER BY expression (used within window functions).
+    ///
+    /// Default: `expr ASC/DESC`.
     fn render_order_by_expr(&mut self, expr: &OrderByExpr<'_>, depth: usize) -> Result<String, BackendError> {
         let rendered = compile_expr(self, &expr.expr, depth)?;
         let dir = match expr.direction {
             super::Direction::Asc => "ASC",
             super::Direction::Desc => "DESC",
         };
-        // Default implementation — backends can override for nulls ordering etc.
         Ok(format!("{} {}", rendered, dir))
     }
 }
@@ -312,5 +436,33 @@ pub fn compile_expr<R: ExprRenderer + ?Sized>(
                 .collect::<Result<Vec<_>, _>>()?;
             renderer.render_window(&func_str, &part_strs, &order_strs, frame.as_ref())
         }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Window frame helpers (used by the default `render_window` implementation)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Render a SQL-standard window frame clause.
+pub fn render_window_frame(frame: &WindowFrame) -> String {
+    let kind = match frame.kind {
+        FrameKind::Rows => "ROWS",
+        FrameKind::Range => "RANGE",
+    };
+    let start = render_frame_bound(&frame.start);
+    if let Some(ref end) = frame.end {
+        format!("{} BETWEEN {} AND {}", kind, start, render_frame_bound(end))
+    } else {
+        format!("{} {}", kind, start)
+    }
+}
+
+fn render_frame_bound(bound: &FrameBound) -> String {
+    match bound {
+        FrameBound::UnboundedPreceding => "UNBOUNDED PRECEDING".to_string(),
+        FrameBound::Preceding(n) => format!("{} PRECEDING", n),
+        FrameBound::CurrentRow => "CURRENT ROW".to_string(),
+        FrameBound::Following(n) => format!("{} FOLLOWING", n),
+        FrameBound::UnboundedFollowing => "UNBOUNDED FOLLOWING".to_string(),
     }
 }

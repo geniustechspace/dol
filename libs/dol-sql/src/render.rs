@@ -8,10 +8,8 @@ use super::dialect::{
 };
 use crate::SqlOutput;
 use dol_core::expr::compiler::{ExprRenderer, compile_expr};
-use dol_core::expr::window::{FrameBound, FrameKind, WindowFrame};
 use dol_core::expr::{
     Direction, Expr, FuncDef, Literal, NullsPosition, OpDef, OrderByExpr, Quantifier,
-    UnaryOp,
 };
 use dol_core::ir::BackendError;
 use dol_core::ir::definition::OwnedEntityConstraint;
@@ -90,13 +88,8 @@ impl<'d, 'c> SqlExprRenderer<'d, 'c> {
 }
 
 impl ExprRenderer for SqlExprRenderer<'_, '_> {
-    fn render_identifier(&mut self, name: &str) -> Result<String, BackendError> {
-        Ok(name.to_owned())
-    }
-
-    fn render_qualified_identifier(&mut self, scope: &str, name: &str) -> Result<String, BackendError> {
-        Ok(format!("{}.{}", scope, name))
-    }
+    // render_identifier — uses default
+    // render_qualified_identifier — uses default
 
     fn render_field_access(&mut self, base: &str, field: &str) -> Result<String, BackendError> {
         let escaped_field = escape_sql_string(field, self.dialect);
@@ -162,13 +155,7 @@ impl ExprRenderer for SqlExprRenderer<'_, '_> {
         })
     }
 
-    fn render_unary_op(&mut self, op: UnaryOp, inner: &str) -> Result<String, BackendError> {
-        Ok(match op {
-            UnaryOp::Not => format!("NOT ({})", inner),
-            UnaryOp::Neg => format!("-({})", inner),
-            UnaryOp::BitNot => format!("~({})", inner),
-        })
-    }
+    // render_unary_op — uses default
 
     fn render_quantified_cmp(
         &mut self,
@@ -202,69 +189,13 @@ impl ExprRenderer for SqlExprRenderer<'_, '_> {
         ))
     }
 
-    fn render_case(
-        &mut self,
-        whens: &[(String, String)],
-        else_expr: Option<&str>,
-    ) -> Result<String, BackendError> {
-        let mut sql = String::from("CASE");
-        for (cond, then) in whens {
-            sql.push_str(&format!(" WHEN {} THEN {}", cond, then));
-        }
-        if let Some(else_val) = else_expr {
-            sql.push_str(&format!(" ELSE {}", else_val));
-        }
-        sql.push_str(" END");
-        Ok(sql)
-    }
-
-    fn render_subquery(&mut self, sql: &str) -> Result<String, BackendError> {
-        Ok(format!("({})", sql))
-    }
-
-    fn render_in_list(
-        &mut self,
-        lhs: &str,
-        list: &[String],
-        negated: bool,
-    ) -> Result<String, BackendError> {
-        let not = if negated { " NOT" } else { "" };
-        Ok(format!("{}{} IN ({})", lhs, not, list.join(", ")))
-    }
-
-    fn render_in_subquery(
-        &mut self,
-        lhs: &str,
-        subquery: &str,
-        negated: bool,
-    ) -> Result<String, BackendError> {
-        let not = if negated { " NOT" } else { "" };
-        Ok(format!("{}{} IN ({})", lhs, not, subquery))
-    }
-
-    fn render_between(
-        &mut self,
-        lhs: &str,
-        low: &str,
-        high: &str,
-        negated: bool,
-    ) -> Result<String, BackendError> {
-        let not = if negated { " NOT" } else { "" };
-        Ok(format!("{}{} BETWEEN {} AND {}", lhs, not, low, high))
-    }
-
-    fn render_exists(&mut self, subquery: &str, negated: bool) -> Result<String, BackendError> {
-        let not = if negated { "NOT " } else { "" };
-        Ok(format!("{}EXISTS ({})", not, subquery))
-    }
-
-    fn render_is_null(&mut self, inner: &str, negated: bool) -> Result<String, BackendError> {
-        Ok(if negated {
-            format!("{} IS NOT NULL", inner)
-        } else {
-            format!("{} IS NULL", inner)
-        })
-    }
+    // render_case — uses default
+    // render_subquery — uses default
+    // render_in_list — uses default
+    // render_in_subquery — uses default
+    // render_between — uses default
+    // render_exists — uses default
+    // render_is_null — uses default
 
     fn render_object_literal(&mut self, pairs: &[(String, String)]) -> Result<String, BackendError> {
         let formatted: Vec<_> = pairs
@@ -291,45 +222,11 @@ impl ExprRenderer for SqlExprRenderer<'_, '_> {
         })
     }
 
-    fn render_raw(&mut self, sql: &str) -> Result<String, BackendError> {
-        Ok(sql.to_owned())
-    }
-
-    fn render_alias(&mut self, inner: &str, alias: &str) -> Result<String, BackendError> {
-        Ok(format!("{} AS {}", inner, alias))
-    }
-
-    fn render_star(&mut self) -> Result<String, BackendError> {
-        Ok("*".to_string())
-    }
-
-    fn render_count_star(&mut self) -> Result<String, BackendError> {
-        Ok("COUNT(*)".to_string())
-    }
-
-    fn render_window(
-        &mut self,
-        func: &str,
-        partition_by: &[String],
-        order_by: &[String],
-        frame: Option<&WindowFrame>,
-    ) -> Result<String, BackendError> {
-        let mut over_parts = Vec::new();
-
-        if !partition_by.is_empty() {
-            over_parts.push(format!("PARTITION BY {}", partition_by.join(", ")));
-        }
-
-        if !order_by.is_empty() {
-            over_parts.push(format!("ORDER BY {}", order_by.join(", ")));
-        }
-
-        if let Some(f) = frame {
-            over_parts.push(render_window_frame(f));
-        }
-
-        Ok(format!("{} OVER ({})", func, over_parts.join(" ")))
-    }
+    // render_raw — uses default
+    // render_alias — uses default
+    // render_star — uses default
+    // render_count_star — uses default
+    // render_window — uses default
 
     fn render_order_by_expr(&mut self, ob: &OrderByExpr<'_>, depth: usize) -> Result<String, BackendError> {
         let expr_sql = compile_expr(self, &ob.expr, depth)?;
@@ -465,29 +362,6 @@ pub fn render_order_by_expr(
 ) -> Result<String, BackendError> {
     let mut renderer = SqlExprRenderer::new(dialect, counter);
     renderer.render_order_by_expr(ob, 0)
-}
-
-fn render_window_frame(frame: &WindowFrame) -> String {
-    let kind = match frame.kind {
-        FrameKind::Rows => "ROWS",
-        FrameKind::Range => "RANGE",
-    };
-    let start = render_frame_bound(&frame.start);
-    if let Some(ref end) = frame.end {
-        format!("{} BETWEEN {} AND {}", kind, start, render_frame_bound(end))
-    } else {
-        format!("{} {}", kind, start)
-    }
-}
-
-fn render_frame_bound(bound: &FrameBound) -> String {
-    match bound {
-        FrameBound::UnboundedPreceding => "UNBOUNDED PRECEDING".to_string(),
-        FrameBound::Preceding(n) => format!("{} PRECEDING", n),
-        FrameBound::CurrentRow => "CURRENT ROW".to_string(),
-        FrameBound::Following(n) => format!("{} FOLLOWING", n),
-        FrameBound::UnboundedFollowing => "UNBOUNDED FOLLOWING".to_string(),
-    }
 }
 
 // ===========================================================================

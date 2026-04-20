@@ -540,25 +540,10 @@ fn render_expr_simple(expr: &Expr<'_>) -> Result<String, BackendError> {
 pub(crate) struct SpreadsheetExprRenderer;
 
 impl ExprRenderer for SpreadsheetExprRenderer {
-    fn render_identifier(&mut self, name: &str) -> Result<String, BackendError> {
-        Ok(name.to_string())
-    }
-
-    fn render_qualified_identifier(
-        &mut self,
-        scope: &str,
-        name: &str,
-    ) -> Result<String, BackendError> {
-        Ok(format!("{}.{}", scope, name))
-    }
-
-    fn render_field_access(&mut self, base: &str, field: &str) -> Result<String, BackendError> {
-        Ok(format!("{}.{}", base, field))
-    }
-
-    fn render_param(&mut self) -> Result<String, BackendError> {
-        Ok("?".to_string())
-    }
+    // render_identifier — uses default
+    // render_qualified_identifier — uses default
+    // render_field_access — uses default
+    // render_param — uses default
 
     fn render_literal(&mut self, lit: &Literal<'_>) -> Result<String, BackendError> {
         render_spreadsheet_literal(lit)
@@ -724,17 +709,9 @@ impl ExprRenderer for SpreadsheetExprRenderer {
         ))
     }
 
-    fn render_alias(&mut self, inner: &str, alias: &str) -> Result<String, BackendError> {
-        Ok(format!("{} AS {}", inner, alias))
-    }
-
-    fn render_star(&mut self) -> Result<String, BackendError> {
-        Ok("*".to_string())
-    }
-
-    fn render_count_star(&mut self) -> Result<String, BackendError> {
-        Ok("COUNT(*)".to_string())
-    }
+    // render_alias — uses default
+    // render_star — uses default
+    // render_count_star — uses default
 
     fn render_window(
         &mut self,
