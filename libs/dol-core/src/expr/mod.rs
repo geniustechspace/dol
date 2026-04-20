@@ -32,12 +32,7 @@ pub mod order;
 pub mod window;
 
 pub use literal::{Literal, Value, TypeError};
-pub use ops::{OpId, Quantifier, UnaryOp};
-#[allow(deprecated)]
-pub use ops::BinOp;
-pub use func::FuncId;
-#[allow(deprecated)]
-pub use func::FuncName;
+pub use ops::{Quantifier, UnaryOp};
 pub use func_def::{
     Arity, ArityError, CompactName, DolFunc, DolOp, FuncDef, FuncKind, OpDef, OpKind,
 };

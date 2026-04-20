@@ -19,7 +19,7 @@
 
 #![deny(unsafe_code)]
 
-use dol_core::expr::{Direction, Expr, Literal, OpId, OrderByExpr, UnaryOp};
+use dol_core::expr::{Direction, Expr, Literal, OpDef, OrderByExpr, UnaryOp};
 use dol_core::ir::Statement;
 
 /// A column definition for spreadsheet sheet creation.
@@ -541,22 +541,22 @@ fn render_expr_simple(expr: &Expr<'_>) -> Result<String, BackendError> {
             negated,
         } => {
             let op_str = match op.name() {
-                OpId::EQ => "=",
-                OpId::NE => "!=",
-                OpId::LT => "<",
-                OpId::LE => "<=",
-                OpId::GT => ">",
-                OpId::GE => ">=",
-                OpId::AND => "AND",
-                OpId::OR => "OR",
-                OpId::ADD => "+",
-                OpId::SUB => "-",
-                OpId::MUL => "*",
-                OpId::DIV => "/",
-                OpId::MOD => "%",
-                OpId::LIKE => "LIKE",
-                OpId::ILIKE => "ILIKE",
-                OpId::CONCAT => "||",
+                OpDef::EQ => "=",
+                OpDef::NE => "!=",
+                OpDef::LT => "<",
+                OpDef::LE => "<=",
+                OpDef::GT => ">",
+                OpDef::GE => ">=",
+                OpDef::AND => "AND",
+                OpDef::OR => "OR",
+                OpDef::ADD => "+",
+                OpDef::SUB => "-",
+                OpDef::MUL => "*",
+                OpDef::DIV => "/",
+                OpDef::MOD => "%",
+                OpDef::LIKE => "LIKE",
+                OpDef::ILIKE => "ILIKE",
+                OpDef::CONCAT => "||",
                 other => {
                     return Err(BackendError::Unsupported(format!(
                         "SpreadsheetBackend does not support binary operator '{}'",
@@ -721,7 +721,7 @@ fn validate_column_expr(expr: &Expr<'_>, context: &str) -> Result<String, Backen
 }
 
 fn spreadsheet_func_name<'a>(name: &'a dol_core::expr::FuncDef) -> std::borrow::Cow<'a, str> {
-    use dol_core::expr::FuncId as K;
+    use dol_core::expr::FuncDef as K;
     match name.name() {
         // ── Renamed functions (DOL name differs from spreadsheet name) ───
         K::LENGTH => std::borrow::Cow::Borrowed("LEN"),

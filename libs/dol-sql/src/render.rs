@@ -9,7 +9,7 @@ use super::dialect::{
 use crate::SqlOutput;
 use dol_core::expr::window::{FrameBound, FrameKind, WindowFrame};
 use dol_core::expr::{
-    Direction, Expr, FuncDef, Literal, NullsPosition, OpDef, OpId, OrderByExpr, Quantifier,
+    Direction, Expr, FuncDef, Literal, NullsPosition, OpDef, OrderByExpr, Quantifier,
     UnaryOp,
 };
 use dol_core::ir::BackendError;
@@ -387,7 +387,7 @@ fn render_binary_op(
     depth: usize,
 ) -> Result<String, BackendError> {
     // Special case: ILike on dialects without native ILIKE support
-    if op.name() == OpId::ILIKE && !dialect.features.ilike {
+    if op.name() == OpDef::ILIKE && !dialect.features.ilike {
         let lhs = render_expr_inner(left, counter, dialect, depth)?;
         let rhs = render_expr_inner(right, counter, dialect, depth)?;
         let not = if negated { "NOT " } else { "" };
@@ -395,7 +395,7 @@ fn render_binary_op(
     }
 
     // Special case: Concat dispatches on dialect.concat_style
-    if op.name() == OpId::CONCAT {
+    if op.name() == OpDef::CONCAT {
         let lhs = render_expr_inner(left, counter, dialect, depth)?;
         let rhs = render_expr_inner(right, counter, dialect, depth)?;
         return Ok(match &dialect.concat_style {
@@ -409,7 +409,7 @@ fn render_binary_op(
     let rhs = render_expr_inner(right, counter, dialect, depth)?;
     let op_str = render_binop_token(op);
 
-    let base = if op.name() == OpId::AND || op.name() == OpId::OR {
+    let base = if op.name() == OpDef::AND || op.name() == OpDef::OR {
         format!("({} {} {})", lhs, op_str, rhs)
     } else {
         format!("{} {} {}", lhs, op_str, rhs)
@@ -426,43 +426,43 @@ fn render_binary_op(
 fn render_binop_token(op: &OpDef) -> &'static str {
     match op.name() {
         // Comparison
-        OpId::EQ => "=",
-        OpId::NE => "!=",
-        OpId::LT => "<",
-        OpId::GT => ">",
-        OpId::LE => "<=",
-        OpId::GE => ">=",
+        OpDef::EQ => "=",
+        OpDef::NE => "!=",
+        OpDef::LT => "<",
+        OpDef::GT => ">",
+        OpDef::LE => "<=",
+        OpDef::GE => ">=",
         // Null-safe comparison
-        OpId::IS_DISTINCT_FROM => "IS DISTINCT FROM",
-        OpId::IS_NOT_DISTINCT_FROM => "IS NOT DISTINCT FROM",
+        OpDef::IS_DISTINCT_FROM => "IS DISTINCT FROM",
+        OpDef::IS_NOT_DISTINCT_FROM => "IS NOT DISTINCT FROM",
         // Arithmetic
-        OpId::ADD => "+",
-        OpId::SUB => "-",
-        OpId::MUL => "*",
-        OpId::DIV => "/",
-        OpId::MOD => "%",
+        OpDef::ADD => "+",
+        OpDef::SUB => "-",
+        OpDef::MUL => "*",
+        OpDef::DIV => "/",
+        OpDef::MOD => "%",
         // Logical
-        OpId::AND => "AND",
-        OpId::OR => "OR",
+        OpDef::AND => "AND",
+        OpDef::OR => "OR",
         // Pattern
-        OpId::LIKE => "LIKE",
-        OpId::ILIKE => "ILIKE",
-        OpId::SIMILAR_TO => "SIMILAR TO",
-        OpId::REGEX_MATCH => "~",
-        OpId::REGEX_MATCH_INSENSITIVE => "~*",
-        OpId::GLOB => "GLOB",
+        OpDef::LIKE => "LIKE",
+        OpDef::ILIKE => "ILIKE",
+        OpDef::SIMILAR_TO => "SIMILAR TO",
+        OpDef::REGEX_MATCH => "~",
+        OpDef::REGEX_MATCH_INSENSITIVE => "~*",
+        OpDef::GLOB => "GLOB",
         // String
-        OpId::CONCAT => "||",
+        OpDef::CONCAT => "||",
         // Bitwise
-        OpId::BIT_AND => "&",
-        OpId::BIT_OR => "|",
-        OpId::BIT_XOR => "#",
-        OpId::SHIFT_LEFT => "<<",
-        OpId::SHIFT_RIGHT => ">>",
+        OpDef::BIT_AND => "&",
+        OpDef::BIT_OR => "|",
+        OpDef::BIT_XOR => "#",
+        OpDef::SHIFT_LEFT => "<<",
+        OpDef::SHIFT_RIGHT => ">>",
         // Array / Collection
-        OpId::CONTAINS => "@>",
-        OpId::CONTAINED_BY => "<@",
-        OpId::OVERLAP => "&&",
+        OpDef::CONTAINS => "@>",
+        OpDef::CONTAINED_BY => "<@",
+        OpDef::OVERLAP => "&&",
         _ => "???",
     }
 }
@@ -1532,7 +1532,7 @@ fn entity_ref_to_sql(mref: &EntityRef, _dialect: &Dialect) -> String {
 }
 
 fn func_id_to_sql<'a>(name: &'a FuncDef) -> std::borrow::Cow<'a, str> {
-    use dol_core::expr::FuncId as K;
+    use dol_core::expr::FuncDef as K;
     match name.name() {
         // ── Multi-to-one mappings ────────────────────────────────────────
         K::COUNT | K::COUNT_DISTINCT => std::borrow::Cow::Borrowed("COUNT"),
