@@ -7,6 +7,7 @@ use super::dialect::{
     ReturningStyle,
 };
 use crate::SqlOutput;
+use dol_core::expr::compiler::{ExprRenderer, compile_expr};
 use dol_core::expr::window::{FrameBound, FrameKind, WindowFrame};
 use dol_core::expr::{
     Direction, Expr, FuncDef, Literal, NullsPosition, OpDef, OrderByExpr, Quantifier,
@@ -20,267 +21,346 @@ use dol_entity::Field;
 use dol_entity::constraint::{FkAction, GeneratedKind};
 
 // ===========================================================================
-// Expr rendering (the core recursive renderer)
+// Expr rendering — SqlExprRenderer + ExprRenderer trait
 // ===========================================================================
 
-/// Maximum nesting depth for expression rendering.
+/// SQL expression renderer — implements [`ExprRenderer`] for SQL output.
 ///
-/// Prevents stack overflow on pathologically deep expression trees
-/// (e.g. from untrusted input or very large generated queries).
-const MAX_EXPR_DEPTH: usize = 128;
+/// Wraps a dialect and a mutable parameter counter to produce
+/// dialect-aware SQL strings from DOL expression trees.
+pub struct SqlExprRenderer<'d, 'c> {
+    pub dialect: &'d Dialect,
+    pub counter: &'c mut ParamCounter,
+}
+
+impl<'d, 'c> SqlExprRenderer<'d, 'c> {
+    pub fn new(dialect: &'d Dialect, counter: &'c mut ParamCounter) -> Self {
+        Self { dialect, counter }
+    }
+
+    /// Get the current parameter count.
+    pub fn param_count(&self) -> usize {
+        self.counter.count()
+    }
+
+    /// Map an [`OpDef`] to its SQL token string.
+    fn binop_token(op: &OpDef) -> &'static str {
+        match op.name() {
+            // Comparison
+            OpDef::EQ => "=",
+            OpDef::NE => "!=",
+            OpDef::LT => "<",
+            OpDef::GT => ">",
+            OpDef::LE => "<=",
+            OpDef::GE => ">=",
+            // Null-safe comparison
+            OpDef::IS_DISTINCT_FROM => "IS DISTINCT FROM",
+            OpDef::IS_NOT_DISTINCT_FROM => "IS NOT DISTINCT FROM",
+            // Arithmetic
+            OpDef::ADD => "+",
+            OpDef::SUB => "-",
+            OpDef::MUL => "*",
+            OpDef::DIV => "/",
+            OpDef::MOD => "%",
+            // Logical
+            OpDef::AND => "AND",
+            OpDef::OR => "OR",
+            // Pattern
+            OpDef::LIKE => "LIKE",
+            OpDef::ILIKE => "ILIKE",
+            OpDef::SIMILAR_TO => "SIMILAR TO",
+            OpDef::REGEX_MATCH => "~",
+            OpDef::REGEX_MATCH_INSENSITIVE => "~*",
+            OpDef::GLOB => "GLOB",
+            // String
+            OpDef::CONCAT => "||",
+            // Bitwise
+            OpDef::BIT_AND => "&",
+            OpDef::BIT_OR => "|",
+            OpDef::BIT_XOR => "#",
+            OpDef::SHIFT_LEFT => "<<",
+            OpDef::SHIFT_RIGHT => ">>",
+            // Array / Collection
+            OpDef::CONTAINS => "@>",
+            OpDef::CONTAINED_BY => "<@",
+            OpDef::OVERLAP => "&&",
+            _ => "???",
+        }
+    }
+}
+
+impl ExprRenderer for SqlExprRenderer<'_, '_> {
+    fn render_identifier(&mut self, name: &str) -> Result<String, BackendError> {
+        Ok(name.to_owned())
+    }
+
+    fn render_qualified_identifier(&mut self, scope: &str, name: &str) -> Result<String, BackendError> {
+        Ok(format!("{}.{}", scope, name))
+    }
+
+    fn render_field_access(&mut self, base: &str, field: &str) -> Result<String, BackendError> {
+        let escaped_field = escape_sql_string(field, self.dialect);
+        Ok(match &self.dialect.json_access {
+            JsonAccessStyle::ArrowOperator => format!("{}->>'{}'", base, escaped_field),
+            JsonAccessStyle::JsonExtractFunction => {
+                format!("json_extract({}, '$.{}')", base, escaped_field)
+            }
+            JsonAccessStyle::JsonValueFunction => {
+                format!("JSON_VALUE({}, '$.{}')", base, escaped_field)
+            }
+            JsonAccessStyle::Unsupported => {
+                return Err(BackendError::Unsupported(format!(
+                    "JSON field access is not supported by this dialect (field '{}')",
+                    field
+                )));
+            }
+        })
+    }
+
+    fn render_param(&mut self) -> Result<String, BackendError> {
+        Ok(self.counter.next())
+    }
+
+    fn render_literal(&mut self, lit: &Literal<'_>) -> Result<String, BackendError> {
+        Ok(render_literal_value(lit, self.dialect))
+    }
+
+    fn render_binary_op(
+        &mut self,
+        lhs: &str,
+        op: &OpDef,
+        rhs: &str,
+        negated: bool,
+    ) -> Result<String, BackendError> {
+        // Special case: ILike on dialects without native ILIKE support
+        if op.name() == OpDef::ILIKE && !self.dialect.features.ilike {
+            let not = if negated { "NOT " } else { "" };
+            return Ok(format!("{}LOWER({}) LIKE LOWER({})", not, lhs, rhs));
+        }
+
+        // Special case: Concat dispatches on dialect.concat_style
+        if op.name() == OpDef::CONCAT {
+            return Ok(match &self.dialect.concat_style {
+                ConcatStyle::PipeOperator => format!("{} || {}", lhs, rhs),
+                ConcatStyle::ConcatFunction => format!("CONCAT({}, {})", lhs, rhs),
+                ConcatStyle::PlusOperator => format!("{} + {}", lhs, rhs),
+            });
+        }
+
+        let op_str = Self::binop_token(op);
+
+        let base = if op.name() == OpDef::AND || op.name() == OpDef::OR {
+            format!("({} {} {})", lhs, op_str, rhs)
+        } else {
+            format!("{} {} {}", lhs, op_str, rhs)
+        };
+
+        Ok(if negated {
+            format!("NOT ({})", base)
+        } else {
+            base
+        })
+    }
+
+    fn render_unary_op(&mut self, op: UnaryOp, inner: &str) -> Result<String, BackendError> {
+        Ok(match op {
+            UnaryOp::Not => format!("NOT ({})", inner),
+            UnaryOp::Neg => format!("-({})", inner),
+            UnaryOp::BitNot => format!("~({})", inner),
+        })
+    }
+
+    fn render_quantified_cmp(
+        &mut self,
+        lhs: &str,
+        op: &OpDef,
+        quantifier: Quantifier,
+        subquery: &str,
+    ) -> Result<String, BackendError> {
+        let op_str = Self::binop_token(op);
+        let quant = match quantifier {
+            Quantifier::Any => "ANY",
+            Quantifier::All => "ALL",
+        };
+        Ok(format!("{} {} {} ({})", lhs, op_str, quant, subquery))
+    }
+
+    fn render_func(&mut self, def: &FuncDef, rendered_args: &[String]) -> Result<String, BackendError> {
+        let func_sql = func_id_to_sql(def);
+        if def.is_no_parens_keyword() && rendered_args.is_empty() {
+            Ok(func_sql.into_owned())
+        } else {
+            Ok(format!("{}({})", func_sql, rendered_args.join(", ")))
+        }
+    }
+
+    fn render_cast(&mut self, inner: &str, as_type: &DataType) -> Result<String, BackendError> {
+        Ok(format!(
+            "CAST({} AS {})",
+            inner,
+            render_type(as_type, self.dialect)
+        ))
+    }
+
+    fn render_case(
+        &mut self,
+        whens: &[(String, String)],
+        else_expr: Option<&str>,
+    ) -> Result<String, BackendError> {
+        let mut sql = String::from("CASE");
+        for (cond, then) in whens {
+            sql.push_str(&format!(" WHEN {} THEN {}", cond, then));
+        }
+        if let Some(else_val) = else_expr {
+            sql.push_str(&format!(" ELSE {}", else_val));
+        }
+        sql.push_str(" END");
+        Ok(sql)
+    }
+
+    fn render_subquery(&mut self, sql: &str) -> Result<String, BackendError> {
+        Ok(format!("({})", sql))
+    }
+
+    fn render_in_list(
+        &mut self,
+        lhs: &str,
+        list: &[String],
+        negated: bool,
+    ) -> Result<String, BackendError> {
+        let not = if negated { " NOT" } else { "" };
+        Ok(format!("{}{} IN ({})", lhs, not, list.join(", ")))
+    }
+
+    fn render_in_subquery(
+        &mut self,
+        lhs: &str,
+        subquery: &str,
+        negated: bool,
+    ) -> Result<String, BackendError> {
+        let not = if negated { " NOT" } else { "" };
+        Ok(format!("{}{} IN ({})", lhs, not, subquery))
+    }
+
+    fn render_between(
+        &mut self,
+        lhs: &str,
+        low: &str,
+        high: &str,
+        negated: bool,
+    ) -> Result<String, BackendError> {
+        let not = if negated { " NOT" } else { "" };
+        Ok(format!("{}{} BETWEEN {} AND {}", lhs, not, low, high))
+    }
+
+    fn render_exists(&mut self, subquery: &str, negated: bool) -> Result<String, BackendError> {
+        let not = if negated { "NOT " } else { "" };
+        Ok(format!("{}EXISTS ({})", not, subquery))
+    }
+
+    fn render_is_null(&mut self, inner: &str, negated: bool) -> Result<String, BackendError> {
+        Ok(if negated {
+            format!("{} IS NOT NULL", inner)
+        } else {
+            format!("{} IS NULL", inner)
+        })
+    }
+
+    fn render_object_literal(&mut self, pairs: &[(String, String)]) -> Result<String, BackendError> {
+        let formatted: Vec<_> = pairs
+            .iter()
+            .map(|(k, v)| {
+                let escaped_key = escape_sql_string(k, self.dialect);
+                format!("'{}', {}", escaped_key, v)
+            })
+            .collect();
+        Ok(match &self.dialect.json_access {
+            JsonAccessStyle::ArrowOperator => {
+                format!("jsonb_build_object({})", formatted.join(", "))
+            }
+            _ => format!("json_object({})", formatted.join(", ")),
+        })
+    }
+
+    fn render_array_literal(&mut self, elements: &[String]) -> Result<String, BackendError> {
+        let joined = elements.join(", ");
+        Ok(match &self.dialect.array_literal_style {
+            ArrayLiteralStyle::ArrayKeyword => format!("ARRAY[{}]", joined),
+            ArrayLiteralStyle::JsonArrayFunction => format!("JSON_ARRAY({})", joined),
+            ArrayLiteralStyle::Unsupported => format!("({})", joined),
+        })
+    }
+
+    fn render_raw(&mut self, sql: &str) -> Result<String, BackendError> {
+        Ok(sql.to_owned())
+    }
+
+    fn render_alias(&mut self, inner: &str, alias: &str) -> Result<String, BackendError> {
+        Ok(format!("{} AS {}", inner, alias))
+    }
+
+    fn render_star(&mut self) -> Result<String, BackendError> {
+        Ok("*".to_string())
+    }
+
+    fn render_count_star(&mut self) -> Result<String, BackendError> {
+        Ok("COUNT(*)".to_string())
+    }
+
+    fn render_window(
+        &mut self,
+        func: &str,
+        partition_by: &[String],
+        order_by: &[String],
+        frame: Option<&WindowFrame>,
+    ) -> Result<String, BackendError> {
+        let mut over_parts = Vec::new();
+
+        if !partition_by.is_empty() {
+            over_parts.push(format!("PARTITION BY {}", partition_by.join(", ")));
+        }
+
+        if !order_by.is_empty() {
+            over_parts.push(format!("ORDER BY {}", order_by.join(", ")));
+        }
+
+        if let Some(f) = frame {
+            over_parts.push(render_window_frame(f));
+        }
+
+        Ok(format!("{} OVER ({})", func, over_parts.join(" ")))
+    }
+
+    fn render_order_by_expr(&mut self, ob: &OrderByExpr<'_>, depth: usize) -> Result<String, BackendError> {
+        let expr_sql = compile_expr(self, &ob.expr, depth)?;
+        let dir = match ob.direction {
+            Direction::Asc => "ASC",
+            Direction::Desc => "DESC",
+        };
+        Ok(match (&ob.nulls, self.dialect.features.nulls_ordering) {
+            (Some(NullsPosition::First), true) => format!("{} {} NULLS FIRST", expr_sql, dir),
+            (Some(NullsPosition::Last), true) => format!("{} {} NULLS LAST", expr_sql, dir),
+            (Some(_), false) | (None, _) => format!("{} {}", expr_sql, dir),
+        })
+    }
+}
 
 /// Renders an [`Expr`] tree into a SQL string.
 ///
-/// Returns `Err(BackendError::Render)` if expression nesting exceeds
-/// [`MAX_EXPR_DEPTH`].
+/// Returns `Err(BackendError::Render)` if expression nesting exceeds the
+/// maximum depth.
 pub fn render_expr(
     expr: &Expr<'_>,
     counter: &mut ParamCounter,
     dialect: &Dialect,
 ) -> Result<String, BackendError> {
-    render_expr_inner(expr, counter, dialect, 0)
+    let mut renderer = SqlExprRenderer::new(dialect, counter);
+    compile_expr(&mut renderer, expr, 0)
 }
 
-fn render_expr_inner(
-    expr: &Expr<'_>,
-    counter: &mut ParamCounter,
-    dialect: &Dialect,
-    depth: usize,
-) -> Result<String, BackendError> {
-    if depth >= MAX_EXPR_DEPTH {
-        return Err(BackendError::Render(
-            "expression nesting too deep (exceeded MAX_EXPR_DEPTH)".into(),
-        ));
-    }
-    let next = depth + 1;
-    match expr {
-        Expr::Identifier(name) => Ok(name.clone()),
-
-        Expr::QualifiedIdentifier { scope, name } => Ok(format!("{}.{}", scope, name)),
-
-        Expr::FieldAccess { base, field } => {
-            let base_sql = render_expr_inner(base, counter, dialect, next)?;
-            let escaped_field = escape_sql_string(field, dialect);
-            Ok(match &dialect.json_access {
-                JsonAccessStyle::ArrowOperator => format!("{}->>'{}'", base_sql, escaped_field),
-                JsonAccessStyle::JsonExtractFunction => {
-                    format!("json_extract({}, '$.{}')", base_sql, escaped_field)
-                }
-                JsonAccessStyle::JsonValueFunction => {
-                    format!("JSON_VALUE({}, '$.{}')", base_sql, escaped_field)
-                }
-                JsonAccessStyle::Unsupported => {
-                    return Err(BackendError::Unsupported(format!(
-                        "JSON field access is not supported by this dialect (field '{}')",
-                        field
-                    )));
-                }
-            })
-        }
-
-        Expr::Param => Ok(counter.next()),
-
-        Expr::Value(lit) => Ok(render_literal(lit, dialect)),
-
-        Expr::BinaryOp {
-            left,
-            op,
-            right,
-            negated,
-        } => render_binary_op(left, op, right, *negated, counter, dialect, next),
-
-        Expr::UnaryOp { op, expr } => {
-            let inner = render_expr_inner(expr, counter, dialect, next)?;
-            Ok(match op {
-                UnaryOp::Not => format!("NOT ({})", inner),
-                UnaryOp::Neg => format!("-({})", inner),
-                UnaryOp::BitNot => format!("~({})", inner),
-            })
-        }
-
-        Expr::Func { name, args } => {
-            let rendered_args: Vec<_> = args
-                .iter()
-                .map(|a| render_expr_inner(a, counter, dialect, next))
-                .collect::<Result<Vec<_>, _>>()?;
-            let func_sql = func_id_to_sql(name);
-            if name.is_no_parens_keyword() && rendered_args.is_empty() {
-                Ok(func_sql.into_owned())
-            } else {
-                Ok(format!("{}({})", func_sql, rendered_args.join(", ")))
-            }
-        }
-
-        Expr::Cast { expr, as_type } => {
-            let inner = render_expr_inner(expr, counter, dialect, next)?;
-            Ok(format!(
-                "CAST({} AS {})",
-                inner,
-                render_type(as_type, dialect)
-            ))
-        }
-
-        Expr::Case { whens, else_expr } => {
-            let mut sql = String::from("CASE");
-            for (cond, then) in whens {
-                let cond_sql = render_expr_inner(cond, counter, dialect, next)?;
-                let then_sql = render_expr_inner(then, counter, dialect, next)?;
-                sql.push_str(&format!(" WHEN {} THEN {}", cond_sql, then_sql));
-            }
-            if let Some(else_val) = else_expr {
-                let else_sql = render_expr_inner(else_val, counter, dialect, next)?;
-                sql.push_str(&format!(" ELSE {}", else_sql));
-            }
-            sql.push_str(" END");
-            Ok(sql)
-        }
-
-        Expr::Subquery(sql) => Ok(format!("({})", sql)),
-
-        Expr::InList {
-            expr,
-            list,
-            negated,
-        } => {
-            let lhs = render_expr_inner(expr, counter, dialect, next)?;
-            let items: Vec<_> = list
-                .iter()
-                .map(|e| render_expr_inner(e, counter, dialect, next))
-                .collect::<Result<Vec<_>, _>>()?;
-            let not = if *negated { " NOT" } else { "" };
-            Ok(format!("{}{} IN ({})", lhs, not, items.join(", ")))
-        }
-
-        Expr::Between {
-            expr,
-            low,
-            high,
-            negated,
-        } => {
-            let lhs = render_expr_inner(expr, counter, dialect, next)?;
-            let low_sql = render_expr_inner(low, counter, dialect, next)?;
-            let high_sql = render_expr_inner(high, counter, dialect, next)?;
-            let not = if *negated { " NOT" } else { "" };
-            Ok(format!(
-                "{}{} BETWEEN {} AND {}",
-                lhs, not, low_sql, high_sql
-            ))
-        }
-
-        Expr::Exists { subquery, negated } => {
-            let not = if *negated { "NOT " } else { "" };
-            Ok(format!("{}EXISTS ({})", not, subquery))
-        }
-
-        Expr::IsNull { expr, negated } => {
-            let inner = render_expr_inner(expr, counter, dialect, next)?;
-            Ok(if *negated {
-                format!("{} IS NOT NULL", inner)
-            } else {
-                format!("{} IS NULL", inner)
-            })
-        }
-
-        Expr::InSubquery {
-            expr,
-            subquery,
-            negated,
-        } => {
-            let lhs = render_expr_inner(expr, counter, dialect, next)?;
-            let not = if *negated { " NOT" } else { "" };
-            Ok(format!("{}{} IN ({})", lhs, not, subquery))
-        }
-
-        Expr::ObjectLiteral(fields) => {
-            let pairs: Vec<_> = fields
-                .iter()
-                .map(|(k, v)| {
-                    let val = render_expr_inner(v, counter, dialect, next)?;
-                    let escaped_key = escape_sql_string(k, dialect);
-                    Ok(format!("'{}', {}", escaped_key, val))
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            Ok(match &dialect.json_access {
-                JsonAccessStyle::ArrowOperator => {
-                    format!("jsonb_build_object({})", pairs.join(", "))
-                }
-                _ => format!("json_object({})", pairs.join(", ")),
-            })
-        }
-
-        Expr::ArrayLiteral(elements) => {
-            let items: Vec<_> = elements
-                .iter()
-                .map(|e| render_expr_inner(e, counter, dialect, next))
-                .collect::<Result<Vec<_>, _>>()?;
-            Ok(match &dialect.array_literal_style {
-                ArrayLiteralStyle::ArrayKeyword => format!("ARRAY[{}]", items.join(", ")),
-                ArrayLiteralStyle::JsonArrayFunction => {
-                    format!("JSON_ARRAY({})", items.join(", "))
-                }
-                ArrayLiteralStyle::Unsupported => format!("({})", items.join(", ")),
-            })
-        }
-
-        Expr::Raw(sql) => Ok(sql.clone()),
-
-        Expr::Alias { expr, alias } => {
-            let inner = render_expr_inner(expr, counter, dialect, next)?;
-            Ok(format!("{} AS {}", inner, alias))
-        }
-
-        Expr::Star => Ok("*".to_string()),
-
-        Expr::CountStar => Ok("COUNT(*)".to_string()),
-
-        Expr::Window {
-            func,
-            partition_by,
-            order_by,
-            frame,
-        } => {
-            let func_sql = render_expr_inner(func, counter, dialect, next)?;
-            let mut over_parts = Vec::new();
-
-            if !partition_by.is_empty() {
-                let parts: Vec<_> = partition_by
-                    .iter()
-                    .map(|e| render_expr_inner(e, counter, dialect, next))
-                    .collect::<Result<Vec<_>, _>>()?;
-                over_parts.push(format!("PARTITION BY {}", parts.join(", ")));
-            }
-
-            if !order_by.is_empty() {
-                let parts: Vec<_> = order_by
-                    .iter()
-                    .map(|ob| render_order_by_expr(ob, counter, dialect))
-                    .collect::<Result<Vec<_>, _>>()?;
-                over_parts.push(format!("ORDER BY {}", parts.join(", ")));
-            }
-
-            if let Some(f) = frame {
-                over_parts.push(render_window_frame(f));
-            }
-
-            Ok(format!("{} OVER ({})", func_sql, over_parts.join(" ")))
-        }
-
-        Expr::QuantifiedCmp {
-            expr,
-            op,
-            quantifier,
-            subquery,
-        } => {
-            let lhs = render_expr_inner(expr, counter, dialect, next)?;
-            let op_str = render_binop_token(op);
-            let quant = match quantifier {
-                Quantifier::Any => "ANY",
-                Quantifier::All => "ALL",
-            };
-            Ok(format!("{} {} {} ({})", lhs, op_str, quant, subquery))
-        }
-    }
-}
+// ===========================================================================
+// Standalone helpers used by both the trait impl and IR renderers
+// ===========================================================================
 
 /// Escape a string value for safe embedding in a SQL literal.
 ///
@@ -299,7 +379,7 @@ fn escape_sql_string(s: &str, dialect: &Dialect) -> String {
     }
 }
 
-fn render_literal(lit: &Literal<'_>, dialect: &Dialect) -> String {
+fn render_literal_value(lit: &Literal<'_>, dialect: &Dialect) -> String {
     use dol_core::expr::Literal as L;
     match lit {
         // Primitive
@@ -377,112 +457,14 @@ fn render_literal(lit: &Literal<'_>, dialect: &Dialect) -> String {
     }
 }
 
-fn render_binary_op(
-    left: &Expr<'_>,
-    op: &OpDef,
-    right: &Expr<'_>,
-    negated: bool,
-    counter: &mut ParamCounter,
-    dialect: &Dialect,
-    depth: usize,
-) -> Result<String, BackendError> {
-    // Special case: ILike on dialects without native ILIKE support
-    if op.name() == OpDef::ILIKE && !dialect.features.ilike {
-        let lhs = render_expr_inner(left, counter, dialect, depth)?;
-        let rhs = render_expr_inner(right, counter, dialect, depth)?;
-        let not = if negated { "NOT " } else { "" };
-        return Ok(format!("{}LOWER({}) LIKE LOWER({})", not, lhs, rhs));
-    }
-
-    // Special case: Concat dispatches on dialect.concat_style
-    if op.name() == OpDef::CONCAT {
-        let lhs = render_expr_inner(left, counter, dialect, depth)?;
-        let rhs = render_expr_inner(right, counter, dialect, depth)?;
-        return Ok(match &dialect.concat_style {
-            ConcatStyle::PipeOperator => format!("{} || {}", lhs, rhs),
-            ConcatStyle::ConcatFunction => format!("CONCAT({}, {})", lhs, rhs),
-            ConcatStyle::PlusOperator => format!("{} + {}", lhs, rhs),
-        });
-    }
-
-    let lhs = render_expr_inner(left, counter, dialect, depth)?;
-    let rhs = render_expr_inner(right, counter, dialect, depth)?;
-    let op_str = render_binop_token(op);
-
-    let base = if op.name() == OpDef::AND || op.name() == OpDef::OR {
-        format!("({} {} {})", lhs, op_str, rhs)
-    } else {
-        format!("{} {} {}", lhs, op_str, rhs)
-    };
-
-    Ok(if negated {
-        format!("NOT ({})", base)
-    } else {
-        base
-    })
-}
-
-/// Map an [`OpDef`] to its SQL token string.
-fn render_binop_token(op: &OpDef) -> &'static str {
-    match op.name() {
-        // Comparison
-        OpDef::EQ => "=",
-        OpDef::NE => "!=",
-        OpDef::LT => "<",
-        OpDef::GT => ">",
-        OpDef::LE => "<=",
-        OpDef::GE => ">=",
-        // Null-safe comparison
-        OpDef::IS_DISTINCT_FROM => "IS DISTINCT FROM",
-        OpDef::IS_NOT_DISTINCT_FROM => "IS NOT DISTINCT FROM",
-        // Arithmetic
-        OpDef::ADD => "+",
-        OpDef::SUB => "-",
-        OpDef::MUL => "*",
-        OpDef::DIV => "/",
-        OpDef::MOD => "%",
-        // Logical
-        OpDef::AND => "AND",
-        OpDef::OR => "OR",
-        // Pattern
-        OpDef::LIKE => "LIKE",
-        OpDef::ILIKE => "ILIKE",
-        OpDef::SIMILAR_TO => "SIMILAR TO",
-        OpDef::REGEX_MATCH => "~",
-        OpDef::REGEX_MATCH_INSENSITIVE => "~*",
-        OpDef::GLOB => "GLOB",
-        // String
-        OpDef::CONCAT => "||",
-        // Bitwise
-        OpDef::BIT_AND => "&",
-        OpDef::BIT_OR => "|",
-        OpDef::BIT_XOR => "#",
-        OpDef::SHIFT_LEFT => "<<",
-        OpDef::SHIFT_RIGHT => ">>",
-        // Array / Collection
-        OpDef::CONTAINS => "@>",
-        OpDef::CONTAINED_BY => "<@",
-        OpDef::OVERLAP => "&&",
-        _ => "???",
-    }
-}
-
 /// Renders an [`OrderByExpr`] into SQL.
 pub fn render_order_by_expr(
     ob: &OrderByExpr<'_>,
     counter: &mut ParamCounter,
     dialect: &Dialect,
 ) -> Result<String, BackendError> {
-    let expr_sql = render_expr(&ob.expr, counter, dialect)?;
-    let dir = match ob.direction {
-        Direction::Asc => "ASC",
-        Direction::Desc => "DESC",
-    };
-    Ok(match (&ob.nulls, dialect.features.nulls_ordering) {
-        (Some(NullsPosition::First), true) => format!("{} {} NULLS FIRST", expr_sql, dir),
-        (Some(NullsPosition::Last), true) => format!("{} {} NULLS LAST", expr_sql, dir),
-        (Some(_), false) | (None, _) => format!("{} {}", expr_sql, dir),
-    })
+    let mut renderer = SqlExprRenderer::new(dialect, counter);
+    renderer.render_order_by_expr(ob, 0)
 }
 
 fn render_window_frame(frame: &WindowFrame) -> String {
