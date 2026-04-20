@@ -19,8 +19,13 @@
 
 #![deny(unsafe_code)]
 
-use dol_core::expr::{Direction, Expr, Literal, OpDef, OrderByExpr, UnaryOp};
+use dol_core::expr::compiler::ExprRenderer;
+use dol_core::expr::window::WindowFrame;
+use dol_core::expr::{
+    Direction, Expr, FuncDef, Literal, OpDef, OrderByExpr, Quantifier, UnaryOp,
+};
 use dol_core::ir::Statement;
+use dol_core::types::DataType;
 
 /// A column definition for spreadsheet sheet creation.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -437,7 +442,7 @@ fn render_filter_list(filters: &[Expr<'_>]) -> Result<Option<String>, BackendErr
 ///
 /// Uses stable formatting rather than `Debug`, so that serialized
 /// `SpreadsheetOp` values are predictable and executor-friendly.
-fn render_literal(lit: &Literal<'_>) -> Result<String, BackendError> {
+fn render_spreadsheet_literal(lit: &Literal<'_>) -> Result<String, BackendError> {
     use dol_core::expr::Literal as L;
     match lit {
         L::Null => Ok("NULL".to_string()),
@@ -528,154 +533,219 @@ fn uuid_from_bytes(b: &[u8; 16]) -> String {
 /// have no meaningful spreadsheet representation (subqueries, window
 /// functions, quantified comparisons, etc.).
 fn render_expr_simple(expr: &Expr<'_>) -> Result<String, BackendError> {
-    match expr {
-        Expr::Identifier(name) => Ok(name.to_string()),
-        Expr::QualifiedIdentifier { scope, name } => Ok(format!("{}.{}", scope, name)),
-        Expr::FieldAccess { base, field } => Ok(format!("{}.{}", render_expr_simple(base)?, field)),
-        Expr::Param => Ok("?".to_string()),
-        Expr::Value(lit) => render_literal(lit),
-        Expr::BinaryOp {
-            left,
-            op,
-            right,
-            negated,
-        } => {
-            let op_str = match op.name() {
-                OpDef::EQ => "=",
-                OpDef::NE => "!=",
-                OpDef::LT => "<",
-                OpDef::LE => "<=",
-                OpDef::GT => ">",
-                OpDef::GE => ">=",
-                OpDef::AND => "AND",
-                OpDef::OR => "OR",
-                OpDef::ADD => "+",
-                OpDef::SUB => "-",
-                OpDef::MUL => "*",
-                OpDef::DIV => "/",
-                OpDef::MOD => "%",
-                OpDef::LIKE => "LIKE",
-                OpDef::ILIKE => "ILIKE",
-                OpDef::CONCAT => "||",
-                other => {
-                    return Err(BackendError::Unsupported(format!(
-                        "SpreadsheetBackend does not support binary operator '{}'",
-                        other,
-                    )));
-                }
-            };
-            let base_expr = format!(
-                "({} {} {})",
-                render_expr_simple(left)?,
-                op_str,
-                render_expr_simple(right)?,
-            );
-            if *negated {
-                Ok(format!("(NOT {})", base_expr))
-            } else {
-                Ok(base_expr)
-            }
-        }
-        Expr::UnaryOp { op, expr: inner } => {
-            let op_str = match op {
-                UnaryOp::Not => "NOT",
-                UnaryOp::Neg => "-",
-                UnaryOp::BitNot => "~",
-            };
-            Ok(format!("({} {})", op_str, render_expr_simple(inner)?))
-        }
-        Expr::Func { name, args } => {
-            let arg_strs = args
-                .iter()
-                .map(render_expr_simple)
-                .collect::<Result<Vec<_>, BackendError>>()?;
-            let func_str = spreadsheet_func_name(name);
-            Ok(format!("{}({})", func_str, arg_strs.join(", ")))
-        }
-        Expr::Cast {
-            expr: inner,
-            as_type,
-        } => Ok(format!(
-            "CAST({} AS {})",
-            render_expr_simple(inner)?,
-            render_spreadsheet_type(as_type)
-        )),
-        Expr::Between {
-            expr: inner,
-            low,
-            high,
-            negated,
-        } => {
-            let not = if *negated { "NOT " } else { "" };
-            Ok(format!(
-                "({} {}BETWEEN {} AND {})",
-                render_expr_simple(inner)?,
-                not,
-                render_expr_simple(low)?,
-                render_expr_simple(high)?,
-            ))
-        }
-        Expr::InList {
-            expr: inner,
-            list,
-            negated,
-        } => {
-            let not = if *negated { "NOT " } else { "" };
-            let items = list
-                .iter()
-                .map(render_expr_simple)
-                .collect::<Result<Vec<_>, BackendError>>()?;
-            Ok(format!(
-                "({} {}IN ({}))",
-                render_expr_simple(inner)?,
-                not,
-                items.join(", "),
-            ))
-        }
-        Expr::IsNull {
-            expr: inner,
-            negated,
-        } => {
-            if *negated {
-                Ok(format!("({} IS NOT NULL)", render_expr_simple(inner)?))
-            } else {
-                Ok(format!("({} IS NULL)", render_expr_simple(inner)?))
-            }
-        }
-        Expr::Star => Ok("*".to_string()),
-        Expr::CountStar => Ok("COUNT(*)".to_string()),
-        Expr::Alias { expr: inner, alias } => {
-            Ok(format!("{} AS {}", render_expr_simple(inner)?, alias))
-        }
-        Expr::Raw(_) => Err(BackendError::Unsupported(
-            "SpreadsheetBackend does not support raw expressions".into(),
-        )),
+    dol_core::expr::compiler::compile_expr(&mut SpreadsheetExprRenderer, expr, 0)
+}
 
-        // ── Unsupported expression variants ─────────────────────────
-        Expr::Subquery(_) => Err(BackendError::Unsupported(
-            "SpreadsheetBackend does not support subquery expressions".into(),
-        )),
-        Expr::InSubquery { .. } => Err(BackendError::Unsupported(
-            "SpreadsheetBackend does not support IN (subquery) expressions".into(),
-        )),
-        Expr::Exists { .. } => Err(BackendError::Unsupported(
-            "SpreadsheetBackend does not support EXISTS expressions".into(),
-        )),
-        Expr::Window { .. } => Err(BackendError::Unsupported(
-            "SpreadsheetBackend does not support window function expressions".into(),
-        )),
-        Expr::QuantifiedCmp { .. } => Err(BackendError::Unsupported(
+/// Spreadsheet expression renderer.
+pub(crate) struct SpreadsheetExprRenderer;
+
+impl ExprRenderer for SpreadsheetExprRenderer {
+    fn render_identifier(&mut self, name: &str) -> Result<String, BackendError> {
+        Ok(name.to_string())
+    }
+
+    fn render_qualified_identifier(
+        &mut self,
+        scope: &str,
+        name: &str,
+    ) -> Result<String, BackendError> {
+        Ok(format!("{}.{}", scope, name))
+    }
+
+    fn render_field_access(&mut self, base: &str, field: &str) -> Result<String, BackendError> {
+        Ok(format!("{}.{}", base, field))
+    }
+
+    fn render_param(&mut self) -> Result<String, BackendError> {
+        Ok("?".to_string())
+    }
+
+    fn render_literal(&mut self, lit: &Literal<'_>) -> Result<String, BackendError> {
+        render_spreadsheet_literal(lit)
+    }
+
+    fn render_binary_op(
+        &mut self,
+        lhs: &str,
+        op: &OpDef,
+        rhs: &str,
+        negated: bool,
+    ) -> Result<String, BackendError> {
+        let op_str = match op.name() {
+            OpDef::EQ => "=",
+            OpDef::NE => "!=",
+            OpDef::LT => "<",
+            OpDef::LE => "<=",
+            OpDef::GT => ">",
+            OpDef::GE => ">=",
+            OpDef::AND => "AND",
+            OpDef::OR => "OR",
+            OpDef::ADD => "+",
+            OpDef::SUB => "-",
+            OpDef::MUL => "*",
+            OpDef::DIV => "/",
+            OpDef::MOD => "%",
+            OpDef::LIKE => "LIKE",
+            OpDef::ILIKE => "ILIKE",
+            OpDef::CONCAT => "||",
+            other => {
+                return Err(BackendError::Unsupported(format!(
+                    "SpreadsheetBackend does not support binary operator '{}'",
+                    other,
+                )));
+            }
+        };
+        let base_expr = format!("({} {} {})", lhs, op_str, rhs);
+        if negated {
+            Ok(format!("(NOT {})", base_expr))
+        } else {
+            Ok(base_expr)
+        }
+    }
+
+    fn render_unary_op(&mut self, op: UnaryOp, inner: &str) -> Result<String, BackendError> {
+        let op_str = match op {
+            UnaryOp::Not => "NOT",
+            UnaryOp::Neg => "-",
+            UnaryOp::BitNot => "~",
+        };
+        Ok(format!("({} {})", op_str, inner))
+    }
+
+    fn render_quantified_cmp(
+        &mut self,
+        _lhs: &str,
+        _op: &OpDef,
+        _quantifier: Quantifier,
+        _subquery: &str,
+    ) -> Result<String, BackendError> {
+        Err(BackendError::Unsupported(
             "SpreadsheetBackend does not support quantified comparisons (ANY/ALL)".into(),
-        )),
-        Expr::Case { .. } => Err(BackendError::Unsupported(
+        ))
+    }
+
+    fn render_func(
+        &mut self,
+        def: &FuncDef,
+        rendered_args: &[String],
+    ) -> Result<String, BackendError> {
+        let func_str = spreadsheet_func_name(def);
+        Ok(format!("{}({})", func_str, rendered_args.join(", ")))
+    }
+
+    fn render_cast(&mut self, inner: &str, as_type: &DataType) -> Result<String, BackendError> {
+        Ok(format!(
+            "CAST({} AS {})",
+            inner,
+            render_spreadsheet_type(as_type)
+        ))
+    }
+
+    fn render_case(
+        &mut self,
+        _whens: &[(String, String)],
+        _else_expr: Option<&str>,
+    ) -> Result<String, BackendError> {
+        Err(BackendError::Unsupported(
             "SpreadsheetBackend does not support CASE expressions".into(),
-        )),
-        Expr::ObjectLiteral(_) => Err(BackendError::Unsupported(
+        ))
+    }
+
+    fn render_subquery(&mut self, _sql: &str) -> Result<String, BackendError> {
+        Err(BackendError::Unsupported(
+            "SpreadsheetBackend does not support subquery expressions".into(),
+        ))
+    }
+
+    fn render_in_list(
+        &mut self,
+        lhs: &str,
+        list: &[String],
+        negated: bool,
+    ) -> Result<String, BackendError> {
+        let not = if negated { "NOT " } else { "" };
+        Ok(format!("({} {}IN ({}))", lhs, not, list.join(", ")))
+    }
+
+    fn render_in_subquery(
+        &mut self,
+        _lhs: &str,
+        _subquery: &str,
+        _negated: bool,
+    ) -> Result<String, BackendError> {
+        Err(BackendError::Unsupported(
+            "SpreadsheetBackend does not support IN (subquery) expressions".into(),
+        ))
+    }
+
+    fn render_between(
+        &mut self,
+        lhs: &str,
+        low: &str,
+        high: &str,
+        negated: bool,
+    ) -> Result<String, BackendError> {
+        let not = if negated { "NOT " } else { "" };
+        Ok(format!("({} {}BETWEEN {} AND {})", lhs, not, low, high))
+    }
+
+    fn render_exists(&mut self, _subquery: &str, _negated: bool) -> Result<String, BackendError> {
+        Err(BackendError::Unsupported(
+            "SpreadsheetBackend does not support EXISTS expressions".into(),
+        ))
+    }
+
+    fn render_is_null(&mut self, inner: &str, negated: bool) -> Result<String, BackendError> {
+        if negated {
+            Ok(format!("({} IS NOT NULL)", inner))
+        } else {
+            Ok(format!("({} IS NULL)", inner))
+        }
+    }
+
+    fn render_object_literal(
+        &mut self,
+        _pairs: &[(String, String)],
+    ) -> Result<String, BackendError> {
+        Err(BackendError::Unsupported(
             "SpreadsheetBackend does not support object literal expressions".into(),
-        )),
-        Expr::ArrayLiteral(_) => Err(BackendError::Unsupported(
+        ))
+    }
+
+    fn render_array_literal(&mut self, _elements: &[String]) -> Result<String, BackendError> {
+        Err(BackendError::Unsupported(
             "SpreadsheetBackend does not support array literal expressions".into(),
-        )),
+        ))
+    }
+
+    fn render_raw(&mut self, _sql: &str) -> Result<String, BackendError> {
+        Err(BackendError::Unsupported(
+            "SpreadsheetBackend does not support raw expressions".into(),
+        ))
+    }
+
+    fn render_alias(&mut self, inner: &str, alias: &str) -> Result<String, BackendError> {
+        Ok(format!("{} AS {}", inner, alias))
+    }
+
+    fn render_star(&mut self) -> Result<String, BackendError> {
+        Ok("*".to_string())
+    }
+
+    fn render_count_star(&mut self) -> Result<String, BackendError> {
+        Ok("COUNT(*)".to_string())
+    }
+
+    fn render_window(
+        &mut self,
+        _func: &str,
+        _partition_by: &[String],
+        _order_by: &[String],
+        _frame: Option<&WindowFrame>,
+    ) -> Result<String, BackendError> {
+        Err(BackendError::Unsupported(
+            "SpreadsheetBackend does not support window function expressions".into(),
+        ))
     }
 }
 
