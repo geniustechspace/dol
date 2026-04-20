@@ -8,13 +8,15 @@ use crate::TransactionRender;
 use crate::backend::sql::dialect::Dialect;
 use crate::builder::EntityBuilderExt;
 use crate::builder::control::{GrantBuilder, Privilege, RevokeBuilder};
-use crate::builder::{DefineIndexBuilder, DropIndexBuilder};
 use crate::builder::transaction::TransactionBuilder;
+use crate::builder::{DefineIndexBuilder, DropIndexBuilder};
 use crate::expr::func;
 use crate::expr::window::FrameBound;
-use crate::expr::{Direction, Expr, NullsPosition, bool_expr, case, field, float, int, param, raw_expr, string};
-use crate::op::LockMode;
+use crate::expr::{
+    Direction, Expr, NullsPosition, bool_expr, case, field, float, int, param, raw_expr, string,
+};
 use crate::model::{DataType, Entity, EntityConstraint, Field, FkAction};
+use crate::op::LockMode;
 
 fn pg() -> Dialect {
     Dialect::postgres()
@@ -49,7 +51,11 @@ fn tenants() -> Entity {
             Field::new("status", DataType::Text),
             Field::new("plan", DataType::Text),
             Field::new("labels", DataType::Json).nullable(),
-            Field::new("scheduled_deletion_at", DataType::TimestampTz { precision: 6 }).nullable(),
+            Field::new(
+                "scheduled_deletion_at",
+                DataType::TimestampTz { precision: 6 },
+            )
+            .nullable(),
             Field::new("created_at", DataType::TimestampTz { precision: 6 }),
             Field::new("created_by", DataType::Uuid),
             Field::new("updated_at", DataType::TimestampTz { precision: 6 }),
@@ -564,11 +570,7 @@ fn insert_specific_columns() {
 #[test]
 fn insert_with_returning() {
     let u = users();
-    let sql = u
-        .insert()
-        .returning(&["id"])
-        .render(Some(&pg()))
-        .unwrap();
+    let sql = u.insert().returning(&["id"]).render(Some(&pg())).unwrap();
     assert!(sql.ends_with("RETURNING id"));
 }
 
@@ -861,11 +863,7 @@ fn create_table() {
 #[test]
 fn create_table_if_not_exists() {
     let s = settings();
-    let sql = s
-        .create()
-        .if_not_exists()
-        .render(Some(&pg()))
-        .unwrap();
+    let sql = s.create().if_not_exists().render(Some(&pg())).unwrap();
     assert!(sql.starts_with("CREATE TABLE IF NOT EXISTS tenant_settings"));
 }
 
@@ -1089,11 +1087,7 @@ fn alter_table_drop_default() {
 #[test]
 fn alter_table_set_not_null() {
     let u = users();
-    let sql = u
-        .alter()
-        .set_not_null("email")
-        .render(Some(&pg()))
-        .unwrap();
+    let sql = u.alter().set_not_null("email").render(Some(&pg())).unwrap();
     assert_eq!(sql, "ALTER TABLE users ALTER COLUMN email SET NOT NULL");
 }
 
@@ -1357,11 +1351,14 @@ fn expr_arithmetic() {
 fn expr_is_null_is_not_null() {
     let pg = Dialect::postgres();
     let mut c1 = pg.param_counter();
-    let sql1 = crate::backend::sql::render::render_expr(&field("meta").is_null(), &mut c1, &pg).unwrap();
+    let sql1 =
+        crate::backend::sql::render::render_expr(&field("meta").is_null(), &mut c1, &pg).unwrap();
     assert_eq!(sql1, "meta IS NULL");
 
     let mut c2 = pg.param_counter();
-    let sql2 = crate::backend::sql::render::render_expr(&field("meta").is_null().negate(), &mut c2, &pg).unwrap();
+    let sql2 =
+        crate::backend::sql::render::render_expr(&field("meta").is_null().negate(), &mut c2, &pg)
+            .unwrap();
     assert_eq!(sql2, "meta IS NOT NULL");
 }
 
@@ -1411,7 +1408,10 @@ fn expr_like_ilike() {
 
 #[test]
 fn expr_cast() {
-    let expr = field("price").cast(DataType::Decimal { precision: Some(10), scale: Some(2) });
+    let expr = field("price").cast(DataType::Decimal {
+        precision: Some(10),
+        scale: Some(2),
+    });
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
     let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();
@@ -1475,7 +1475,10 @@ fn expr_concat_pg_pipe_vs_mysql_func() {
 fn expr_case_when() {
     let expr = case()
         .when(field("status").eq(raw_expr("'active'")), string("Active"))
-        .when(field("status").eq(raw_expr("'disabled'")), string("Disabled"))
+        .when(
+            field("status").eq(raw_expr("'disabled'")),
+            string("Disabled"),
+        )
         .else_(string("Unknown"))
         .end();
     let pg = Dialect::postgres();
@@ -1507,13 +1510,15 @@ fn func_lower_upper() {
 
     let mut c1 = pg.param_counter();
     assert_eq!(
-        crate::backend::sql::render::render_expr(&func::lower(field("email")), &mut c1, &pg).unwrap(),
+        crate::backend::sql::render::render_expr(&func::lower(field("email")), &mut c1, &pg)
+            .unwrap(),
         "LOWER(email)"
     );
 
     let mut c2 = pg.param_counter();
     assert_eq!(
-        crate::backend::sql::render::render_expr(&func::upper(field("name")), &mut c2, &pg).unwrap(),
+        crate::backend::sql::render::render_expr(&func::upper(field("name")), &mut c2, &pg)
+            .unwrap(),
         "UPPER(name)"
     );
 }
@@ -1531,7 +1536,8 @@ fn func_coalesce() {
 fn func_count_star() {
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
-    let sql = crate::backend::sql::render::render_expr(&func::count_star(), &mut counter, &pg).unwrap();
+    let sql =
+        crate::backend::sql::render::render_expr(&func::count_star(), &mut counter, &pg).unwrap();
     assert_eq!(sql, "COUNT(*)");
 }
 
@@ -1637,10 +1643,7 @@ fn set_op_union() {
 fn set_op_union_all() {
     let s = settings();
     let q1 = s.get().build();
-    let q2 = s
-        .get()
-        .filter(field("tenant_id").eq(param()))
-        .build();
+    let q2 = s.get().filter(field("tenant_id").eq(param())).build();
     let sql = CompoundSelectBuilder::new(q1)
         .union_all(q2)
         .render(Some(&pg()))
@@ -2057,12 +2060,18 @@ fn dialect_presets_all_instantiate() {
 fn dialect_type_map_resolve() {
     let pg = Dialect::postgres();
     assert_eq!(pg.resolve_type(&DataType::Uuid), "UUID");
-    assert_eq!(pg.resolve_type(&DataType::TimestampTz { precision: 6 }), "TIMESTAMPTZ(6)");
+    assert_eq!(
+        pg.resolve_type(&DataType::TimestampTz { precision: 6 }),
+        "TIMESTAMPTZ(6)"
+    );
 
     let mysql = Dialect::mysql();
     assert_eq!(mysql.resolve_type(&DataType::Uuid), "CHAR(36)");
     assert_eq!(mysql.resolve_type(&DataType::Bool), "TINYINT(1)");
-    assert_eq!(mysql.resolve_type(&DataType::TimestampTz { precision: 6 }), "DATETIME(6)");
+    assert_eq!(
+        mysql.resolve_type(&DataType::TimestampTz { precision: 6 }),
+        "DATETIME(6)"
+    );
 
     let mssql = Dialect::mssql();
     assert_eq!(mssql.resolve_type(&DataType::Uuid), "UNIQUEIDENTIFIER");
@@ -2404,7 +2413,7 @@ fn storage_move_file() {
 
 #[test]
 fn expr_field_access() {
-    let expr = field("profile").access("address").access("city");
+    let expr = field("profile").get("address").get("city");
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
     let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();

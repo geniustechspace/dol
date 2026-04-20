@@ -12,7 +12,7 @@ use super::window::WindowBuilder;
 
 impl<'a> Expr<'a> {
     /// Nested field access: `self.field_name`.
-    pub fn access(self, name: &str) -> Expr<'a> {
+    pub fn get(self, name: &str) -> Expr<'a> {
         Expr::FieldAccess {
             base: Box::new(self),
             field: name.to_string(),

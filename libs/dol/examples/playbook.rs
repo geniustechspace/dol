@@ -30,16 +30,18 @@ use dol::Render;
 use dol::TransactionRender;
 use dol::backend::sql::dialect::Dialect;
 use dol::builder::control::{GrantBuilder, Privilege, RevokeBuilder};
-use dol::builder::{DefineEntityBuilder, DefineIndexBuilder, DropIndexBuilder};
 use dol::builder::storage::{
     GetObjectBuilder, ListObjectsBuilder, MoveFileBuilder, PutObjectBuilder, ReadFileBuilder,
     WriteFileBuilder,
 };
 use dol::builder::transaction::TransactionBuilder;
+use dol::builder::{DefineEntityBuilder, DefineIndexBuilder, DropIndexBuilder};
 use dol::expr::window::FrameBound;
-use dol::expr::{Direction, Expr, bool_expr, case, field, float, func, int, param, raw_expr, string};
-use dol::op::LockMode;
+use dol::expr::{
+    Direction, Expr, bool_expr, case, field, float, func, int, param, raw_expr, string,
+};
 use dol::model::{DataType, Entity, EntityConstraint, Field, FkAction};
+use dol::op::LockMode;
 
 // ============================================================================
 // 1. MODEL DEFINITION — the single source of truth for a data shape
@@ -113,7 +115,9 @@ fn audit_log() -> Entity {
     Entity::new(
         "audit_log",
         vec![
-            Field::new("id", DataType::Int64).auto_increment().primary_key(),
+            Field::new("id", DataType::Int64)
+                .auto_increment()
+                .primary_key(),
             Field::new("user_id", DataType::Uuid).references(
                 "users",
                 "id",
@@ -152,7 +156,13 @@ fn products() -> Entity {
             Field::new("id", DataType::Uuid).primary_key(),
             Field::new("name", DataType::Varchar(Some(255))),
             Field::new("sku", DataType::Char(12)).unique(),
-            Field::new("price", DataType::Decimal { precision: None, scale: None }),
+            Field::new(
+                "price",
+                DataType::Decimal {
+                    precision: None,
+                    scale: None,
+                },
+            ),
             Field::new("quantity", DataType::Int32).default("0"),
             Field::new("weight_kg", DataType::Float32).nullable(),
             Field::new("description", DataType::Text).nullable(),
@@ -174,7 +184,13 @@ fn order_items() -> Entity {
             Field::new("order_id", DataType::Uuid),
             Field::new("product_id", DataType::Uuid),
             Field::new("quantity", DataType::Int32),
-            Field::new("unit_price", DataType::Decimal { precision: None, scale: None }),
+            Field::new(
+                "unit_price",
+                DataType::Decimal {
+                    precision: None,
+                    scale: None,
+                },
+            ),
         ],
     )
     .with_constraints(vec![
@@ -225,10 +241,7 @@ fn main() {
     assert_eq!(email_field.name, "email");
     assert_eq!(email_field.data_type, DataType::Text);
     assert!(email_field.unique);
-    println!(
-        "  Field lookup: users.email -> {:?}",
-        email_field.data_type
-    );
+    println!("  Field lookup: users.email -> {:?}", email_field.data_type);
 
     // Safe field lookup
     assert!(users.try_field("nonexistent").is_none());
@@ -320,7 +333,11 @@ fn main() {
     // 2g. IN list
     let sql = users
         .get()
-        .filter(field("status").in_list(vec![string("active"), string("pending"), string("suspended")]))
+        .filter(field("status").in_list(vec![
+            string("active"),
+            string("pending"),
+            string("suspended"),
+        ]))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] IN list: {}", sql);
@@ -809,7 +826,16 @@ fn main() {
     let sql = DefineEntityBuilder::new("dynamic_table")
         .field(dol::FieldDef::new("id", DataType::Uuid).primary_key())
         .field(dol::FieldDef::new("name", DataType::Text))
-        .field(dol::FieldDef::new("value", DataType::Decimal { precision: None, scale: None }).nullable())
+        .field(
+            dol::FieldDef::new(
+                "value",
+                DataType::Decimal {
+                    precision: None,
+                    scale: None,
+                },
+            )
+            .nullable(),
+        )
         .if_not_exists()
         .render(Some(&pg))
         .unwrap();
@@ -1029,7 +1055,7 @@ fn main() {
     println!("  CASE WHEN: ✓");
 
     // 5j. Field access for nested/JSON data
-    let _access = field("profile").access("address").access("city");
+    let _access = field("profile").get("address").get("city");
     println!("  Field access: profile.address.city ✓");
 
     // 5k. Qualified identifiers
@@ -1058,12 +1084,16 @@ fn main() {
 
     // 5p. IN list / NOT IN list
     let _in = field("status").in_list(vec![string("a"), string("b")]);
-    let _not_in = field("status").in_list(vec![string("x"), string("y")]).negate();
+    let _not_in = field("status")
+        .in_list(vec![string("x"), string("y")])
+        .negate();
     println!("  IN / NOT IN list ✓");
 
     // 5q. IN / NOT IN subquery
     let _in_sub = field("id").in_subquery("SELECT user_id FROM active_users");
-    let _not_in_sub = field("id").in_subquery("SELECT user_id FROM banned_users").negate();
+    let _not_in_sub = field("id")
+        .in_subquery("SELECT user_id FROM banned_users")
+        .negate();
     println!("  IN / NOT IN subquery ✓");
 
     // 5r. All function constructors
@@ -1580,13 +1610,13 @@ fn main() {
 /// Separate function for migration examples (feature-gated).
 #[cfg(feature = "migration")]
 fn migration_examples() {
-    use dol::op::definition::{DefineIndex, FieldDef};
-    use dol::op::{AlterAction, EntityRef};
     use dol::migration::{
         InMemoryRegistry, Migration, MigrationDirection, MigrationRegistry, MigrationRunner,
         MigrationState, MigrationStep, MigrationTarget, RenderedStep,
     };
     use dol::model::DataType;
+    use dol::op::definition::{DefineIndex, FieldDef};
+    use dol::op::{AlterAction, EntityRef};
 
     println!("\n--- 12. Migration System ---");
 
@@ -1607,7 +1637,10 @@ fn migration_examples() {
                     .field(FieldDef::new("id", DataType::Uuid).primary_key())
                     .field(FieldDef::new("email", DataType::Text).unique())
                     .field(FieldDef::new("status", DataType::Text).default("'active'"))
-                    .field(FieldDef::new("created_at", DataType::TimestampTz { precision: 6 }).default("NOW()"))
+                    .field(
+                        FieldDef::new("created_at", DataType::TimestampTz { precision: 6 })
+                            .default("NOW()"),
+                    )
                     .if_not_exists()
                     .build(),
             )]
@@ -1838,12 +1871,12 @@ fn migration_examples() {
 /// Schema diff examples: comparing model versions and generating alter steps.
 #[cfg(feature = "migration")]
 fn schema_diff_examples() {
-    use dol::op::AlterAction;
     use dol::migration::schema_diff::{
         EntitySnapshot, create_entity_step, diff_entities, diff_to_steps, drop_entity_step,
         field_to_field_def,
     };
     use dol::model::DataType;
+    use dol::op::AlterAction;
 
     println!("\n--- 13. Schema Diff & Auto-Discovery ---");
 
@@ -1951,11 +1984,11 @@ fn schema_diff_examples() {
 /// Config-integrated migration examples.
 #[cfg(all(feature = "migration", feature = "config"))]
 fn config_migration_examples() {
-    use dol::op::definition::FieldDef;
     use dol::migration::{
         InMemoryRegistry, Migration, MigrationRunner, MigrationStep, RenderedStep,
     };
     use dol::model::DataType;
+    use dol::op::definition::FieldDef;
 
     println!("\n--- 14. Config-Integrated Migrations ---");
 
@@ -1972,7 +2005,13 @@ fn config_migration_examples() {
             vec![MigrationStep::define_entity(
                 dol::builder::DefineEntityBuilder::new("orders")
                     .field(FieldDef::new("id", DataType::Uuid).primary_key())
-                    .field(FieldDef::new("total", DataType::Decimal { precision: None, scale: None }))
+                    .field(FieldDef::new(
+                        "total",
+                        DataType::Decimal {
+                            precision: None,
+                            scale: None,
+                        },
+                    ))
                     .if_not_exists()
                     .build(),
             )]

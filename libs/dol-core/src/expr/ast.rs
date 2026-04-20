@@ -22,7 +22,7 @@ use super::window::WindowFrame;
 ///
 /// let expr = field("age").gt(int(18i32));
 /// let expr = field("age").gt(int(18i32)) & field("status").eq(string("active"));
-/// let expr = field("profile").access("address").access("city");
+/// let expr = field("profile").get("address").get("city");
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

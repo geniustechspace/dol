@@ -384,7 +384,7 @@ fn test_empty_vec_obj() {
 
 #[test]
 fn test_nested_field_access() {
-    let e = field("a").access("b").access("c");
+    let e = field("a").get("b").get("c");
     assert!(matches!(e, Expr::FieldAccess { field, .. } if field == "c"));
 }
 
