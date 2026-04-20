@@ -9,7 +9,8 @@ use super::dialect::{
 use crate::SqlOutput;
 use dol_core::expr::window::{FrameBound, FrameKind, WindowFrame};
 use dol_core::expr::{
-    Direction, Expr, FuncId, Literal, NullsPosition, OpId, OrderByExpr, Quantifier, UnaryOp,
+    Direction, Expr, FuncDef, Literal, NullsPosition, OpDef, OpId, OrderByExpr, Quantifier,
+    UnaryOp,
 };
 use dol_core::ir::BackendError;
 use dol_core::ir::definition::OwnedEntityConstraint;
@@ -378,7 +379,7 @@ fn render_literal(lit: &Literal<'_>, dialect: &Dialect) -> String {
 
 fn render_binary_op(
     left: &Expr<'_>,
-    op: &OpId,
+    op: &OpDef,
     right: &Expr<'_>,
     negated: bool,
     counter: &mut ParamCounter,
@@ -386,7 +387,7 @@ fn render_binary_op(
     depth: usize,
 ) -> Result<String, BackendError> {
     // Special case: ILike on dialects without native ILIKE support
-    if *op == OpId::ILIKE && !dialect.features.ilike {
+    if op.name() == OpId::ILIKE && !dialect.features.ilike {
         let lhs = render_expr_inner(left, counter, dialect, depth)?;
         let rhs = render_expr_inner(right, counter, dialect, depth)?;
         let not = if negated { "NOT " } else { "" };
@@ -394,7 +395,7 @@ fn render_binary_op(
     }
 
     // Special case: Concat dispatches on dialect.concat_style
-    if *op == OpId::CONCAT {
+    if op.name() == OpId::CONCAT {
         let lhs = render_expr_inner(left, counter, dialect, depth)?;
         let rhs = render_expr_inner(right, counter, dialect, depth)?;
         return Ok(match &dialect.concat_style {
@@ -408,7 +409,7 @@ fn render_binary_op(
     let rhs = render_expr_inner(right, counter, dialect, depth)?;
     let op_str = render_binop_token(op);
 
-    let base = if *op == OpId::AND || *op == OpId::OR {
+    let base = if op.name() == OpId::AND || op.name() == OpId::OR {
         format!("({} {} {})", lhs, op_str, rhs)
     } else {
         format!("{} {} {}", lhs, op_str, rhs)
@@ -421,9 +422,9 @@ fn render_binary_op(
     })
 }
 
-/// Map an [`OpId`] to its SQL token string.
-fn render_binop_token(op: &OpId) -> &'static str {
-    match op.as_str() {
+/// Map an [`OpDef`] to its SQL token string.
+fn render_binop_token(op: &OpDef) -> &'static str {
+    match op.name() {
         // Comparison
         OpId::EQ => "=",
         OpId::NE => "!=",
@@ -1530,9 +1531,9 @@ fn entity_ref_to_sql(mref: &EntityRef, _dialect: &Dialect) -> String {
     }
 }
 
-fn func_id_to_sql<'a>(name: &'a FuncId) -> std::borrow::Cow<'a, str> {
+fn func_id_to_sql<'a>(name: &'a FuncDef) -> std::borrow::Cow<'a, str> {
     use dol_core::expr::FuncId as K;
-    match name.as_str() {
+    match name.name() {
         // ── Multi-to-one mappings ────────────────────────────────────────
         K::COUNT | K::COUNT_DISTINCT => std::borrow::Cow::Borrowed("COUNT"),
         K::EPOCH_TO_TIMESTAMP | K::TIMESTAMP_TO_EPOCH => std::borrow::Cow::Borrowed("TO_TIMESTAMP"),

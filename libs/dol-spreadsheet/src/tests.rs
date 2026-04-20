@@ -913,7 +913,7 @@ fn query_rejects_non_column_sort_expr() {
         having: vec![],
         order_by: vec![OrderByExpr {
             expr: Expr::Func {
-                name: dol_core::expr::FuncId::new("UPPER"),
+                name: dol_core::expr::FuncDef::custom("UPPER"),
                 args: vec![field("name")],
             },
             direction: dol_core::expr::Direction::Asc,

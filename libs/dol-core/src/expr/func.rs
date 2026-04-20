@@ -5,6 +5,7 @@
 //! [`FuncId::new()`] — no enum variant needed.
 
 use super::Expr;
+use super::func_def::DolFunc;
 use core::fmt;
 
 // ---------------------------------------------------------------------------
@@ -308,17 +309,15 @@ pub type FuncName = FuncId;
 /// Build a function-call expression from any name string.
 pub fn func<'a>(name: &str, args: Vec<Expr<'a>>) -> Expr<'a> {
     Expr::Func {
-        name: FuncId::new(name),
+        name: super::FuncDef::custom(name),
         args,
     }
 }
 
-/// Internal helper to build a function-call expression from a well-known constant.
-fn known<'a>(name: &str, args: Vec<Expr<'a>>) -> Expr<'a> {
-    Expr::Func {
-        name: FuncId::new(name),
-        args,
-    }
+/// Internal helper to build a function-call expression from a well-known
+/// [`FuncDef`] (zero heap allocation for the name).
+fn known_def<'a>(def: super::FuncDef, args: Vec<Expr<'a>>) -> Expr<'a> {
+    Expr::Func { name: def, args }
 }
 
 // ---------------------------------------------------------------------------
@@ -326,7 +325,7 @@ fn known<'a>(name: &str, args: Vec<Expr<'a>>) -> Expr<'a> {
 // ---------------------------------------------------------------------------
 
 pub fn count<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::COUNT, vec![expr.into()])
+    known_def(super::func_registry::Count::def(), vec![expr.into()])
 }
 
 pub fn count_star<'a>() -> Expr<'a> {
@@ -334,19 +333,19 @@ pub fn count_star<'a>() -> Expr<'a> {
 }
 
 pub fn sum<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::SUM, vec![expr.into()])
+    known_def(super::func_registry::Sum::def(), vec![expr.into()])
 }
 
 pub fn avg<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::AVG, vec![expr.into()])
+    known_def(super::func_registry::Avg::def(), vec![expr.into()])
 }
 
 pub fn min<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::MIN, vec![expr.into()])
+    known_def(super::func_registry::Min::def(), vec![expr.into()])
 }
 
 pub fn max<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::MAX, vec![expr.into()])
+    known_def(super::func_registry::Max::def(), vec![expr.into()])
 }
 
 // ---------------------------------------------------------------------------
@@ -354,19 +353,19 @@ pub fn max<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
 // ---------------------------------------------------------------------------
 
 pub fn lower<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::LOWER, vec![expr.into()])
+    known_def(super::func_registry::Lower::def(), vec![expr.into()])
 }
 
 pub fn upper<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::UPPER, vec![expr.into()])
+    known_def(super::func_registry::Upper::def(), vec![expr.into()])
 }
 
 pub fn trim<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::TRIM, vec![expr.into()])
+    known_def(super::func_registry::Trim::def(), vec![expr.into()])
 }
 
 pub fn length<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::LENGTH, vec![expr.into()])
+    known_def(super::func_registry::Length::def(), vec![expr.into()])
 }
 
 pub fn substr<'a>(
@@ -374,11 +373,11 @@ pub fn substr<'a>(
     start: impl Into<Expr<'a>>,
     len: impl Into<Expr<'a>>,
 ) -> Expr<'a> {
-    known(FuncId::SUBSTR, vec![expr.into(), start.into(), len.into()])
+    known_def(super::func_registry::Substr::def(), vec![expr.into(), start.into(), len.into()])
 }
 
 pub fn concat_fn<'a>(args: Vec<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::CONCAT, args)
+    known_def(super::func_registry::Concat::def(), args)
 }
 
 pub fn replace<'a>(
@@ -386,7 +385,7 @@ pub fn replace<'a>(
     from: impl Into<Expr<'a>>,
     to: impl Into<Expr<'a>>,
 ) -> Expr<'a> {
-    known(FuncId::REPLACE, vec![expr.into(), from.into(), to.into()])
+    known_def(super::func_registry::Replace::def(), vec![expr.into(), from.into(), to.into()])
 }
 
 // ---------------------------------------------------------------------------
@@ -394,15 +393,15 @@ pub fn replace<'a>(
 // ---------------------------------------------------------------------------
 
 pub fn now<'a>() -> Expr<'a> {
-    known(FuncId::NOW, vec![])
+    known_def(super::func_registry::Now::def(), vec![])
 }
 
 pub fn current_date<'a>() -> Expr<'a> {
-    known(FuncId::CURRENT_DATE, vec![])
+    known_def(super::func_registry::CurrentDate::def(), vec![])
 }
 
 pub fn current_timestamp<'a>() -> Expr<'a> {
-    known(FuncId::CURRENT_TIMESTAMP, vec![])
+    known_def(super::func_registry::CurrentTimestamp::def(), vec![])
 }
 
 // ---------------------------------------------------------------------------
@@ -410,11 +409,11 @@ pub fn current_timestamp<'a>() -> Expr<'a> {
 // ---------------------------------------------------------------------------
 
 pub fn coalesce<'a>(args: Vec<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::COALESCE, args)
+    known_def(super::func_registry::Coalesce::def(), args)
 }
 
 pub fn nullif<'a>(expr1: impl Into<Expr<'a>>, expr2: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::NULLIF, vec![expr1.into(), expr2.into()])
+    known_def(super::func_registry::Nullif::def(), vec![expr1.into(), expr2.into()])
 }
 
 // ---------------------------------------------------------------------------
@@ -422,19 +421,19 @@ pub fn nullif<'a>(expr1: impl Into<Expr<'a>>, expr2: impl Into<Expr<'a>>) -> Exp
 // ---------------------------------------------------------------------------
 
 pub fn row_number<'a>() -> Expr<'a> {
-    known(FuncId::ROW_NUMBER, vec![])
+    known_def(super::func_registry::RowNumber::def(), vec![])
 }
 
 pub fn rank<'a>() -> Expr<'a> {
-    known(FuncId::RANK, vec![])
+    known_def(super::func_registry::Rank::def(), vec![])
 }
 
 pub fn dense_rank<'a>() -> Expr<'a> {
-    known(FuncId::DENSE_RANK, vec![])
+    known_def(super::func_registry::DenseRank::def(), vec![])
 }
 
 pub fn ntile<'a>(n: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::NTILE, vec![n.into()])
+    known_def(super::func_registry::Ntile::def(), vec![n.into()])
 }
 
 pub fn lag<'a>(
@@ -449,7 +448,7 @@ pub fn lag<'a>(
     if let Some(d) = default {
         args.push(d);
     }
-    known(FuncId::LAG, args)
+    known_def(super::func_registry::Lag::def(), args)
 }
 
 pub fn lead<'a>(
@@ -464,15 +463,15 @@ pub fn lead<'a>(
     if let Some(d) = default {
         args.push(d);
     }
-    known(FuncId::LEAD, args)
+    known_def(super::func_registry::Lead::def(), args)
 }
 
 pub fn first_value<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::FIRST_VALUE, vec![expr.into()])
+    known_def(super::func_registry::FirstValue::def(), vec![expr.into()])
 }
 
 pub fn last_value<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::LAST_VALUE, vec![expr.into()])
+    known_def(super::func_registry::LastValue::def(), vec![expr.into()])
 }
 
 // ---------------------------------------------------------------------------
@@ -480,7 +479,7 @@ pub fn last_value<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
 // ---------------------------------------------------------------------------
 
 pub fn abs<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::ABS, vec![expr.into()])
+    known_def(super::func_registry::Abs::def(), vec![expr.into()])
 }
 
 pub fn round<'a>(expr: impl Into<Expr<'a>>, precision: Option<Expr<'a>>) -> Expr<'a> {
@@ -488,27 +487,27 @@ pub fn round<'a>(expr: impl Into<Expr<'a>>, precision: Option<Expr<'a>>) -> Expr
     if let Some(p) = precision {
         args.push(p);
     }
-    known(FuncId::ROUND, args)
+    known_def(super::func_registry::Round::def(), args)
 }
 
 pub fn sqrt<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::SQRT, vec![expr.into()])
+    known_def(super::func_registry::Sqrt::def(), vec![expr.into()])
 }
 
 pub fn cbrt<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::CBRT, vec![expr.into()])
+    known_def(super::func_registry::Cbrt::def(), vec![expr.into()])
 }
 
 pub fn factorial<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::FACTORIAL, vec![expr.into()])
+    known_def(super::func_registry::Factorial::def(), vec![expr.into()])
 }
 
 pub fn greatest<'a>(args: Vec<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::GREATEST, args)
+    known_def(super::func_registry::Greatest::def(), args)
 }
 
 pub fn least<'a>(args: Vec<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::LEAST, args)
+    known_def(super::func_registry::Least::def(), args)
 }
 
 // ---------------------------------------------------------------------------
@@ -516,11 +515,11 @@ pub fn least<'a>(args: Vec<Expr<'a>>) -> Expr<'a> {
 // ---------------------------------------------------------------------------
 
 pub fn json_get<'a>(doc: impl Into<Expr<'a>>, key: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::JSON_GET, vec![doc.into(), key.into()])
+    known_def(super::func_registry::JsonGet::def(), vec![doc.into(), key.into()])
 }
 
 pub fn json_has_key<'a>(doc: impl Into<Expr<'a>>, key: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::JSON_HAS_KEY, vec![doc.into(), key.into()])
+    known_def(super::func_registry::JsonHasKey::def(), vec![doc.into(), key.into()])
 }
 
 // ---------------------------------------------------------------------------
@@ -528,19 +527,19 @@ pub fn json_has_key<'a>(doc: impl Into<Expr<'a>>, key: impl Into<Expr<'a>>) -> E
 // ---------------------------------------------------------------------------
 
 pub fn array_append<'a>(arr: impl Into<Expr<'a>>, elem: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::ARRAY_APPEND, vec![arr.into(), elem.into()])
+    known_def(super::func_registry::ArrayAppend::def(), vec![arr.into(), elem.into()])
 }
 
 pub fn array_prepend<'a>(elem: impl Into<Expr<'a>>, arr: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::ARRAY_PREPEND, vec![elem.into(), arr.into()])
+    known_def(super::func_registry::ArrayPrepend::def(), vec![elem.into(), arr.into()])
 }
 
 pub fn array_length<'a>(arr: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::ARRAY_LENGTH, vec![arr.into()])
+    known_def(super::func_registry::ArrayLength::def(), vec![arr.into()])
 }
 
 pub fn unnest<'a>(arr: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::UNNEST, vec![arr.into()])
+    known_def(super::func_registry::Unnest::def(), vec![arr.into()])
 }
 
 // ---------------------------------------------------------------------------
@@ -548,5 +547,5 @@ pub fn unnest<'a>(arr: impl Into<Expr<'a>>) -> Expr<'a> {
 // ---------------------------------------------------------------------------
 
 pub fn st_distance<'a>(a: impl Into<Expr<'a>>, b: impl Into<Expr<'a>>) -> Expr<'a> {
-    known(FuncId::ST_DISTANCE, vec![a.into(), b.into()])
+    known_def(super::func_registry::StDistance::def(), vec![a.into(), b.into()])
 }

@@ -540,7 +540,7 @@ fn render_expr_simple(expr: &Expr<'_>) -> Result<String, BackendError> {
             right,
             negated,
         } => {
-            let op_str = match op.as_str() {
+            let op_str = match op.name() {
                 OpId::EQ => "=",
                 OpId::NE => "!=",
                 OpId::LT => "<",
@@ -720,9 +720,9 @@ fn validate_column_expr(expr: &Expr<'_>, context: &str) -> Result<String, Backen
     }
 }
 
-fn spreadsheet_func_name<'a>(name: &'a dol_core::expr::FuncId) -> std::borrow::Cow<'a, str> {
+fn spreadsheet_func_name<'a>(name: &'a dol_core::expr::FuncDef) -> std::borrow::Cow<'a, str> {
     use dol_core::expr::FuncId as K;
-    match name.as_str() {
+    match name.name() {
         // ── Renamed functions (DOL name differs from spreadsheet name) ───
         K::LENGTH => std::borrow::Cow::Borrowed("LEN"),
         K::NULLIF | K::IFNULL => std::borrow::Cow::Borrowed("IFERROR"),
