@@ -44,79 +44,79 @@ impl OpId {
 
     // ── Comparison ──────────────────────────────────────────────────────
     /// `=`
-    pub const EQ: &str = "eq";
+    pub const EQ: &str = "EQ";
     /// `!=` / `<>`
-    pub const NE: &str = "ne";
+    pub const NE: &str = "NE";
     /// `<`
-    pub const LT: &str = "lt";
+    pub const LT: &str = "LT";
     /// `>`
-    pub const GT: &str = "gt";
+    pub const GT: &str = "GT";
     /// `<=`
-    pub const LE: &str = "le";
+    pub const LE: &str = "LE";
     /// `>=`
-    pub const GE: &str = "ge";
+    pub const GE: &str = "GE";
 
     // ── Null-safe comparison ────────────────────────────────────────────
     /// `IS DISTINCT FROM` — null-safe inequality.
-    pub const IS_DISTINCT_FROM: &str = "is_distinct_from";
+    pub const IS_DISTINCT_FROM: &str = "IS_DISTINCT_FROM";
     /// `IS NOT DISTINCT FROM` — null-safe equality.
-    pub const IS_NOT_DISTINCT_FROM: &str = "is_not_distinct_from";
+    pub const IS_NOT_DISTINCT_FROM: &str = "IS_NOT_DISTINCT_FROM";
 
     // ── Arithmetic ──────────────────────────────────────────────────────
     /// `+`
-    pub const ADD: &str = "add";
+    pub const ADD: &str = "ADD";
     /// `-`
-    pub const SUB: &str = "sub";
+    pub const SUB: &str = "SUB";
     /// `*`
-    pub const MUL: &str = "mul";
+    pub const MUL: &str = "MUL";
     /// `/`
-    pub const DIV: &str = "div";
+    pub const DIV: &str = "DIV";
     /// `%` / `MOD`
-    pub const MOD: &str = "mod";
+    pub const MOD: &str = "MOD";
 
     // ── Logical ─────────────────────────────────────────────────────────
     /// `AND`
-    pub const AND: &str = "and";
+    pub const AND: &str = "AND";
     /// `OR`
-    pub const OR: &str = "or";
+    pub const OR: &str = "OR";
 
     // ── Pattern matching (negation via `negated: bool`) ─────────────────
     /// `LIKE` / `NOT LIKE`
-    pub const LIKE: &str = "like";
+    pub const LIKE: &str = "LIKE";
     /// `ILIKE` / `NOT ILIKE` (case-insensitive LIKE)
-    pub const ILIKE: &str = "ilike";
+    pub const ILIKE: &str = "ILIKE";
     /// `SIMILAR TO` / `NOT SIMILAR TO` (SQL-standard regex)
-    pub const SIMILAR_TO: &str = "similar_to";
+    pub const SIMILAR_TO: &str = "SIMILAR_TO";
     /// POSIX regex match (`~` / `!~`)
-    pub const REGEX_MATCH: &str = "regex_match";
+    pub const REGEX_MATCH: &str = "REGEX_MATCH";
     /// POSIX regex match, case-insensitive (`~*` / `!~*`)
-    pub const REGEX_MATCH_INSENSITIVE: &str = "regex_match_insensitive";
+    pub const REGEX_MATCH_INSENSITIVE: &str = "REGEX_MATCH_INSENSITIVE";
     /// Glob-style pattern match (SQLite `GLOB`)
-    pub const GLOB: &str = "glob";
+    pub const GLOB: &str = "GLOB";
 
     // ── String ──────────────────────────────────────────────────────────
     /// String concatenation (`||` / `CONCAT()` / `+` depending on dialect).
-    pub const CONCAT: &str = "concat";
+    pub const CONCAT: &str = "CONCAT";
 
     // ── Bitwise ─────────────────────────────────────────────────────────
     /// `&` — bitwise AND.
-    pub const BIT_AND: &str = "bit_and";
+    pub const BIT_AND: &str = "BIT_AND";
     /// `|` — bitwise OR.
-    pub const BIT_OR: &str = "bit_or";
+    pub const BIT_OR: &str = "BIT_OR";
     /// `^` / `#` — bitwise XOR.
-    pub const BIT_XOR: &str = "bit_xor";
+    pub const BIT_XOR: &str = "BIT_XOR";
     /// `<<` — bit shift left.
-    pub const SHIFT_LEFT: &str = "shift_left";
+    pub const SHIFT_LEFT: &str = "SHIFT_LEFT";
     /// `>>` — bit shift right.
-    pub const SHIFT_RIGHT: &str = "shift_right";
+    pub const SHIFT_RIGHT: &str = "SHIFT_RIGHT";
 
     // ── Collection containment predicates ───────────────────────────────
     /// Array/collection contains element or sub-collection.
-    pub const CONTAINS: &str = "contains";
+    pub const CONTAINS: &str = "CONTAINS";
     /// Array/collection is contained by another.
-    pub const CONTAINED_BY: &str = "contained_by";
+    pub const CONTAINED_BY: &str = "CONTAINED_BY";
     /// Arrays/collections share at least one element.
-    pub const OVERLAP: &str = "overlap";
+    pub const OVERLAP: &str = "OVERLAP";
 }
 
 impl fmt::Display for OpId {

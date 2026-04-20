@@ -1,9 +1,9 @@
 use super::*;
+use dol_core::expr::{field, int, param, string};
 use dol_core::ir::definition::{DefineEntityIR, DropEntityIR, FieldDef, OwnedForeignKeyRef};
 use dol_core::ir::mutation::{InsertIR, RemoveIR, UpdateIR};
 use dol_core::ir::query::{JoinIR, JoinType, LockMode, QueryIR};
 use dol_core::ir::{AlterAction, AlterEntityIR, EntityRef, OffsetLimit};
-use dol_core::expr::{field, int, param, string};
 use dol_core::types::DataType;
 
 fn entity_ref(name: &str) -> EntityRef {
@@ -41,23 +41,24 @@ fn define_entity_creates_sheet() {
     let stmt = Statement::DefineEntity(Box::new(ir));
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result;
-            assert_eq!(out.sheet, "users");
-            assert!(out.workbook.is_none());
-            match out.operation {
-                SpreadsheetOp::CreateSheet {
-                    columns,
-                    if_not_exists,
-                } => {
-                    assert_eq!(columns.len(), 3);
-                    assert_eq!(columns[0].name, "id");
-                    assert_eq!(columns[0].data_type, DataType::Uuid);
-                    assert_eq!(columns[1].name, "email");
-                    assert_eq!(columns[2].name, "age");
-                    assert!(!if_not_exists);
-                }
-                _ => panic!("expected CreateSheet"),
+    {
+        let out = result;
+        assert_eq!(out.sheet, "users");
+        assert!(out.workbook.is_none());
+        match out.operation {
+            SpreadsheetOp::CreateSheet {
+                columns,
+                if_not_exists,
+            } => {
+                assert_eq!(columns.len(), 3);
+                assert_eq!(columns[0].name, "id");
+                assert_eq!(columns[0].data_type, DataType::Uuid);
+                assert_eq!(columns[1].name, "email");
+                assert_eq!(columns[2].name, "age");
+                assert!(!if_not_exists);
             }
+            _ => panic!("expected CreateSheet"),
+        }
     }
 }
 
@@ -74,14 +75,15 @@ fn define_entity_with_namespace() {
     let stmt = Statement::DefineEntity(Box::new(ir));
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result;
-            assert_eq!(out.sheet, "hr.users");
-            match out.operation {
-                SpreadsheetOp::CreateSheet { if_not_exists, .. } => {
-                    assert!(if_not_exists);
-                }
-                _ => panic!("expected CreateSheet"),
+    {
+        let out = result;
+        assert_eq!(out.sheet, "hr.users");
+        match out.operation {
+            SpreadsheetOp::CreateSheet { if_not_exists, .. } => {
+                assert!(if_not_exists);
             }
+            _ => panic!("expected CreateSheet"),
+        }
     }
 }
 
@@ -145,9 +147,7 @@ fn define_entity_rejects_generated() {
     let ir = DefineEntityIR {
         name: "items".to_string(),
         namespace: None,
-        fields: vec![
-            FieldDef::new("total", DataType::Int32).generated_stored("qty * price"),
-        ],
+        fields: vec![FieldDef::new("total", DataType::Int32).generated_stored("qty * price")],
         constraints: vec![],
         if_not_exists: false,
     };
@@ -195,14 +195,15 @@ fn drop_entity_drops_sheet() {
     let stmt = Statement::DropEntity(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result;
-            assert_eq!(out.sheet, "users");
-            match out.operation {
-                SpreadsheetOp::DropSheet { if_exists } => {
-                    assert!(if_exists);
-                }
-                _ => panic!("expected DropSheet"),
+    {
+        let out = result;
+        assert_eq!(out.sheet, "users");
+        match out.operation {
+            SpreadsheetOp::DropSheet { if_exists } => {
+                assert!(if_exists);
             }
+            _ => panic!("expected DropSheet"),
+        }
     }
 }
 
@@ -229,14 +230,15 @@ fn alter_entity_rename_to_rename_sheet() {
     let stmt = Statement::AlterEntity(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result;
-            assert_eq!(out.sheet, "users");
-            match out.operation {
-                SpreadsheetOp::RenameSheet { new_name } => {
-                    assert_eq!(new_name, "employees");
-                }
-                _ => panic!("expected RenameSheet"),
+    {
+        let out = result;
+        assert_eq!(out.sheet, "users");
+        match out.operation {
+            SpreadsheetOp::RenameSheet { new_name } => {
+                assert_eq!(new_name, "employees");
             }
+            _ => panic!("expected RenameSheet"),
+        }
     }
 }
 
@@ -244,7 +246,10 @@ fn alter_entity_rename_to_rename_sheet() {
 fn alter_entity_add_field_unsupported() {
     let ir = AlterEntityIR {
         target: entity_ref("users"),
-        actions: vec![AlterAction::AddField(FieldDef::new("phone", DataType::Text))],
+        actions: vec![AlterAction::AddField(FieldDef::new(
+            "phone",
+            DataType::Text,
+        ))],
     };
 
     let stmt = Statement::AlterEntity(ir);
@@ -289,18 +294,16 @@ fn insert_appends_rows() {
     let stmt = Statement::Insert(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result;
-            assert_eq!(out.sheet, "users");
-            match out.operation {
-                SpreadsheetOp::AppendRows {
-                    columns,
-                    row_count,
-                } => {
-                    assert_eq!(columns, vec!["id", "email"]);
-                    assert_eq!(row_count, 3);
-                }
-                _ => panic!("expected AppendRows"),
+    {
+        let out = result;
+        assert_eq!(out.sheet, "users");
+        match out.operation {
+            SpreadsheetOp::AppendRows { columns, row_count } => {
+                assert_eq!(columns, vec!["id", "email"]);
+                assert_eq!(row_count, 3);
             }
+            _ => panic!("expected AppendRows"),
+        }
     }
 }
 
@@ -330,22 +333,23 @@ fn update_with_filter() {
     let stmt = Statement::Update(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result;
-            assert_eq!(out.sheet, "users");
-            match out.operation {
-                SpreadsheetOp::UpdateRows {
-                    assignments,
-                    filter,
-                } => {
-                    assert_eq!(assignments.len(), 1);
-                    assert_eq!(assignments[0].0, "email");
-                    assert!(filter.is_some());
-                    let f = filter.unwrap();
-                    assert!(f.contains("id"));
-                    assert!(f.contains("="));
-                }
-                _ => panic!("expected UpdateRows"),
+    {
+        let out = result;
+        assert_eq!(out.sheet, "users");
+        match out.operation {
+            SpreadsheetOp::UpdateRows {
+                assignments,
+                filter,
+            } => {
+                assert_eq!(assignments.len(), 1);
+                assert_eq!(assignments[0].0, "email");
+                assert!(filter.is_some());
+                let f = filter.unwrap();
+                assert!(f.contains("id"));
+                assert!(f.contains("="));
             }
+            _ => panic!("expected UpdateRows"),
+        }
     }
 }
 
@@ -362,10 +366,10 @@ fn update_without_filter() {
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
     match result.operation {
-            SpreadsheetOp::UpdateRows { filter, .. } => {
-                assert!(filter.is_none());
-            }
-            _ => panic!("expected UpdateRows"),
+        SpreadsheetOp::UpdateRows { filter, .. } => {
+            assert!(filter.is_none());
+        }
+        _ => panic!("expected UpdateRows"),
     }
 }
 
@@ -394,16 +398,17 @@ fn remove_with_filter() {
     let stmt = Statement::Remove(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result;
-            assert_eq!(out.sheet, "users");
-            match out.operation {
-                SpreadsheetOp::DeleteRows { filter } => {
-                    assert!(filter.is_some());
-                    let f = filter.unwrap();
-                    assert!(f.contains("status"));
-                }
-                _ => panic!("expected DeleteRows"),
+    {
+        let out = result;
+        assert_eq!(out.sheet, "users");
+        match out.operation {
+            SpreadsheetOp::DeleteRows { filter } => {
+                assert!(filter.is_some());
+                let f = filter.unwrap();
+                assert!(f.contains("status"));
             }
+            _ => panic!("expected DeleteRows"),
+        }
     }
 }
 
@@ -419,10 +424,10 @@ fn remove_without_filter() {
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
     match result.operation {
-            SpreadsheetOp::DeleteRows { filter } => {
-                assert!(filter.is_none());
-            }
-            _ => panic!("expected DeleteRows"),
+        SpreadsheetOp::DeleteRows { filter } => {
+            assert!(filter.is_none());
+        }
+        _ => panic!("expected DeleteRows"),
     }
 }
 
@@ -459,26 +464,27 @@ fn query_read_rows_basic() {
     let stmt = Statement::Query(Box::new(ir));
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result;
-            assert_eq!(out.sheet, "users");
-            match out.operation {
-                SpreadsheetOp::ReadRows {
-                    columns,
-                    filter,
-                    sort,
-                    limit,
-                    offset,
-                    distinct,
-                } => {
-                    assert_eq!(columns, vec!["id", "email"]);
-                    assert!(filter.is_none());
-                    assert!(sort.is_empty());
-                    assert!(limit.is_none());
-                    assert!(offset.is_none());
-                    assert!(!distinct);
-                }
-                _ => panic!("expected ReadRows"),
+    {
+        let out = result;
+        assert_eq!(out.sheet, "users");
+        match out.operation {
+            SpreadsheetOp::ReadRows {
+                columns,
+                filter,
+                sort,
+                limit,
+                offset,
+                distinct,
+            } => {
+                assert_eq!(columns, vec!["id", "email"]);
+                assert!(filter.is_none());
+                assert!(sort.is_empty());
+                assert!(limit.is_none());
+                assert!(offset.is_none());
+                assert!(!distinct);
             }
+            _ => panic!("expected ReadRows"),
+        }
     }
 }
 
@@ -503,20 +509,20 @@ fn query_with_filter_and_limit() {
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
     match result.operation {
-            SpreadsheetOp::ReadRows {
-                columns,
-                filter,
-                limit,
-                ..
-            } => {
-                assert_eq!(columns, vec!["email"]);
-                assert!(filter.is_some());
-                let f = filter.unwrap();
-                assert!(f.contains("age"));
-                assert!(f.contains(">"));
-                assert_eq!(limit, Some(10));
-            }
-            _ => panic!("expected ReadRows"),
+        SpreadsheetOp::ReadRows {
+            columns,
+            filter,
+            limit,
+            ..
+        } => {
+            assert_eq!(columns, vec!["email"]);
+            assert!(filter.is_some());
+            let f = filter.unwrap();
+            assert!(f.contains("age"));
+            assert!(f.contains(">"));
+            assert_eq!(limit, Some(10));
+        }
+        _ => panic!("expected ReadRows"),
     }
 }
 
@@ -552,23 +558,23 @@ fn query_with_sort() {
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
     match result.operation {
-            SpreadsheetOp::ReadRows {
-                sort,
-                limit,
-                offset,
-                distinct,
-                ..
-            } => {
-                assert_eq!(sort.len(), 2);
-                assert_eq!(sort[0].column, "age");
-                assert_eq!(sort[0].direction, Direction::Desc);
-                assert_eq!(sort[1].column, "name");
-                assert_eq!(sort[1].direction, Direction::Asc);
-                assert_eq!(limit, Some(20));
-                assert_eq!(offset, Some(5));
-                assert!(distinct);
-            }
-            _ => panic!("expected ReadRows"),
+        SpreadsheetOp::ReadRows {
+            sort,
+            limit,
+            offset,
+            distinct,
+            ..
+        } => {
+            assert_eq!(sort.len(), 2);
+            assert_eq!(sort[0].column, "age");
+            assert_eq!(sort[0].direction, Direction::Desc);
+            assert_eq!(sort[1].column, "name");
+            assert_eq!(sort[1].direction, Direction::Asc);
+            assert_eq!(limit, Some(20));
+            assert_eq!(offset, Some(5));
+            assert!(distinct);
+        }
+        _ => panic!("expected ReadRows"),
     }
 }
 
@@ -811,14 +817,15 @@ fn alter_entity_rename_qualifies_new_name_with_namespace() {
     let stmt = Statement::AlterEntity(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result;
-            assert_eq!(out.sheet, "hr.users");
-            match out.operation {
-                SpreadsheetOp::RenameSheet { new_name } => {
-                    assert_eq!(new_name, "hr.employees");
-                }
-                _ => panic!("expected RenameSheet"),
+    {
+        let out = result;
+        assert_eq!(out.sheet, "hr.users");
+        match out.operation {
+            SpreadsheetOp::RenameSheet { new_name } => {
+                assert_eq!(new_name, "hr.employees");
             }
+            _ => panic!("expected RenameSheet"),
+        }
     }
 }
 

@@ -47,221 +47,221 @@ impl FuncId {
     }
 
     // ── Aggregate ────────────────────────────────────────────────────────
-    pub const COUNT: &str = "count";
-    pub const COUNT_DISTINCT: &str = "count_distinct";
-    pub const SUM: &str = "sum";
-    pub const AVG: &str = "avg";
-    pub const MIN: &str = "min";
-    pub const MAX: &str = "max";
-    pub const MEDIAN: &str = "median";
-    pub const STDDEV: &str = "stddev";
-    pub const VARIANCE: &str = "variance";
-    pub const ARRAY_AGG: &str = "array_agg";
-    pub const STRING_AGG: &str = "string_agg";
-    pub const JSON_AGG: &str = "json_agg";
-    pub const BOOL_AND: &str = "bool_and";
-    pub const BOOL_OR: &str = "bool_or";
-    pub const FIRST: &str = "first";
-    pub const LAST: &str = "last";
+    pub const COUNT: &str = "COUNT";
+    pub const COUNT_DISTINCT: &str = "COUNT_DISTINCT";
+    pub const SUM: &str = "SUM";
+    pub const AVG: &str = "AVG";
+    pub const MIN: &str = "MIN";
+    pub const MAX: &str = "MAX";
+    pub const MEDIAN: &str = "MEDIAN";
+    pub const STDDEV: &str = "STDDEV";
+    pub const VARIANCE: &str = "VARIANCE";
+    pub const ARRAY_AGG: &str = "ARRAY_AGG";
+    pub const STRING_AGG: &str = "STRING_AGG";
+    pub const JSON_AGG: &str = "JSON_AGG";
+    pub const BOOL_AND: &str = "BOOL_AND";
+    pub const BOOL_OR: &str = "BOOL_OR";
+    pub const FIRST: &str = "FIRST";
+    pub const LAST: &str = "LAST";
 
     // ── String ───────────────────────────────────────────────────────────
-    pub const LOWER: &str = "lower";
-    pub const UPPER: &str = "upper";
-    pub const TRIM: &str = "trim";
-    pub const LTRIM: &str = "ltrim";
-    pub const RTRIM: &str = "rtrim";
-    pub const LENGTH: &str = "length";
-    pub const CHAR_LENGTH: &str = "char_length";
-    pub const OCTET_LENGTH: &str = "octet_length";
-    pub const SUBSTR: &str = "substr";
-    pub const LEFT: &str = "left";
-    pub const RIGHT: &str = "right";
-    pub const CONCAT: &str = "concat";
-    pub const CONCAT_WS: &str = "concat_ws";
-    pub const REPLACE: &str = "replace";
-    pub const REVERSE: &str = "reverse";
-    pub const REPEAT: &str = "repeat";
-    pub const PAD_LEFT: &str = "pad_left";
-    pub const PAD_RIGHT: &str = "pad_right";
-    pub const POSITION: &str = "position";
-    pub const INITCAP: &str = "initcap";
-    pub const ASCII: &str = "ascii";
-    pub const CHR: &str = "chr";
-    pub const MD5: &str = "md5";
-    pub const SHA256: &str = "sha256";
-    pub const BASE64_ENCODE: &str = "base64_encode";
-    pub const BASE64_DECODE: &str = "base64_decode";
-    pub const REGEX_REPLACE: &str = "regex_replace";
-    pub const REGEX_EXTRACT: &str = "regex_extract";
-    pub const SPLIT: &str = "split";
-    pub const SPLIT_PART: &str = "split_part";
-    pub const FORMAT: &str = "format";
-    pub const STARTS_WITH: &str = "starts_with";
-    pub const CONTAINS: &str = "contains";
-    pub const TO_HEX: &str = "to_hex";
+    pub const LOWER: &str = "LOWER";
+    pub const UPPER: &str = "UPPER";
+    pub const TRIM: &str = "TRIM";
+    pub const LTRIM: &str = "LTRIM";
+    pub const RTRIM: &str = "RTRIM";
+    pub const LENGTH: &str = "LENGTH";
+    pub const CHAR_LENGTH: &str = "CHAR_LENGTH";
+    pub const OCTET_LENGTH: &str = "OCTET_LENGTH";
+    pub const SUBSTR: &str = "SUBSTR";
+    pub const LEFT: &str = "LEFT";
+    pub const RIGHT: &str = "RIGHT";
+    pub const CONCAT: &str = "CONCAT";
+    pub const CONCAT_WS: &str = "CONCAT_WS";
+    pub const REPLACE: &str = "REPLACE";
+    pub const REVERSE: &str = "REVERSE";
+    pub const REPEAT: &str = "REPEAT";
+    pub const PAD_LEFT: &str = "PAD_LEFT";
+    pub const PAD_RIGHT: &str = "PAD_RIGHT";
+    pub const POSITION: &str = "POSITION";
+    pub const INITCAP: &str = "INITCAP";
+    pub const ASCII: &str = "ASCII";
+    pub const CHR: &str = "CHR";
+    pub const MD5: &str = "MD5";
+    pub const SHA256: &str = "SHA256";
+    pub const BASE64_ENCODE: &str = "BASE64_ENCODE";
+    pub const BASE64_DECODE: &str = "BASE64_DECODE";
+    pub const REGEX_REPLACE: &str = "REGEX_REPLACE";
+    pub const REGEX_EXTRACT: &str = "REGEX_EXTRACT";
+    pub const SPLIT: &str = "SPLIT";
+    pub const SPLIT_PART: &str = "SPLIT_PART";
+    pub const FORMAT: &str = "FORMAT";
+    pub const STARTS_WITH: &str = "STARTS_WITH";
+    pub const CONTAINS: &str = "CONTAINS";
+    pub const TO_HEX: &str = "TO_HEX";
 
     // ── Numeric / Math ───────────────────────────────────────────────────
-    pub const ABS: &str = "abs";
-    pub const CEIL: &str = "ceil";
-    pub const FLOOR: &str = "floor";
-    pub const ROUND: &str = "round";
-    pub const TRUNC: &str = "trunc";
-    pub const SIGN: &str = "sign";
-    pub const POWER: &str = "power";
-    pub const SQRT: &str = "sqrt";
-    pub const CBRT: &str = "cbrt";
-    pub const EXP: &str = "exp";
-    pub const LN: &str = "ln";
-    pub const LOG: &str = "log";
-    pub const LOG2: &str = "log2";
-    pub const LOG10: &str = "log10";
-    pub const PI: &str = "pi";
-    pub const DEGREES: &str = "degrees";
-    pub const RADIANS: &str = "radians";
-    pub const SIN: &str = "sin";
-    pub const COS: &str = "cos";
-    pub const TAN: &str = "tan";
-    pub const ASIN: &str = "asin";
-    pub const ACOS: &str = "acos";
-    pub const ATAN: &str = "atan";
-    pub const ATAN2: &str = "atan2";
-    pub const SINH: &str = "sinh";
-    pub const COSH: &str = "cosh";
-    pub const TANH: &str = "tanh";
-    pub const FACTORIAL: &str = "factorial";
-    pub const GCD: &str = "gcd";
-    pub const LCM: &str = "lcm";
-    pub const RANDOM: &str = "random";
-    pub const GREATEST: &str = "greatest";
-    pub const LEAST: &str = "least";
+    pub const ABS: &str = "ABS";
+    pub const CEIL: &str = "CEIL";
+    pub const FLOOR: &str = "FLOOR";
+    pub const ROUND: &str = "ROUND";
+    pub const TRUNC: &str = "TRUNC";
+    pub const SIGN: &str = "SIGN";
+    pub const POWER: &str = "POWER";
+    pub const SQRT: &str = "SQRT";
+    pub const CBRT: &str = "CBRT";
+    pub const EXP: &str = "EXP";
+    pub const LN: &str = "LN";
+    pub const LOG: &str = "LOG";
+    pub const LOG2: &str = "LOG2";
+    pub const LOG10: &str = "LOG10";
+    pub const PI: &str = "PI";
+    pub const DEGREES: &str = "DEGREES";
+    pub const RADIANS: &str = "RADIANS";
+    pub const SIN: &str = "SIN";
+    pub const COS: &str = "COS";
+    pub const TAN: &str = "TAN";
+    pub const ASIN: &str = "ASIN";
+    pub const ACOS: &str = "ACOS";
+    pub const ATAN: &str = "ATAN";
+    pub const ATAN2: &str = "ATAN2";
+    pub const SINH: &str = "SINH";
+    pub const COSH: &str = "COSH";
+    pub const TANH: &str = "TANH";
+    pub const FACTORIAL: &str = "FACTORIAL";
+    pub const GCD: &str = "GCD";
+    pub const LCM: &str = "LCM";
+    pub const RANDOM: &str = "RANDOM";
+    pub const GREATEST: &str = "GREATEST";
+    pub const LEAST: &str = "LEAST";
 
     // ── Date / Time ──────────────────────────────────────────────────────
-    pub const NOW: &str = "now";
-    pub const CURRENT_DATE: &str = "current_date";
-    pub const CURRENT_TIME: &str = "current_time";
-    pub const CURRENT_TIMESTAMP: &str = "current_timestamp";
-    pub const DATE_PART: &str = "date_part";
-    pub const DATE_TRUNC: &str = "date_trunc";
-    pub const EXTRACT: &str = "extract";
-    pub const DATE_ADD: &str = "date_add";
-    pub const DATE_SUB: &str = "date_sub";
-    pub const DATE_DIFF: &str = "date_diff";
-    pub const AGE: &str = "age";
-    pub const TO_DATE: &str = "to_date";
-    pub const TO_TIMESTAMP: &str = "to_timestamp";
-    pub const YEAR: &str = "year";
-    pub const MONTH: &str = "month";
-    pub const DAY: &str = "day";
-    pub const HOUR: &str = "hour";
-    pub const MINUTE: &str = "minute";
-    pub const SECOND: &str = "second";
-    pub const DAY_OF_WEEK: &str = "day_of_week";
-    pub const DAY_OF_YEAR: &str = "day_of_year";
-    pub const WEEK_OF_YEAR: &str = "week_of_year";
-    pub const QUARTER: &str = "quarter";
-    pub const MAKE_DATE: &str = "make_date";
-    pub const MAKE_TIME: &str = "make_time";
-    pub const MAKE_TIMESTAMP: &str = "make_timestamp";
-    pub const EPOCH_TO_TIMESTAMP: &str = "epoch_to_timestamp";
-    pub const TIMESTAMP_TO_EPOCH: &str = "timestamp_to_epoch";
+    pub const NOW: &str = "NOW";
+    pub const CURRENT_DATE: &str = "CURRENT_DATE";
+    pub const CURRENT_TIME: &str = "CURRENT_TIME";
+    pub const CURRENT_TIMESTAMP: &str = "CURRENT_TIMESTAMP";
+    pub const DATE_PART: &str = "DATE_PART";
+    pub const DATE_TRUNC: &str = "DATE_TRUNC";
+    pub const EXTRACT: &str = "EXTRACT";
+    pub const DATE_ADD: &str = "DATE_ADD";
+    pub const DATE_SUB: &str = "DATE_SUB";
+    pub const DATE_DIFF: &str = "DATE_DIFF";
+    pub const AGE: &str = "AGE";
+    pub const TO_DATE: &str = "TO_DATE";
+    pub const TO_TIMESTAMP: &str = "TO_TIMESTAMP";
+    pub const YEAR: &str = "YEAR";
+    pub const MONTH: &str = "MONTH";
+    pub const DAY: &str = "DAY";
+    pub const HOUR: &str = "HOUR";
+    pub const MINUTE: &str = "MINUTE";
+    pub const SECOND: &str = "SECOND";
+    pub const DAY_OF_WEEK: &str = "DAY_OF_WEEK";
+    pub const DAY_OF_YEAR: &str = "DAY_OF_YEAR";
+    pub const WEEK_OF_YEAR: &str = "WEEK_OF_YEAR";
+    pub const QUARTER: &str = "QUARTER";
+    pub const MAKE_DATE: &str = "MAKE_DATE";
+    pub const MAKE_TIME: &str = "MAKE_TIME";
+    pub const MAKE_TIMESTAMP: &str = "MAKE_TIMESTAMP";
+    pub const EPOCH_TO_TIMESTAMP: &str = "EPOCH_TO_TIMESTAMP";
+    pub const TIMESTAMP_TO_EPOCH: &str = "TIMESTAMP_TO_EPOCH";
 
     // ── Null-handling ────────────────────────────────────────────────────
-    pub const COALESCE: &str = "coalesce";
-    pub const NULLIF: &str = "nullif";
-    pub const IFNULL: &str = "ifnull";
+    pub const COALESCE: &str = "COALESCE";
+    pub const NULLIF: &str = "NULLIF";
+    pub const IFNULL: &str = "IFNULL";
 
     // ── Type conversion ──────────────────────────────────────────────────
-    pub const TYPEOF: &str = "typeof";
-    pub const TO_TEXT: &str = "to_text";
-    pub const TO_INT: &str = "to_int";
-    pub const TO_FLOAT: &str = "to_float";
-    pub const TO_BOOL: &str = "to_bool";
+    pub const TYPEOF: &str = "TYPEOF";
+    pub const TO_TEXT: &str = "TO_TEXT";
+    pub const TO_INT: &str = "TO_INT";
+    pub const TO_FLOAT: &str = "TO_FLOAT";
+    pub const TO_BOOL: &str = "TO_BOOL";
 
     // ── JSON / Document ──────────────────────────────────────────────────
-    pub const JSON_GET: &str = "json_get";
-    pub const JSON_GET_TEXT: &str = "json_get_text";
-    pub const JSON_PATH: &str = "json_path";
-    pub const JSON_PATH_TEXT: &str = "json_path_text";
-    pub const JSON_HAS_KEY: &str = "json_has_key";
-    pub const JSON_HAS_ANY_KEY: &str = "json_has_any_key";
-    pub const JSON_HAS_ALL_KEYS: &str = "json_has_all_keys";
-    pub const JSON_SET: &str = "json_set";
-    pub const JSON_INSERT: &str = "json_insert";
-    pub const JSON_REMOVE: &str = "json_remove";
-    pub const JSON_REPLACE: &str = "json_replace";
-    pub const JSON_MERGE_PATCH: &str = "json_merge_patch";
-    pub const JSON_ARRAY: &str = "json_array";
-    pub const JSON_OBJECT: &str = "json_object";
-    pub const JSON_ARRAY_LENGTH: &str = "json_array_length";
-    pub const JSON_KEYS: &str = "json_keys";
-    pub const JSON_VALUES: &str = "json_values";
-    pub const JSON_TYPEOF: &str = "json_typeof";
+    pub const JSON_GET: &str = "JSON_GET";
+    pub const JSON_GET_TEXT: &str = "JSON_GET_TEXT";
+    pub const JSON_PATH: &str = "JSON_PATH";
+    pub const JSON_PATH_TEXT: &str = "JSON_PATH_TEXT";
+    pub const JSON_HAS_KEY: &str = "JSON_HAS_KEY";
+    pub const JSON_HAS_ANY_KEY: &str = "JSON_HAS_ANY_KEY";
+    pub const JSON_HAS_ALL_KEYS: &str = "JSON_HAS_ALL_KEYS";
+    pub const JSON_SET: &str = "JSON_SET";
+    pub const JSON_INSERT: &str = "JSON_INSERT";
+    pub const JSON_REMOVE: &str = "JSON_REMOVE";
+    pub const JSON_REPLACE: &str = "JSON_REPLACE";
+    pub const JSON_MERGE_PATCH: &str = "JSON_MERGE_PATCH";
+    pub const JSON_ARRAY: &str = "JSON_ARRAY";
+    pub const JSON_OBJECT: &str = "JSON_OBJECT";
+    pub const JSON_ARRAY_LENGTH: &str = "JSON_ARRAY_LENGTH";
+    pub const JSON_KEYS: &str = "JSON_KEYS";
+    pub const JSON_VALUES: &str = "JSON_VALUES";
+    pub const JSON_TYPEOF: &str = "JSON_TYPEOF";
 
     // ── Array / Collection ───────────────────────────────────────────────
-    pub const ARRAY_LENGTH: &str = "array_length";
-    pub const ARRAY_POSITION: &str = "array_position";
-    pub const ARRAY_APPEND: &str = "array_append";
-    pub const ARRAY_PREPEND: &str = "array_prepend";
-    pub const ARRAY_REMOVE: &str = "array_remove";
-    pub const ARRAY_CAT: &str = "array_cat";
-    pub const ARRAY_DISTINCT: &str = "array_distinct";
-    pub const ARRAY_SORT: &str = "array_sort";
-    pub const ARRAY_REVERSE: &str = "array_reverse";
-    pub const ARRAY_SLICE: &str = "array_slice";
-    pub const ARRAY_FLATTEN: &str = "array_flatten";
-    pub const UNNEST: &str = "unnest";
-    pub const ARRAY_TO_STRING: &str = "array_to_string";
-    pub const STRING_TO_ARRAY: &str = "string_to_array";
+    pub const ARRAY_LENGTH: &str = "ARRAY_LENGTH";
+    pub const ARRAY_POSITION: &str = "ARRAY_POSITION";
+    pub const ARRAY_APPEND: &str = "ARRAY_APPEND";
+    pub const ARRAY_PREPEND: &str = "ARRAY_PREPEND";
+    pub const ARRAY_REMOVE: &str = "ARRAY_REMOVE";
+    pub const ARRAY_CAT: &str = "ARRAY_CAT";
+    pub const ARRAY_DISTINCT: &str = "ARRAY_DISTINCT";
+    pub const ARRAY_SORT: &str = "ARRAY_SORT";
+    pub const ARRAY_REVERSE: &str = "ARRAY_REVERSE";
+    pub const ARRAY_SLICE: &str = "ARRAY_SLICE";
+    pub const ARRAY_FLATTEN: &str = "ARRAY_FLATTEN";
+    pub const UNNEST: &str = "UNNEST";
+    pub const ARRAY_TO_STRING: &str = "ARRAY_TO_STRING";
+    pub const STRING_TO_ARRAY: &str = "STRING_TO_ARRAY";
 
     // ── Object / Map ─────────────────────────────────────────────────────
-    pub const MAP_MERGE: &str = "map_merge";
-    pub const MAP_GET: &str = "map_get";
-    pub const MAP_KEYS: &str = "map_keys";
-    pub const MAP_VALUES: &str = "map_values";
-    pub const MAP_CONTAINS_KEY: &str = "map_contains_key";
-    pub const MAP_REMOVE_KEY: &str = "map_remove_key";
+    pub const MAP_MERGE: &str = "MAP_MERGE";
+    pub const MAP_GET: &str = "MAP_GET";
+    pub const MAP_KEYS: &str = "MAP_KEYS";
+    pub const MAP_VALUES: &str = "MAP_VALUES";
+    pub const MAP_CONTAINS_KEY: &str = "MAP_CONTAINS_KEY";
+    pub const MAP_REMOVE_KEY: &str = "MAP_REMOVE_KEY";
 
     // ── Range operations ─────────────────────────────────────────────────
-    pub const RANGE_CONTAINS: &str = "range_contains";
-    pub const RANGE_CONTAINED_BY: &str = "range_contained_by";
-    pub const RANGE_OVERLAP: &str = "range_overlap";
-    pub const RANGE_LOWER: &str = "range_lower";
-    pub const RANGE_UPPER: &str = "range_upper";
-    pub const RANGE_IS_EMPTY: &str = "range_is_empty";
+    pub const RANGE_CONTAINS: &str = "RANGE_CONTAINS";
+    pub const RANGE_CONTAINED_BY: &str = "RANGE_CONTAINED_BY";
+    pub const RANGE_OVERLAP: &str = "RANGE_OVERLAP";
+    pub const RANGE_LOWER: &str = "RANGE_LOWER";
+    pub const RANGE_UPPER: &str = "RANGE_UPPER";
+    pub const RANGE_IS_EMPTY: &str = "RANGE_IS_EMPTY";
 
     // ── Window / Ranking ─────────────────────────────────────────────────
-    pub const ROW_NUMBER: &str = "row_number";
-    pub const RANK: &str = "rank";
-    pub const DENSE_RANK: &str = "dense_rank";
-    pub const NTILE: &str = "ntile";
-    pub const LAG: &str = "lag";
-    pub const LEAD: &str = "lead";
-    pub const FIRST_VALUE: &str = "first_value";
-    pub const LAST_VALUE: &str = "last_value";
-    pub const NTH_VALUE: &str = "nth_value";
-    pub const CUME_DIST: &str = "cume_dist";
-    pub const PERCENT_RANK: &str = "percent_rank";
+    pub const ROW_NUMBER: &str = "ROW_NUMBER";
+    pub const RANK: &str = "RANK";
+    pub const DENSE_RANK: &str = "DENSE_RANK";
+    pub const NTILE: &str = "NTILE";
+    pub const LAG: &str = "LAG";
+    pub const LEAD: &str = "LEAD";
+    pub const FIRST_VALUE: &str = "FIRST_VALUE";
+    pub const LAST_VALUE: &str = "LAST_VALUE";
+    pub const NTH_VALUE: &str = "NTH_VALUE";
+    pub const CUME_DIST: &str = "CUME_DIST";
+    pub const PERCENT_RANK: &str = "PERCENT_RANK";
 
     // ── UUID ─────────────────────────────────────────────────────────────
-    pub const GEN_RANDOM_UUID: &str = "gen_random_uuid";
+    pub const GEN_RANDOM_UUID: &str = "GEN_RANDOM_UUID";
 
     // ── Geo / Spatial ────────────────────────────────────────────────────
-    pub const ST_CONTAINS: &str = "st_contains";
-    pub const ST_INTERSECTS: &str = "st_intersects";
-    pub const ST_WITHIN: &str = "st_within";
-    pub const ST_AREA: &str = "st_area";
-    pub const ST_LENGTH: &str = "st_length";
-    pub const ST_DISTANCE: &str = "st_distance";
-    pub const ST_BUFFER: &str = "st_buffer";
-    pub const ST_CENTROID: &str = "st_centroid";
-    pub const ST_AS_TEXT: &str = "st_as_text";
-    pub const ST_GEOM_FROM_TEXT: &str = "st_geom_from_text";
+    pub const ST_CONTAINS: &str = "ST_CONTAINS";
+    pub const ST_INTERSECTS: &str = "ST_INTERSECTS";
+    pub const ST_WITHIN: &str = "ST_WITHIN";
+    pub const ST_AREA: &str = "ST_AREA";
+    pub const ST_LENGTH: &str = "ST_LENGTH";
+    pub const ST_DISTANCE: &str = "ST_DISTANCE";
+    pub const ST_BUFFER: &str = "ST_BUFFER";
+    pub const ST_CENTROID: &str = "ST_CENTROID";
+    pub const ST_AS_TEXT: &str = "ST_AS_TEXT";
+    pub const ST_GEOM_FROM_TEXT: &str = "ST_GEOM_FROM_TEXT";
 
     // ── Hashing / Encoding ───────────────────────────────────────────────
-    pub const HASH: &str = "hash";
-    pub const CRC32: &str = "crc32";
-    pub const HEX_ENCODE: &str = "hex_encode";
-    pub const HEX_DECODE: &str = "hex_decode";
+    pub const HASH: &str = "HASH";
+    pub const CRC32: &str = "CRC32";
+    pub const HEX_ENCODE: &str = "HEX_ENCODE";
+    pub const HEX_DECODE: &str = "HEX_DECODE";
 
     /// Returns `true` if this is a well-known "no-parens" SQL keyword
     /// (e.g. `CURRENT_DATE`).
@@ -307,12 +307,18 @@ pub type FuncName = FuncId;
 
 /// Build a function-call expression from any name string.
 pub fn func<'a>(name: &str, args: Vec<Expr<'a>>) -> Expr<'a> {
-    Expr::Func { name: FuncId::new(name), args }
+    Expr::Func {
+        name: FuncId::new(name),
+        args,
+    }
 }
 
 /// Internal helper to build a function-call expression from a well-known constant.
 fn known<'a>(name: &str, args: Vec<Expr<'a>>) -> Expr<'a> {
-    Expr::Func { name: FuncId::new(name), args }
+    Expr::Func {
+        name: FuncId::new(name),
+        args,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -323,7 +329,9 @@ pub fn count<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
     known(FuncId::COUNT, vec![expr.into()])
 }
 
-pub fn count_star<'a>() -> Expr<'a> { Expr::CountStar }
+pub fn count_star<'a>() -> Expr<'a> {
+    Expr::CountStar
+}
 
 pub fn sum<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
     known(FuncId::SUM, vec![expr.into()])
@@ -361,7 +369,11 @@ pub fn length<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
     known(FuncId::LENGTH, vec![expr.into()])
 }
 
-pub fn substr<'a>(expr: impl Into<Expr<'a>>, start: impl Into<Expr<'a>>, len: impl Into<Expr<'a>>) -> Expr<'a> {
+pub fn substr<'a>(
+    expr: impl Into<Expr<'a>>,
+    start: impl Into<Expr<'a>>,
+    len: impl Into<Expr<'a>>,
+) -> Expr<'a> {
     known(FuncId::SUBSTR, vec![expr.into(), start.into(), len.into()])
 }
 
@@ -369,7 +381,11 @@ pub fn concat_fn<'a>(args: Vec<Expr<'a>>) -> Expr<'a> {
     known(FuncId::CONCAT, args)
 }
 
-pub fn replace<'a>(expr: impl Into<Expr<'a>>, from: impl Into<Expr<'a>>, to: impl Into<Expr<'a>>) -> Expr<'a> {
+pub fn replace<'a>(
+    expr: impl Into<Expr<'a>>,
+    from: impl Into<Expr<'a>>,
+    to: impl Into<Expr<'a>>,
+) -> Expr<'a> {
     known(FuncId::REPLACE, vec![expr.into(), from.into(), to.into()])
 }
 
@@ -421,17 +437,33 @@ pub fn ntile<'a>(n: impl Into<Expr<'a>>) -> Expr<'a> {
     known(FuncId::NTILE, vec![n.into()])
 }
 
-pub fn lag<'a>(expr: impl Into<Expr<'a>>, offset: Option<Expr<'a>>, default: Option<Expr<'a>>) -> Expr<'a> {
+pub fn lag<'a>(
+    expr: impl Into<Expr<'a>>,
+    offset: Option<Expr<'a>>,
+    default: Option<Expr<'a>>,
+) -> Expr<'a> {
     let mut args = vec![expr.into()];
-    if let Some(o) = offset { args.push(o); }
-    if let Some(d) = default { args.push(d); }
+    if let Some(o) = offset {
+        args.push(o);
+    }
+    if let Some(d) = default {
+        args.push(d);
+    }
     known(FuncId::LAG, args)
 }
 
-pub fn lead<'a>(expr: impl Into<Expr<'a>>, offset: Option<Expr<'a>>, default: Option<Expr<'a>>) -> Expr<'a> {
+pub fn lead<'a>(
+    expr: impl Into<Expr<'a>>,
+    offset: Option<Expr<'a>>,
+    default: Option<Expr<'a>>,
+) -> Expr<'a> {
     let mut args = vec![expr.into()];
-    if let Some(o) = offset { args.push(o); }
-    if let Some(d) = default { args.push(d); }
+    if let Some(o) = offset {
+        args.push(o);
+    }
+    if let Some(d) = default {
+        args.push(d);
+    }
     known(FuncId::LEAD, args)
 }
 
@@ -453,7 +485,9 @@ pub fn abs<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
 
 pub fn round<'a>(expr: impl Into<Expr<'a>>, precision: Option<Expr<'a>>) -> Expr<'a> {
     let mut args = vec![expr.into()];
-    if let Some(p) = precision { args.push(p); }
+    if let Some(p) = precision {
+        args.push(p);
+    }
     known(FuncId::ROUND, args)
 }
 

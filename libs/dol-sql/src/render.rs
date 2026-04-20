@@ -6,16 +6,16 @@ use super::dialect::{
     ArrayLiteralStyle, ConcatStyle, Dialect, JsonAccessStyle, PaginationStyle, ParamCounter,
     ReturningStyle,
 };
+use crate::SqlOutput;
 use dol_core::expr::window::{FrameBound, FrameKind, WindowFrame};
 use dol_core::expr::{
     Direction, Expr, FuncId, Literal, NullsPosition, OpId, OrderByExpr, Quantifier, UnaryOp,
 };
-use crate::SqlOutput;
 use dol_core::ir::BackendError;
 use dol_core::ir::definition::OwnedEntityConstraint;
 use dol_core::ir::*;
-use dol_entity::Field;
 use dol_entity::DataType;
+use dol_entity::Field;
 use dol_entity::constraint::{FkAction, GeneratedKind};
 
 // ===========================================================================
@@ -55,9 +55,7 @@ fn render_expr_inner(
     match expr {
         Expr::Identifier(name) => Ok(name.clone()),
 
-        Expr::QualifiedIdentifier { scope, name } => {
-            Ok(format!("{}.{}", scope, name))
-        }
+        Expr::QualifiedIdentifier { scope, name } => Ok(format!("{}.{}", scope, name)),
 
         Expr::FieldAccess { base, field } => {
             let base_sql = render_expr_inner(base, counter, dialect, next)?;
@@ -104,10 +102,7 @@ fn render_expr_inner(
                 .iter()
                 .map(|a| render_expr_inner(a, counter, dialect, next))
                 .collect::<Result<Vec<_>, _>>()?;
-            let func_sql: std::borrow::Cow<str> = match func_id_to_sql(name) {
-                Ok(s) => std::borrow::Cow::Borrowed(s),
-                Err(_) => std::borrow::Cow::Borrowed(name.as_str()),
-            };
+            let func_sql = func_id_to_sql(name);
             if name.is_no_parens_keyword() && rendered_args.is_empty() {
                 Ok(func_sql.into_owned())
             } else {
@@ -117,7 +112,11 @@ fn render_expr_inner(
 
         Expr::Cast { expr, as_type } => {
             let inner = render_expr_inner(expr, counter, dialect, next)?;
-            Ok(format!("CAST({} AS {})", inner, render_type(as_type, dialect)))
+            Ok(format!(
+                "CAST({} AS {})",
+                inner,
+                render_type(as_type, dialect)
+            ))
         }
 
         Expr::Case { whens, else_expr } => {
@@ -161,7 +160,10 @@ fn render_expr_inner(
             let low_sql = render_expr_inner(low, counter, dialect, next)?;
             let high_sql = render_expr_inner(high, counter, dialect, next)?;
             let not = if *negated { " NOT" } else { "" };
-            Ok(format!("{}{} BETWEEN {} AND {}", lhs, not, low_sql, high_sql))
+            Ok(format!(
+                "{}{} BETWEEN {} AND {}",
+                lhs, not, low_sql, high_sql
+            ))
         }
 
         Expr::Exists { subquery, negated } => {
@@ -510,7 +512,11 @@ fn render_frame_bound(bound: &FrameBound) -> String {
 // ===========================================================================
 
 /// Renders a `Vec<Expr>` as a WHERE clause (AND-joined).
-pub fn render_filters(filters: &[Expr<'_>], counter: &mut ParamCounter, dialect: &Dialect) -> Result<String, BackendError> {
+pub fn render_filters(
+    filters: &[Expr<'_>],
+    counter: &mut ParamCounter,
+    dialect: &Dialect,
+) -> Result<String, BackendError> {
     if filters.is_empty() {
         return Ok(String::new());
     }
@@ -1524,196 +1530,62 @@ fn entity_ref_to_sql(mref: &EntityRef, _dialect: &Dialect) -> String {
     }
 }
 
-fn func_id_to_sql(name: &FuncId) -> Result<&'static str, BackendError> {
+fn func_id_to_sql<'a>(name: &'a FuncId) -> std::borrow::Cow<'a, str> {
     use dol_core::expr::FuncId as K;
     match name.as_str() {
-        K::COUNT | K::COUNT_DISTINCT => Ok("COUNT"),
-        K::SUM => Ok("SUM"),
-        K::AVG => Ok("AVG"),
-        K::MIN => Ok("MIN"),
-        K::MAX => Ok("MAX"),
-        K::MEDIAN => Ok("MEDIAN"),
-        K::STDDEV => Ok("STDDEV"),
-        K::VARIANCE => Ok("VARIANCE"),
-        K::ARRAY_AGG => Ok("ARRAY_AGG"),
-        K::STRING_AGG => Ok("STRING_AGG"),
-        K::JSON_AGG => Ok("JSON_AGG"),
-        K::BOOL_AND => Ok("BOOL_AND"),
-        K::BOOL_OR => Ok("BOOL_OR"),
-        K::FIRST => Ok("FIRST"),
-        K::LAST => Ok("LAST"),
-        K::LOWER => Ok("LOWER"),
-        K::UPPER => Ok("UPPER"),
-        K::TRIM => Ok("TRIM"),
-        K::LTRIM => Ok("LTRIM"),
-        K::RTRIM => Ok("RTRIM"),
-        K::LENGTH => Ok("LENGTH"),
-        K::CHAR_LENGTH => Ok("CHAR_LENGTH"),
-        K::OCTET_LENGTH => Ok("OCTET_LENGTH"),
-        K::SUBSTR => Ok("SUBSTR"),
-        K::LEFT => Ok("LEFT"),
-        K::RIGHT => Ok("RIGHT"),
-        K::CONCAT => Ok("CONCAT"),
-        K::CONCAT_WS => Ok("CONCAT_WS"),
-        K::REPLACE => Ok("REPLACE"),
-        K::REVERSE => Ok("REVERSE"),
-        K::REPEAT => Ok("REPEAT"),
-        K::PAD_LEFT => Ok("LPAD"),
-        K::PAD_RIGHT => Ok("RPAD"),
-        K::POSITION => Ok("POSITION"),
-        K::INITCAP => Ok("INITCAP"),
-        K::ASCII => Ok("ASCII"),
-        K::CHR => Ok("CHR"),
-        K::MD5 => Ok("MD5"),
-        K::SHA256 => Ok("SHA256"),
-        K::BASE64_ENCODE => Ok("ENCODE"),
-        K::BASE64_DECODE => Ok("DECODE"),
-        K::REGEX_REPLACE => Ok("REGEXP_REPLACE"),
-        K::REGEX_EXTRACT => Ok("REGEXP_MATCH"),
-        K::SPLIT => Ok("STRING_TO_ARRAY"),
-        K::SPLIT_PART => Ok("SPLIT_PART"),
-        K::FORMAT => Ok("FORMAT"),
-        K::STARTS_WITH => Ok("STARTS_WITH"),
-        K::CONTAINS => Ok("CONTAINS"),
-        K::TO_HEX => Ok("TO_HEX"),
-        K::ABS => Ok("ABS"),
-        K::CEIL => Ok("CEIL"),
-        K::FLOOR => Ok("FLOOR"),
-        K::ROUND => Ok("ROUND"),
-        K::TRUNC => Ok("TRUNC"),
-        K::SIGN => Ok("SIGN"),
-        K::POWER => Ok("POWER"),
-        K::SQRT => Ok("SQRT"),
-        K::CBRT => Ok("CBRT"),
-        K::EXP => Ok("EXP"),
-        K::LN => Ok("LN"),
-        K::LOG => Ok("LOG"),
-        K::LOG2 => Ok("LOG2"),
-        K::LOG10 => Ok("LOG10"),
-        K::PI => Ok("PI"),
-        K::DEGREES => Ok("DEGREES"),
-        K::RADIANS => Ok("RADIANS"),
-        K::SIN => Ok("SIN"),
-        K::COS => Ok("COS"),
-        K::TAN => Ok("TAN"),
-        K::ASIN => Ok("ASIN"),
-        K::ACOS => Ok("ACOS"),
-        K::ATAN => Ok("ATAN"),
-        K::ATAN2 => Ok("ATAN2"),
-        K::SINH => Ok("SINH"),
-        K::COSH => Ok("COSH"),
-        K::TANH => Ok("TANH"),
-        K::FACTORIAL => Ok("FACTORIAL"),
-        K::GCD => Ok("GCD"),
-        K::LCM => Ok("LCM"),
-        K::RANDOM => Ok("RANDOM"),
-        K::GREATEST => Ok("GREATEST"),
-        K::LEAST => Ok("LEAST"),
-        K::NOW => Ok("NOW"),
-        K::CURRENT_DATE => Ok("CURRENT_DATE"),
-        K::CURRENT_TIME => Ok("CURRENT_TIME"),
-        K::CURRENT_TIMESTAMP => Ok("CURRENT_TIMESTAMP"),
-        K::DATE_PART => Ok("DATE_PART"),
-        K::DATE_TRUNC => Ok("DATE_TRUNC"),
-        K::EXTRACT => Ok("EXTRACT"),
-        K::DATE_ADD => Ok("DATE_ADD"),
-        K::DATE_SUB => Ok("DATE_SUB"),
-        K::DATE_DIFF => Ok("DATE_DIFF"),
-        K::AGE => Ok("AGE"),
-        K::TO_DATE => Ok("TO_DATE"),
-        K::TO_TIMESTAMP => Ok("TO_TIMESTAMP"),
-        K::YEAR => Ok("YEAR"),
-        K::MONTH => Ok("MONTH"),
-        K::DAY => Ok("DAY"),
-        K::HOUR => Ok("HOUR"),
-        K::MINUTE => Ok("MINUTE"),
-        K::SECOND => Ok("SECOND"),
-        K::DAY_OF_WEEK => Ok("DAYOFWEEK"),
-        K::DAY_OF_YEAR => Ok("DAYOFYEAR"),
-        K::WEEK_OF_YEAR => Ok("WEEKOFYEAR"),
-        K::QUARTER => Ok("QUARTER"),
-        K::MAKE_DATE => Ok("MAKE_DATE"),
-        K::MAKE_TIME => Ok("MAKE_TIME"),
-        K::MAKE_TIMESTAMP => Ok("MAKE_TIMESTAMP"),
-        K::EPOCH_TO_TIMESTAMP | K::TIMESTAMP_TO_EPOCH => Ok("TO_TIMESTAMP"),
-        K::COALESCE => Ok("COALESCE"),
-        K::NULLIF => Ok("NULLIF"),
-        K::IFNULL => Ok("IFNULL"),
-        K::TYPEOF => Ok("TYPEOF"),
-        K::TO_TEXT | K::TO_INT | K::TO_FLOAT | K::TO_BOOL => Ok("CAST"),
-        K::JSON_GET => Ok("jsonb_extract_path"),
-        K::JSON_GET_TEXT => Ok("jsonb_extract_path_text"),
-        K::JSON_PATH => Ok("jsonb_extract_path"),
-        K::JSON_PATH_TEXT => Ok("jsonb_extract_path_text"),
-        K::JSON_HAS_KEY => Ok("jsonb_exists"),
-        K::JSON_HAS_ANY_KEY => Ok("jsonb_exists_any"),
-        K::JSON_HAS_ALL_KEYS => Ok("jsonb_exists_all"),
-        K::JSON_SET => Ok("jsonb_set"),
-        K::JSON_INSERT => Ok("jsonb_insert"),
-        K::JSON_REMOVE => Ok("jsonb_delete"),
-        K::JSON_REPLACE => Ok("jsonb_set"),
-        K::JSON_MERGE_PATCH => Ok("jsonb_merge_patch"),
-        K::JSON_ARRAY => Ok("jsonb_build_array"),
-        K::JSON_OBJECT => Ok("jsonb_build_object"),
-        K::JSON_ARRAY_LENGTH => Ok("jsonb_array_length"),
-        K::JSON_KEYS => Ok("jsonb_object_keys"),
-        K::JSON_VALUES => Ok("jsonb_each"),
-        K::JSON_TYPEOF => Ok("jsonb_typeof"),
-        K::ARRAY_LENGTH => Ok("ARRAY_LENGTH"),
-        K::ARRAY_POSITION => Ok("ARRAY_POSITION"),
-        K::ARRAY_APPEND => Ok("ARRAY_APPEND"),
-        K::ARRAY_PREPEND => Ok("ARRAY_PREPEND"),
-        K::ARRAY_REMOVE => Ok("ARRAY_REMOVE"),
-        K::ARRAY_CAT => Ok("ARRAY_CAT"),
-        K::ARRAY_DISTINCT => Ok("ARRAY_DISTINCT"),
-        K::ARRAY_SORT => Ok("ARRAY_SORT"),
-        K::ARRAY_REVERSE => Ok("ARRAY_REVERSE"),
-        K::ARRAY_SLICE => Ok("ARRAY_SLICE"),
-        K::ARRAY_FLATTEN => Ok("ARRAY_FLATTEN"),
-        K::UNNEST => Ok("UNNEST"),
-        K::ARRAY_TO_STRING => Ok("ARRAY_TO_STRING"),
-        K::STRING_TO_ARRAY => Ok("STRING_TO_ARRAY"),
-        K::MAP_MERGE => Ok("jsonb_merge_patch"),
-        K::MAP_GET => Ok("jsonb_extract_path"),
-        K::MAP_KEYS => Ok("jsonb_object_keys"),
-        K::MAP_VALUES => Ok("jsonb_each"),
-        K::MAP_CONTAINS_KEY => Ok("jsonb_exists"),
-        K::MAP_REMOVE_KEY => Ok("jsonb_delete"),
-        K::RANGE_CONTAINS => Ok("RANGE_CONTAINS"),
-        K::RANGE_CONTAINED_BY => Ok("RANGE_CONTAINED_BY"),
-        K::RANGE_OVERLAP => Ok("RANGE_OVERLAP"),
-        K::RANGE_LOWER => Ok("LOWER"),
-        K::RANGE_UPPER => Ok("UPPER"),
-        K::RANGE_IS_EMPTY => Ok("ISEMPTY"),
-        K::ROW_NUMBER => Ok("ROW_NUMBER"),
-        K::RANK => Ok("RANK"),
-        K::DENSE_RANK => Ok("DENSE_RANK"),
-        K::NTILE => Ok("NTILE"),
-        K::LAG => Ok("LAG"),
-        K::LEAD => Ok("LEAD"),
-        K::FIRST_VALUE => Ok("FIRST_VALUE"),
-        K::LAST_VALUE => Ok("LAST_VALUE"),
-        K::NTH_VALUE => Ok("NTH_VALUE"),
-        K::CUME_DIST => Ok("CUME_DIST"),
-        K::PERCENT_RANK => Ok("PERCENT_RANK"),
-        K::GEN_RANDOM_UUID => Ok("GEN_RANDOM_UUID"),
-        K::ST_CONTAINS => Ok("ST_Contains"),
-        K::ST_INTERSECTS => Ok("ST_Intersects"),
-        K::ST_WITHIN => Ok("ST_Within"),
-        K::ST_AREA => Ok("ST_Area"),
-        K::ST_LENGTH => Ok("ST_Length"),
-        K::ST_DISTANCE => Ok("ST_Distance"),
-        K::ST_BUFFER => Ok("ST_Buffer"),
-        K::ST_CENTROID => Ok("ST_Centroid"),
-        K::ST_AS_TEXT => Ok("ST_AsText"),
-        K::ST_GEOM_FROM_TEXT => Ok("ST_GeomFromText"),
-        K::HASH => Ok("HASH"),
-        K::CRC32 => Ok("CRC32"),
-        K::HEX_ENCODE => Ok("ENCODE"),
-        K::HEX_DECODE => Ok("DECODE"),
-        _ => Err(BackendError::Unsupported(format!(
-            "SQL backend does not support function '{}'", name
-        ))),
+        // ── Multi-to-one mappings ────────────────────────────────────────
+        K::COUNT | K::COUNT_DISTINCT => std::borrow::Cow::Borrowed("COUNT"),
+        K::EPOCH_TO_TIMESTAMP | K::TIMESTAMP_TO_EPOCH => std::borrow::Cow::Borrowed("TO_TIMESTAMP"),
+        K::TO_TEXT | K::TO_INT | K::TO_FLOAT | K::TO_BOOL => std::borrow::Cow::Borrowed("CAST"),
+
+        // ── Renamed functions (DOL name differs from SQL name) ───────────
+        K::PAD_LEFT => std::borrow::Cow::Borrowed("LPAD"),
+        K::PAD_RIGHT => std::borrow::Cow::Borrowed("RPAD"),
+        K::BASE64_ENCODE | K::HEX_ENCODE => std::borrow::Cow::Borrowed("ENCODE"),
+        K::BASE64_DECODE | K::HEX_DECODE => std::borrow::Cow::Borrowed("DECODE"),
+        K::REGEX_REPLACE => std::borrow::Cow::Borrowed("REGEXP_REPLACE"),
+        K::REGEX_EXTRACT => std::borrow::Cow::Borrowed("REGEXP_MATCH"),
+        K::SPLIT => std::borrow::Cow::Borrowed("STRING_TO_ARRAY"),
+        K::DAY_OF_WEEK => std::borrow::Cow::Borrowed("DAYOFWEEK"),
+        K::DAY_OF_YEAR => std::borrow::Cow::Borrowed("DAYOFYEAR"),
+        K::WEEK_OF_YEAR => std::borrow::Cow::Borrowed("WEEKOFYEAR"),
+        K::RANGE_LOWER => std::borrow::Cow::Borrowed("LOWER"),
+        K::RANGE_UPPER => std::borrow::Cow::Borrowed("UPPER"),
+        K::RANGE_IS_EMPTY => std::borrow::Cow::Borrowed("ISEMPTY"),
+
+        // ── JSON / Document (PostgreSQL jsonb functions are lowercase) ────
+        K::JSON_GET | K::JSON_PATH | K::MAP_GET => std::borrow::Cow::Borrowed("jsonb_extract_path"),
+        K::JSON_GET_TEXT | K::JSON_PATH_TEXT => {
+            std::borrow::Cow::Borrowed("jsonb_extract_path_text")
+        }
+        K::JSON_HAS_KEY | K::MAP_CONTAINS_KEY => std::borrow::Cow::Borrowed("jsonb_exists"),
+        K::JSON_HAS_ANY_KEY => std::borrow::Cow::Borrowed("jsonb_exists_any"),
+        K::JSON_HAS_ALL_KEYS => std::borrow::Cow::Borrowed("jsonb_exists_all"),
+        K::JSON_SET | K::JSON_REPLACE => std::borrow::Cow::Borrowed("jsonb_set"),
+        K::JSON_INSERT => std::borrow::Cow::Borrowed("jsonb_insert"),
+        K::JSON_REMOVE | K::MAP_REMOVE_KEY => std::borrow::Cow::Borrowed("jsonb_delete"),
+        K::JSON_MERGE_PATCH | K::MAP_MERGE => std::borrow::Cow::Borrowed("jsonb_merge_patch"),
+        K::JSON_ARRAY => std::borrow::Cow::Borrowed("jsonb_build_array"),
+        K::JSON_OBJECT => std::borrow::Cow::Borrowed("jsonb_build_object"),
+        K::JSON_ARRAY_LENGTH => std::borrow::Cow::Borrowed("jsonb_array_length"),
+        K::JSON_KEYS | K::MAP_KEYS => std::borrow::Cow::Borrowed("jsonb_object_keys"),
+        K::JSON_VALUES | K::MAP_VALUES => std::borrow::Cow::Borrowed("jsonb_each"),
+        K::JSON_TYPEOF => std::borrow::Cow::Borrowed("jsonb_typeof"),
+
+        // ── Geo/Spatial (mixed-case PascalCase) ──────────────────────────
+        K::ST_CONTAINS => std::borrow::Cow::Borrowed("ST_Contains"),
+        K::ST_INTERSECTS => std::borrow::Cow::Borrowed("ST_Intersects"),
+        K::ST_WITHIN => std::borrow::Cow::Borrowed("ST_Within"),
+        K::ST_AREA => std::borrow::Cow::Borrowed("ST_Area"),
+        K::ST_LENGTH => std::borrow::Cow::Borrowed("ST_Length"),
+        K::ST_DISTANCE => std::borrow::Cow::Borrowed("ST_Distance"),
+        K::ST_BUFFER => std::borrow::Cow::Borrowed("ST_Buffer"),
+        K::ST_CENTROID => std::borrow::Cow::Borrowed("ST_Centroid"),
+        K::ST_AS_TEXT => std::borrow::Cow::Borrowed("ST_AsText"),
+        K::ST_GEOM_FROM_TEXT => std::borrow::Cow::Borrowed("ST_GeomFromText"),
+
+        // ── Default: pass through as-is (already uppercase) ──────────────
+        other => std::borrow::Cow::Borrowed(other),
     }
 }
 

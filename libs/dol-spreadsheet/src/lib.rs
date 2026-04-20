@@ -22,7 +22,6 @@
 use dol_core::expr::{Direction, Expr, Literal, OpId, OrderByExpr, UnaryOp};
 use dol_core::ir::Statement;
 
-
 /// A column definition for spreadsheet sheet creation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -52,13 +51,35 @@ pub struct SpreadsheetOutput {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SpreadsheetOp {
-    CreateSheet { columns: Vec<SpreadsheetColumnDef>, if_not_exists: bool },
-    AppendRows { columns: Vec<String>, row_count: usize },
-    UpdateRows { assignments: Vec<(String, String)>, filter: Option<String> },
-    DeleteRows { filter: Option<String> },
-    ReadRows { columns: Vec<String>, filter: Option<String>, sort: Vec<SpreadsheetSortSpec>, limit: Option<u64>, offset: Option<u64>, distinct: bool },
-    RenameSheet { new_name: String },
-    DropSheet { if_exists: bool },
+    CreateSheet {
+        columns: Vec<SpreadsheetColumnDef>,
+        if_not_exists: bool,
+    },
+    AppendRows {
+        columns: Vec<String>,
+        row_count: usize,
+    },
+    UpdateRows {
+        assignments: Vec<(String, String)>,
+        filter: Option<String>,
+    },
+    DeleteRows {
+        filter: Option<String>,
+    },
+    ReadRows {
+        columns: Vec<String>,
+        filter: Option<String>,
+        sort: Vec<SpreadsheetSortSpec>,
+        limit: Option<u64>,
+        offset: Option<u64>,
+        distinct: bool,
+    },
+    RenameSheet {
+        new_name: String,
+    },
+    DropSheet {
+        if_exists: bool,
+    },
 }
 
 use dol_core::ir::BackendError;
@@ -96,32 +117,38 @@ impl SpreadsheetBackend {
                 for f in &ir.fields {
                     if f.primary_key {
                         return Err(BackendError::Unsupported(format!(
-                            "SpreadsheetBackend does not support primary_key (field '{}')", f.name,
+                            "SpreadsheetBackend does not support primary_key (field '{}')",
+                            f.name,
                         )));
                     }
                     if f.unique {
                         return Err(BackendError::Unsupported(format!(
-                            "SpreadsheetBackend does not support unique constraint (field '{}')", f.name,
+                            "SpreadsheetBackend does not support unique constraint (field '{}')",
+                            f.name,
                         )));
                     }
                     if f.references.is_some() {
                         return Err(BackendError::Unsupported(format!(
-                            "SpreadsheetBackend does not support foreign key references (field '{}')", f.name,
+                            "SpreadsheetBackend does not support foreign key references (field '{}')",
+                            f.name,
                         )));
                     }
                     if f.check.is_some() {
                         return Err(BackendError::Unsupported(format!(
-                            "SpreadsheetBackend does not support check constraints (field '{}')", f.name,
+                            "SpreadsheetBackend does not support check constraints (field '{}')",
+                            f.name,
                         )));
                     }
                     if f.generated.is_some() {
                         return Err(BackendError::Unsupported(format!(
-                            "SpreadsheetBackend does not support generated columns (field '{}')", f.name,
+                            "SpreadsheetBackend does not support generated columns (field '{}')",
+                            f.name,
                         )));
                     }
                     if f.auto_increment {
                         return Err(BackendError::Unsupported(format!(
-                            "SpreadsheetBackend does not support auto_increment (field '{}')", f.name,
+                            "SpreadsheetBackend does not support auto_increment (field '{}')",
+                            f.name,
                         )));
                     }
                 }
@@ -169,8 +196,7 @@ impl SpreadsheetBackend {
                 // Only a single rename action is supported in spreadsheets.
                 match ir.actions.as_slice() {
                     [dol_core::ir::AlterAction::RenameEntity(new_name)] => {
-                        let sheet =
-                            qualified_name(&ir.target.namespace, &ir.target.name);
+                        let sheet = qualified_name(&ir.target.namespace, &ir.target.name);
 
                         Ok(SpreadsheetOutput {
                             operation: SpreadsheetOp::RenameSheet {
@@ -190,13 +216,11 @@ impl SpreadsheetBackend {
                          one RenameEntity action; received a different single action"
                             .into(),
                     )),
-                    actions => Err(BackendError::Unsupported(
-                        format!(
-                            "SpreadsheetBackend only supports AlterEntity with exactly \
+                    actions => Err(BackendError::Unsupported(format!(
+                        "SpreadsheetBackend only supports AlterEntity with exactly \
                              one RenameEntity action; rejected {} actions",
-                            actions.len()
-                        ),
-                    )),
+                        actions.len()
+                    ))),
                 }
             }
 
@@ -357,17 +381,15 @@ impl SpreadsheetBackend {
                 "SpreadsheetBackend does not support compound queries (UNION/INTERSECT/EXCEPT)"
                     .into(),
             )),
-            Statement::DefineIndex(_) | Statement::DropIndex(_) => Err(
-                BackendError::Unsupported("Spreadsheets do not support indexes".into()),
+            Statement::DefineIndex(_) | Statement::DropIndex(_) => Err(BackendError::Unsupported(
+                "Spreadsheets do not support indexes".into(),
+            )),
+            Statement::DefineType(_) | Statement::DropType(_) => Err(BackendError::Unsupported(
+                "Spreadsheets do not support custom types".into(),
+            )),
+            Statement::Grant(_) | Statement::Revoke(_) | Statement::DefinePolicy(_) => Err(
+                BackendError::Unsupported("Spreadsheets do not support access control".into()),
             ),
-            Statement::DefineType(_) | Statement::DropType(_) => Err(
-                BackendError::Unsupported("Spreadsheets do not support custom types".into()),
-            ),
-            Statement::Grant(_) | Statement::Revoke(_) | Statement::DefinePolicy(_) => {
-                Err(BackendError::Unsupported(
-                    "Spreadsheets do not support access control".into(),
-                ))
-            }
             Statement::Transaction(_) => Err(BackendError::Unsupported(
                 "Spreadsheets do not support transactions".into(),
             )),
@@ -481,8 +503,22 @@ fn render_literal(lit: &Literal<'_>) -> Result<String, BackendError> {
 fn uuid_from_bytes(b: &[u8; 16]) -> String {
     format!(
         "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
-        b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7],
-        b[8], b[9], b[10], b[11], b[12], b[13], b[14], b[15]
+        b[0],
+        b[1],
+        b[2],
+        b[3],
+        b[4],
+        b[5],
+        b[6],
+        b[7],
+        b[8],
+        b[9],
+        b[10],
+        b[11],
+        b[12],
+        b[13],
+        b[14],
+        b[15]
     )
 }
 
@@ -495,9 +531,7 @@ fn render_expr_simple(expr: &Expr<'_>) -> Result<String, BackendError> {
     match expr {
         Expr::Identifier(name) => Ok(name.to_string()),
         Expr::QualifiedIdentifier { scope, name } => Ok(format!("{}.{}", scope, name)),
-        Expr::FieldAccess { base, field } => {
-            Ok(format!("{}.{}", render_expr_simple(base)?, field))
-        }
+        Expr::FieldAccess { base, field } => Ok(format!("{}.{}", render_expr_simple(base)?, field)),
         Expr::Param => Ok("?".to_string()),
         Expr::Value(lit) => render_literal(lit),
         Expr::BinaryOp {
@@ -555,15 +589,17 @@ fn render_expr_simple(expr: &Expr<'_>) -> Result<String, BackendError> {
                 .iter()
                 .map(render_expr_simple)
                 .collect::<Result<Vec<_>, BackendError>>()?;
-            let func_str = match spreadsheet_func_name(name) {
-                Ok(s) => s.to_string(),
-                Err(_) => name.as_str().to_uppercase(),
-            };
+            let func_str = spreadsheet_func_name(name);
             Ok(format!("{}({})", func_str, arg_strs.join(", ")))
         }
-        Expr::Cast { expr: inner, as_type } => {
-            Ok(format!("CAST({} AS {})", render_expr_simple(inner)?, render_spreadsheet_type(as_type)))
-        }
+        Expr::Cast {
+            expr: inner,
+            as_type,
+        } => Ok(format!(
+            "CAST({} AS {})",
+            render_expr_simple(inner)?,
+            render_spreadsheet_type(as_type)
+        )),
         Expr::Between {
             expr: inner,
             low,
@@ -596,7 +632,10 @@ fn render_expr_simple(expr: &Expr<'_>) -> Result<String, BackendError> {
                 items.join(", "),
             ))
         }
-        Expr::IsNull { expr: inner, negated } => {
+        Expr::IsNull {
+            expr: inner,
+            negated,
+        } => {
             if *negated {
                 Ok(format!("({} IS NOT NULL)", render_expr_simple(inner)?))
             } else {
@@ -648,7 +687,10 @@ fn render_sort_spec(order: &OrderByExpr<'_>) -> Result<SpreadsheetSortSpec, Back
         ));
     }
     let column = validate_column_expr(&order.expr, "ORDER BY")?;
-    Ok(SpreadsheetSortSpec { column, direction: order.direction })
+    Ok(SpreadsheetSortSpec {
+        column,
+        direction: order.direction,
+    })
 }
 
 /// Validate that an expression is a supported column expression, returning the
@@ -678,36 +720,32 @@ fn validate_column_expr(expr: &Expr<'_>, context: &str) -> Result<String, Backen
     }
 }
 
-fn spreadsheet_func_name(name: &dol_core::expr::FuncId) -> Result<&'static str, BackendError> {
+fn spreadsheet_func_name<'a>(name: &'a dol_core::expr::FuncId) -> std::borrow::Cow<'a, str> {
     use dol_core::expr::FuncId as K;
     match name.as_str() {
-        K::COUNT => Ok("COUNT"),
-        K::SUM => Ok("SUM"),
-        K::AVG => Ok("AVG"),
-        K::MIN => Ok("MIN"),
-        K::MAX => Ok("MAX"),
-        K::LOWER => Ok("LOWER"),
-        K::UPPER => Ok("UPPER"),
-        K::TRIM => Ok("TRIM"),
-        K::LENGTH => Ok("LEN"),
-        K::COALESCE => Ok("COALESCE"),
-        K::NULLIF | K::IFNULL => Ok("IFERROR"),
-        K::NOW => Ok("NOW"),
-        K::CURRENT_DATE => Ok("TODAY"),
-        K::YEAR => Ok("YEAR"),
-        K::MONTH => Ok("MONTH"),
-        K::DAY => Ok("DAY"),
-        other => Err(BackendError::Unsupported(format!(
-            "SpreadsheetBackend does not support function '{}'", other
-        ))),
+        // ── Renamed functions (DOL name differs from spreadsheet name) ───
+        K::LENGTH => std::borrow::Cow::Borrowed("LEN"),
+        K::NULLIF | K::IFNULL => std::borrow::Cow::Borrowed("IFERROR"),
+        K::CURRENT_DATE => std::borrow::Cow::Borrowed("TODAY"),
+
+        // ── Default: pass through as-is (already uppercase) ──────────────
+        other => std::borrow::Cow::Borrowed(other),
     }
 }
 
 fn render_spreadsheet_type(dt: &dol_core::types::DataType) -> &'static str {
     use dol_core::types::DataType as D;
     match dt {
-        D::Int8 | D::Int16 | D::Int32 | D::Int64 | D::Int128
-        | D::UInt8 | D::UInt16 | D::UInt32 | D::UInt64 | D::UInt128 => "NUMBER",
+        D::Int8
+        | D::Int16
+        | D::Int32
+        | D::Int64
+        | D::Int128
+        | D::UInt8
+        | D::UInt16
+        | D::UInt32
+        | D::UInt64
+        | D::UInt128 => "NUMBER",
         D::Float32 | D::Float64 | D::Decimal { .. } => "DECIMAL",
         D::Text | D::Varchar(_) | D::Char(_) => "TEXT",
         D::Bool => "BOOLEAN",
