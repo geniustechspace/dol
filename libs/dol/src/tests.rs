@@ -1361,7 +1361,7 @@ fn expr_is_null_is_not_null() {
     assert_eq!(sql1, "meta IS NULL");
 
     let mut c2 = pg.param_counter();
-    let sql2 = crate::backend::sql::render::render_expr(&field("meta").is_not_null(), &mut c2, &pg).unwrap();
+    let sql2 = crate::backend::sql::render::render_expr(&field("meta").is_null().negate(), &mut c2, &pg).unwrap();
     assert_eq!(sql2, "meta IS NOT NULL");
 }
 
@@ -1385,7 +1385,7 @@ fn expr_in_list() {
 
 #[test]
 fn expr_not_in_list() {
-    let expr = field("status").not_in_list(vec![param(), param()]);
+    let expr = field("status").in_list(vec![param(), param()]).negate();
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
     let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();

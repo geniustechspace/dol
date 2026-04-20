@@ -160,7 +160,7 @@ fn test_is_null() {
 
 #[test]
 fn test_is_not_null() {
-    let e = field("x").is_not_null();
+    let e = field("x").is_null().negate();
     assert!(matches!(e, Expr::IsNull { negated: true, .. }));
 }
 
@@ -174,7 +174,7 @@ fn test_between() {
 
 #[test]
 fn test_not_between() {
-    let e = field("age").not_between(int(0i32), int(17i32));
+    let e = field("age").between(int(0i32), int(17i32)).negate();
     assert!(matches!(e, Expr::Between { negated: true, .. }));
 }
 
@@ -191,7 +191,7 @@ fn test_in_list() {
 
 #[test]
 fn test_not_in_list() {
-    let e = field("status").not_in_list(vec![string("x")]);
+    let e = field("status").in_list(vec![string("x")]).negate();
     assert!(matches!(
         e,
         Expr::InList { negated: true, list, .. } if list.len() == 1
@@ -209,7 +209,7 @@ fn test_in_subquery() {
 
 #[test]
 fn test_not_in_subquery() {
-    let e = field("id").not_in_subquery("SELECT id FROM banned");
+    let e = field("id").in_subquery("SELECT id FROM banned").negate();
     assert!(matches!(
         e,
         Expr::InSubquery { negated: true, subquery, .. } if subquery == "SELECT id FROM banned"
@@ -262,14 +262,14 @@ fn test_desc() {
 
 #[test]
 fn test_asc_nulls_first() {
-    let o = field("x").asc_nulls_first();
+    let o = field("x").asc().nulls_first();
     assert_eq!(o.direction, Direction::Asc);
     assert_eq!(o.nulls, Some(NullsPosition::First));
 }
 
 #[test]
 fn test_desc_nulls_last() {
-    let o = field("x").desc_nulls_last();
+    let o = field("x").desc().nulls_last();
     assert_eq!(o.direction, Direction::Desc);
     assert_eq!(o.nulls, Some(NullsPosition::Last));
 }

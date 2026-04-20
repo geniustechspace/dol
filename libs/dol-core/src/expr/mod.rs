@@ -324,13 +324,53 @@ impl<'a> Expr<'a> {
         }
     }
 
-    /// Internal helper to construct a negated binary op from an OpDef.
-    fn binop_def_neg(self, op: OpDef, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        Expr::BinaryOp {
-            left: Box::new(self),
-            op,
-            right: Box::new(rhs.into()),
-            negated: true,
+    // ── Negation ──
+
+    /// Negate an expression in-place. Flips the `negated` flag on
+    /// `BinaryOp`, `IsNull`, `Between`, `InList`, `InSubquery`, and `Exists`
+    /// nodes. For other variants, wraps in `UnaryOp::Not`.
+    ///
+    /// This is the unified negation mechanism — use `expr.like(rhs).negate()`
+    /// instead of separate `not_like()` methods.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use dol_core::expr::{field, string, int};
+    ///
+    /// // NOT LIKE: field("name").like(string("%foo%")).negate()
+    /// let expr = field("name").like(string("%foo%")).negate();
+    ///
+    /// // NOT BETWEEN: field("age").between(int(0i32), int(17i32)).negate()
+    /// let expr = field("age").between(int(0i32), int(17i32)).negate();
+    ///
+    /// // NOT IN: field("status").in_list(vec![string("x")]).negate()
+    /// let expr = field("status").in_list(vec![string("x")]).negate();
+    ///
+    /// // IS NOT NULL: field("x").is_null().negate()
+    /// let expr = field("x").is_null().negate();
+    /// ```
+    pub fn negate(self) -> Expr<'a> {
+        match self {
+            Expr::BinaryOp { left, op, right, negated } => {
+                Expr::BinaryOp { left, op, right, negated: !negated }
+            }
+            Expr::IsNull { expr, negated } => {
+                Expr::IsNull { expr, negated: !negated }
+            }
+            Expr::Between { expr, low, high, negated } => {
+                Expr::Between { expr, low, high, negated: !negated }
+            }
+            Expr::InList { expr, list, negated } => {
+                Expr::InList { expr, list, negated: !negated }
+            }
+            Expr::InSubquery { expr, subquery, negated } => {
+                Expr::InSubquery { expr, subquery, negated: !negated }
+            }
+            Expr::Exists { subquery, negated } => {
+                Expr::Exists { subquery, negated: !negated }
+            }
+            other => Expr::UnaryOp { op: UnaryOp::Not, expr: Box::new(other) },
         }
     }
 
@@ -380,29 +420,27 @@ impl<'a> Expr<'a> {
 
     // ── Pattern matching ──
 
+    /// `self LIKE rhs`. Chain `.negate()` for `NOT LIKE`.
     pub fn like(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop_def(op_registry::OpLike::def(), rhs) }
-    pub fn not_like(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop_def_neg(op_registry::OpLike::def(), rhs) }
+    /// `self ILIKE rhs`. Chain `.negate()` for `NOT ILIKE`.
     pub fn ilike(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop_def(op_registry::OpIlike::def(), rhs) }
-    pub fn not_ilike(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop_def_neg(op_registry::OpIlike::def(), rhs) }
+    /// `self SIMILAR TO rhs`. Chain `.negate()` for `NOT SIMILAR TO`.
     pub fn similar_to(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop_def(op_registry::OpSimilarTo::def(), rhs) }
-    pub fn not_similar_to(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop_def_neg(op_registry::OpSimilarTo::def(), rhs) }
+    /// `self ~ rhs` (POSIX regex match). Chain `.negate()` for `!~`.
     pub fn regex_match(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop_def(op_registry::OpRegexMatch::def(), rhs) }
-    pub fn not_regex_match(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop_def_neg(op_registry::OpRegexMatch::def(), rhs) }
+    /// `self ~* rhs` (case-insensitive POSIX regex). Chain `.negate()` for `!~*`.
     pub fn regex_match_insensitive(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop_def(op_registry::OpRegexMatchInsensitive::def(), rhs) }
-    pub fn not_regex_match_insensitive(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> { self.binop_def_neg(op_registry::OpRegexMatchInsensitive::def(), rhs) }
 
     // ── Null checks ──
 
+    /// `self IS NULL`. Chain `.negate()` for `IS NOT NULL`.
     pub fn is_null(self) -> Expr<'a> {
         Expr::IsNull { expr: Box::new(self), negated: false }
     }
 
-    pub fn is_not_null(self) -> Expr<'a> {
-        Expr::IsNull { expr: Box::new(self), negated: true }
-    }
-
     // ── Range ──
 
+    /// `self BETWEEN low AND high`. Chain `.negate()` for `NOT BETWEEN`.
     pub fn between(self, low: impl Into<Expr<'a>>, high: impl Into<Expr<'a>>) -> Expr<'a> {
         Expr::Between {
             expr: Box::new(self),
@@ -412,31 +450,16 @@ impl<'a> Expr<'a> {
         }
     }
 
-    pub fn not_between(self, low: impl Into<Expr<'a>>, high: impl Into<Expr<'a>>) -> Expr<'a> {
-        Expr::Between {
-            expr: Box::new(self),
-            low: Box::new(low.into()),
-            high: Box::new(high.into()),
-            negated: true,
-        }
-    }
-
     // ── Set membership ──
 
+    /// `self IN (list)`. Chain `.negate()` for `NOT IN`.
     pub fn in_list(self, list: Vec<Expr<'a>>) -> Expr<'a> {
         Expr::InList { expr: Box::new(self), list, negated: false }
     }
 
-    pub fn not_in_list(self, list: Vec<Expr<'a>>) -> Expr<'a> {
-        Expr::InList { expr: Box::new(self), list, negated: true }
-    }
-
+    /// `self IN (subquery)`. Chain `.negate()` for `NOT IN`.
     pub fn in_subquery(self, subquery: &str) -> Expr<'a> {
         Expr::InSubquery { expr: Box::new(self), subquery: subquery.to_string(), negated: false }
-    }
-
-    pub fn not_in_subquery(self, subquery: &str) -> Expr<'a> {
-        Expr::InSubquery { expr: Box::new(self), subquery: subquery.to_string(), negated: true }
     }
 
     // ── Type conversion ──
@@ -457,28 +480,14 @@ impl<'a> Expr<'a> {
 
     // ── Ordering ──
 
+    /// Create an ascending ORDER BY. Chain `.nulls_first()` or `.nulls_last()` as needed.
     pub fn asc(self) -> OrderByExpr<'a> {
         OrderByExpr { expr: self, direction: Direction::Asc, nulls: None }
     }
 
+    /// Create a descending ORDER BY. Chain `.nulls_first()` or `.nulls_last()` as needed.
     pub fn desc(self) -> OrderByExpr<'a> {
         OrderByExpr { expr: self, direction: Direction::Desc, nulls: None }
-    }
-
-    pub fn asc_nulls_first(self) -> OrderByExpr<'a> {
-        OrderByExpr { expr: self, direction: Direction::Asc, nulls: Some(NullsPosition::First) }
-    }
-
-    pub fn asc_nulls_last(self) -> OrderByExpr<'a> {
-        OrderByExpr { expr: self, direction: Direction::Asc, nulls: Some(NullsPosition::Last) }
-    }
-
-    pub fn desc_nulls_first(self) -> OrderByExpr<'a> {
-        OrderByExpr { expr: self, direction: Direction::Desc, nulls: Some(NullsPosition::First) }
-    }
-
-    pub fn desc_nulls_last(self) -> OrderByExpr<'a> {
-        OrderByExpr { expr: self, direction: Direction::Desc, nulls: Some(NullsPosition::Last) }
     }
 
     // ── Window ──

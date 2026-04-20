@@ -304,7 +304,7 @@ fn main() {
     // 2e. NULL checks
     let sql = users
         .get()
-        .filter(field("profile").is_not_null())
+        .filter(field("profile").is_null().negate())
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] IS NOT NULL: {}", sql);
@@ -341,7 +341,7 @@ fn main() {
     let subquery = "SELECT user_id FROM banned_users";
     let sql = users
         .get()
-        .filter(field("id").not_in_subquery(subquery))
+        .filter(field("id").in_subquery(subquery).negate())
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] NOT IN subquery: {}", sql);
@@ -385,7 +385,7 @@ fn main() {
     // 2m. Ordering with NULLS FIRST/LAST
     let sql = users
         .get()
-        .order_by_expr(field("display_name").asc_nulls_last())
+        .order_by_expr(field("display_name").asc().nulls_last())
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] ORDER BY NULLS LAST: {}", sql);
@@ -1048,22 +1048,22 @@ fn main() {
 
     // 5n. IS NULL / IS NOT NULL
     let _is_null = field("profile").is_null();
-    let _is_not_null = field("profile").is_not_null();
+    let _is_not_null = field("profile").is_null().negate();
     println!("  IS NULL / IS NOT NULL ✓");
 
     // 5o. BETWEEN / NOT BETWEEN
     let _between = field("age").between(int(18), int(65));
-    let _not_between = field("age").not_between(int(0), int(17));
+    let _not_between = field("age").between(int(0), int(17)).negate();
     println!("  BETWEEN / NOT BETWEEN ✓");
 
     // 5p. IN list / NOT IN list
     let _in = field("status").in_list(vec![string("a"), string("b")]);
-    let _not_in = field("status").not_in_list(vec![string("x"), string("y")]);
+    let _not_in = field("status").in_list(vec![string("x"), string("y")]).negate();
     println!("  IN / NOT IN list ✓");
 
     // 5q. IN / NOT IN subquery
     let _in_sub = field("id").in_subquery("SELECT user_id FROM active_users");
-    let _not_in_sub = field("id").not_in_subquery("SELECT user_id FROM banned_users");
+    let _not_in_sub = field("id").in_subquery("SELECT user_id FROM banned_users").negate();
     println!("  IN / NOT IN subquery ✓");
 
     // 5r. All function constructors
@@ -1108,14 +1108,14 @@ fn main() {
     let _arr = dol::expr::arr(vec![int(1), int(2), int(3)]);
     println!("  Object/Array literals ✓");
 
-    // 5u. Ordering expressions (all 6 variants)
+    // 5u. Ordering expressions (chained with nulls modifiers)
     let _ = field("name").asc();
     let _ = field("name").desc();
-    let _ = field("name").asc_nulls_first();
-    let _ = field("name").asc_nulls_last();
-    let _ = field("name").desc_nulls_first();
-    let _ = field("name").desc_nulls_last();
-    println!("  All 6 ordering variants ✓");
+    let _ = field("name").asc().nulls_first();
+    let _ = field("name").asc().nulls_last();
+    let _ = field("name").desc().nulls_first();
+    let _ = field("name").desc().nulls_last();
+    println!("  All ordering variants (asc/desc + nulls_first/nulls_last) ✓");
 
     // 5v. Window builder with frame
     let _ = func::row_number()
