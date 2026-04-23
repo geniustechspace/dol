@@ -1,0 +1,14 @@
+[package]
+name = "dol-expr"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "DOL expression AST, type system, arena, and interner (internal)"
+
+[dependencies]
+smallvec = { workspace = true }
+serde    = { workspace = true, optional = true }
+
+[features]
+default = []
+serde = ["dep:serde"]

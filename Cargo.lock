@@ -20,6 +20,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dol-builder"
+version = "0.1.0"
+dependencies = [
+ "dol-expr",
+ "dol-ir",
+ "smallvec",
+]
+
+[[package]]
 name = "dol-config"
 version = "0.1.0"
 dependencies = [
@@ -45,6 +54,31 @@ dependencies = [
  "dol-core",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "dol-entity-internal"
+version = "0.1.0"
+dependencies = [
+ "dol-expr",
+ "serde",
+]
+
+[[package]]
+name = "dol-expr"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "smallvec",
+]
+
+[[package]]
+name = "dol-ir"
+version = "0.1.0"
+dependencies = [
+ "dol-expr",
+ "serde",
+ "smallvec",
 ]
 
 [[package]]
