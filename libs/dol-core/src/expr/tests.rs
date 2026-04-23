@@ -832,3 +832,207 @@ fn arena_string_dedup_across_nodes() {
     assert_eq!(id_a, id_b, "same field name must share StrId");
     assert_eq!(interner.len(), 1, "only one unique string");
 }
+
+// ── Passes (Phase 3) ─────────────────────────────────────────────────────────
+
+mod pass_tests {
+    use crate::expr::arena::ExprArena;
+    use crate::expr::interner::Interner;
+    use crate::expr::pass::{
+        AllowList, ExprContext, PassCaps, PassChain, PassError, Schema,
+        run_passes,
+    };
+    use crate::expr::pass::arity::ArityPass;
+    use crate::expr::pass::node_count::NodeCountPass;
+    use crate::expr::pass::scope::ScopePass;
+    use crate::expr::pass::security::SecurityPass;
+    use crate::expr::pass::semantic::SemanticPass;
+    use crate::expr::{field, int, string};
+    use crate::expr::func::{count, row_number};
+
+    fn lower(expr: &crate::expr::Expr<'_>) -> (ExprArena, Interner) {
+        let mut arena = ExprArena::new();
+        let mut interner = Interner::new();
+        arena.lower(expr, &mut interner);
+        (arena, interner)
+    }
+
+    // ── NodeCountPass ────────────────────────────────────────────────────────
+
+    #[test]
+    fn node_count_at_limit_passes() {
+        let (arena, _) = lower(&field("x"));
+        let caps = PassCaps { max_nodes: 1, ..Default::default() };
+        assert!(NodeCountPass.check(&arena, &caps).is_empty());
+    }
+
+    #[test]
+    fn node_count_over_limit_fails() {
+        // field("a").gt(int(1)) → 3 nodes
+        let (arena, _) = lower(&field("a").gt(int(1i32)));
+        let caps = PassCaps { max_nodes: 2, ..Default::default() };
+        let errs = NodeCountPass.check(&arena, &caps);
+        assert_eq!(errs.len(), 1);
+        assert!(matches!(&errs[0], PassError::TooManyNodes { count: 3, limit: 2 }));
+    }
+
+    // ── ArityPass ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn arity_pass_correct_args_passes() {
+        // count(field) — COUNT takes exactly 1 arg
+        let (arena, _) = lower(&count(field("value")));
+        assert!(ArityPass.check(&arena).is_empty());
+    }
+
+    #[test]
+    fn arity_pass_bad_args_fails() {
+        use crate::expr::{Expr, FuncDef, FuncKind, Arity};
+        // Manually build COUNT with 2 args (wrong arity).
+        let expr = Expr::Func {
+            name: FuncDef::new_static("COUNT", Arity::Exact(1), FuncKind::Aggregate),
+            args: vec![field("a"), field("b")],
+        };
+        let (arena, _) = lower(&expr);
+        let errs = ArityPass.check(&arena);
+        assert_eq!(errs.len(), 1);
+        assert!(matches!(&errs[0], PassError::BadArity { func_name, actual: 2, .. }
+            if func_name == "COUNT"));
+    }
+
+    // ── ScopePass ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn scope_pass_no_schema_is_noop() {
+        let (arena, interner) = lower(&field("anything"));
+        let errs = ScopePass.check(&arena, &interner, None);
+        assert!(errs.is_empty());
+    }
+
+    #[test]
+    fn scope_pass_known_field_passes() {
+        let schema = Schema::from_fields(["age", "email"]);
+        let (arena, interner) = lower(&field("age"));
+        let errs = ScopePass.check(&arena, &interner, Some(&schema));
+        assert!(errs.is_empty());
+    }
+
+    #[test]
+    fn scope_pass_unknown_field_fails() {
+        let schema = Schema::from_fields(["age"]);
+        let (arena, interner) = lower(&field("password_hash"));
+        let errs = ScopePass.check(&arena, &interner, Some(&schema));
+        assert_eq!(errs.len(), 1);
+        assert!(matches!(&errs[0], PassError::UnknownField { path }
+            if path == "password_hash"));
+    }
+
+    // ── SemanticPass ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn aggregate_in_select_passes() {
+        let (arena, _) = lower(&count(field("id")));
+        assert!(SemanticPass.check(&arena, ExprContext::Select).is_empty());
+    }
+
+    #[test]
+    fn aggregate_in_where_fails() {
+        let (arena, _) = lower(&count(field("id")));
+        let errs = SemanticPass.check(&arena, ExprContext::Where);
+        assert_eq!(errs.len(), 1);
+        assert!(matches!(&errs[0], PassError::AggregateInWrongContext {
+            func_name, context: ExprContext::Where
+        } if func_name == "COUNT"));
+    }
+
+    #[test]
+    fn window_func_in_where_fails() {
+        let (arena, _) = lower(&row_number());
+        let errs = SemanticPass.check(&arena, ExprContext::Where);
+        assert_eq!(errs.len(), 1);
+        assert!(matches!(&errs[0], PassError::WindowInWrongContext {
+            context: ExprContext::Where, ..
+        }));
+    }
+
+    #[test]
+    fn window_func_in_having_fails() {
+        let (arena, _) = lower(&row_number());
+        let errs = SemanticPass.check(&arena, ExprContext::Having);
+        assert!(!errs.is_empty());
+    }
+
+    // ── SecurityPass ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn security_no_allowlist_permits_all() {
+        let (arena, interner) = lower(&count(field("id")));
+        let caps = PassCaps::default();
+        assert!(SecurityPass.check(&arena, &interner, &caps, None).is_empty());
+    }
+
+    #[test]
+    fn security_allowlist_permits_listed_func() {
+        let allow = AllowList::from_funcs(["COUNT"]);
+        let (arena, interner) = lower(&count(field("id")));
+        let caps = PassCaps::default();
+        assert!(SecurityPass.check(&arena, &interner, &caps, Some(&allow)).is_empty());
+    }
+
+    #[test]
+    fn security_allowlist_rejects_unlisted_func() {
+        let allow = AllowList::from_funcs(["LOWER"]); // COUNT not in list
+        let (arena, interner) = lower(&count(field("id")));
+        let caps = PassCaps::default();
+        let errs = SecurityPass.check(&arena, &interner, &caps, Some(&allow));
+        assert_eq!(errs.len(), 1);
+        assert!(matches!(&errs[0], PassError::DisallowedFunction { func_name }
+            if func_name == "COUNT"));
+    }
+
+    #[test]
+    fn security_string_within_limit_passes() {
+        let (arena, interner) = lower(&string("hello"));
+        let caps = PassCaps { max_string_len: Some(10), ..Default::default() };
+        assert!(SecurityPass.check(&arena, &interner, &caps, None).is_empty());
+    }
+
+    #[test]
+    fn security_string_over_limit_fails() {
+        let (arena, interner) = lower(&string("exceeds_limit"));
+        let caps = PassCaps { max_string_len: Some(5), ..Default::default() };
+        let errs = SecurityPass.check(&arena, &interner, &caps, None);
+        assert_eq!(errs.len(), 1);
+        assert!(matches!(&errs[0], PassError::StringTooLong { length: 13, limit: 5 }));
+    }
+
+    // ── run_passes (chain) ───────────────────────────────────────────────────
+
+    #[test]
+    fn run_passes_clean_expr_returns_empty() {
+        let schema = Schema::from_fields(["age"]);
+        let (arena, interner) = lower(&field("age").gt(int(18i32)));
+        let chain = PassChain {
+            caps:    PassCaps::default(),
+            schema:  Some(&schema),
+            context: ExprContext::Where,
+            allow:   None,
+        };
+        assert!(run_passes(&arena, &interner, &chain).is_empty());
+    }
+
+    #[test]
+    fn run_passes_stops_at_first_failing_pass() {
+        // node limit of 1 but we have 3 nodes — NodeCountPass fires first.
+        let (arena, interner) = lower(&field("a").gt(int(1i32)));
+        let chain = PassChain {
+            caps:    PassCaps { max_nodes: 1, ..Default::default() },
+            schema:  None,
+            context: ExprContext::Where,
+            allow:   None,
+        };
+        let errs = run_passes(&arena, &interner, &chain);
+        assert_eq!(errs.len(), 1);
+        assert!(matches!(errs[0], PassError::TooManyNodes { .. }));
+    }
+}

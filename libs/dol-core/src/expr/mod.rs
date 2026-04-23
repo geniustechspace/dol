@@ -34,6 +34,7 @@ pub mod op_registry;
 mod ops;
 pub mod order;
 mod path;
+pub mod pass;
 pub mod window;
 
 pub use ast::Expr;
