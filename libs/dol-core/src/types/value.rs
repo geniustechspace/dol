@@ -152,19 +152,19 @@ pub enum Value {
     Int16(i16),
     Int32(i32),
     Int64(i64),
-    Int128(i128),
+    Int128(Box<i128>),
     UInt8(u8),
     UInt16(u16),
     UInt32(u32),
     UInt64(u64),
-    UInt128(u128),
+    UInt128(Box<u128>),
 
     // ── Float ──
     Float32(f32),
     Float64(f64),
 
     // ── Decimal ──
-    Decimal(Decimal),
+    Decimal(Box<Decimal>),
 
     // ── Network ──
     Inet(IpAddr),
@@ -175,8 +175,8 @@ pub enum Value {
     Date(Date),
     Time(Time),
     DateTime(DateTime),
-    TimestampTz(TimestampTz),
-    Interval(Interval),
+    TimestampTz(Box<TimestampTz>),
+    Interval(Box<Interval>),
 
     // ── Geometric ──
     // Point is 16 bytes — fits unboxed.
@@ -205,10 +205,8 @@ pub enum Value {
 
     // ── Extension ──
     /// A domain-specific extension value not covered by the well-known variants.
-    Extension {
-        type_name: Box<str>,
-        data: Box<[u8]>,
-    },
+    /// Boxed to keep `Value` at 24 bytes on 64-bit targets.
+    Extension(Box<(Box<str>, Box<[u8]>)>),
 }
 
 impl Value {
@@ -298,7 +296,7 @@ impl Value {
             Self::Map(_) => "map",
             Self::Struct(_) => "struct",
             Self::Range(_) => "range",
-            Self::Extension { .. } => "extension",
+            Self::Extension(_) => "extension",
         }
     }
 
@@ -334,7 +332,7 @@ impl Value {
     }
     pub fn as_decimal(&self) -> Option<Decimal> {
         if let Self::Decimal(v) = self {
-            Some(*v)
+            Some(**v)
         } else {
             None
         }
@@ -362,14 +360,14 @@ impl Value {
     }
     pub fn as_timestamp_tz(&self) -> Option<TimestampTz> {
         if let Self::TimestampTz(v) = self {
-            Some(*v)
+            Some(**v)
         } else {
             None
         }
     }
     pub fn as_interval(&self) -> Option<Interval> {
         if let Self::Interval(v) = self {
-            Some(*v)
+            Some(**v)
         } else {
             None
         }
@@ -522,8 +520,8 @@ impl fmt::Display for Value {
                 f.write_str("}")
             }
             Self::Range(r) => write!(f, "{r}"),
-            Self::Extension { type_name, data } => {
-                write!(f, "ext:{}(len={})", type_name, data.len())
+            Self::Extension(inner) => {
+                write!(f, "ext:{}(len={})", inner.0, inner.1.len())
             }
         }
     }
@@ -588,7 +586,7 @@ impl From<i64> for Value {
 }
 impl From<i128> for Value {
     fn from(v: i128) -> Self {
-        Self::Int128(v)
+        Self::Int128(Box::new(v))
     }
 }
 impl From<u8> for Value {
@@ -613,7 +611,7 @@ impl From<u64> for Value {
 }
 impl From<u128> for Value {
     fn from(v: u128) -> Self {
-        Self::UInt128(v)
+        Self::UInt128(Box::new(v))
     }
 }
 impl From<f32> for Value {
@@ -633,7 +631,7 @@ impl From<[u8; 16]> for Value {
 }
 impl From<Decimal> for Value {
     fn from(v: Decimal) -> Self {
-        Self::Decimal(v)
+        Self::Decimal(Box::new(v))
     }
 }
 impl From<Date> for Value {
@@ -653,12 +651,12 @@ impl From<DateTime> for Value {
 }
 impl From<TimestampTz> for Value {
     fn from(v: TimestampTz) -> Self {
-        Self::TimestampTz(v)
+        Self::TimestampTz(Box::new(v))
     }
 }
 impl From<Interval> for Value {
     fn from(v: Interval) -> Self {
-        Self::Interval(v)
+        Self::Interval(Box::new(v))
     }
 }
 impl From<IpAddr> for Value {
@@ -729,7 +727,7 @@ pub enum Literal<'a> {
     Float64(f64),
 
     // ── Decimal ──
-    Decimal(Decimal),
+    Decimal(Box<Decimal>),
 
     // ── Network ──
     Inet(IpAddr),
@@ -740,8 +738,8 @@ pub enum Literal<'a> {
     Date(Date),
     Time(Time),
     DateTime(DateTime),
-    TimestampTz(TimestampTz),
-    Interval(Interval),
+    TimestampTz(Box<TimestampTz>),
+    Interval(Box<Interval>),
 
     // ── Geometric ──
     Point(Point),
@@ -762,10 +760,8 @@ pub enum Literal<'a> {
 
     // ── Extension ──
     /// A domain-specific extension value not covered by the well-known variants.
-    Extension {
-        type_name: Box<str>,
-        data: Box<[u8]>,
-    },
+    /// Boxed to keep `Literal` at 32 bytes on 64-bit targets.
+    Extension(Box<(Box<str>, Box<[u8]>)>),
 }
 
 impl<'a> Literal<'a> {
@@ -837,7 +833,7 @@ impl<'a> Literal<'a> {
 
     pub fn decimal(unscaled: i128, scale: u32) -> Result<Self, super::TypeError> {
         match Decimal::try_new(unscaled, scale) {
-            Ok(d) => Ok(Self::Decimal(d)),
+            Ok(d) => Ok(Self::Decimal(Box::new(d))),
             Err(e) => Err(e),
         }
     }
@@ -862,12 +858,12 @@ impl<'a> Literal<'a> {
         Self::DateTime(DateTime::new(date, time))
     }
 
-    pub const fn timestamp_tz(datetime: DateTime, offset: Offset) -> Self {
-        Self::TimestampTz(TimestampTz::new(datetime, offset))
+    pub fn timestamp_tz(datetime: DateTime, offset: Offset) -> Self {
+        Self::TimestampTz(Box::new(TimestampTz::new(datetime, offset)))
     }
 
-    pub const fn interval(months: i32, days: i32, nanoseconds: i64) -> Self {
-        Self::Interval(Interval::new(months, days, nanoseconds))
+    pub fn interval(months: i32, days: i32, nanoseconds: i64) -> Self {
+        Self::Interval(Box::new(Interval::new(months, days, nanoseconds)))
     }
 
     // ── Network constructors ──
@@ -999,7 +995,7 @@ impl<'a> Literal<'a> {
     }
     pub fn as_decimal(&self) -> Option<Decimal> {
         if let Self::Decimal(v) = self {
-            Some(*v)
+            Some(**v)
         } else {
             None
         }
@@ -1116,8 +1112,8 @@ impl<'a> fmt::Display for Literal<'a> {
                 f.write_str("}")
             }
             Self::Range(r) => write!(f, "{r}"),
-            Self::Extension { type_name, data } => {
-                write!(f, "ext:{}(len={})", type_name, data.len())
+            Self::Extension(inner) => {
+                write!(f, "ext:{}(len={})", inner.0, inner.1.len())
             }
         }
     }
@@ -1141,12 +1137,12 @@ impl<'a> From<Literal<'a>> for Value {
             Literal::Int16(v) => Self::Int16(v),
             Literal::Int32(v) => Self::Int32(v),
             Literal::Int64(v) => Self::Int64(v),
-            Literal::Int128(v) => Self::Int128(v),
+            Literal::Int128(v) => Self::Int128(Box::new(v)),
             Literal::UInt8(v) => Self::UInt8(v),
             Literal::UInt16(v) => Self::UInt16(v),
             Literal::UInt32(v) => Self::UInt32(v),
             Literal::UInt64(v) => Self::UInt64(v),
-            Literal::UInt128(v) => Self::UInt128(v),
+            Literal::UInt128(v) => Self::UInt128(Box::new(v)),
             Literal::Float32(v) => Self::Float32(v),
             Literal::Float64(v) => Self::Float64(v),
             Literal::Decimal(v) => Self::Decimal(v),
@@ -1171,7 +1167,7 @@ impl<'a> From<Literal<'a>> for Value {
             Literal::Map(entries) => Self::Map(own_kv_slice(entries)),
             Literal::Struct(entries) => Self::Struct(own_kv_slice(entries)),
             Literal::Range(r) => Self::Range(convert_range(*r)),
-            Literal::Extension { type_name, data } => Self::Extension { type_name, data },
+            Literal::Extension(inner) => Self::Extension(inner),
         }
     }
 }
@@ -1310,7 +1306,7 @@ impl<'a> From<[u8; 16]> for Literal<'a> {
 }
 impl<'a> From<Decimal> for Literal<'a> {
     fn from(v: Decimal) -> Self {
-        Self::Decimal(v)
+        Self::Decimal(Box::new(v))
     }
 }
 impl<'a> From<Date> for Literal<'a> {
@@ -1330,12 +1326,12 @@ impl<'a> From<DateTime> for Literal<'a> {
 }
 impl<'a> From<TimestampTz> for Literal<'a> {
     fn from(v: TimestampTz) -> Self {
-        Self::TimestampTz(v)
+        Self::TimestampTz(Box::new(v))
     }
 }
 impl<'a> From<Interval> for Literal<'a> {
     fn from(v: Interval) -> Self {
-        Self::Interval(v)
+        Self::Interval(Box::new(v))
     }
 }
 impl<'a> From<IpAddr> for Literal<'a> {
@@ -1369,19 +1365,21 @@ mod tests {
 
     #[test]
     fn value_size_is_exactly_24_bytes() {
-        // TODO: box Decimal/TimestampTz/Interval to bring this down to 24
-        assert!(
-            size_of::<Value>() <= 48,
-            "Value size regressed; check for new unboxed large variants"
+        assert_eq!(
+            size_of::<Value>(),
+            24,
+            "Value size changed; check for new large unboxed variants (current: {} bytes)",
+            size_of::<Value>()
         );
     }
 
     #[test]
     fn literal_size_is_exactly_32_bytes() {
-        // TODO: box Decimal/TimestampTz/Interval to bring this down to 32
-        assert!(
-            size_of::<Literal<'static>>() <= 48,
-            "Literal size regressed; check for new unboxed large variants"
+        assert_eq!(
+            size_of::<Literal<'static>>(),
+            32,
+            "Literal size changed; check for new large unboxed variants (current: {} bytes)",
+            size_of::<Literal<'static>>()
         );
     }
 

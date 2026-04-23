@@ -56,7 +56,7 @@ pub fn now_tz() -> Value {
     let date = Date::new_unchecked(year, month, day);
     let time = Time::new_unchecked(hour, minute, second, nano);
     let dt = DateTime::new(date, time);
-    Value::TimestampTz(TimestampTz::utc(dt))
+    Value::TimestampTz(Box::new(TimestampTz::utc(dt)))
 }
 
 /// Constructs a `Value::Date` from year, month, day components.
@@ -76,17 +76,17 @@ pub fn from_hms_nano(hour: u8, minute: u8, second: u8, nano: u32) -> Result<Valu
 
 /// Constructs a `Value::Interval` spanning the given number of days.
 pub fn interval_days(days: i32) -> Value {
-    Value::Interval(Interval::from_days(days))
+    Value::Interval(Box::new(Interval::from_days(days)))
 }
 
 /// Constructs a `Value::Interval` spanning the given number of months.
 pub fn interval_months(months: i32) -> Value {
-    Value::Interval(Interval::from_months(months))
+    Value::Interval(Box::new(Interval::from_months(months)))
 }
 
 /// Constructs a `Value::Interval` spanning the given number of nanoseconds.
 pub fn interval_nanos(nanos: i64) -> Value {
-    Value::Interval(Interval::from_nanos(nanos))
+    Value::Interval(Box::new(Interval::from_nanos(nanos)))
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────

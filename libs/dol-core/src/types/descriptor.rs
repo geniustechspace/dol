@@ -825,7 +825,7 @@ mod tests {
             scale: Some(2),
         };
         // 123.45 → unscaled = 12345, 5 significant digits > 4
-        let v = Value::Decimal(Decimal::new_unchecked(12345, 2));
+        let v = Value::Decimal(Box::new(Decimal::new_unchecked(12345, 2)));
         let err = dt.accepts(&v).unwrap_err();
         assert!(matches!(err, TypeError::PrecisionExceeded { max: 4, .. }));
     }
@@ -837,7 +837,7 @@ mod tests {
             scale: Some(2),
         };
         // scale of 3 exceeds max 2
-        let v = Value::Decimal(Decimal::new_unchecked(12345, 3));
+        let v = Value::Decimal(Box::new(Decimal::new_unchecked(12345, 3)));
         let err = dt.accepts(&v).unwrap_err();
         assert!(matches!(err, TypeError::ScaleExceeded { max: 2, .. }));
     }
