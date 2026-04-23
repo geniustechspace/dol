@@ -826,7 +826,7 @@ fn object_source_from_bytes() {
 
 #[test]
 fn object_source_from_expr() {
-    let src = ObjectSource::FromExpr(crate::expr::Expr::Identifier("col".to_string()));
+    let src = ObjectSource::FromExpr(crate::expr::field_dyn("col"));
     assert!(matches!(src, ObjectSource::FromExpr(_)));
 }
 
@@ -846,7 +846,7 @@ fn join_ir_construction() {
 fn query_ir_with_options() {
     let q = Query {
         source: entity_ref("users"),
-        projections: vec![crate::expr::Expr::Identifier("id".to_string())],
+        projections: vec![crate::expr::field_dyn("id")],
         joins: vec![],
         filters: vec![],
         group_by: vec![],

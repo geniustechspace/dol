@@ -30,19 +30,21 @@ mod op_meta;
 pub mod op_registry;
 mod ops;
 pub mod order;
+mod path;
 pub mod window;
 
 pub use ast::Expr;
 pub use compiler::{ExprRenderer, MAX_EXPR_DEPTH, compile_expr};
 pub use constructors::{
-    IntoFloatLiteral, IntoIntLiteral, arr, bool_expr, case, field, float, int, null, obj, param,
-    qualified, raw_expr, string,
+    IntoFloatLiteral, IntoIntLiteral, arr, bool_expr, case, field, field_dyn, float, int, null,
+    obj, param, qualified, string,
 };
+pub use path::PathExpr;
 pub use func_def::{
     Arity, ArityError, CompactName, DolFunc, DolOp, FuncDef, FuncKind, OpDef, OpKind,
 };
 pub use literal::{Literal, TypeError, Value};
-pub use ops::{Quantifier, UnaryOp};
+pub use ops::UnaryOp;
 pub use order::{Direction, NullsPosition, OrderByExpr};
 pub use window::{CaseBuilder, FrameBound, FrameKind, WindowBuilder, WindowFrame};
 

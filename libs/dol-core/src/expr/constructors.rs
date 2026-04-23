@@ -1,20 +1,34 @@
 //! Free constructors and coercion traits for the expression DSL.
 
 use super::ast::Expr;
+use super::compact_name::CompactName;
 use super::literal::Literal;
+use super::path::PathExpr;
 use super::window::CaseBuilder;
 
-/// Create a field/identifier reference expression (DOL primary constructor).
-pub fn field<'a>(name: &str) -> Expr<'a> {
-    Expr::Identifier(name.to_string())
+/// Create a field reference: `field_name`.
+///
+/// The name is a string literal → stored as `CompactName::Static` (zero alloc).
+pub fn field(name: &'static str) -> Expr<'static> {
+    Expr::Ref(PathExpr::one(name))
 }
 
-/// Create a qualified field reference: `scope.name`.
-pub fn qualified<'a>(scope: &str, name: &str) -> Expr<'a> {
-    Expr::QualifiedIdentifier {
-        scope: scope.to_string(),
-        name: name.to_string(),
-    }
+/// Create a runtime field reference from a non-static `&str` (allocates).
+///
+/// Unlike [`field`], this accepts any `&str` at runtime by cloning the string
+/// into an owned `CompactName`. The returned expression is `Expr<'static>`
+/// because no borrowed data is captured.
+///
+/// Prefer [`field`] for compile-time-known names.
+pub fn field_dyn(name: &str) -> Expr<'static> {
+    Expr::Ref(PathExpr::from_str(name))
+}
+
+/// Create a qualified reference: `scope.name` (e.g. `"users"`, `"email"`).
+///
+/// Both segments are string literals → zero alloc.
+pub fn qualified(scope: &'static str, name: &'static str) -> Expr<'static> {
+    Expr::Ref(PathExpr::from_segments([scope, name]))
 }
 
 /// Create a null literal.
@@ -47,30 +61,39 @@ pub fn param<'a>() -> Expr<'a> {
     Expr::Param
 }
 
-/// Create a raw expression string (escape hatch).
-pub fn raw_expr<'a>(expr: &str) -> Expr<'a> {
-    Expr::Raw(expr.to_string())
-}
-
-/// Start building a CASE expression.
+/// Start building a `CASE` expression.
 pub fn case<'a>() -> CaseBuilder<'a> {
     CaseBuilder::new()
 }
 
-/// Create an object literal expression: `{ key: value, ... }`.
+/// Create an object literal: `{ key: value, ... }`.
+///
+/// Keys are `&str` and stored as `CompactName::Owned`.
 pub fn obj<'a>(fields: Vec<(&str, Expr<'a>)>) -> Expr<'a> {
-    Expr::ObjectLiteral(
+    Expr::Object(
         fields
             .into_iter()
-            .map(|(k, v)| (k.to_string(), v))
+            .map(|(k, v)| (CompactName::from_str(k), v))
             .collect(),
     )
 }
 
-/// Create an array literal expression: `[elem1, elem2, ...]`.
+/// Create an array literal: `[elem1, elem2, ...]`.
 pub fn arr<'a>(elements: Vec<Expr<'a>>) -> Expr<'a> {
-    Expr::ArrayLiteral(elements)
+    Expr::Array(elements)
 }
+
+/// Convert `&str` to `Expr::Ref` for ergonomic builder use.
+///
+/// String literals use `CompactName::Static` (zero alloc). Non-static `&str`
+/// creates an `Owned` variant.
+impl<'a> From<&str> for Expr<'a> {
+    fn from(s: &str) -> Self {
+        Expr::Ref(PathExpr::from_str(s))
+    }
+}
+
+// ── Integer coercion ─────────────────────────────────────────────────────────
 
 /// Trait for values that can become integer literals.
 pub trait IntoIntLiteral {
@@ -87,16 +110,18 @@ macro_rules! impl_into_int {
     };
 }
 
-impl_into_int!(i8, Int8);
-impl_into_int!(i16, Int16);
-impl_into_int!(i32, Int32);
-impl_into_int!(i64, Int64);
+impl_into_int!(i8,   Int8);
+impl_into_int!(i16,  Int16);
+impl_into_int!(i32,  Int32);
+impl_into_int!(i64,  Int64);
 impl_into_int!(i128, Int128);
-impl_into_int!(u8, UInt8);
-impl_into_int!(u16, UInt16);
-impl_into_int!(u32, UInt32);
-impl_into_int!(u64, UInt64);
+impl_into_int!(u8,   UInt8);
+impl_into_int!(u16,  UInt16);
+impl_into_int!(u32,  UInt32);
+impl_into_int!(u64,  UInt64);
 impl_into_int!(u128, UInt128);
+
+// ── Float coercion ───────────────────────────────────────────────────────────
 
 /// Trait for values that can become float literals.
 pub trait IntoFloatLiteral {
@@ -112,12 +137,5 @@ impl IntoFloatLiteral for f32 {
 impl IntoFloatLiteral for f64 {
     fn into_float_literal(self) -> Literal<'static> {
         Literal::Float64(self)
-    }
-}
-
-/// Convert `&str` to `Expr::Identifier` for ergonomic builder use.
-impl<'a> From<&str> for Expr<'a> {
-    fn from(s: &str) -> Self {
-        Expr::Identifier(s.to_string())
     }
 }

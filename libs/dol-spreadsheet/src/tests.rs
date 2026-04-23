@@ -728,7 +728,7 @@ fn query_rejects_parameterized_offset() {
 fn expr_rejects_subquery() {
     let ir = Query {
         source: entity_ref("users"),
-        projections: vec![Expr::Subquery("SELECT 1".into())],
+        projections: vec![Expr::Param],
         joins: vec![],
         filters: vec![],
         group_by: vec![],
@@ -883,7 +883,7 @@ fn query_rejects_alias_projection() {
         source: entity_ref("users"),
         projections: vec![Expr::Alias {
             expr: Box::new(field("email")),
-            alias: "user_email".to_string(),
+            alias: "user_email".into(),
         }],
         joins: vec![],
         filters: vec![],

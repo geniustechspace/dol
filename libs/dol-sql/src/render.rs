@@ -9,7 +9,7 @@ use super::dialect::{
 use crate::SqlOutput;
 use dol_core::expr::compiler::{ExprRenderer, compile_expr};
 use dol_core::expr::{
-    Direction, Expr, FuncDef, Literal, NullsPosition, OpDef, OrderByExpr, Quantifier,
+    Direction, Expr, FuncDef, Literal, NullsPosition, OpDef, OrderByExpr,
 };
 use dol_core::op::BackendError;
 use dol_core::op::definition::OwnedEntityConstraint;
@@ -88,26 +88,29 @@ impl<'d, 'c> SqlExprRenderer<'d, 'c> {
 }
 
 impl ExprRenderer for SqlExprRenderer<'_, '_> {
-    // render_identifier — uses default
-    // render_qualified_identifier — uses default
-
-    fn render_field_access(&mut self, base: &str, field: &str) -> Result<String, BackendError> {
-        let escaped_field = escape_sql_string(field, self.dialect);
-        Ok(match &self.dialect.json_access {
-            JsonAccessStyle::ArrowOperator => format!("{}->>'{}'", base, escaped_field),
-            JsonAccessStyle::JsonExtractFunction => {
-                format!("json_extract({}, '$.{}')", base, escaped_field)
-            }
-            JsonAccessStyle::JsonValueFunction => {
-                format!("JSON_VALUE({}, '$.{}')", base, escaped_field)
-            }
-            JsonAccessStyle::Unsupported => {
-                return Err(BackendError::Unsupported(format!(
-                    "JSON field access is not supported by this dialect (field '{}')",
-                    field
-                )));
-            }
-        })
+    fn render_access(&mut self, base: &str, path: &[&str]) -> Result<String, BackendError> {
+        // For multi-segment paths, apply the JSON access style for each segment
+        // by building up from the base expression.
+        let mut result = base.to_owned();
+        for &segment in path {
+            let escaped = escape_sql_string(segment, self.dialect);
+            result = match &self.dialect.json_access {
+                JsonAccessStyle::ArrowOperator => format!("{}->>'{}'", result, escaped),
+                JsonAccessStyle::JsonExtractFunction => {
+                    format!("json_extract({}, '$.{}')", result, escaped)
+                }
+                JsonAccessStyle::JsonValueFunction => {
+                    format!("JSON_VALUE({}, '$.{}')", result, escaped)
+                }
+                JsonAccessStyle::Unsupported => {
+                    return Err(BackendError::Unsupported(format!(
+                        "JSON field access is not supported by this dialect (field '{}')",
+                        segment
+                    )));
+                }
+            };
+        }
+        Ok(result)
     }
 
     fn render_param(&mut self) -> Result<String, BackendError> {
@@ -123,12 +126,10 @@ impl ExprRenderer for SqlExprRenderer<'_, '_> {
         lhs: &str,
         op: &OpDef,
         rhs: &str,
-        negated: bool,
     ) -> Result<String, BackendError> {
         // Special case: ILike on dialects without native ILIKE support
         if op.name() == OpDef::ILIKE && !self.dialect.features.ilike {
-            let not = if negated { "NOT " } else { "" };
-            return Ok(format!("{}LOWER({}) LIKE LOWER({})", not, lhs, rhs));
+            return Ok(format!("LOWER({}) LIKE LOWER({})", lhs, rhs));
         }
 
         // Special case: Concat dispatches on dialect.concat_style
@@ -142,35 +143,14 @@ impl ExprRenderer for SqlExprRenderer<'_, '_> {
 
         let op_str = Self::binop_token(op);
 
-        let base = if op.name() == OpDef::AND || op.name() == OpDef::OR {
+        Ok(if op.name() == OpDef::AND || op.name() == OpDef::OR {
             format!("({} {} {})", lhs, op_str, rhs)
         } else {
             format!("{} {} {}", lhs, op_str, rhs)
-        };
-
-        Ok(if negated {
-            format!("NOT ({})", base)
-        } else {
-            base
         })
     }
 
     // render_unary_op — uses default
-
-    fn render_quantified_cmp(
-        &mut self,
-        lhs: &str,
-        op: &OpDef,
-        quantifier: Quantifier,
-        subquery: &str,
-    ) -> Result<String, BackendError> {
-        let op_str = Self::binop_token(op);
-        let quant = match quantifier {
-            Quantifier::Any => "ANY",
-            Quantifier::All => "ALL",
-        };
-        Ok(format!("{} {} {} ({})", lhs, op_str, quant, subquery))
-    }
 
     fn render_func(&mut self, def: &FuncDef, rendered_args: &[String]) -> Result<String, BackendError> {
         let func_sql = func_id_to_sql(def);
@@ -190,14 +170,10 @@ impl ExprRenderer for SqlExprRenderer<'_, '_> {
     }
 
     // render_case — uses default
-    // render_subquery — uses default
     // render_in_list — uses default
-    // render_in_subquery — uses default
     // render_between — uses default
-    // render_exists — uses default
-    // render_is_null — uses default
 
-    fn render_object_literal(&mut self, pairs: &[(String, String)]) -> Result<String, BackendError> {
+    fn render_object_literal(&mut self, pairs: &[(&str, String)]) -> Result<String, BackendError> {
         let formatted: Vec<_> = pairs
             .iter()
             .map(|(k, v)| {
@@ -222,7 +198,6 @@ impl ExprRenderer for SqlExprRenderer<'_, '_> {
         })
     }
 
-    // render_raw — uses default
     // render_alias — uses default
     // render_star — uses default
     // render_count_star — uses default
@@ -350,7 +325,7 @@ fn render_literal_value(lit: &Literal<'_>, dialect: &Dialect) -> String {
         }
 
         // Extension — render as quoted Display representation
-        L::Extension { .. } => format!("'{}'", lit),
+        L::Extension(..) => format!("'{}'", lit),
     }
 }
 

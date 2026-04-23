@@ -1,6 +1,6 @@
 //! UPDATE query builder for `dol-query`.
 
-use dol_core::expr::{Expr, field};
+use dol_core::expr::{Expr, field_dyn};
 use dol_core::op::{EntityRef, Update};
 
 // ===========================================================================
@@ -45,16 +45,9 @@ impl UpdateQuery {
         self
     }
 
-    /// Set a column to a literal SQL expression: `col = <literal>`.
-    pub fn set_literal(mut self, column: &str, literal: &str) -> Self {
-        self.assignments
-            .push((column.to_string(), dol_core::expr::raw_expr(literal)));
-        self
-    }
-
     /// Increment a column: `col = col + $N`.
     pub fn set_increment(mut self, column: &str) -> Self {
-        let expr = field(column) + Expr::Param;
+        let expr = field_dyn(column) + Expr::Param;
         self.assignments.push((column.to_string(), expr));
         self
     }

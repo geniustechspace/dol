@@ -13,7 +13,7 @@ use crate::builder::{DefineIndexBuilder, DropIndexBuilder};
 use crate::expr::func;
 use crate::expr::window::FrameBound;
 use crate::expr::{
-    Direction, Expr, NullsPosition, bool_expr, case, field, float, int, param, raw_expr, string,
+    Direction, Expr, NullsPosition, bool_expr, case, field, float, int, param, string,
 };
 use crate::model::{DataType, Entity, EntityConstraint, Field, FkAction};
 use crate::op::LockMode;
@@ -213,7 +213,7 @@ fn select_with_literal_where() {
     let u = users();
     let sql = u
         .get()
-        .filter(field("status").eq(raw_expr("'active'")))
+        .filter(field("status").eq(string("active")))
         .filter(field("tenant_id").eq(param()))
         .render(Some(&pg()))
         .unwrap();
@@ -261,7 +261,7 @@ fn select_group_by_having() {
         .fields(&["tenant_id"])
         .field(Expr::CountStar.alias("cnt"))
         .group_by(&["tenant_id"])
-        .having(raw_expr("COUNT(*) > 10"))
+        .having(Expr::CountStar.gt(int(10i32)))
         .render(Some(&pg()))
         .unwrap();
     assert!(sql.contains("GROUP BY tenant_id"));
@@ -334,7 +334,7 @@ fn select_raw_column() {
     let u = users();
     let sql = u
         .get()
-        .field(raw_expr("COALESCE(display_name, email) AS name"))
+        .field(func::coalesce(vec![field("display_name"), field("email")]).alias("name"))
         .filter(field("id").eq(param()))
         .render(Some(&pg()))
         .unwrap();
@@ -351,42 +351,11 @@ fn select_or_predicate() {
         .get()
         .filter(field("tenant_id").eq(param()))
         .filter(
-            field("status").eq(raw_expr("'active'")) | field("status").eq(raw_expr("'pending'")),
+            field("status").eq(string("active")) | field("status").eq(string("pending")),
         )
         .render(Some(&pg()))
         .unwrap();
     assert!(sql.contains("WHERE tenant_id = $1 AND (status = 'active' OR status = 'pending')"));
-}
-
-#[test]
-fn select_exists_subquery() {
-    let u = users();
-    let sql = u
-        .get()
-        .filter(Expr::Exists {
-            subquery: "SELECT 1 FROM sessions WHERE sessions.user_id = users.id".to_string(),
-            negated: false,
-        })
-        .render(Some(&pg()))
-        .unwrap();
-    assert!(
-        sql.contains("WHERE EXISTS (SELECT 1 FROM sessions WHERE sessions.user_id = users.id)")
-    );
-}
-
-#[test]
-fn select_in_subquery() {
-    let u = users();
-    let sql = u
-        .get()
-        .filter(Expr::InSubquery {
-            expr: Box::new(field("tenant_id")),
-            subquery: "SELECT id FROM tenants WHERE status = 'active'".to_string(),
-            negated: false,
-        })
-        .render(Some(&pg()))
-        .unwrap();
-    assert!(sql.contains("WHERE tenant_id IN (SELECT id FROM tenants WHERE status = 'active')"));
 }
 
 #[test]
@@ -395,10 +364,10 @@ fn select_where_raw() {
     let sql = u
         .get()
         .filter(field("tenant_id").eq(param()))
-        .filter(raw_expr("created_at > NOW() - INTERVAL '30 days'"))
+        .filter(field("created_at").gt(param()))
         .render(Some(&pg()))
         .unwrap();
-    assert!(sql.contains("AND created_at > NOW() - INTERVAL '30 days'"));
+    assert!(sql.contains("AND created_at > $2"));
 }
 
 #[test]
@@ -515,7 +484,7 @@ fn delete_filter_api() {
     let sql = u
         .remove()
         .filter(field("tenant_id").eq(param()))
-        .filter(field("status").eq(raw_expr("'deleted'")))
+        .filter(field("status").eq(string("deleted")))
         .render(Some(&pg()))
         .unwrap();
     assert_eq!(
@@ -531,7 +500,7 @@ fn select_filter_or_group() {
         .get()
         .filter(field("tenant_id").eq(param()))
         .filter(
-            field("status").eq(raw_expr("'active'")) | field("status").eq(raw_expr("'pending'")),
+            field("status").eq(string("active")) | field("status").eq(string("pending")),
         )
         .render(Some(&pg()))
         .unwrap();
@@ -672,9 +641,9 @@ fn update_with_literal_set_and_returning() {
     let u = users();
     let sql = u
         .update()
-        .set_literal("status", "'revoked'")
+        .set_expr("status", string("revoked"))
         .filter(field("id").eq(param()))
-        .filter(field("status").eq(raw_expr("'active'")))
+        .filter(field("status").eq(string("active")))
         .returning_all()
         .render(Some(&pg()))
         .unwrap();
@@ -688,12 +657,12 @@ fn update_with_raw_where() {
     let u = users();
     let sql = u
         .update()
-        .set_literal("status", "'archived'")
+        .set_expr("status", string("archived"))
         .filter(field("tenant_id").eq(param()))
-        .filter(raw_expr("updated_at < NOW() - INTERVAL '1 year'"))
+        .filter(field("updated_at").lt(param()))
         .render(Some(&pg()))
         .unwrap();
-    assert!(sql.contains("WHERE tenant_id = $1 AND updated_at < NOW() - INTERVAL '1 year'"));
+    assert!(sql.contains("WHERE tenant_id = $1 AND updated_at < $2"));
 }
 
 #[test]
@@ -741,10 +710,10 @@ fn delete_with_raw_where() {
     let sql = u
         .remove()
         .filter(field("tenant_id").eq(param()))
-        .filter(raw_expr("created_at < NOW() - INTERVAL '90 days'"))
+        .filter(field("created_at").lt(param()))
         .render(Some(&pg()))
         .unwrap();
-    assert!(sql.contains("WHERE tenant_id = $1 AND created_at < NOW() - INTERVAL '90 days'"));
+    assert!(sql.contains("WHERE tenant_id = $1 AND created_at < $2"));
 }
 
 #[test]
@@ -1474,9 +1443,9 @@ fn expr_concat_pg_pipe_vs_mysql_func() {
 #[test]
 fn expr_case_when() {
     let expr = case()
-        .when(field("status").eq(raw_expr("'active'")), string("Active"))
+        .when(field("status").eq(string("active")), string("Active"))
         .when(
-            field("status").eq(raw_expr("'disabled'")),
+            field("status").eq(string("disabled")),
             string("Disabled"),
         )
         .else_(string("Unknown"))
@@ -1495,9 +1464,13 @@ fn expr_case_when() {
 // ===========================================================================
 
 #[test]
-fn field_produces_identifier() {
+fn field_produces_ref() {
     let f = field("email");
-    assert!(matches!(f, Expr::Identifier(n) if n == "email"));
+    if let Expr::Ref(ref path) = f {
+        assert_eq!(path.as_single(), Some("email"));
+    } else {
+        panic!("expected Expr::Ref, got {f:?}");
+    }
 }
 
 // ===========================================================================
@@ -1629,7 +1602,7 @@ fn set_op_union() {
     let q2 = u
         .get()
         .fields(&["id", "email"])
-        .filter(field("status").eq(raw_expr("'active'")))
+        .filter(field("status").eq(string("active")))
         .build();
     let sql = CompoundSelectBuilder::new(q1)
         .union(q2)
@@ -1663,7 +1636,7 @@ fn set_op_intersect_except() {
     let q3 = u
         .get()
         .fields(&["id"])
-        .filter(field("status").eq(raw_expr("'disabled'")))
+        .filter(field("status").eq(string("disabled")))
         .build();
     let sql = CompoundSelectBuilder::new(q1)
         .intersect(q2)
@@ -1692,42 +1665,6 @@ fn set_op_with_order_and_limit() {
     assert!(sql.contains("UNION ALL"));
     assert!(sql.contains("ORDER BY id ASC"));
     assert!(sql.contains("LIMIT"));
-}
-
-// ===========================================================================
-// Subquery composition
-// ===========================================================================
-
-#[test]
-fn subquery_as_scalar() {
-    let s = settings();
-    let u = users();
-    let sub = s
-        .get()
-        .field(func::sum(field("max_users")).alias("total"))
-        .render(Some(&pg()))
-        .unwrap();
-    let sql = u
-        .get()
-        .filter(field("id").in_subquery(&sub))
-        .render(Some(&pg()))
-        .unwrap();
-    assert!(sql.contains("IN (SELECT SUM(max_users) AS total FROM tenant_settings)"));
-}
-
-#[test]
-fn subquery_exists_expr() {
-    let expr = Expr::Exists {
-        subquery: "SELECT 1 FROM sessions WHERE sessions.user_id = users.id".to_string(),
-        negated: false,
-    };
-    let pg = Dialect::postgres();
-    let mut counter = pg.param_counter();
-    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();
-    assert_eq!(
-        sql,
-        "EXISTS (SELECT 1 FROM sessions WHERE sessions.user_id = users.id)"
-    );
 }
 
 // ===========================================================================

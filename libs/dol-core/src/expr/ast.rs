@@ -1,10 +1,12 @@
 //! Expression AST definitions.
 
+use super::compact_name::CompactName;
 use super::func_meta::FuncDef;
 use super::literal::Literal;
 use super::op_meta::OpDef;
-use super::ops::{Quantifier, UnaryOp};
+use super::ops::UnaryOp;
 use super::order::OrderByExpr;
+use super::path::PathExpr;
 use super::window::WindowFrame;
 
 /// A composable expression node, the core AST type for DOL.
@@ -15,7 +17,7 @@ use super::window::WindowFrame;
 /// The lifetime `'a` allows zero-copy string literals in the AST via
 /// [`Literal<'a>`], which uses `Cow<'a, str>` / `Cow<'a, [u8]>` internally.
 ///
-/// # Examples
+/// # Constructors
 ///
 /// ```rust
 /// use dol_core::expr::{field, string, int};
@@ -27,116 +29,115 @@ use super::window::WindowFrame;
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Expr<'a> {
-    // Identifiers
-    /// A field reference: `field_name`.
-    Identifier(String),
-    /// A qualified field reference: `scope.name` (e.g., `users.email`).
-    QualifiedIdentifier { scope: String, name: String },
-    /// Nested field access: `base.field` (e.g., `profile.address.city`).
-    FieldAccess { base: Box<Expr<'a>>, field: String },
+    // ── References ──────────────────────────────────────────────────────────
 
-    // Values
+    /// A path reference: `field`, `table.field`, `schema.table.field`.
+    ///
+    /// Use [`field()`] for single-segment, [`qualified()`] for multi-segment.
+    /// Rendered by backends as a dotted identifier path.
+    Ref(PathExpr),
+
+    /// Sub-path access on an expression result: `expr.field`, `expr.a.b`.
+    ///
+    /// Built by chaining [`Expr::get()`]. For SQL this typically renders as
+    /// JSON access (`->>`, `json_extract`, etc.) depending on the dialect.
+    Access {
+        base: Box<Expr<'a>>,
+        path: PathExpr,
+    },
+
+    // ── Values ───────────────────────────────────────────────────────────────
+
     /// A positional bind parameter (`$1`, `?`, `@p1`, `:1`).
     Param,
+
     /// A literal value from the unified type system.
     Value(Literal<'a>),
 
-    // Operations
-    /// A binary operation: `left op right`, optionally negated.
+    /// An array literal: `[elem1, elem2, ...]`.
+    Array(Vec<Expr<'a>>),
+
+    /// An object / map literal: `{ key: expr, ... }`.
+    Object(Vec<(CompactName, Expr<'a>)>),
+
+    // ── Operations ───────────────────────────────────────────────────────────
+
+    /// A binary operation: `left op right`.
     ///
-    /// The `negated` flag handles `NOT LIKE`, `NOT SIMILAR TO`, etc. without
-    /// doubling the operator count.
+    /// Negation (`NOT LIKE`, `NOT IN`, etc.) is expressed by wrapping in
+    /// `UnaryOp::Not` via [`Expr::negate()`].
     BinaryOp {
         left: Box<Expr<'a>>,
         op: OpDef,
         right: Box<Expr<'a>>,
-        negated: bool,
     },
+
     /// A unary operation: `op expr`.
-    UnaryOp { op: UnaryOp, expr: Box<Expr<'a>> },
-    /// A quantified comparison: `expr op ANY(subquery)` / `expr op ALL(subquery)`.
-    QuantifiedCmp {
+    ///
+    /// Includes `NOT`, `-`, `~`, `IS NULL`, `IS NOT NULL`.
+    UnaryOp {
+        op: UnaryOp,
         expr: Box<Expr<'a>>,
-        op: OpDef,
-        quantifier: Quantifier,
-        subquery: String,
     },
 
-    // Function call
-    /// A function call: `name(args...)`.
-    Func { name: FuncDef, args: Vec<Expr<'a>> },
+    // ── Calls ────────────────────────────────────────────────────────────────
 
-    // Type conversion
+    /// A function call: `name(args…)`.
+    Func {
+        name: FuncDef,
+        args: Vec<Expr<'a>>,
+    },
+
+    // ── Structural ───────────────────────────────────────────────────────────
+
     /// A type cast: `CAST(expr AS type)`.
     Cast {
         expr: Box<Expr<'a>>,
         as_type: crate::types::DataType,
     },
 
-    // Conditional
-    /// A CASE expression: `CASE WHEN ... THEN ... ELSE ... END`.
+    /// A `CASE WHEN … THEN … ELSE … END` expression.
     Case {
         whens: Vec<(Expr<'a>, Expr<'a>)>,
         else_expr: Option<Box<Expr<'a>>>,
     },
 
-    // Subquery
-    /// A subquery: `(SELECT ...)`.
-    Subquery(String),
+    /// `expr [NOT] BETWEEN low AND high`.
+    ///
+    /// For `NOT BETWEEN`, wrap with [`Expr::negate()`].
+    Between {
+        expr: Box<Expr<'a>>,
+        low:  Box<Expr<'a>>,
+        high: Box<Expr<'a>>,
+    },
 
-    // Set membership
     /// `expr [NOT] IN (list)`.
+    ///
+    /// For `NOT IN`, wrap with [`Expr::negate()`].
     InList {
         expr: Box<Expr<'a>>,
         list: Vec<Expr<'a>>,
-        negated: bool,
-    },
-    /// `expr [NOT] IN (subquery)`.
-    InSubquery {
-        expr: Box<Expr<'a>>,
-        subquery: String,
-        negated: bool,
     },
 
-    // Range
-    /// `expr [NOT] BETWEEN low AND high`.
-    Between {
-        expr: Box<Expr<'a>>,
-        low: Box<Expr<'a>>,
-        high: Box<Expr<'a>>,
-        negated: bool,
-    },
+    // ── Decoration ───────────────────────────────────────────────────────────
 
-    // Existence
-    /// `[NOT] EXISTS (subquery)`.
-    Exists { subquery: String, negated: bool },
-
-    // Null check
-    /// `expr IS [NOT] NULL`.
-    IsNull { expr: Box<Expr<'a>>, negated: bool },
-
-    // Composites
-    /// An object literal: `{ key: value, key2: value2 }`.
-    ObjectLiteral(Vec<(String, Expr<'a>)>),
-    /// An array literal: `[1, 2, 3]`.
-    ArrayLiteral(Vec<Expr<'a>>),
-
-    // Escape hatch
-    /// Raw expression string (escape hatch).
-    Raw(String),
-
-    // Decoration
     /// `expr AS alias`.
-    Alias { expr: Box<Expr<'a>>, alias: String },
-    /// `*` (all fields).
+    Alias {
+        expr:  Box<Expr<'a>>,
+        alias: CompactName,
+    },
+
+    /// `*` (all fields in a projection).
     Star,
+
     /// `COUNT(*)`.
     CountStar,
-    /// A window function: `func OVER (PARTITION BY ... ORDER BY ... frame)`.
+
+    /// A window function: `func OVER (PARTITION BY … ORDER BY … frame)`.
     Window {
-        func: Box<Expr<'a>>,
+        func:         Box<Expr<'a>>,
         partition_by: Vec<Expr<'a>>,
-        order_by: Vec<OrderByExpr<'a>>,
-        frame: Option<WindowFrame>,
+        order_by:     Vec<OrderByExpr<'a>>,
+        frame:        Option<WindowFrame>,
     },
 }

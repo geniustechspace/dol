@@ -22,6 +22,14 @@ impl CompactName {
             Self::Owned(s) => s,
         }
     }
+
+    /// Create an owned `CompactName` from a runtime `&str` (always allocates).
+    ///
+    /// Prefer `CompactName::Static("name")` or `From<&'static str>` for
+    /// compile-time-known names.
+    pub fn from_str(s: &str) -> Self {
+        Self::Owned(s.into())
+    }
 }
 
 impl PartialEq for CompactName {

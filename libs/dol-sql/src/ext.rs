@@ -16,7 +16,7 @@ use dol_query::builder::mutation::{
 };
 use dol_query::builder::query::GetBuilder;
 use dol_query::builder::transaction::TransactionBuilder;
-use dol_core::expr::{Expr, OrderByExpr};
+use dol_core::expr::OrderByExpr;
 use dol_core::op::BackendError;
 use dol_core::op::OffsetLimit;
 use dol_core::op::query::{CompoundQuery, Query, SetOp};
@@ -384,10 +384,6 @@ pub trait GetBuilderSqlExt<'a> {
     fn intersect(self, other: GetBuilder<'a>) -> CompoundSelectBuilder<'a>;
     /// Start an EXCEPT compound query.
     fn except(self, other: GetBuilder<'a>) -> CompoundSelectBuilder<'a>;
-    /// Render this query as a scalar subquery expression `(SELECT ...)`.
-    fn as_scalar(&self) -> Expr<'static>;
-    /// Render this query as a scalar subquery expression using a specific dialect.
-    fn as_scalar_with(&self, dialect: &Dialect) -> Expr<'static>;
 }
 
 impl<'a> GetBuilderSqlExt<'a> for GetBuilder<'a> {
@@ -405,14 +401,6 @@ impl<'a> GetBuilderSqlExt<'a> for GetBuilder<'a> {
 
     fn except(self, other: GetBuilder<'a>) -> CompoundSelectBuilder<'a> {
         CompoundSelectBuilder::new(self.build()).except(other.build())
-    }
-
-    fn as_scalar(&self) -> Expr<'static> {
-        Expr::Subquery(Render::render(self, None).unwrap_or_default())
-    }
-
-    fn as_scalar_with(&self, dialect: &Dialect) -> Expr<'static> {
-        Expr::Subquery(Render::render(self, Some(dialect)).unwrap_or_default())
     }
 }
 

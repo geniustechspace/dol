@@ -8,53 +8,39 @@
 //! Backends implement [`ExprRenderer`] to produce their output format.
 
 use super::window::{FrameBound, FrameKind, WindowFrame};
-use super::{Expr, FuncDef, Literal, OpDef, OrderByExpr, Quantifier, UnaryOp};
+use super::{Expr, FuncDef, Literal, OpDef, OrderByExpr};
+use super::ops::UnaryOp;
 use crate::op::BackendError;
 use crate::types::DataType;
 
-/// Maximum nesting depth for expression rendering.
+/// Maximum expression nesting depth.
 pub const MAX_EXPR_DEPTH: usize = 128;
 
 /// A backend must implement this trait to render expressions.
 ///
-/// The compiler calls these methods for each expression variant.
-/// Each method receives already-rendered sub-expressions as strings.
-///
-/// # Example
-///
-/// ```ignore
-/// struct MyRenderer;
-///
-/// impl ExprRenderer for MyRenderer {
-///     fn render_identifier(&mut self, name: &str) -> Result<String, BackendError> { ... }
-///     // ... implement all methods
-/// }
-/// ```
+/// The compiler calls these methods for each expression variant, passing
+/// already-rendered sub-expressions as strings.
 pub trait ExprRenderer {
-    /// Render a bare identifier (field reference).
+    // ── References ───────────────────────────────────────────────────────────
+
+    /// Render a path reference: `field`, `table.field`, `schema.table.field`.
     ///
-    /// Default: returns the name unchanged.
-    fn render_identifier(&mut self, name: &str) -> Result<String, BackendError> {
-        Ok(name.to_owned())
+    /// `segments` is always non-empty. Default: join with `.`.
+    fn render_ref(&mut self, segments: &[&str]) -> Result<String, BackendError> {
+        Ok(segments.join("."))
     }
 
-    /// Render a qualified identifier: `scope.name`.
+    /// Render sub-path access on an expression result: `expr.field`, `expr.a.b`.
     ///
-    /// Default: `scope.name`.
-    fn render_qualified_identifier(
-        &mut self,
-        scope: &str,
-        name: &str,
-    ) -> Result<String, BackendError> {
-        Ok(format!("{}.{}", scope, name))
+    /// `path` is always non-empty. Default: `base.path` (dot-joined).
+    ///
+    /// Backends that support nested JSON/document access (PostgreSQL `->>`,
+    /// SQLite `json_extract`, etc.) override this method.
+    fn render_access(&mut self, base: &str, path: &[&str]) -> Result<String, BackendError> {
+        Ok(format!("{}.{}", base, path.join(".")))
     }
 
-    /// Render field access: `base.field` (e.g., JSON access).
-    ///
-    /// Default: `base.field`.
-    fn render_field_access(&mut self, base: &str, field: &str) -> Result<String, BackendError> {
-        Ok(format!("{}.{}", base, field))
-    }
+    // ── Values ───────────────────────────────────────────────────────────────
 
     /// Render a bind parameter placeholder.
     ///
@@ -65,50 +51,63 @@ pub trait ExprRenderer {
 
     /// Render a literal value.
     ///
-    /// **Required** — no sensible universal default; escaping and formatting
-    /// rules vary between backends.
+    /// **Required** — escaping and formatting rules vary between backends.
     fn render_literal(&mut self, lit: &Literal<'_>) -> Result<String, BackendError>;
 
-    /// Render a binary operation: `lhs op rhs`, optionally negated.
+    /// Render an array literal: `[elem, ...]`.
+    ///
+    /// **Required** — representation is highly backend-specific.
+    fn render_array_literal(
+        &mut self,
+        elements: &[String],
+    ) -> Result<String, BackendError>;
+
+    /// Render an object literal: `{ key: value, ... }`.
+    ///
+    /// **Required** — representation is highly backend-specific.
+    fn render_object_literal(
+        &mut self,
+        pairs: &[(&str, String)],
+    ) -> Result<String, BackendError>;
+
+    // ── Operations ───────────────────────────────────────────────────────────
+
+    /// Render a binary operation: `lhs op rhs`.
     ///
     /// **Required** — operator-to-token mapping is backend-specific.
     fn render_binary_op(
         &mut self,
         lhs: &str,
-        op: &OpDef,
+        op:  &OpDef,
         rhs: &str,
-        negated: bool,
     ) -> Result<String, BackendError>;
 
     /// Render a unary operation: `op expr`.
     ///
-    /// Default: SQL-standard `NOT (expr)` / `-(expr)` / `~(expr)`.
-    fn render_unary_op(&mut self, op: UnaryOp, inner: &str) -> Result<String, BackendError> {
+    /// Default: SQL-standard forms for all variants.
+    fn render_unary_op(
+        &mut self,
+        op:    UnaryOp,
+        inner: &str,
+    ) -> Result<String, BackendError> {
         Ok(match op {
-            UnaryOp::Not => format!("NOT ({})", inner),
-            UnaryOp::Neg => format!("-({})", inner),
-            UnaryOp::BitNot => format!("~({})", inner),
+            UnaryOp::Not      => format!("NOT ({})", inner),
+            UnaryOp::Neg      => format!("-({})", inner),
+            UnaryOp::BitNot   => format!("~({})", inner),
+            UnaryOp::IsNull   => format!("{} IS NULL", inner),
+            UnaryOp::IsNotNull => format!("{} IS NOT NULL", inner),
         })
     }
 
-    /// Render a quantified comparison: `expr op ANY/ALL (subquery)`.
-    ///
-    /// **Required** — operator-to-token mapping is backend-specific.
-    fn render_quantified_cmp(
-        &mut self,
-        lhs: &str,
-        op: &OpDef,
-        quantifier: Quantifier,
-        subquery: &str,
-    ) -> Result<String, BackendError>;
+    // ── Calls ────────────────────────────────────────────────────────────────
 
-    /// Render a function call: `name(args...)`.
+    /// Render a function call: `name(args…)`.
     ///
     /// Default: `NAME(arg1, arg2, …)`. No-parens keywords
     /// (e.g. `CURRENT_DATE`) are emitted without parentheses.
     fn render_func(
         &mut self,
-        def: &FuncDef,
+        def:           &FuncDef,
         rendered_args: &[String],
     ) -> Result<String, BackendError> {
         if def.is_no_parens_keyword() && rendered_args.is_empty() {
@@ -118,120 +117,96 @@ pub trait ExprRenderer {
         }
     }
 
+    // ── Structural ───────────────────────────────────────────────────────────
+
     /// Render a type cast: `CAST(inner AS type)`.
     ///
     /// Default: `CAST(inner AS <DataType Display>)`.
-    fn render_cast(&mut self, inner: &str, as_type: &DataType) -> Result<String, BackendError> {
+    fn render_cast(
+        &mut self,
+        inner:   &str,
+        as_type: &DataType,
+    ) -> Result<String, BackendError> {
         Ok(format!("CAST({} AS {})", inner, as_type))
     }
 
-    /// Render a CASE expression.
+    /// Render a `CASE` expression.
     ///
     /// Default: SQL-standard `CASE WHEN … THEN … ELSE … END`.
     fn render_case(
         &mut self,
-        whens: &[(String, String)],
+        whens:     &[(String, String)],
         else_expr: Option<&str>,
     ) -> Result<String, BackendError> {
         let mut sql = String::from("CASE");
         for (cond, then) in whens {
             sql.push_str(&format!(" WHEN {} THEN {}", cond, then));
         }
-        if let Some(else_val) = else_expr {
-            sql.push_str(&format!(" ELSE {}", else_val));
+        if let Some(e) = else_expr {
+            sql.push_str(&format!(" ELSE {}", e));
         }
         sql.push_str(" END");
         Ok(sql)
     }
 
-    /// Render a subquery: `(SELECT ...)`.
+    /// Render `expr BETWEEN low AND high`.
     ///
-    /// Default: wraps in parentheses.
-    fn render_subquery(&mut self, sql: &str) -> Result<String, BackendError> {
-        Ok(format!("({})", sql))
-    }
-
-    /// Render `expr [NOT] IN (list)`.
+    /// Default: `lhs BETWEEN low AND high`.
     ///
-    /// Default: `lhs [NOT] IN (a, b, c)`.
-    fn render_in_list(
-        &mut self,
-        lhs: &str,
-        list: &[String],
-        negated: bool,
-    ) -> Result<String, BackendError> {
-        let not = if negated { " NOT" } else { "" };
-        Ok(format!("{}{} IN ({})", lhs, not, list.join(", ")))
-    }
-
-    /// Render `expr [NOT] IN (subquery)`.
-    ///
-    /// Default: `lhs [NOT] IN (subquery)`.
-    fn render_in_subquery(
-        &mut self,
-        lhs: &str,
-        subquery: &str,
-        negated: bool,
-    ) -> Result<String, BackendError> {
-        let not = if negated { " NOT" } else { "" };
-        Ok(format!("{}{} IN ({})", lhs, not, subquery))
-    }
-
-    /// Render `expr [NOT] BETWEEN low AND high`.
-    ///
-    /// Default: `lhs [NOT] BETWEEN low AND high`.
+    /// For `NOT BETWEEN`, the caller wraps in `UnaryOp::Not` before rendering.
     fn render_between(
         &mut self,
-        lhs: &str,
-        low: &str,
+        lhs:  &str,
+        low:  &str,
         high: &str,
-        negated: bool,
     ) -> Result<String, BackendError> {
-        let not = if negated { " NOT" } else { "" };
-        Ok(format!("{}{} BETWEEN {} AND {}", lhs, not, low, high))
+        Ok(format!("{} BETWEEN {} AND {}", lhs, low, high))
     }
 
-    /// Render `[NOT] EXISTS (subquery)`.
+    /// Render `expr IN (list)`.
     ///
-    /// Default: `[NOT] EXISTS (subquery)`.
-    fn render_exists(&mut self, subquery: &str, negated: bool) -> Result<String, BackendError> {
-        let not = if negated { "NOT " } else { "" };
-        Ok(format!("{}EXISTS ({})", not, subquery))
+    /// Default: `lhs IN (a, b, c)`.
+    fn render_in_list(
+        &mut self,
+        lhs:  &str,
+        list: &[String],
+    ) -> Result<String, BackendError> {
+        Ok(format!("{} IN ({})", lhs, list.join(", ")))
     }
 
-    /// Render `expr IS [NOT] NULL`.
+    /// Render `expr NOT IN (list)`.
     ///
-    /// Default: `inner IS [NOT] NULL`.
-    fn render_is_null(&mut self, inner: &str, negated: bool) -> Result<String, BackendError> {
-        Ok(if negated {
-            format!("{} IS NOT NULL", inner)
-        } else {
-            format!("{} IS NULL", inner)
-        })
+    /// Default: `lhs NOT IN (a, b, c)`.
+    fn render_not_in_list(
+        &mut self,
+        lhs:  &str,
+        list: &[String],
+    ) -> Result<String, BackendError> {
+        Ok(format!("{} NOT IN ({})", lhs, list.join(", ")))
     }
 
-    /// Render an object literal: `{ key: value, ... }`.
+    /// Render `expr NOT BETWEEN low AND high`.
     ///
-    /// **Required** — representation is highly backend-specific.
-    fn render_object_literal(&mut self, pairs: &[(String, String)])
-    -> Result<String, BackendError>;
-
-    /// Render an array literal: `[elem, ...]`.
-    ///
-    /// **Required** — representation is highly backend-specific.
-    fn render_array_literal(&mut self, elements: &[String]) -> Result<String, BackendError>;
-
-    /// Render a raw expression string (escape hatch).
-    ///
-    /// Default: returns the string unchanged.
-    fn render_raw(&mut self, sql: &str) -> Result<String, BackendError> {
-        Ok(sql.to_owned())
+    /// Default: `lhs NOT BETWEEN low AND high`.
+    fn render_not_between(
+        &mut self,
+        lhs:  &str,
+        low:  &str,
+        high: &str,
+    ) -> Result<String, BackendError> {
+        Ok(format!("{} NOT BETWEEN {} AND {}", lhs, low, high))
     }
+
+    // ── Decoration ───────────────────────────────────────────────────────────
 
     /// Render `expr AS alias`.
     ///
     /// Default: `inner AS alias`.
-    fn render_alias(&mut self, inner: &str, alias: &str) -> Result<String, BackendError> {
+    fn render_alias(
+        &mut self,
+        inner: &str,
+        alias: &str,
+    ) -> Result<String, BackendError> {
         Ok(format!("{} AS {}", inner, alias))
     }
 
@@ -249,28 +224,27 @@ pub trait ExprRenderer {
         Ok("COUNT(*)".into())
     }
 
-    /// Render a window function: `func OVER (...)`.
+    /// Render a window function: `func OVER (…)`.
     ///
     /// Default: SQL-standard `func OVER (PARTITION BY … ORDER BY … frame)`.
     fn render_window(
         &mut self,
-        func: &str,
+        func:         &str,
         partition_by: &[String],
-        order_by: &[String],
-        frame: Option<&WindowFrame>,
+        order_by:     &[String],
+        frame:        Option<&WindowFrame>,
     ) -> Result<String, BackendError> {
-        let mut over_parts = Vec::new();
-
+        let mut parts = Vec::new();
         if !partition_by.is_empty() {
-            over_parts.push(format!("PARTITION BY {}", partition_by.join(", ")));
+            parts.push(format!("PARTITION BY {}", partition_by.join(", ")));
         }
         if !order_by.is_empty() {
-            over_parts.push(format!("ORDER BY {}", order_by.join(", ")));
+            parts.push(format!("ORDER BY {}", order_by.join(", ")));
         }
         if let Some(f) = frame {
-            over_parts.push(render_window_frame(f));
+            parts.push(render_window_frame(f));
         }
-        Ok(format!("{} OVER ({})", func, over_parts.join(" ")))
+        Ok(format!("{} OVER ({})", func, parts.join(" ")))
     }
 
     /// Render an ORDER BY expression (used within window functions).
@@ -278,12 +252,12 @@ pub trait ExprRenderer {
     /// Default: `expr ASC/DESC`.
     fn render_order_by_expr(
         &mut self,
-        expr: &OrderByExpr<'_>,
+        expr:  &OrderByExpr<'_>,
         depth: usize,
     ) -> Result<String, BackendError> {
         let rendered = compile_expr(self, &expr.expr, depth)?;
         let dir = match expr.direction {
-            super::Direction::Asc => "ASC",
+            super::Direction::Asc  => "ASC",
             super::Direction::Desc => "DESC",
         };
         Ok(format!("{} {}", rendered, dir))
@@ -292,14 +266,12 @@ pub trait ExprRenderer {
 
 /// Compile an expression tree into a string by delegating to the given renderer.
 ///
-/// This is the generic compiler that walks the `Expr` tree. The renderer handles
-/// all backend-specific formatting decisions.
-///
-/// Returns `Err(BackendError::Render)` if expression nesting exceeds [`MAX_EXPR_DEPTH`].
+/// Returns `Err(BackendError::Render)` if expression nesting exceeds
+/// [`MAX_EXPR_DEPTH`].
 pub fn compile_expr<R: ExprRenderer + ?Sized>(
     renderer: &mut R,
-    expr: &Expr<'_>,
-    depth: usize,
+    expr:     &Expr<'_>,
+    depth:    usize,
 ) -> Result<String, BackendError> {
     if depth >= MAX_EXPR_DEPTH {
         return Err(BackendError::Render(
@@ -309,63 +281,84 @@ pub fn compile_expr<R: ExprRenderer + ?Sized>(
     let next = depth + 1;
 
     match expr {
-        Expr::Identifier(name) => renderer.render_identifier(name),
-
-        Expr::QualifiedIdentifier { scope, name } => {
-            renderer.render_qualified_identifier(scope, name)
+        Expr::Ref(path) => {
+            let segs: Vec<&str> = path.iter().collect();
+            renderer.render_ref(&segs)
         }
 
-        Expr::FieldAccess { base, field } => {
+        Expr::Access { base, path } => {
             let base_str = compile_expr(renderer, base, next)?;
-            renderer.render_field_access(&base_str, field)
+            let segs: Vec<&str> = path.iter().collect();
+            renderer.render_access(&base_str, &segs)
         }
 
         Expr::Param => renderer.render_param(),
 
         Expr::Value(lit) => renderer.render_literal(lit),
 
-        Expr::BinaryOp {
-            left,
-            op,
-            right,
-            negated,
-        } => {
-            let lhs = compile_expr(renderer, left, next)?;
+        Expr::Array(elements) => {
+            let items: Vec<String> = elements
+                .iter()
+                .map(|e| compile_expr(renderer, e, next))
+                .collect::<Result<_, _>>()?;
+            renderer.render_array_literal(&items)
+        }
+
+        Expr::Object(fields) => {
+            let pairs: Vec<(&str, String)> = fields
+                .iter()
+                .map(|(k, v)| {
+                    let val = compile_expr(renderer, v, next)?;
+                    Ok((k.as_str(), val))
+                })
+                .collect::<Result<_, BackendError>>()?;
+            renderer.render_object_literal(&pairs)
+        }
+
+        Expr::BinaryOp { left, op, right } => {
+            let lhs = compile_expr(renderer, left,  next)?;
             let rhs = compile_expr(renderer, right, next)?;
-            renderer.render_binary_op(&lhs, op, &rhs, *negated)
+            renderer.render_binary_op(&lhs, op, &rhs)
         }
 
         Expr::UnaryOp { op, expr: inner } => {
+            // Special-case NOT(InList) → NOT IN and NOT(Between) → NOT BETWEEN
+            // for canonical SQL form.
+            if *op == UnaryOp::Not {
+                match inner.as_ref() {
+                    Expr::InList { expr, list } => {
+                        let lhs = compile_expr(renderer, expr, next)?;
+                        let items = list
+                            .iter()
+                            .map(|e| compile_expr(renderer, e, next))
+                            .collect::<Result<Vec<_>, _>>()?;
+                        return renderer.render_not_in_list(&lhs, &items);
+                    }
+                    Expr::Between { expr, low, high } => {
+                        let lhs = compile_expr(renderer, expr, next)?;
+                        let lo  = compile_expr(renderer, low,  next)?;
+                        let hi  = compile_expr(renderer, high, next)?;
+                        return renderer.render_not_between(&lhs, &lo, &hi);
+                    }
+                    _ => {}
+                }
+            }
             let inner_str = compile_expr(renderer, inner, next)?;
             renderer.render_unary_op(*op, &inner_str)
         }
 
-        Expr::QuantifiedCmp {
-            expr: inner,
-            op,
-            quantifier,
-            subquery,
-        } => {
-            let lhs = compile_expr(renderer, inner, next)?;
-            renderer.render_quantified_cmp(&lhs, op, *quantifier, subquery)
-        }
-
         Expr::Func { name, args } => {
-            // Validate arity for well-known functions
             if let Err(e) = name.validate_arity(args.len()) {
                 return Err(BackendError::Validation(e.to_string()));
             }
             let rendered_args: Vec<String> = args
                 .iter()
                 .map(|a| compile_expr(renderer, a, next))
-                .collect::<Result<Vec<_>, _>>()?;
+                .collect::<Result<_, _>>()?;
             renderer.render_func(name, &rendered_args)
         }
 
-        Expr::Cast {
-            expr: inner,
-            as_type,
-        } => {
+        Expr::Cast { expr: inner, as_type } => {
             let inner_str = compile_expr(renderer, inner, next)?;
             renderer.render_cast(&inner_str, as_type)
         }
@@ -374,92 +367,40 @@ pub fn compile_expr<R: ExprRenderer + ?Sized>(
             let rendered_whens: Vec<(String, String)> = whens
                 .iter()
                 .map(|(cond, then)| {
-                    let cond_str = compile_expr(renderer, cond, next)?;
-                    let then_str = compile_expr(renderer, then, next)?;
-                    Ok((cond_str, then_str))
+                    let c = compile_expr(renderer, cond, next)?;
+                    let t = compile_expr(renderer, then, next)?;
+                    Ok((c, t))
                 })
-                .collect::<Result<Vec<_>, BackendError>>()?;
+                .collect::<Result<_, BackendError>>()?;
             let rendered_else = match else_expr {
                 Some(e) => Some(compile_expr(renderer, e, next)?),
-                None => None,
+                None    => None,
             };
             renderer.render_case(&rendered_whens, rendered_else.as_deref())
         }
 
-        Expr::Subquery(sql) => renderer.render_subquery(sql),
+        Expr::Between { expr, low, high } => {
+            let lhs  = compile_expr(renderer, expr, next)?;
+            let lo   = compile_expr(renderer, low,  next)?;
+            let hi   = compile_expr(renderer, high, next)?;
+            renderer.render_between(&lhs, &lo, &hi)
+        }
 
-        Expr::InList {
-            expr: inner,
-            list,
-            negated,
-        } => {
-            let lhs = compile_expr(renderer, inner, next)?;
+        Expr::InList { expr, list } => {
+            let lhs   = compile_expr(renderer, expr, next)?;
             let items: Vec<String> = list
                 .iter()
                 .map(|e| compile_expr(renderer, e, next))
-                .collect::<Result<Vec<_>, _>>()?;
-            renderer.render_in_list(&lhs, &items, *negated)
+                .collect::<Result<_, _>>()?;
+            renderer.render_in_list(&lhs, &items)
         }
-
-        Expr::InSubquery {
-            expr: inner,
-            subquery,
-            negated,
-        } => {
-            let lhs = compile_expr(renderer, inner, next)?;
-            renderer.render_in_subquery(&lhs, subquery, *negated)
-        }
-
-        Expr::Between {
-            expr: inner,
-            low,
-            high,
-            negated,
-        } => {
-            let lhs = compile_expr(renderer, inner, next)?;
-            let low_str = compile_expr(renderer, low, next)?;
-            let high_str = compile_expr(renderer, high, next)?;
-            renderer.render_between(&lhs, &low_str, &high_str, *negated)
-        }
-
-        Expr::Exists { subquery, negated } => renderer.render_exists(subquery, *negated),
-
-        Expr::IsNull {
-            expr: inner,
-            negated,
-        } => {
-            let inner_str = compile_expr(renderer, inner, next)?;
-            renderer.render_is_null(&inner_str, *negated)
-        }
-
-        Expr::ObjectLiteral(fields) => {
-            let pairs: Vec<(String, String)> = fields
-                .iter()
-                .map(|(k, v)| {
-                    let val = compile_expr(renderer, v, next)?;
-                    Ok((k.clone(), val))
-                })
-                .collect::<Result<Vec<_>, BackendError>>()?;
-            renderer.render_object_literal(&pairs)
-        }
-
-        Expr::ArrayLiteral(elements) => {
-            let items: Vec<String> = elements
-                .iter()
-                .map(|e| compile_expr(renderer, e, next))
-                .collect::<Result<Vec<_>, _>>()?;
-            renderer.render_array_literal(&items)
-        }
-
-        Expr::Raw(sql) => renderer.render_raw(sql),
 
         Expr::Alias { expr: inner, alias } => {
             let inner_str = compile_expr(renderer, inner, next)?;
-            renderer.render_alias(&inner_str, alias)
+            renderer.render_alias(&inner_str, alias.as_str())
         }
 
-        Expr::Star => renderer.render_star(),
-
+        Expr::Star      => renderer.render_star(),
         Expr::CountStar => renderer.render_count_star(),
 
         Expr::Window {
@@ -472,40 +413,37 @@ pub fn compile_expr<R: ExprRenderer + ?Sized>(
             let part_strs: Vec<String> = partition_by
                 .iter()
                 .map(|e| compile_expr(renderer, e, next))
-                .collect::<Result<Vec<_>, _>>()?;
+                .collect::<Result<_, _>>()?;
             let order_strs: Vec<String> = order_by
                 .iter()
                 .map(|ob| renderer.render_order_by_expr(ob, next))
-                .collect::<Result<Vec<_>, _>>()?;
+                .collect::<Result<_, _>>()?;
             renderer.render_window(&func_str, &part_strs, &order_strs, frame.as_ref())
         }
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Window frame helpers (used by the default `render_window` implementation)
-// ═══════════════════════════════════════════════════════════════════════════
+// ── Window frame helpers ─────────────────────────────────────────────────────
 
 /// Render a SQL-standard window frame clause.
 pub fn render_window_frame(frame: &WindowFrame) -> String {
     let kind = match frame.kind {
-        FrameKind::Rows => "ROWS",
+        FrameKind::Rows  => "ROWS",
         FrameKind::Range => "RANGE",
     };
     let start = render_frame_bound(&frame.start);
-    if let Some(ref end) = frame.end {
-        format!("{} BETWEEN {} AND {}", kind, start, render_frame_bound(end))
-    } else {
-        format!("{} {}", kind, start)
+    match &frame.end {
+        Some(end) => format!("{} BETWEEN {} AND {}", kind, start, render_frame_bound(end)),
+        None      => format!("{} {}", kind, start),
     }
 }
 
 fn render_frame_bound(bound: &FrameBound) -> String {
     match bound {
         FrameBound::UnboundedPreceding => "UNBOUNDED PRECEDING".to_string(),
-        FrameBound::Preceding(n) => format!("{} PRECEDING", n),
-        FrameBound::CurrentRow => "CURRENT ROW".to_string(),
-        FrameBound::Following(n) => format!("{} FOLLOWING", n),
+        FrameBound::Preceding(n)       => format!("{} PRECEDING", n),
+        FrameBound::CurrentRow         => "CURRENT ROW".to_string(),
+        FrameBound::Following(n)       => format!("{} FOLLOWING", n),
         FrameBound::UnboundedFollowing => "UNBOUNDED FOLLOWING".to_string(),
     }
 }

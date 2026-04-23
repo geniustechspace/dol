@@ -38,7 +38,7 @@ use dol::builder::transaction::TransactionBuilder;
 use dol::builder::{DefineEntityBuilder, DefineIndexBuilder, DropIndexBuilder};
 use dol::expr::window::FrameBound;
 use dol::expr::{
-    Direction, Expr, bool_expr, case, field, float, func, int, param, raw_expr, string,
+    Direction, Expr, bool_expr, case, field, float, func, int, param, string,
 };
 use dol::model::{DataType, Entity, EntityConstraint, Field, FkAction};
 use dol::op::LockMode;
@@ -342,63 +342,6 @@ fn main() {
         .unwrap();
     println!("  [PG] IN list: {}", sql);
 
-    // 2h. IN subquery
-    let sql = users
-        .get()
-        .filter(Expr::InSubquery {
-            expr: Box::new(field("tenant_id")),
-            subquery: "SELECT id FROM tenants WHERE status = 'active'".to_string(),
-            negated: false,
-        })
-        .render(Some(&pg))
-        .unwrap();
-    println!("  [PG] IN subquery: {}", sql);
-
-    // 2i. NOT IN subquery (via filter)
-    let subquery = "SELECT user_id FROM banned_users";
-    let sql = users
-        .get()
-        .filter(field("id").in_subquery(subquery).negate())
-        .render(Some(&pg))
-        .unwrap();
-    println!("  [PG] NOT IN subquery: {}", sql);
-
-    // 2j. EXISTS subquery
-    let sql = users
-        .get()
-        .filter(Expr::Exists {
-            subquery: "SELECT 1 FROM sessions WHERE sessions.user_id = users.id".to_string(),
-            negated: false,
-        })
-        .render(Some(&pg))
-        .unwrap();
-    println!("  [PG] EXISTS: {}", sql);
-
-    // 2k. NOT EXISTS subquery
-    let sql = users
-        .get()
-        .filter(Expr::Exists {
-            subquery: "SELECT 1 FROM banned WHERE banned.user_id = users.id".to_string(),
-            negated: true,
-        })
-        .render(Some(&pg))
-        .unwrap();
-    println!("  [PG] NOT EXISTS: {}", sql);
-
-    // 2l. Scalar subquery in projection
-    let sql = users
-        .get()
-        .fields(&["id", "email"])
-        .field(
-            dol::expr::Expr::Subquery(
-                "SELECT COUNT(*) FROM sessions WHERE sessions.user_id = users.id".into(),
-            )
-            .alias("session_count"),
-        )
-        .render(Some(&pg))
-        .unwrap();
-    println!("  [PG] Scalar subquery: {}", sql);
-
     // 2m. Ordering with NULLS FIRST/LAST
     let sql = users
         .get()
@@ -454,7 +397,7 @@ fn main() {
         .fields(&["tenant_id"])
         .field(Expr::CountStar.alias("cnt"))
         .group_by(&["tenant_id"])
-        .having(raw_expr("COUNT(*) > 10"))
+        .having(Expr::CountStar.gt(int(10i32)))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] GROUP BY HAVING: {}", sql);
@@ -485,7 +428,7 @@ fn main() {
 
     let sql = users
         .get()
-        .field(raw_expr("COALESCE(display_name, email) AS name"))
+        .field(func::coalesce(vec![field("display_name"), field("email")]).alias("name"))
         .filter(field("id").eq(param()))
         .render(Some(&pg))
         .unwrap();
@@ -668,7 +611,7 @@ fn main() {
     let sql = users
         .update()
         .set("status")
-        .set_literal("updated_at", "NOW()")
+        .set_expr("updated_at", func::now())
         .filter(field("id").eq(param()))
         .returning_all()
         .render(Some(&pg))
@@ -701,7 +644,7 @@ fn main() {
     let sql = users
         .update()
         .set("status")
-        .filter(raw_expr("created_at < NOW() - INTERVAL '30 days'"))
+        .filter(field("created_at").lt(param()))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Update raw WHERE: {}", sql);
@@ -735,7 +678,7 @@ fn main() {
     // 3o. DELETE with raw WHERE
     let sql = users
         .remove()
-        .filter(raw_expr("created_at < NOW() - INTERVAL '90 days'"))
+        .filter(field("created_at").lt(param()))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Delete raw: {}", sql);
@@ -1089,13 +1032,6 @@ fn main() {
         .negate();
     println!("  IN / NOT IN list ✓");
 
-    // 5q. IN / NOT IN subquery
-    let _in_sub = field("id").in_subquery("SELECT user_id FROM active_users");
-    let _not_in_sub = field("id")
-        .in_subquery("SELECT user_id FROM banned_users")
-        .negate();
-    println!("  IN / NOT IN subquery ✓");
-
     // 5r. All function constructors
     let _ = func::lower(field("email"));
     let _ = func::upper(field("name"));
@@ -1170,9 +1106,9 @@ fn main() {
     let _ = dol::expr::Expr::Value(dol::expr::Literal::Null); // Literal::Null
     println!("  Typed constructors: string, int, float, bool_expr, Null ✓");
 
-    // 5x. Raw expression escape hatch
-    let _raw = raw_expr("NOW() - INTERVAL '30 days'");
-    println!("  Raw expression ✓");
+    // 5x. NOW() function expression
+    let _now = func::now();
+    println!("  NOW() function expression ✓");
 
     // 5y. Param placeholder
     let _param = param();

@@ -6,7 +6,8 @@ publish = false
 description = "DOL Core — type system, expressions, IR, Backend trait, and constraint types."
 
 [dependencies]
-serde = { workspace = true, optional = true }
+smallvec = { workspace = true }
+serde    = { workspace = true, optional = true }
 
 [features]
 default = []

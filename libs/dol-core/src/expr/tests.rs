@@ -4,15 +4,22 @@ use super::*;
 
 #[test]
 fn test_field() {
-    assert!(matches!(field("email"), Expr::Identifier(s) if s == "email"));
+    let e = field("email");
+    if let Expr::Ref(ref path) = e {
+        assert_eq!(path.as_single(), Some("email"));
+    } else {
+        panic!("expected Ref, got {e:?}");
+    }
 }
 
 #[test]
 fn test_qualified() {
-    assert!(matches!(
-        qualified("users", "email"),
-        Expr::QualifiedIdentifier { scope, name } if scope == "users" && name == "email"
-    ));
+    let e = qualified("users", "email");
+    if let Expr::Ref(ref path) = e {
+        assert_eq!(path.iter().collect::<Vec<_>>(), vec!["users", "email"]);
+    } else {
+        panic!("expected Ref, got {e:?}");
+    }
 }
 
 #[test]
@@ -74,31 +81,26 @@ fn test_param() {
 }
 
 #[test]
-fn test_raw_expr() {
-    assert!(matches!(raw_expr("1 = 1"), Expr::Raw(s) if s == "1 = 1"));
-}
-
-#[test]
 fn test_case_builder_basic() {
     let expr = case()
         .when(field("x").gt(int(0i32)), string("positive"))
         .else_(string("non-positive"))
         .end();
     assert!(
-        matches!(expr, Expr::Case { whens, else_expr } if whens.len() == 1 && else_expr.is_some())
+        matches!(expr, Expr::Case { ref whens, ref else_expr } if whens.len() == 1 && else_expr.is_some())
     );
 }
 
 #[test]
 fn test_obj() {
     let expr = obj(vec![("key", int(1i32)), ("name", string("val"))]);
-    assert!(matches!(expr, Expr::ObjectLiteral(fields) if fields.len() == 2));
+    assert!(matches!(expr, Expr::Object(ref fields) if fields.len() == 2));
 }
 
 #[test]
 fn test_arr() {
     let expr = arr(vec![int(1i32), int(2i32), int(3i32)]);
-    assert!(matches!(expr, Expr::ArrayLiteral(elems) if elems.len() == 3));
+    assert!(matches!(expr, Expr::Array(ref elems) if elems.len() == 3));
 }
 
 // ── 2. Comparison operators ──
@@ -158,13 +160,13 @@ fn test_ilike() {
 #[test]
 fn test_is_null() {
     let e = field("x").is_null();
-    assert!(matches!(e, Expr::IsNull { negated: false, .. }));
+    assert!(matches!(e, Expr::UnaryOp { op: UnaryOp::IsNull, .. }));
 }
 
 #[test]
 fn test_is_not_null() {
     let e = field("x").is_null().negate();
-    assert!(matches!(e, Expr::IsNull { negated: true, .. }));
+    assert!(matches!(e, Expr::UnaryOp { op: UnaryOp::IsNotNull, .. }));
 }
 
 // ── 5. Range ──
@@ -172,13 +174,16 @@ fn test_is_not_null() {
 #[test]
 fn test_between() {
     let e = field("age").between(int(18i32), int(65i32));
-    assert!(matches!(e, Expr::Between { negated: false, .. }));
+    assert!(matches!(e, Expr::Between { .. }));
 }
 
 #[test]
 fn test_not_between() {
     let e = field("age").between(int(0i32), int(17i32)).negate();
-    assert!(matches!(e, Expr::Between { negated: true, .. }));
+    assert!(matches!(
+        e,
+        Expr::UnaryOp { op: UnaryOp::Not, ref expr } if matches!(**expr, Expr::Between { .. })
+    ));
 }
 
 // ── 6. Set membership ──
@@ -188,7 +193,7 @@ fn test_in_list() {
     let e = field("status").in_list(vec![string("a"), string("b")]);
     assert!(matches!(
         e,
-        Expr::InList { negated: false, list, .. } if list.len() == 2
+        Expr::InList { ref list, .. } if list.len() == 2
     ));
 }
 
@@ -197,25 +202,8 @@ fn test_not_in_list() {
     let e = field("status").in_list(vec![string("x")]).negate();
     assert!(matches!(
         e,
-        Expr::InList { negated: true, list, .. } if list.len() == 1
-    ));
-}
-
-#[test]
-fn test_in_subquery() {
-    let e = field("id").in_subquery("SELECT id FROM other");
-    assert!(matches!(
-        e,
-        Expr::InSubquery { negated: false, subquery, .. } if subquery == "SELECT id FROM other"
-    ));
-}
-
-#[test]
-fn test_not_in_subquery() {
-    let e = field("id").in_subquery("SELECT id FROM banned").negate();
-    assert!(matches!(
-        e,
-        Expr::InSubquery { negated: true, subquery, .. } if subquery == "SELECT id FROM banned"
+        Expr::UnaryOp { op: UnaryOp::Not, ref expr }
+        if matches!(**expr, Expr::InList { ref list, .. } if list.len() == 1)
     ));
 }
 
@@ -237,7 +225,7 @@ fn test_alias() {
     let e = field("first_name").alias("name");
     assert!(matches!(
         e,
-        Expr::Alias { alias, .. } if alias == "name"
+        Expr::Alias { ref alias, .. } if alias.as_str() == "name"
     ));
 }
 
@@ -284,7 +272,7 @@ fn test_over_basic() {
     let e = func::row_number().over().build();
     assert!(matches!(
         e,
-        Expr::Window { partition_by, order_by, frame, .. }
+        Expr::Window { ref partition_by, ref order_by, ref frame, .. }
         if partition_by.is_empty() && order_by.is_empty() && frame.is_none()
     ));
 }
@@ -308,10 +296,7 @@ fn test_not() {
     let e = !field("active");
     assert!(matches!(
         e,
-        Expr::UnaryOp {
-            op: UnaryOp::Not,
-            ..
-        }
+        Expr::UnaryOp { op: UnaryOp::Not, .. }
     ));
 }
 
@@ -350,10 +335,7 @@ fn test_neg() {
     let e = -field("a");
     assert!(matches!(
         e,
-        Expr::UnaryOp {
-            op: UnaryOp::Neg,
-            ..
-        }
+        Expr::UnaryOp { op: UnaryOp::Neg, .. }
     ));
 }
 
@@ -362,30 +344,39 @@ fn test_neg() {
 #[test]
 fn test_from_str_for_expr() {
     let e: Expr = "email".into();
-    assert!(matches!(e, Expr::Identifier(s) if s == "email"));
+    if let Expr::Ref(ref path) = e {
+        assert_eq!(path.as_single(), Some("email"));
+    } else {
+        panic!("expected Ref, got {e:?}");
+    }
 }
 
 // ── 13. Edge cases ──
 
 #[test]
 fn test_empty_string_field() {
-    assert!(matches!(field(""), Expr::Identifier(s) if s.is_empty()));
+    let e = field("");
+    assert!(matches!(e, Expr::Ref(_)));
 }
 
 #[test]
 fn test_empty_vec_arr() {
-    assert!(matches!(arr(vec![]), Expr::ArrayLiteral(v) if v.is_empty()));
+    assert!(matches!(arr(vec![]), Expr::Array(ref v) if v.is_empty()));
 }
 
 #[test]
 fn test_empty_vec_obj() {
-    assert!(matches!(obj(vec![]), Expr::ObjectLiteral(v) if v.is_empty()));
+    assert!(matches!(obj(vec![]), Expr::Object(ref v) if v.is_empty()));
 }
 
 #[test]
 fn test_nested_field_access() {
     let e = field("a").get("b").get("c");
-    assert!(matches!(e, Expr::FieldAccess { field, .. } if field == "c"));
+    if let Expr::Access { ref path, .. } = e {
+        assert_eq!(path.iter().collect::<Vec<_>>(), vec!["b", "c"]);
+    } else {
+        panic!("expected Access, got {e:?}");
+    }
 }
 
 #[test]
@@ -399,7 +390,7 @@ fn test_in_list_empty() {
     let e = field("x").in_list(vec![]);
     assert!(matches!(
         e,
-        Expr::InList { list, negated: false, .. } if list.is_empty()
+        Expr::InList { ref list, .. } if list.is_empty()
     ));
 }
 
@@ -580,16 +571,14 @@ fn test_window_full_chain() {
 fn test_comparison_preserves_operands() {
     let e = field("age").gt(int(18i64));
     match e {
-        Expr::BinaryOp {
-            left,
-            op,
-            right,
-            negated,
-        } => {
-            assert!(matches!(*left, Expr::Identifier(s) if s == "age"));
-            assert!(op.name() == OpDef::GT);
+        Expr::BinaryOp { left, op, right } => {
+            if let Expr::Ref(ref path) = *left {
+                assert_eq!(path.as_single(), Some("age"));
+            } else {
+                panic!("expected Ref on left, got {left:?}");
+            }
+            assert_eq!(op.name(), OpDef::GT);
             assert!(matches!(*right, Expr::Value(Literal::Int64(18))));
-            assert!(!negated);
         }
         other => panic!("expected BinaryOp, got {other:?}"),
     }
@@ -601,7 +590,7 @@ fn test_alias_preserves_inner() {
     match e {
         Expr::Alias { expr, alias } => {
             assert!(matches!(*expr, Expr::CountStar));
-            assert_eq!(alias, "total");
+            assert_eq!(alias.as_str(), "total");
         }
         other => panic!("expected Alias, got {other:?}"),
     }
@@ -623,16 +612,14 @@ fn test_cast_preserves_inner() {
 fn test_between_preserves_bounds() {
     let e = field("score").between(int(0i64), int(100i64));
     match e {
-        Expr::Between {
-            expr,
-            low,
-            high,
-            negated,
-        } => {
-            assert!(matches!(*expr, Expr::Identifier(s) if s == "score"));
+        Expr::Between { expr, low, high } => {
+            if let Expr::Ref(ref path) = *expr {
+                assert_eq!(path.as_single(), Some("score"));
+            } else {
+                panic!("expected Ref, got {expr:?}");
+            }
             assert!(matches!(*low, Expr::Value(Literal::Int64(0))));
             assert!(matches!(*high, Expr::Value(Literal::Int64(100))));
-            assert!(!negated);
         }
         other => panic!("expected Between, got {other:?}"),
     }
@@ -642,12 +629,13 @@ fn test_between_preserves_bounds() {
 fn test_eq_with_into_expr() {
     let e = field("status").eq("active");
     match e {
-        Expr::BinaryOp {
-            right, op, negated, ..
-        } => {
-            assert!(op.name() == OpDef::EQ);
-            assert!(!negated);
-            assert!(matches!(*right, Expr::Identifier(s) if s == "active"));
+        Expr::BinaryOp { right, op, .. } => {
+            assert_eq!(op.name(), OpDef::EQ);
+            if let Expr::Ref(ref path) = *right {
+                assert_eq!(path.as_single(), Some("active"));
+            } else {
+                panic!("expected Ref on right, got {right:?}");
+            }
         }
         other => panic!("expected BinaryOp, got {other:?}"),
     }
@@ -675,4 +663,39 @@ fn test_typed_constructors() {
     assert!(matches!(string("hello"), Expr::Value(Literal::String(ref s)) if s == "hello"));
     assert!(matches!(int(42i64), Expr::Value(Literal::Int64(42))));
     assert!(matches!(bool_expr(true), Expr::Value(Literal::Bool(true))));
+}
+
+// ── PathExpr and get() ──
+
+#[test]
+fn test_get_extends_access_path() {
+    let e = field("profile").get("address").get("city");
+    if let Expr::Access { base, path } = &e {
+        // base should still be a Ref to "profile"
+        assert!(matches!(**base, Expr::Ref(_)));
+        // path has both "address" and "city"
+        assert_eq!(path.iter().collect::<Vec<_>>(), vec!["address", "city"]);
+    } else {
+        panic!("expected Access, got {e:?}");
+    }
+}
+
+#[test]
+fn test_negate_double_not_eliminated() {
+    let e = field("active");
+    let negated = e.clone().negate();
+    let double_negated = negated.negate();
+    // NOT NOT e → e
+    assert!(matches!(double_negated, Expr::Ref(_)));
+}
+
+#[test]
+fn test_field_dyn() {
+    let name = String::from("dynamic");
+    let e = field_dyn(&name);
+    if let Expr::Ref(ref path) = e {
+        assert_eq!(path.as_single(), Some("dynamic"));
+    } else {
+        panic!("expected Ref, got {e:?}");
+    }
 }

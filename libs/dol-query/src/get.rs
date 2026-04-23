@@ -3,7 +3,7 @@
 //! Mirrors `dol-builder::GetBuilder` but works with owned name/namespace
 //! instead of requiring a static `&Entity` reference.
 
-use dol_core::expr::{Direction, Expr, NullsPosition, OrderByExpr, field};
+use dol_core::expr::{Direction, Expr, NullsPosition, OrderByExpr, field_dyn};
 use dol_core::op::{EntityRef, Join, JoinKind, LockMode, OffsetLimit, Query};
 
 // ---------------------------------------------------------------------------
@@ -84,7 +84,7 @@ impl GetQuery {
     /// Add named columns to the projection list.
     pub fn fields(mut self, names: &[&str]) -> Self {
         for name in names {
-            self.projections.push(field(name));
+            self.projections.push(field_dyn(name));
         }
         self
     }
@@ -190,7 +190,7 @@ impl GetQuery {
 
     /// Set the GROUP BY columns.
     pub fn group_by(mut self, columns: &[&str]) -> Self {
-        self.group_by = columns.iter().map(|c| field(c)).collect();
+        self.group_by = columns.iter().map(|c| field_dyn(c)).collect();
         self
     }
 
@@ -205,7 +205,7 @@ impl GetQuery {
     /// Add `column DESC` to the ORDER BY clause.
     pub fn order_by_desc(mut self, column: &str) -> Self {
         self.order_by.push(OrderByExpr {
-            expr: field(column),
+            expr: field_dyn(column),
             direction: Direction::Desc,
             nulls: None,
         });
@@ -215,7 +215,7 @@ impl GetQuery {
     /// Add `column ASC` to the ORDER BY clause.
     pub fn order_by_asc(mut self, column: &str) -> Self {
         self.order_by.push(OrderByExpr {
-            expr: field(column),
+            expr: field_dyn(column),
             direction: Direction::Asc,
             nulls: None,
         });
@@ -230,7 +230,7 @@ impl GetQuery {
         nulls: Option<NullsPosition>,
     ) -> Self {
         self.order_by.push(OrderByExpr {
-            expr: field(column),
+            expr: field_dyn(column),
             direction,
             nulls,
         });
@@ -335,7 +335,7 @@ impl GetQuery {
         // and field metadata is available.
         let projections = if self.projections.is_empty() {
             if let Some(ref names) = self.field_names {
-                names.iter().map(|n| Expr::Identifier(n.clone())).collect()
+                names.iter().map(|n| field_dyn(n)).collect()
             } else {
                 self.projections
             }

@@ -6,7 +6,7 @@
 //! For SQL rendering, import the `Render` extension trait from `dol-sql`.
 
 use dol_entity::Entity;
-use dol_core::expr::{Direction, Expr, NullsPosition, OrderByExpr, field};
+use dol_core::expr::{Direction, Expr, NullsPosition, OrderByExpr, field_dyn};
 use dol_core::op::{EntityRef, Join, JoinKind, LockMode, OffsetLimit, Query};
 
 // ---------------------------------------------------------------------------
@@ -79,7 +79,7 @@ impl<'a> GetBuilder<'a> {
     /// Add named columns to the projection list.
     pub fn fields(mut self, names: &[&str]) -> Self {
         for name in names {
-            self.projections.push(field(name));
+            self.projections.push(field_dyn(name));
         }
         self
     }
@@ -187,7 +187,7 @@ impl<'a> GetBuilder<'a> {
 
     /// Set the GROUP BY columns.
     pub fn group_by(mut self, columns: &[&str]) -> Self {
-        self.group_by = columns.iter().map(|c| field(c)).collect();
+        self.group_by = columns.iter().map(|c| field_dyn(c)).collect();
         self
     }
 
@@ -202,7 +202,7 @@ impl<'a> GetBuilder<'a> {
     /// Add `column DESC` to the ORDER BY clause.
     pub fn order_by_desc(mut self, column: &str) -> Self {
         self.order_by.push(OrderByExpr {
-            expr: field(column),
+            expr: field_dyn(column),
             direction: Direction::Desc,
             nulls: None,
         });
@@ -212,7 +212,7 @@ impl<'a> GetBuilder<'a> {
     /// Add `column ASC` to the ORDER BY clause.
     pub fn order_by_asc(mut self, column: &str) -> Self {
         self.order_by.push(OrderByExpr {
-            expr: field(column),
+            expr: field_dyn(column),
             direction: Direction::Asc,
             nulls: None,
         });
@@ -227,7 +227,7 @@ impl<'a> GetBuilder<'a> {
         nulls: Option<NullsPosition>,
     ) -> Self {
         self.order_by.push(OrderByExpr {
-            expr: field(column),
+            expr: field_dyn(column),
             direction,
             nulls,
         });
@@ -358,7 +358,7 @@ impl<'a> GetBuilder<'a> {
             self.model
                 .fields
                 .iter()
-                .map(|f| Expr::Identifier(f.name.to_string()))
+                .map(|f| field_dyn(f.name))
                 .collect()
         } else {
             self.projections
@@ -396,8 +396,6 @@ pub(crate) fn count_single_expr_params(expr: &Expr<'static>) -> usize {
 
         Expr::UnaryOp { expr, .. } => count_single_expr_params(expr),
 
-        Expr::IsNull { expr, .. } => count_single_expr_params(expr),
-
         Expr::Func { args, .. } => args.iter().map(count_single_expr_params).sum(),
 
         Expr::Cast { expr, .. } => count_single_expr_params(expr),
@@ -427,10 +425,6 @@ pub(crate) fn count_single_expr_params(expr: &Expr<'static>) -> usize {
                 + count_single_expr_params(high)
         }
 
-        Expr::InSubquery { expr, .. } => count_single_expr_params(expr),
-
-        Expr::Alias { expr, .. } => count_single_expr_params(expr),
-
         Expr::Window {
             func,
             partition_by,
@@ -448,16 +442,16 @@ pub(crate) fn count_single_expr_params(expr: &Expr<'static>) -> usize {
                     .sum::<usize>()
         }
 
-        Expr::FieldAccess { base, .. } => count_single_expr_params(base),
+        Expr::Alias { expr, .. } => count_single_expr_params(expr),
 
-        Expr::QuantifiedCmp { expr, .. } => count_single_expr_params(expr),
+        Expr::Access { base, .. } => count_single_expr_params(base),
 
-        Expr::ObjectLiteral(fields) => fields
+        Expr::Object(fields) => fields
             .iter()
             .map(|(_, v)| count_single_expr_params(v))
             .sum(),
 
-        Expr::ArrayLiteral(elements) => elements.iter().map(count_single_expr_params).sum(),
+        Expr::Array(elements) => elements.iter().map(count_single_expr_params).sum(),
 
         _ => 0,
     }

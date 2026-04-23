@@ -6,7 +6,7 @@
 //! For SQL rendering, import the `Render` extension trait from `dol-sql`.
 
 use dol_entity::Entity;
-use dol_core::expr::{Expr, field, raw_expr};
+use dol_core::expr::{Expr, field_dyn};
 use dol_core::op::{EntityRef, Insert, InsertSelect, Remove, Update, Upsert};
 
 use super::query::count_single_expr_params;
@@ -202,16 +202,9 @@ impl<'a> UpdateBuilder<'a> {
         self
     }
 
-    /// Set a column to a literal SQL expression: `col = <literal>`.
-    pub fn set_literal(mut self, column: &str, literal: &str) -> Self {
-        self.assignments
-            .push((column.to_string(), raw_expr(literal)));
-        self
-    }
-
     /// Increment a column: `col = col + $N`.
     pub fn set_increment(mut self, column: &str) -> Self {
-        let expr = field(column) + Expr::Param;
+        let expr = field_dyn(column) + Expr::Param;
         self.assignments.push((column.to_string(), expr));
         self
     }
