@@ -1,10 +1,10 @@
-//! Definition IR — canonical representation of schema operations.
+//! Definition operations — canonical representation of schema operations.
 
 use super::EntityRef;
-use crate::types::DataType;
 use crate::constraint::{EntityConstraint, FkAction, GeneratedKind};
+use crate::types::DataType;
 
-/// An owned model-level constraint for use in IR and builders (not `'static`).
+/// An owned model-level constraint for use in operations and builders (not `'static`).
 ///
 /// This mirrors [`EntityConstraint`] but uses owned `String`/`Vec<String>`
 /// instead of `&'static str`/`&'static [&'static str]`, enabling serde
@@ -58,10 +58,16 @@ impl From<EntityConstraint> for OwnedEntityConstraint {
     }
 }
 
+/// Preferred alias for [`OwnedEntityConstraint`].
+pub type Constraint = OwnedEntityConstraint;
+
+/// Preferred alias for [`OwnedForeignKeyRef`].
+pub type ForeignKeyDef = OwnedForeignKeyRef;
+
 /// Define (create) a new model.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct DefineEntityIR {
+pub struct DefineEntity {
     pub name: String,
     pub namespace: Option<String>,
     pub fields: Vec<FieldDef>,
@@ -69,7 +75,7 @@ pub struct DefineEntityIR {
     pub if_not_exists: bool,
 }
 
-/// An owned field definition for use in IR and builders (not `'static`).
+/// An owned field definition for use in operations and builders (not `'static`).
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FieldDef {
@@ -214,7 +220,7 @@ impl OwnedForeignKeyRef {
 /// Alter an existing model.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct AlterEntityIR {
+pub struct AlterEntity {
     pub target: EntityRef,
     pub actions: Vec<AlterAction>,
 }
@@ -239,7 +245,7 @@ pub enum AlterAction {
 /// Drop (remove) a model.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct DropEntityIR {
+pub struct DropEntity {
     pub target: EntityRef,
     pub if_exists: bool,
     pub cascade: bool,
@@ -248,7 +254,7 @@ pub struct DropEntityIR {
 /// Define (create) an index.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct DefineIndexIR {
+pub struct DefineIndex {
     pub name: String,
     pub target: EntityRef,
     pub columns: Vec<String>,
@@ -282,7 +288,7 @@ pub enum IndexMethod {
 /// Drop an index.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct DropIndexIR {
+pub struct DropIndex {
     pub name: String,
     pub if_exists: bool,
     pub concurrently: bool,
@@ -292,7 +298,7 @@ pub struct DropIndexIR {
 /// Define a custom type (e.g., enum).
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct DefineTypeIR {
+pub struct DefineType {
     pub name: String,
     pub namespace: Option<String>,
     pub variants: Vec<String>,
@@ -301,7 +307,7 @@ pub struct DefineTypeIR {
 /// Drop a custom type.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct DropTypeIR {
+pub struct DropType {
     pub name: String,
     pub if_exists: bool,
 }

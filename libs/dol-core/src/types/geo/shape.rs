@@ -1,5 +1,5 @@
+use super::{super::error::TypeError, Point};
 use core::fmt;
-use super::{Point, super::error::TypeError};
 
 /// An axis-aligned 2D rectangle defined by two corners.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -10,7 +10,9 @@ pub struct Rect {
 }
 
 impl Rect {
-    pub const fn new(low: Point, high: Point) -> Self { Self { low, high } }
+    pub const fn new(low: Point, high: Point) -> Self {
+        Self { low, high }
+    }
 }
 
 impl fmt::Display for Rect {
@@ -56,7 +58,10 @@ pub struct Path {
 
 impl Path {
     pub fn new(closed: bool, points: Vec<Point>) -> Self {
-        Self { closed, points: points.into_boxed_slice() }
+        Self {
+            closed,
+            points: points.into_boxed_slice(),
+        }
     }
 }
 
@@ -65,7 +70,9 @@ impl fmt::Display for Path {
         let (open, close) = if self.closed { ('(', ')') } else { ('[', ']') };
         write!(f, "{open}")?;
         for (i, p) in self.points.iter().enumerate() {
-            if i > 0 { write!(f, ",")?; }
+            if i > 0 {
+                write!(f, ",")?;
+            }
             write!(f, "{p}")?;
         }
         write!(f, "{close}")
@@ -81,7 +88,9 @@ pub struct Polygon {
 
 impl Polygon {
     pub fn new(points: Vec<Point>) -> Self {
-        Self { points: points.into_boxed_slice() }
+        Self {
+            points: points.into_boxed_slice(),
+        }
     }
 }
 
@@ -89,7 +98,9 @@ impl fmt::Display for Polygon {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "(")?;
         for (i, p) in self.points.iter().enumerate() {
-            if i > 0 { write!(f, ",")?; }
+            if i > 0 {
+                write!(f, ",")?;
+            }
             write!(f, "{p}")?;
         }
         write!(f, ")")

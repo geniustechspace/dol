@@ -8,13 +8,15 @@ use crate::TransactionRender;
 use crate::backend::sql::dialect::Dialect;
 use crate::builder::EntityBuilderExt;
 use crate::builder::control::{GrantBuilder, Privilege, RevokeBuilder};
-use crate::builder::{DefineIndexBuilder, DropIndexBuilder};
 use crate::builder::transaction::TransactionBuilder;
+use crate::builder::{DefineIndexBuilder, DropIndexBuilder};
 use crate::expr::func;
 use crate::expr::window::FrameBound;
-use crate::expr::{Direction, Expr, NullsPosition, bool_expr, case, field, float, int, param, raw_expr, string};
-use crate::ir::LockMode;
+use crate::expr::{
+    Direction, Expr, NullsPosition, bool_expr, case, field, float, int, param, string,
+};
 use crate::model::{DataType, Entity, EntityConstraint, Field, FkAction};
+use crate::op::LockMode;
 
 fn pg() -> Dialect {
     Dialect::postgres()
@@ -49,7 +51,11 @@ fn tenants() -> Entity {
             Field::new("status", DataType::Text),
             Field::new("plan", DataType::Text),
             Field::new("labels", DataType::Json).nullable(),
-            Field::new("scheduled_deletion_at", DataType::TimestampTz { precision: 6 }).nullable(),
+            Field::new(
+                "scheduled_deletion_at",
+                DataType::TimestampTz { precision: 6 },
+            )
+            .nullable(),
             Field::new("created_at", DataType::TimestampTz { precision: 6 }),
             Field::new("created_by", DataType::Uuid),
             Field::new("updated_at", DataType::TimestampTz { precision: 6 }),
@@ -207,7 +213,7 @@ fn select_with_literal_where() {
     let u = users();
     let sql = u
         .get()
-        .filter(field("status").eq(raw_expr("'active'")))
+        .filter(field("status").eq(string("active")))
         .filter(field("tenant_id").eq(param()))
         .render(Some(&pg()))
         .unwrap();
@@ -255,7 +261,7 @@ fn select_group_by_having() {
         .fields(&["tenant_id"])
         .field(Expr::CountStar.alias("cnt"))
         .group_by(&["tenant_id"])
-        .having(raw_expr("COUNT(*) > 10"))
+        .having(Expr::CountStar.gt(int(10i32)))
         .render(Some(&pg()))
         .unwrap();
     assert!(sql.contains("GROUP BY tenant_id"));
@@ -328,7 +334,7 @@ fn select_raw_column() {
     let u = users();
     let sql = u
         .get()
-        .field(raw_expr("COALESCE(display_name, email) AS name"))
+        .field(func::coalesce(vec![field("display_name"), field("email")]).alias("name"))
         .filter(field("id").eq(param()))
         .render(Some(&pg()))
         .unwrap();
@@ -345,42 +351,11 @@ fn select_or_predicate() {
         .get()
         .filter(field("tenant_id").eq(param()))
         .filter(
-            field("status").eq(raw_expr("'active'")) | field("status").eq(raw_expr("'pending'")),
+            field("status").eq(string("active")) | field("status").eq(string("pending")),
         )
         .render(Some(&pg()))
         .unwrap();
     assert!(sql.contains("WHERE tenant_id = $1 AND (status = 'active' OR status = 'pending')"));
-}
-
-#[test]
-fn select_exists_subquery() {
-    let u = users();
-    let sql = u
-        .get()
-        .filter(Expr::Exists {
-            subquery: "SELECT 1 FROM sessions WHERE sessions.user_id = users.id".to_string(),
-            negated: false,
-        })
-        .render(Some(&pg()))
-        .unwrap();
-    assert!(
-        sql.contains("WHERE EXISTS (SELECT 1 FROM sessions WHERE sessions.user_id = users.id)")
-    );
-}
-
-#[test]
-fn select_in_subquery() {
-    let u = users();
-    let sql = u
-        .get()
-        .filter(Expr::InSubquery {
-            expr: Box::new(field("tenant_id")),
-            subquery: "SELECT id FROM tenants WHERE status = 'active'".to_string(),
-            negated: false,
-        })
-        .render(Some(&pg()))
-        .unwrap();
-    assert!(sql.contains("WHERE tenant_id IN (SELECT id FROM tenants WHERE status = 'active')"));
 }
 
 #[test]
@@ -389,10 +364,10 @@ fn select_where_raw() {
     let sql = u
         .get()
         .filter(field("tenant_id").eq(param()))
-        .filter(raw_expr("created_at > NOW() - INTERVAL '30 days'"))
+        .filter(field("created_at").gt(param()))
         .render(Some(&pg()))
         .unwrap();
-    assert!(sql.contains("AND created_at > NOW() - INTERVAL '30 days'"));
+    assert!(sql.contains("AND created_at > $2"));
 }
 
 #[test]
@@ -509,7 +484,7 @@ fn delete_filter_api() {
     let sql = u
         .remove()
         .filter(field("tenant_id").eq(param()))
-        .filter(field("status").eq(raw_expr("'deleted'")))
+        .filter(field("status").eq(string("deleted")))
         .render(Some(&pg()))
         .unwrap();
     assert_eq!(
@@ -525,7 +500,7 @@ fn select_filter_or_group() {
         .get()
         .filter(field("tenant_id").eq(param()))
         .filter(
-            field("status").eq(raw_expr("'active'")) | field("status").eq(raw_expr("'pending'")),
+            field("status").eq(string("active")) | field("status").eq(string("pending")),
         )
         .render(Some(&pg()))
         .unwrap();
@@ -564,11 +539,7 @@ fn insert_specific_columns() {
 #[test]
 fn insert_with_returning() {
     let u = users();
-    let sql = u
-        .insert()
-        .returning(&["id"])
-        .render(Some(&pg()))
-        .unwrap();
+    let sql = u.insert().returning(&["id"]).render(Some(&pg())).unwrap();
     assert!(sql.ends_with("RETURNING id"));
 }
 
@@ -670,9 +641,9 @@ fn update_with_literal_set_and_returning() {
     let u = users();
     let sql = u
         .update()
-        .set_literal("status", "'revoked'")
+        .set_expr("status", string("revoked"))
         .filter(field("id").eq(param()))
-        .filter(field("status").eq(raw_expr("'active'")))
+        .filter(field("status").eq(string("active")))
         .returning_all()
         .render(Some(&pg()))
         .unwrap();
@@ -686,12 +657,12 @@ fn update_with_raw_where() {
     let u = users();
     let sql = u
         .update()
-        .set_literal("status", "'archived'")
+        .set_expr("status", string("archived"))
         .filter(field("tenant_id").eq(param()))
-        .filter(raw_expr("updated_at < NOW() - INTERVAL '1 year'"))
+        .filter(field("updated_at").lt(param()))
         .render(Some(&pg()))
         .unwrap();
-    assert!(sql.contains("WHERE tenant_id = $1 AND updated_at < NOW() - INTERVAL '1 year'"));
+    assert!(sql.contains("WHERE tenant_id = $1 AND updated_at < $2"));
 }
 
 #[test]
@@ -739,10 +710,10 @@ fn delete_with_raw_where() {
     let sql = u
         .remove()
         .filter(field("tenant_id").eq(param()))
-        .filter(raw_expr("created_at < NOW() - INTERVAL '90 days'"))
+        .filter(field("created_at").lt(param()))
         .render(Some(&pg()))
         .unwrap();
-    assert!(sql.contains("WHERE tenant_id = $1 AND created_at < NOW() - INTERVAL '90 days'"));
+    assert!(sql.contains("WHERE tenant_id = $1 AND created_at < $2"));
 }
 
 #[test]
@@ -861,11 +832,7 @@ fn create_table() {
 #[test]
 fn create_table_if_not_exists() {
     let s = settings();
-    let sql = s
-        .create()
-        .if_not_exists()
-        .render(Some(&pg()))
-        .unwrap();
+    let sql = s.create().if_not_exists().render(Some(&pg())).unwrap();
     assert!(sql.starts_with("CREATE TABLE IF NOT EXISTS tenant_settings"));
 }
 
@@ -1089,11 +1056,7 @@ fn alter_table_drop_default() {
 #[test]
 fn alter_table_set_not_null() {
     let u = users();
-    let sql = u
-        .alter()
-        .set_not_null("email")
-        .render(Some(&pg()))
-        .unwrap();
+    let sql = u.alter().set_not_null("email").render(Some(&pg())).unwrap();
     assert_eq!(sql, "ALTER TABLE users ALTER COLUMN email SET NOT NULL");
 }
 
@@ -1357,11 +1320,14 @@ fn expr_arithmetic() {
 fn expr_is_null_is_not_null() {
     let pg = Dialect::postgres();
     let mut c1 = pg.param_counter();
-    let sql1 = crate::backend::sql::render::render_expr(&field("meta").is_null(), &mut c1, &pg).unwrap();
+    let sql1 =
+        crate::backend::sql::render::render_expr(&field("meta").is_null(), &mut c1, &pg).unwrap();
     assert_eq!(sql1, "meta IS NULL");
 
     let mut c2 = pg.param_counter();
-    let sql2 = crate::backend::sql::render::render_expr(&field("meta").is_not_null(), &mut c2, &pg).unwrap();
+    let sql2 =
+        crate::backend::sql::render::render_expr(&field("meta").is_null().negate(), &mut c2, &pg)
+            .unwrap();
     assert_eq!(sql2, "meta IS NOT NULL");
 }
 
@@ -1385,7 +1351,7 @@ fn expr_in_list() {
 
 #[test]
 fn expr_not_in_list() {
-    let expr = field("status").not_in_list(vec![param(), param()]);
+    let expr = field("status").in_list(vec![param(), param()]).negate();
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
     let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();
@@ -1411,7 +1377,10 @@ fn expr_like_ilike() {
 
 #[test]
 fn expr_cast() {
-    let expr = field("price").cast(DataType::Decimal { precision: Some(10), scale: Some(2) });
+    let expr = field("price").cast(DataType::Decimal {
+        precision: Some(10),
+        scale: Some(2),
+    });
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
     let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();
@@ -1474,8 +1443,11 @@ fn expr_concat_pg_pipe_vs_mysql_func() {
 #[test]
 fn expr_case_when() {
     let expr = case()
-        .when(field("status").eq(raw_expr("'active'")), string("Active"))
-        .when(field("status").eq(raw_expr("'disabled'")), string("Disabled"))
+        .when(field("status").eq(string("active")), string("Active"))
+        .when(
+            field("status").eq(string("disabled")),
+            string("Disabled"),
+        )
         .else_(string("Unknown"))
         .end();
     let pg = Dialect::postgres();
@@ -1492,9 +1464,13 @@ fn expr_case_when() {
 // ===========================================================================
 
 #[test]
-fn field_produces_identifier() {
+fn field_produces_ref() {
     let f = field("email");
-    assert!(matches!(f, Expr::Identifier(n) if n == "email"));
+    if let Expr::Ref(ref path) = f {
+        assert_eq!(path.as_single(), Some("email"));
+    } else {
+        panic!("expected Expr::Ref, got {f:?}");
+    }
 }
 
 // ===========================================================================
@@ -1507,13 +1483,15 @@ fn func_lower_upper() {
 
     let mut c1 = pg.param_counter();
     assert_eq!(
-        crate::backend::sql::render::render_expr(&func::lower(field("email")), &mut c1, &pg).unwrap(),
+        crate::backend::sql::render::render_expr(&func::lower(field("email")), &mut c1, &pg)
+            .unwrap(),
         "LOWER(email)"
     );
 
     let mut c2 = pg.param_counter();
     assert_eq!(
-        crate::backend::sql::render::render_expr(&func::upper(field("name")), &mut c2, &pg).unwrap(),
+        crate::backend::sql::render::render_expr(&func::upper(field("name")), &mut c2, &pg)
+            .unwrap(),
         "UPPER(name)"
     );
 }
@@ -1531,7 +1509,8 @@ fn func_coalesce() {
 fn func_count_star() {
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
-    let sql = crate::backend::sql::render::render_expr(&func::count_star(), &mut counter, &pg).unwrap();
+    let sql =
+        crate::backend::sql::render::render_expr(&func::count_star(), &mut counter, &pg).unwrap();
     assert_eq!(sql, "COUNT(*)");
 }
 
@@ -1623,7 +1602,7 @@ fn set_op_union() {
     let q2 = u
         .get()
         .fields(&["id", "email"])
-        .filter(field("status").eq(raw_expr("'active'")))
+        .filter(field("status").eq(string("active")))
         .build();
     let sql = CompoundSelectBuilder::new(q1)
         .union(q2)
@@ -1637,10 +1616,7 @@ fn set_op_union() {
 fn set_op_union_all() {
     let s = settings();
     let q1 = s.get().build();
-    let q2 = s
-        .get()
-        .filter(field("tenant_id").eq(param()))
-        .build();
+    let q2 = s.get().filter(field("tenant_id").eq(param())).build();
     let sql = CompoundSelectBuilder::new(q1)
         .union_all(q2)
         .render(Some(&pg()))
@@ -1660,7 +1636,7 @@ fn set_op_intersect_except() {
     let q3 = u
         .get()
         .fields(&["id"])
-        .filter(field("status").eq(raw_expr("'disabled'")))
+        .filter(field("status").eq(string("disabled")))
         .build();
     let sql = CompoundSelectBuilder::new(q1)
         .intersect(q2)
@@ -1689,42 +1665,6 @@ fn set_op_with_order_and_limit() {
     assert!(sql.contains("UNION ALL"));
     assert!(sql.contains("ORDER BY id ASC"));
     assert!(sql.contains("LIMIT"));
-}
-
-// ===========================================================================
-// Subquery composition
-// ===========================================================================
-
-#[test]
-fn subquery_as_scalar() {
-    let s = settings();
-    let u = users();
-    let sub = s
-        .get()
-        .field(func::sum(field("max_users")).alias("total"))
-        .render(Some(&pg()))
-        .unwrap();
-    let sql = u
-        .get()
-        .filter(field("id").in_subquery(&sub))
-        .render(Some(&pg()))
-        .unwrap();
-    assert!(sql.contains("IN (SELECT SUM(max_users) AS total FROM tenant_settings)"));
-}
-
-#[test]
-fn subquery_exists_expr() {
-    let expr = Expr::Exists {
-        subquery: "SELECT 1 FROM sessions WHERE sessions.user_id = users.id".to_string(),
-        negated: false,
-    };
-    let pg = Dialect::postgres();
-    let mut counter = pg.param_counter();
-    let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();
-    assert_eq!(
-        sql,
-        "EXISTS (SELECT 1 FROM sessions WHERE sessions.user_id = users.id)"
-    );
 }
 
 // ===========================================================================
@@ -2057,12 +1997,18 @@ fn dialect_presets_all_instantiate() {
 fn dialect_type_map_resolve() {
     let pg = Dialect::postgres();
     assert_eq!(pg.resolve_type(&DataType::Uuid), "UUID");
-    assert_eq!(pg.resolve_type(&DataType::TimestampTz { precision: 6 }), "TIMESTAMPTZ(6)");
+    assert_eq!(
+        pg.resolve_type(&DataType::TimestampTz { precision: 6 }),
+        "TIMESTAMPTZ(6)"
+    );
 
     let mysql = Dialect::mysql();
     assert_eq!(mysql.resolve_type(&DataType::Uuid), "CHAR(36)");
     assert_eq!(mysql.resolve_type(&DataType::Bool), "TINYINT(1)");
-    assert_eq!(mysql.resolve_type(&DataType::TimestampTz { precision: 6 }), "DATETIME(6)");
+    assert_eq!(
+        mysql.resolve_type(&DataType::TimestampTz { precision: 6 }),
+        "DATETIME(6)"
+    );
 
     let mssql = Dialect::mssql();
     assert_eq!(mssql.resolve_type(&DataType::Uuid), "UNIQUEIDENTIFIER");
@@ -2404,7 +2350,7 @@ fn storage_move_file() {
 
 #[test]
 fn expr_field_access() {
-    let expr = field("profile").access("address").access("city");
+    let expr = field("profile").get("address").get("city");
     let pg = Dialect::postgres();
     let mut counter = pg.param_counter();
     let sql = crate::backend::sql::render::render_expr(&expr, &mut counter, &pg).unwrap();
@@ -2438,7 +2384,7 @@ fn expr_array_literal() {
 
 #[test]
 fn define_model_via_static_method() {
-    use crate::ir::definition::FieldDef;
+    use crate::op::definition::FieldDef;
 
     let ir = Entity::define("users")
         .field(FieldDef::new("id", DataType::Uuid).primary_key())

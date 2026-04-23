@@ -1,7 +1,7 @@
 use super::*;
 use dol_query::builder::EntityBuilderExt;
 use dol_core::expr::{field, param};
-use dol_core::ir::definition::FieldDef;
+use dol_core::op::definition::FieldDef;
 use dol_entity::{Entity, Field, DataType};
 
 fn pg() -> Dialect {
@@ -81,7 +81,7 @@ fn insert_returning_all() {
     let sql = model
         .insert()
         .fields(&["id"])
-        .returning_all()
+        .output_all()
         .render(None)
         .unwrap();
     assert!(sql.contains("RETURNING *"));
@@ -134,8 +134,8 @@ fn upsert_basic() {
     let sql = model
         .upsert()
         .fields(&["id", "email", "status"])
-        .on_conflict(&["id"])
-        .do_update(&["email", "status"])
+        .match_on(&["id"])
+        .patch(&["email", "status"])
         .render(Some(&pg()))
         .unwrap();
     assert!(sql.contains("INSERT INTO users (id, email, status)"));
@@ -422,7 +422,7 @@ fn drop_type_mysql_is_comment() {
 fn define_policy_postgres() {
     use dol_query::builder::DefinePolicyBuilder;
     use dol_core::expr::{field, param};
-    use dol_core::ir::control::PolicyAction;
+    use dol_core::op::control::PolicyAction;
 
     let sql = DefinePolicyBuilder::new("tenant_isolation")
         .on("orders")
@@ -443,7 +443,7 @@ fn define_policy_postgres() {
 fn define_policy_read_only() {
     use dol_query::builder::DefinePolicyBuilder;
     use dol_core::expr::{field, bool_expr};
-    use dol_core::ir::control::PolicyAction;
+    use dol_core::op::control::PolicyAction;
 
     let sql = DefinePolicyBuilder::new("public_read")
         .on("posts")
@@ -462,7 +462,7 @@ fn define_policy_read_only() {
 #[test]
 fn define_policy_no_expressions() {
     use dol_query::builder::DefinePolicyBuilder;
-    use dol_core::ir::control::PolicyAction;
+    use dol_core::op::control::PolicyAction;
 
     let sql = DefinePolicyBuilder::new("allow_all")
         .on("logs")
@@ -472,7 +472,123 @@ fn define_policy_no_expressions() {
     assert_eq!(sql, "CREATE POLICY allow_all ON logs FOR ALL");
 }
 
-// -- Transaction block --
+
+// -- render_with / BuildSession --
+
+#[test]
+fn render_with_valid_query() {
+    use dol_core::session::BuildSession;
+
+    let model = test_model();
+    let session = BuildSession::new();
+    let sql = model
+        .get()
+        .filter(field("status").eq(param()))
+        .render_with(&session, Some(&pg()))
+        .unwrap();
+    assert!(sql.contains("SELECT"));
+    assert!(sql.contains("WHERE"));
+}
+
+#[test]
+fn render_with_aggregate_in_where_rejected() {
+    use dol_core::expr::func::count;
+    use dol_core::session::{BuildError, BuildSession};
+    use dol_core::expr::pass::PassError;
+
+    let model = test_model();
+    let session = BuildSession::new();
+    // count() is an aggregate — illegal in WHERE context
+    let err = model
+        .get()
+        .filter(count(field("id")).gt(param()))
+        .render_with(&session, Some(&pg()))
+        .unwrap_err();
+
+    match err {
+        BuildError::Validation(errs) => {
+            assert!(
+                errs.iter().any(|e| matches!(e, PassError::AggregateInWrongContext { .. })),
+                "expected AggregateInWrongContext, got: {errs:?}",
+            );
+        }
+        other => panic!("expected Validation error, got: {other}"),
+    }
+}
+
+#[test]
+fn render_with_disallowed_function_rejected() {
+    use dol_core::expr::func::count;
+    use dol_core::expr::pass::AllowList;
+    use dol_core::session::{BuildError, BuildSession};
+    use dol_core::expr::pass::PassError;
+
+    let model = test_model();
+    // Allowlist permits nothing — count() in SELECT should be rejected
+    let session = BuildSession::new()
+        .with_allowlist(AllowList::from_funcs([] as [&str; 0]));
+    let err = model
+        .get()
+        .field(count(field("id")))
+        .render_with(&session, Some(&pg()))
+        .unwrap_err();
+
+    match err {
+        BuildError::Validation(errs) => {
+            assert!(
+                errs.iter().any(|e| matches!(e, PassError::DisallowedFunction { .. })),
+                "expected DisallowedFunction, got: {errs:?}",
+            );
+        }
+        other => panic!("expected Validation error, got: {other}"),
+    }
+}
+
+#[test]
+fn render_with_update_aggregate_in_where_rejected() {
+    use dol_core::expr::func::sum;
+    use dol_core::session::{BuildError, BuildSession};
+    use dol_core::expr::pass::PassError;
+
+    let model = test_model();
+    let session = BuildSession::new();
+    let err = model
+        .update()
+        .set("status")
+        .filter(sum(field("id")).gt(param()))
+        .render_with(&session, Some(&pg()))
+        .unwrap_err();
+
+    match err {
+        BuildError::Validation(errs) => {
+            assert!(errs.iter().any(|e| matches!(e, PassError::AggregateInWrongContext { .. })));
+        }
+        other => panic!("expected Validation, got: {other}"),
+    }
+}
+
+#[test]
+fn render_with_remove_aggregate_in_where_rejected() {
+    use dol_core::expr::func::count;
+    use dol_core::session::{BuildError, BuildSession};
+    use dol_core::expr::pass::PassError;
+
+    let model = test_model();
+    let session = BuildSession::new();
+    let err = model
+        .remove()
+        .filter(count(field("id")).gt(param()))
+        .render_with(&session, Some(&pg()))
+        .unwrap_err();
+
+    match err {
+        BuildError::Validation(errs) => {
+            assert!(errs.iter().any(|e| matches!(e, PassError::AggregateInWrongContext { .. })));
+        }
+        other => panic!("expected Validation, got: {other}"),
+    }
+}
+
 
 #[test]
 fn transaction_block_postgres() {
@@ -480,7 +596,7 @@ fn transaction_block_postgres() {
 
     let model = test_model();
     let insert_ir = model.insert().fields(&["id", "email"]).build();
-    let stmts = vec![dol_core::ir::Statement::Insert(insert_ir)];
+    let stmts = vec![dol_core::op::Statement::Insert(insert_ir)];
     let ir = TransactionBuilder::block(stmts);
     let sql = TransactionBuilder::render(&ir, Some(&pg())).unwrap();
     assert!(sql.starts_with("BEGIN"), "Should start with BEGIN: {sql}");

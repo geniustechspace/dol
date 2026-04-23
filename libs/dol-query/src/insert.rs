@@ -1,6 +1,6 @@
 //! INSERT query builder for `dol-query`.
 
-use dol_core::ir::{EntityRef, InsertIR};
+use dol_core::op::{EntityRef, Insert};
 
 // ===========================================================================
 // InsertQuery
@@ -70,11 +70,11 @@ impl InsertQuery {
         field_count * self.row_count
     }
 
-    /// Build the canonical [`InsertIR`].
+    /// Build the canonical [`Insert`].
     ///
     /// When no fields have been set (via `.fields()`) and Entity field
     /// metadata is available, all entity fields are included by default.
-    pub fn build(self) -> InsertIR {
+    pub fn build(self) -> Insert {
         // Default: include all entity fields when none were specified.
         let fields = if self.fields.is_empty() {
             self.field_names.unwrap_or_default()
@@ -82,7 +82,7 @@ impl InsertQuery {
             self.fields
         };
 
-        InsertIR {
+        Insert {
             target: EntityRef {
                 name: self.name,
                 namespace: self.namespace,

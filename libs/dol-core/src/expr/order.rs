@@ -26,3 +26,17 @@ pub struct OrderByExpr<'a> {
     pub direction: Direction,
     pub nulls: Option<NullsPosition>,
 }
+
+impl<'a> OrderByExpr<'a> {
+    /// Set NULLS FIRST positioning.
+    pub fn nulls_first(mut self) -> Self {
+        self.nulls = Some(NullsPosition::First);
+        self
+    }
+
+    /// Set NULLS LAST positioning.
+    pub fn nulls_last(mut self) -> Self {
+        self.nulls = Some(NullsPosition::Last);
+        self
+    }
+}

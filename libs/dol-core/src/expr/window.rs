@@ -64,13 +64,21 @@ impl<'a> WindowBuilder<'a> {
 
     /// `ROWS BETWEEN start AND end`
     pub fn rows_between(mut self, start: FrameBound, end: FrameBound) -> Self {
-        self.frame = Some(WindowFrame { kind: FrameKind::Rows, start, end: Some(end) });
+        self.frame = Some(WindowFrame {
+            kind: FrameKind::Rows,
+            start,
+            end: Some(end),
+        });
         self
     }
 
     /// `RANGE BETWEEN start AND end`
     pub fn range_between(mut self, start: FrameBound, end: FrameBound) -> Self {
-        self.frame = Some(WindowFrame { kind: FrameKind::Range, start, end: Some(end) });
+        self.frame = Some(WindowFrame {
+            kind: FrameKind::Range,
+            start,
+            end: Some(end),
+        });
         self
     }
 
@@ -93,12 +101,17 @@ pub struct CaseBuilder<'a> {
 }
 
 impl<'a> Default for CaseBuilder<'a> {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<'a> CaseBuilder<'a> {
     pub fn new() -> Self {
-        Self { whens: Vec::new(), else_expr: None }
+        Self {
+            whens: Vec::new(),
+            else_expr: None,
+        }
     }
 
     /// Add a `WHEN condition THEN result` clause.

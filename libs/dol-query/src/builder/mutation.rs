@@ -6,8 +6,8 @@
 //! For SQL rendering, import the `Render` extension trait from `dol-sql`.
 
 use dol_entity::Entity;
-use dol_core::expr::{Expr, field, raw_expr};
-use dol_core::ir::{EntityRef, InsertIR, InsertSelectIR, RemoveIR, UpdateIR, UpsertIR};
+use dol_core::expr::{Expr, field_dyn};
+use dol_core::op::{EntityRef, Insert, InsertSelect, Remove, Update, Upsert};
 
 use super::query::count_single_expr_params;
 
@@ -60,16 +60,28 @@ impl<'a> InsertBuilder<'a> {
         self
     }
 
-    /// Add `RETURNING *`.
-    pub fn returning_all(mut self) -> Self {
+    /// Return all columns from the affected rows.
+    pub fn output_all(mut self) -> Self {
         self.returning = vec!["*".to_string()];
         self
     }
 
-    /// Specify columns to return.
-    pub fn returning(mut self, cols: &[&str]) -> Self {
+    #[deprecated(note = "use `output_all()`")]
+    #[inline]
+    pub fn returning_all(self) -> Self {
+        self.output_all()
+    }
+
+    /// Return specific columns from the affected rows.
+    pub fn output(mut self, cols: &[&str]) -> Self {
         self.returning = cols.iter().map(|s| s.to_string()).collect();
         self
+    }
+
+    #[deprecated(note = "use `output()`")]
+    #[inline]
+    pub fn returning(self, cols: &[&str]) -> Self {
+        self.output(cols)
     }
 
     /// Total bind-parameter count for this INSERT.
@@ -82,11 +94,11 @@ impl<'a> InsertBuilder<'a> {
         field_count * self.row_count
     }
 
-    /// Build the canonical [`InsertIR`].
+    /// Build the canonical [`Insert`].
     ///
     /// When no fields have been set (via `.fields()`), all entity fields
     /// are included by default.
-    pub fn build(self) -> InsertIR {
+    pub fn build(self) -> Insert {
         // Default: include all entity fields when none were specified.
         let fields = if self.fields.is_empty() {
             self.model.field_names().map(|s| s.to_string()).collect()
@@ -94,7 +106,7 @@ impl<'a> InsertBuilder<'a> {
             self.fields
         };
 
-        InsertIR {
+        Insert {
             target: entity_ref(self.model),
             fields,
             row_count: self.row_count,
@@ -139,21 +151,33 @@ impl<'a> InsertSelectBuilder<'a> {
         self
     }
 
-    /// Specify columns to return.
-    pub fn returning(mut self, cols: &[&str]) -> Self {
+    /// Return specific columns from the affected rows.
+    pub fn output(mut self, cols: &[&str]) -> Self {
         self.returning = cols.iter().map(|s| s.to_string()).collect();
         self
     }
 
-    /// Add `RETURNING *`.
-    pub fn returning_all(mut self) -> Self {
+    #[deprecated(note = "use `output()`")]
+    #[inline]
+    pub fn returning(self, cols: &[&str]) -> Self {
+        self.output(cols)
+    }
+
+    /// Return all columns from the affected rows.
+    pub fn output_all(mut self) -> Self {
         self.returning = vec!["*".to_string()];
         self
     }
 
-    /// Build the canonical [`InsertSelectIR`].
-    pub fn build(self) -> InsertSelectIR {
-        InsertSelectIR {
+    #[deprecated(note = "use `output_all()`")]
+    #[inline]
+    pub fn returning_all(self) -> Self {
+        self.output_all()
+    }
+
+    /// Build the canonical [`InsertSelect`].
+    pub fn build(self) -> InsertSelect {
+        InsertSelect {
             target: entity_ref(self.model),
             fields: self.fields,
             source_query: self.source_query,
@@ -202,16 +226,9 @@ impl<'a> UpdateBuilder<'a> {
         self
     }
 
-    /// Set a column to a literal SQL expression: `col = <literal>`.
-    pub fn set_literal(mut self, column: &str, literal: &str) -> Self {
-        self.assignments
-            .push((column.to_string(), raw_expr(literal)));
-        self
-    }
-
     /// Increment a column: `col = col + $N`.
     pub fn set_increment(mut self, column: &str) -> Self {
-        let expr = field(column) + Expr::Param;
+        let expr = field_dyn(column) + Expr::Param;
         self.assignments.push((column.to_string(), expr));
         self
     }
@@ -230,16 +247,28 @@ impl<'a> UpdateBuilder<'a> {
         self
     }
 
-    /// Add `RETURNING *`.
-    pub fn returning_all(mut self) -> Self {
+    /// Return all columns from the affected rows.
+    pub fn output_all(mut self) -> Self {
         self.returning = vec!["*".to_string()];
         self
     }
 
-    /// Specify columns to return.
-    pub fn returning(mut self, cols: &[&str]) -> Self {
+    #[deprecated(note = "use `output_all()`")]
+    #[inline]
+    pub fn returning_all(self) -> Self {
+        self.output_all()
+    }
+
+    /// Return specific columns from the affected rows.
+    pub fn output(mut self, cols: &[&str]) -> Self {
         self.returning = cols.iter().map(|s| s.to_string()).collect();
         self
+    }
+
+    #[deprecated(note = "use `output()`")]
+    #[inline]
+    pub fn returning(self, cols: &[&str]) -> Self {
+        self.output(cols)
     }
 
     /// Total bind-parameter count for this UPDATE.
@@ -253,9 +282,9 @@ impl<'a> UpdateBuilder<'a> {
         set_params + filter_params
     }
 
-    /// Build the canonical [`UpdateIR`].
-    pub fn build(self) -> UpdateIR<'static> {
-        UpdateIR {
+    /// Build the canonical [`Update`].
+    pub fn build(self) -> Update<'static> {
+        Update {
             target: entity_ref(self.model),
             assignments: self.assignments,
             filters: self.filters,
@@ -294,16 +323,28 @@ impl<'a> RemoveBuilder<'a> {
         self
     }
 
-    /// Add `RETURNING *`.
-    pub fn returning_all(mut self) -> Self {
+    /// Return all columns from the affected rows.
+    pub fn output_all(mut self) -> Self {
         self.returning = vec!["*".to_string()];
         self
     }
 
-    /// Specify columns to return.
-    pub fn returning(mut self, cols: &[&str]) -> Self {
+    #[deprecated(note = "use `output_all()`")]
+    #[inline]
+    pub fn returning_all(self) -> Self {
+        self.output_all()
+    }
+
+    /// Return specific columns from the affected rows.
+    pub fn output(mut self, cols: &[&str]) -> Self {
         self.returning = cols.iter().map(|s| s.to_string()).collect();
         self
+    }
+
+    #[deprecated(note = "use `output()`")]
+    #[inline]
+    pub fn returning(self, cols: &[&str]) -> Self {
+        self.output(cols)
     }
 
     /// Total bind-parameter count for this DELETE.
@@ -311,9 +352,9 @@ impl<'a> RemoveBuilder<'a> {
         self.filters.iter().map(count_single_expr_params).sum()
     }
 
-    /// Build the canonical [`RemoveIR`].
-    pub fn build(self) -> RemoveIR<'static> {
-        RemoveIR {
+    /// Build the canonical [`Remove`].
+    pub fn build(self) -> Remove<'static> {
+        Remove {
             target: entity_ref(self.model),
             filters: self.filters,
             returning: self.returning,
@@ -359,49 +400,100 @@ impl<'a> UpsertBuilder<'a> {
         self
     }
 
-    /// Set the conflict target columns: `ON CONFLICT (col1, col2)`.
-    pub fn on_conflict(mut self, cols: &[&str]) -> Self {
+    /// Set the conflict target columns.
+    ///
+    /// In SQL-backed stores this maps to `ON CONFLICT (col1, col2)`.
+    pub fn match_on(mut self, cols: &[&str]) -> Self {
         self.conflict_fields = cols.iter().map(|s| s.to_string()).collect();
         self
     }
 
-    /// Set the conflict target to a named constraint: `ON CONFLICT ON CONSTRAINT name`.
-    pub fn on_conflict_constraint(mut self, name: &str) -> Self {
+    #[deprecated(note = "use `match_on()`")]
+    #[inline]
+    pub fn on_conflict(self, cols: &[&str]) -> Self {
+        self.match_on(cols)
+    }
+
+    /// Set the conflict target to a named constraint.
+    ///
+    /// In SQL-backed stores this maps to `ON CONFLICT ON CONSTRAINT name`.
+    pub fn match_constraint(mut self, name: &str) -> Self {
         self.conflict_constraint = Some(name.to_string());
         self
     }
 
-    /// Set the columns to update on conflict: `DO UPDATE SET col = EXCLUDED.col`.
-    pub fn do_update(mut self, cols: &[&str]) -> Self {
+    #[deprecated(note = "use `match_constraint()`")]
+    #[inline]
+    pub fn on_conflict_constraint(self, name: &str) -> Self {
+        self.match_constraint(name)
+    }
+
+    /// Set the columns to update on conflict.
+    ///
+    /// In SQL-backed stores this maps to `DO UPDATE SET col = EXCLUDED.col`.
+    pub fn patch(mut self, cols: &[&str]) -> Self {
         self.update_fields = cols.iter().map(|s| s.to_string()).collect();
         self.do_nothing_flag = false;
         self
     }
 
-    /// Use `DO NOTHING` on conflict.
-    pub fn do_nothing(mut self) -> Self {
+    #[deprecated(note = "use `patch()`")]
+    #[inline]
+    pub fn do_update(self, cols: &[&str]) -> Self {
+        self.patch(cols)
+    }
+
+    /// Ignore the row silently on conflict.
+    ///
+    /// In SQL-backed stores this maps to `DO NOTHING`.
+    pub fn skip_on_match(mut self) -> Self {
         self.do_nothing_flag = true;
         self.update_fields.clear();
         self
     }
 
-    /// Specify columns to return.
-    pub fn returning(mut self, cols: &[&str]) -> Self {
+    #[deprecated(note = "use `skip_on_match()`")]
+    #[inline]
+    pub fn do_nothing(self) -> Self {
+        self.skip_on_match()
+    }
+
+    /// Return specific columns from the affected rows.
+    pub fn output(mut self, cols: &[&str]) -> Self {
         self.returning = cols.iter().map(|s| s.to_string()).collect();
         self
     }
 
-    /// Add `RETURNING *`.
-    pub fn returning_all(mut self) -> Self {
+    #[deprecated(note = "use `output()`")]
+    #[inline]
+    pub fn returning(self, cols: &[&str]) -> Self {
+        self.output(cols)
+    }
+
+    /// Return all columns from the affected rows.
+    pub fn output_all(mut self) -> Self {
         self.returning = vec!["*".to_string()];
         self
     }
 
-    /// Add a filter expression to the conflict's WHERE clause
-    /// (the WHERE that qualifies the DO UPDATE SET).
-    pub fn conflict_filter(mut self, expr: Expr<'static>) -> Self {
+    #[deprecated(note = "use `output_all()`")]
+    #[inline]
+    pub fn returning_all(self) -> Self {
+        self.output_all()
+    }
+
+    /// Add a filter expression that qualifies the conflict update action.
+    ///
+    /// In SQL-backed stores this maps to the WHERE clause inside `DO UPDATE SET`.
+    pub fn match_filter(mut self, expr: Expr<'static>) -> Self {
         self.conflict_filters.push(expr);
         self
+    }
+
+    #[deprecated(note = "use `match_filter()`")]
+    #[inline]
+    pub fn conflict_filter(self, expr: Expr<'static>) -> Self {
+        self.match_filter(expr)
     }
 
     /// Total bind-parameter count for this UPSERT.
@@ -422,11 +514,11 @@ impl<'a> UpsertBuilder<'a> {
         insert_params + conflict_params
     }
 
-    /// Build the canonical [`UpsertIR`].
+    /// Build the canonical [`Upsert`].
     ///
     /// When no fields have been set (via `.fields()`), all entity fields
     /// are included by default.
-    pub fn build(self) -> UpsertIR<'static> {
+    pub fn build(self) -> Upsert<'static> {
         // Default: include all entity fields when none were specified.
         let fields = if self.fields.is_empty() {
             self.model.field_names().map(|s| s.to_string()).collect()
@@ -434,7 +526,7 @@ impl<'a> UpsertBuilder<'a> {
             self.fields
         };
 
-        UpsertIR {
+        Upsert {
             target: entity_ref(self.model),
             fields,
             conflict_fields: self.conflict_fields,

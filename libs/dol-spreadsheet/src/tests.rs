@@ -1,9 +1,9 @@
 use super::*;
-use dol_core::ir::definition::{DefineEntityIR, DropEntityIR, FieldDef, OwnedForeignKeyRef};
-use dol_core::ir::mutation::{InsertIR, RemoveIR, UpdateIR};
-use dol_core::ir::query::{JoinIR, JoinType, LockMode, QueryIR};
-use dol_core::ir::{AlterAction, AlterEntityIR, EntityRef, OffsetLimit};
 use dol_core::expr::{field, int, param, string};
+use dol_core::op::definition::{DefineEntity, DropEntity, FieldDef, OwnedForeignKeyRef};
+use dol_core::op::mutation::{Insert, Remove, Update};
+use dol_core::op::query::{Join, JoinKind, LockMode, Query};
+use dol_core::op::{AlterAction, AlterEntity, EntityRef, OffsetLimit};
 use dol_core::types::DataType;
 
 fn entity_ref(name: &str) -> EntityRef {
@@ -26,7 +26,7 @@ fn entity_ref_ns(ns: &str, name: &str) -> EntityRef {
 
 #[test]
 fn define_entity_creates_sheet() {
-    let ir = DefineEntityIR {
+    let ir = DefineEntity {
         name: "users".to_string(),
         namespace: None,
         fields: vec![
@@ -41,29 +41,30 @@ fn define_entity_creates_sheet() {
     let stmt = Statement::DefineEntity(Box::new(ir));
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result;
-            assert_eq!(out.sheet, "users");
-            assert!(out.workbook.is_none());
-            match out.operation {
-                SpreadsheetOp::CreateSheet {
-                    columns,
-                    if_not_exists,
-                } => {
-                    assert_eq!(columns.len(), 3);
-                    assert_eq!(columns[0].name, "id");
-                    assert_eq!(columns[0].data_type, DataType::Uuid);
-                    assert_eq!(columns[1].name, "email");
-                    assert_eq!(columns[2].name, "age");
-                    assert!(!if_not_exists);
-                }
-                _ => panic!("expected CreateSheet"),
+    {
+        let out = result;
+        assert_eq!(out.sheet, "users");
+        assert!(out.workbook.is_none());
+        match out.operation {
+            SpreadsheetOp::CreateSheet {
+                columns,
+                if_not_exists,
+            } => {
+                assert_eq!(columns.len(), 3);
+                assert_eq!(columns[0].name, "id");
+                assert_eq!(columns[0].data_type, DataType::Uuid);
+                assert_eq!(columns[1].name, "email");
+                assert_eq!(columns[2].name, "age");
+                assert!(!if_not_exists);
             }
+            _ => panic!("expected CreateSheet"),
+        }
     }
 }
 
 #[test]
 fn define_entity_with_namespace() {
-    let ir = DefineEntityIR {
+    let ir = DefineEntity {
         name: "users".to_string(),
         namespace: Some("hr".to_string()),
         fields: vec![FieldDef::new("id", DataType::Uuid)],
@@ -74,20 +75,21 @@ fn define_entity_with_namespace() {
     let stmt = Statement::DefineEntity(Box::new(ir));
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result;
-            assert_eq!(out.sheet, "hr.users");
-            match out.operation {
-                SpreadsheetOp::CreateSheet { if_not_exists, .. } => {
-                    assert!(if_not_exists);
-                }
-                _ => panic!("expected CreateSheet"),
+    {
+        let out = result;
+        assert_eq!(out.sheet, "hr.users");
+        match out.operation {
+            SpreadsheetOp::CreateSheet { if_not_exists, .. } => {
+                assert!(if_not_exists);
             }
+            _ => panic!("expected CreateSheet"),
+        }
     }
 }
 
 #[test]
 fn define_entity_rejects_primary_key() {
-    let ir = DefineEntityIR {
+    let ir = DefineEntity {
         name: "users".to_string(),
         namespace: None,
         fields: vec![FieldDef::new("id", DataType::Uuid).primary_key()],
@@ -100,7 +102,7 @@ fn define_entity_rejects_primary_key() {
 
 #[test]
 fn define_entity_rejects_unique() {
-    let ir = DefineEntityIR {
+    let ir = DefineEntity {
         name: "users".to_string(),
         namespace: None,
         fields: vec![FieldDef::new("email", DataType::Text).unique()],
@@ -113,7 +115,7 @@ fn define_entity_rejects_unique() {
 
 #[test]
 fn define_entity_rejects_references() {
-    let ir = DefineEntityIR {
+    let ir = DefineEntity {
         name: "orders".to_string(),
         namespace: None,
         fields: vec![
@@ -129,7 +131,7 @@ fn define_entity_rejects_references() {
 
 #[test]
 fn define_entity_rejects_check() {
-    let ir = DefineEntityIR {
+    let ir = DefineEntity {
         name: "items".to_string(),
         namespace: None,
         fields: vec![FieldDef::new("qty", DataType::Int32).check("qty > 0")],
@@ -142,12 +144,10 @@ fn define_entity_rejects_check() {
 
 #[test]
 fn define_entity_rejects_generated() {
-    let ir = DefineEntityIR {
+    let ir = DefineEntity {
         name: "items".to_string(),
         namespace: None,
-        fields: vec![
-            FieldDef::new("total", DataType::Int32).generated_stored("qty * price"),
-        ],
+        fields: vec![FieldDef::new("total", DataType::Int32).generated_stored("qty * price")],
         constraints: vec![],
         if_not_exists: false,
     };
@@ -157,7 +157,7 @@ fn define_entity_rejects_generated() {
 
 #[test]
 fn define_entity_rejects_auto_increment() {
-    let ir = DefineEntityIR {
+    let ir = DefineEntity {
         name: "items".to_string(),
         namespace: None,
         fields: vec![FieldDef::new("id", DataType::Int64).auto_increment()],
@@ -170,8 +170,8 @@ fn define_entity_rejects_auto_increment() {
 
 #[test]
 fn define_entity_rejects_table_constraints() {
-    use dol_core::ir::definition::OwnedEntityConstraint;
-    let ir = DefineEntityIR {
+    use dol_core::op::definition::OwnedEntityConstraint;
+    let ir = DefineEntity {
         name: "users".to_string(),
         namespace: None,
         fields: vec![FieldDef::new("id", DataType::Uuid)],
@@ -186,7 +186,7 @@ fn define_entity_rejects_table_constraints() {
 
 #[test]
 fn drop_entity_drops_sheet() {
-    let ir = DropEntityIR {
+    let ir = DropEntity {
         target: entity_ref("users"),
         if_exists: true,
         cascade: false,
@@ -195,20 +195,21 @@ fn drop_entity_drops_sheet() {
     let stmt = Statement::DropEntity(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result;
-            assert_eq!(out.sheet, "users");
-            match out.operation {
-                SpreadsheetOp::DropSheet { if_exists } => {
-                    assert!(if_exists);
-                }
-                _ => panic!("expected DropSheet"),
+    {
+        let out = result;
+        assert_eq!(out.sheet, "users");
+        match out.operation {
+            SpreadsheetOp::DropSheet { if_exists } => {
+                assert!(if_exists);
             }
+            _ => panic!("expected DropSheet"),
+        }
     }
 }
 
 #[test]
 fn drop_entity_rejects_cascade() {
-    let ir = DropEntityIR {
+    let ir = DropEntity {
         target: entity_ref("users"),
         if_exists: false,
         cascade: true,
@@ -221,7 +222,7 @@ fn drop_entity_rejects_cascade() {
 
 #[test]
 fn alter_entity_rename_to_rename_sheet() {
-    let ir = AlterEntityIR {
+    let ir = AlterEntity {
         target: entity_ref("users"),
         actions: vec![AlterAction::RenameEntity("employees".to_string())],
     };
@@ -229,22 +230,26 @@ fn alter_entity_rename_to_rename_sheet() {
     let stmt = Statement::AlterEntity(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result;
-            assert_eq!(out.sheet, "users");
-            match out.operation {
-                SpreadsheetOp::RenameSheet { new_name } => {
-                    assert_eq!(new_name, "employees");
-                }
-                _ => panic!("expected RenameSheet"),
+    {
+        let out = result;
+        assert_eq!(out.sheet, "users");
+        match out.operation {
+            SpreadsheetOp::RenameSheet { new_name } => {
+                assert_eq!(new_name, "employees");
             }
+            _ => panic!("expected RenameSheet"),
+        }
     }
 }
 
 #[test]
 fn alter_entity_add_field_unsupported() {
-    let ir = AlterEntityIR {
+    let ir = AlterEntity {
         target: entity_ref("users"),
-        actions: vec![AlterAction::AddField(FieldDef::new("phone", DataType::Text))],
+        actions: vec![AlterAction::AddField(FieldDef::new(
+            "phone",
+            DataType::Text,
+        ))],
     };
 
     let stmt = Statement::AlterEntity(ir);
@@ -254,7 +259,7 @@ fn alter_entity_add_field_unsupported() {
 
 #[test]
 fn alter_entity_empty_actions_unsupported() {
-    let ir = AlterEntityIR {
+    let ir = AlterEntity {
         target: entity_ref("users"),
         actions: vec![],
     };
@@ -264,7 +269,7 @@ fn alter_entity_empty_actions_unsupported() {
 
 #[test]
 fn alter_entity_multiple_actions_unsupported() {
-    let ir = AlterEntityIR {
+    let ir = AlterEntity {
         target: entity_ref("users"),
         actions: vec![
             AlterAction::RenameEntity("employees".to_string()),
@@ -279,7 +284,7 @@ fn alter_entity_multiple_actions_unsupported() {
 
 #[test]
 fn insert_appends_rows() {
-    let ir = InsertIR {
+    let ir = Insert {
         target: entity_ref("users"),
         fields: vec!["id".to_string(), "email".to_string()],
         row_count: 3,
@@ -289,24 +294,22 @@ fn insert_appends_rows() {
     let stmt = Statement::Insert(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result;
-            assert_eq!(out.sheet, "users");
-            match out.operation {
-                SpreadsheetOp::AppendRows {
-                    columns,
-                    row_count,
-                } => {
-                    assert_eq!(columns, vec!["id", "email"]);
-                    assert_eq!(row_count, 3);
-                }
-                _ => panic!("expected AppendRows"),
+    {
+        let out = result;
+        assert_eq!(out.sheet, "users");
+        match out.operation {
+            SpreadsheetOp::AppendRows { columns, row_count } => {
+                assert_eq!(columns, vec!["id", "email"]);
+                assert_eq!(row_count, 3);
             }
+            _ => panic!("expected AppendRows"),
+        }
     }
 }
 
 #[test]
 fn insert_rejects_returning() {
-    let ir = InsertIR {
+    let ir = Insert {
         target: entity_ref("users"),
         fields: vec!["id".to_string()],
         row_count: 1,
@@ -320,7 +323,7 @@ fn insert_rejects_returning() {
 
 #[test]
 fn update_with_filter() {
-    let ir = UpdateIR {
+    let ir = Update {
         target: entity_ref("users"),
         assignments: vec![("email".to_string(), string("new@example.com"))],
         filters: vec![field("id").eq(param())],
@@ -330,28 +333,29 @@ fn update_with_filter() {
     let stmt = Statement::Update(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result;
-            assert_eq!(out.sheet, "users");
-            match out.operation {
-                SpreadsheetOp::UpdateRows {
-                    assignments,
-                    filter,
-                } => {
-                    assert_eq!(assignments.len(), 1);
-                    assert_eq!(assignments[0].0, "email");
-                    assert!(filter.is_some());
-                    let f = filter.unwrap();
-                    assert!(f.contains("id"));
-                    assert!(f.contains("="));
-                }
-                _ => panic!("expected UpdateRows"),
+    {
+        let out = result;
+        assert_eq!(out.sheet, "users");
+        match out.operation {
+            SpreadsheetOp::UpdateRows {
+                assignments,
+                filter,
+            } => {
+                assert_eq!(assignments.len(), 1);
+                assert_eq!(assignments[0].0, "email");
+                assert!(filter.is_some());
+                let f = filter.unwrap();
+                assert!(f.contains("id"));
+                assert!(f.contains("="));
             }
+            _ => panic!("expected UpdateRows"),
+        }
     }
 }
 
 #[test]
 fn update_without_filter() {
-    let ir = UpdateIR {
+    let ir = Update {
         target: entity_ref("users"),
         assignments: vec![("status".to_string(), string("archived"))],
         filters: vec![],
@@ -362,16 +366,16 @@ fn update_without_filter() {
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
     match result.operation {
-            SpreadsheetOp::UpdateRows { filter, .. } => {
-                assert!(filter.is_none());
-            }
-            _ => panic!("expected UpdateRows"),
+        SpreadsheetOp::UpdateRows { filter, .. } => {
+            assert!(filter.is_none());
+        }
+        _ => panic!("expected UpdateRows"),
     }
 }
 
 #[test]
 fn update_rejects_returning() {
-    let ir = UpdateIR {
+    let ir = Update {
         target: entity_ref("users"),
         assignments: vec![("email".to_string(), string("x@y.com"))],
         filters: vec![],
@@ -385,7 +389,7 @@ fn update_rejects_returning() {
 
 #[test]
 fn remove_with_filter() {
-    let ir = RemoveIR {
+    let ir = Remove {
         target: entity_ref("users"),
         filters: vec![field("status").eq(string("inactive"))],
         returning: vec![],
@@ -394,22 +398,23 @@ fn remove_with_filter() {
     let stmt = Statement::Remove(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result;
-            assert_eq!(out.sheet, "users");
-            match out.operation {
-                SpreadsheetOp::DeleteRows { filter } => {
-                    assert!(filter.is_some());
-                    let f = filter.unwrap();
-                    assert!(f.contains("status"));
-                }
-                _ => panic!("expected DeleteRows"),
+    {
+        let out = result;
+        assert_eq!(out.sheet, "users");
+        match out.operation {
+            SpreadsheetOp::DeleteRows { filter } => {
+                assert!(filter.is_some());
+                let f = filter.unwrap();
+                assert!(f.contains("status"));
             }
+            _ => panic!("expected DeleteRows"),
+        }
     }
 }
 
 #[test]
 fn remove_without_filter() {
-    let ir = RemoveIR {
+    let ir = Remove {
         target: entity_ref("users"),
         filters: vec![],
         returning: vec![],
@@ -419,16 +424,16 @@ fn remove_without_filter() {
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
     match result.operation {
-            SpreadsheetOp::DeleteRows { filter } => {
-                assert!(filter.is_none());
-            }
-            _ => panic!("expected DeleteRows"),
+        SpreadsheetOp::DeleteRows { filter } => {
+            assert!(filter.is_none());
+        }
+        _ => panic!("expected DeleteRows"),
     }
 }
 
 #[test]
 fn remove_rejects_returning() {
-    let ir = RemoveIR {
+    let ir = Remove {
         target: entity_ref("users"),
         filters: vec![],
         returning: vec!["id".to_string()],
@@ -441,7 +446,7 @@ fn remove_rejects_returning() {
 
 #[test]
 fn query_read_rows_basic() {
-    let ir = QueryIR {
+    let ir = Query {
         source: entity_ref("users"),
         projections: vec![field("id"), field("email")],
         joins: vec![],
@@ -459,32 +464,33 @@ fn query_read_rows_basic() {
     let stmt = Statement::Query(Box::new(ir));
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result;
-            assert_eq!(out.sheet, "users");
-            match out.operation {
-                SpreadsheetOp::ReadRows {
-                    columns,
-                    filter,
-                    sort,
-                    limit,
-                    offset,
-                    distinct,
-                } => {
-                    assert_eq!(columns, vec!["id", "email"]);
-                    assert!(filter.is_none());
-                    assert!(sort.is_empty());
-                    assert!(limit.is_none());
-                    assert!(offset.is_none());
-                    assert!(!distinct);
-                }
-                _ => panic!("expected ReadRows"),
+    {
+        let out = result;
+        assert_eq!(out.sheet, "users");
+        match out.operation {
+            SpreadsheetOp::ReadRows {
+                columns,
+                filter,
+                sort,
+                limit,
+                offset,
+                distinct,
+            } => {
+                assert_eq!(columns, vec!["id", "email"]);
+                assert!(filter.is_none());
+                assert!(sort.is_empty());
+                assert!(limit.is_none());
+                assert!(offset.is_none());
+                assert!(!distinct);
             }
+            _ => panic!("expected ReadRows"),
+        }
     }
 }
 
 #[test]
 fn query_with_filter_and_limit() {
-    let ir = QueryIR {
+    let ir = Query {
         source: entity_ref("users"),
         projections: vec![field("email")],
         joins: vec![],
@@ -503,26 +509,26 @@ fn query_with_filter_and_limit() {
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
     match result.operation {
-            SpreadsheetOp::ReadRows {
-                columns,
-                filter,
-                limit,
-                ..
-            } => {
-                assert_eq!(columns, vec!["email"]);
-                assert!(filter.is_some());
-                let f = filter.unwrap();
-                assert!(f.contains("age"));
-                assert!(f.contains(">"));
-                assert_eq!(limit, Some(10));
-            }
-            _ => panic!("expected ReadRows"),
+        SpreadsheetOp::ReadRows {
+            columns,
+            filter,
+            limit,
+            ..
+        } => {
+            assert_eq!(columns, vec!["email"]);
+            assert!(filter.is_some());
+            let f = filter.unwrap();
+            assert!(f.contains("age"));
+            assert!(f.contains(">"));
+            assert_eq!(limit, Some(10));
+        }
+        _ => panic!("expected ReadRows"),
     }
 }
 
 #[test]
 fn query_with_sort() {
-    let ir = QueryIR {
+    let ir = Query {
         source: entity_ref("users"),
         projections: vec![field("name"), field("age")],
         joins: vec![],
@@ -552,33 +558,33 @@ fn query_with_sort() {
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
     match result.operation {
-            SpreadsheetOp::ReadRows {
-                sort,
-                limit,
-                offset,
-                distinct,
-                ..
-            } => {
-                assert_eq!(sort.len(), 2);
-                assert_eq!(sort[0].column, "age");
-                assert_eq!(sort[0].direction, Direction::Desc);
-                assert_eq!(sort[1].column, "name");
-                assert_eq!(sort[1].direction, Direction::Asc);
-                assert_eq!(limit, Some(20));
-                assert_eq!(offset, Some(5));
-                assert!(distinct);
-            }
-            _ => panic!("expected ReadRows"),
+        SpreadsheetOp::ReadRows {
+            sort,
+            limit,
+            offset,
+            distinct,
+            ..
+        } => {
+            assert_eq!(sort.len(), 2);
+            assert_eq!(sort[0].column, "age");
+            assert_eq!(sort[0].direction, Direction::Desc);
+            assert_eq!(sort[1].column, "name");
+            assert_eq!(sort[1].direction, Direction::Asc);
+            assert_eq!(limit, Some(20));
+            assert_eq!(offset, Some(5));
+            assert!(distinct);
+        }
+        _ => panic!("expected ReadRows"),
     }
 }
 
 #[test]
 fn query_rejects_joins() {
-    let ir = QueryIR {
+    let ir = Query {
         source: entity_ref("users"),
         projections: vec![field("id")],
-        joins: vec![JoinIR {
-            join_type: JoinType::Inner,
+        joins: vec![Join {
+            join_type: JoinKind::Inner,
             target: entity_ref("orders"),
             on_conditions: vec![("users.id".to_string(), "orders.user_id".to_string())],
         }],
@@ -598,7 +604,7 @@ fn query_rejects_joins() {
 
 #[test]
 fn query_rejects_group_by() {
-    let ir = QueryIR {
+    let ir = Query {
         source: entity_ref("users"),
         projections: vec![field("status")],
         joins: vec![],
@@ -618,7 +624,7 @@ fn query_rejects_group_by() {
 
 #[test]
 fn query_rejects_having() {
-    let ir = QueryIR {
+    let ir = Query {
         source: entity_ref("users"),
         projections: vec![field("status")],
         joins: vec![],
@@ -638,7 +644,7 @@ fn query_rejects_having() {
 
 #[test]
 fn query_rejects_distinct_on() {
-    let ir = QueryIR {
+    let ir = Query {
         source: entity_ref("users"),
         projections: vec![field("id")],
         joins: vec![],
@@ -658,7 +664,7 @@ fn query_rejects_distinct_on() {
 
 #[test]
 fn query_rejects_lock_mode() {
-    let ir = QueryIR {
+    let ir = Query {
         source: entity_ref("users"),
         projections: vec![field("id")],
         joins: vec![],
@@ -678,7 +684,7 @@ fn query_rejects_lock_mode() {
 
 #[test]
 fn query_rejects_parameterized_limit() {
-    let ir = QueryIR {
+    let ir = Query {
         source: entity_ref("users"),
         projections: vec![field("id")],
         joins: vec![],
@@ -698,7 +704,7 @@ fn query_rejects_parameterized_limit() {
 
 #[test]
 fn query_rejects_parameterized_offset() {
-    let ir = QueryIR {
+    let ir = Query {
         source: entity_ref("users"),
         projections: vec![field("id")],
         joins: vec![],
@@ -720,9 +726,9 @@ fn query_rejects_parameterized_offset() {
 
 #[test]
 fn expr_rejects_subquery() {
-    let ir = QueryIR {
+    let ir = Query {
         source: entity_ref("users"),
-        projections: vec![Expr::Subquery("SELECT 1".into())],
+        projections: vec![Expr::Param],
         joins: vec![],
         filters: vec![],
         group_by: vec![],
@@ -740,7 +746,7 @@ fn expr_rejects_subquery() {
 
 #[test]
 fn expr_rejects_window_function() {
-    let ir = QueryIR {
+    let ir = Query {
         source: entity_ref("users"),
         projections: vec![Expr::Window {
             func: Box::new(Expr::CountStar),
@@ -767,13 +773,13 @@ fn expr_rejects_window_function() {
 
 #[test]
 fn transaction_unsupported() {
-    let stmt = Statement::Transaction(dol_core::ir::TransactionIR::Begin);
+    let stmt = Statement::Transaction(dol_core::op::Transaction::Begin);
     assert!(SpreadsheetBackend.render(&stmt).is_err());
 }
 
 #[test]
 fn index_unsupported() {
-    let ir = dol_core::ir::DefineIndexIR {
+    let ir = dol_core::op::DefineIndex {
         name: "idx_email".to_string(),
         target: entity_ref("users"),
         columns: vec!["email".to_string()],
@@ -789,9 +795,9 @@ fn index_unsupported() {
 
 #[test]
 fn storage_operations_unsupported() {
-    use dol_core::ir::storage::GetObjectIR;
+    use dol_core::op::storage::GetObject;
 
-    let ir = GetObjectIR {
+    let ir = GetObject {
         key: "key".to_string(),
         bucket: "bucket".to_string(),
     };
@@ -803,7 +809,7 @@ fn storage_operations_unsupported() {
 
 #[test]
 fn alter_entity_rename_qualifies_new_name_with_namespace() {
-    let ir = AlterEntityIR {
+    let ir = AlterEntity {
         target: entity_ref_ns("hr", "users"),
         actions: vec![AlterAction::RenameEntity("employees".to_string())],
     };
@@ -811,14 +817,15 @@ fn alter_entity_rename_qualifies_new_name_with_namespace() {
     let stmt = Statement::AlterEntity(ir);
     let result = SpreadsheetBackend.render(&stmt).unwrap();
 
-    { let out = result;
-            assert_eq!(out.sheet, "hr.users");
-            match out.operation {
-                SpreadsheetOp::RenameSheet { new_name } => {
-                    assert_eq!(new_name, "hr.employees");
-                }
-                _ => panic!("expected RenameSheet"),
+    {
+        let out = result;
+        assert_eq!(out.sheet, "hr.users");
+        match out.operation {
+            SpreadsheetOp::RenameSheet { new_name } => {
+                assert_eq!(new_name, "hr.employees");
             }
+            _ => panic!("expected RenameSheet"),
+        }
     }
 }
 
@@ -826,7 +833,7 @@ fn alter_entity_rename_qualifies_new_name_with_namespace() {
 
 #[test]
 fn query_rejects_nulls_first_ordering() {
-    let ir = QueryIR {
+    let ir = Query {
         source: entity_ref("users"),
         projections: vec![field("name")],
         joins: vec![],
@@ -852,7 +859,7 @@ fn query_rejects_nulls_first_ordering() {
 
 #[test]
 fn query_rejects_non_column_projection() {
-    let ir = QueryIR {
+    let ir = Query {
         source: entity_ref("users"),
         projections: vec![field("age").gt(int(18i32))],
         joins: vec![],
@@ -872,11 +879,11 @@ fn query_rejects_non_column_projection() {
 
 #[test]
 fn query_rejects_alias_projection() {
-    let ir = QueryIR {
+    let ir = Query {
         source: entity_ref("users"),
         projections: vec![Expr::Alias {
             expr: Box::new(field("email")),
-            alias: "user_email".to_string(),
+            alias: "user_email".into(),
         }],
         joins: vec![],
         filters: vec![],
@@ -897,7 +904,7 @@ fn query_rejects_alias_projection() {
 
 #[test]
 fn query_rejects_non_column_sort_expr() {
-    let ir = QueryIR {
+    let ir = Query {
         source: entity_ref("users"),
         projections: vec![field("name")],
         joins: vec![],
@@ -906,7 +913,7 @@ fn query_rejects_non_column_sort_expr() {
         having: vec![],
         order_by: vec![OrderByExpr {
             expr: Expr::Func {
-                name: dol_core::expr::FuncName::Custom("UPPER".to_string()),
+                name: dol_core::expr::FuncDef::custom("UPPER"),
                 args: vec![field("name")],
             },
             direction: dol_core::expr::Direction::Asc,

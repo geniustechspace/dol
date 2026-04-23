@@ -1,11 +1,11 @@
-//! Storage IR — canonical representation of object/file storage operations.
+//! Storage operations — canonical representation of object/file storage operations.
 
 use crate::expr::Expr;
 
 /// Put (upload/write) an object into a bucket/store.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct PutObjectIR<'a> {
+pub struct PutObject<'a> {
     pub key: String,
     pub source: ObjectSource<'a>,
     pub bucket: String,
@@ -28,7 +28,7 @@ pub enum ObjectSource<'a> {
 /// Get (download/read) an object from a bucket/store.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct GetObjectIR {
+pub struct GetObject {
     pub key: String,
     pub bucket: String,
 }
@@ -36,7 +36,7 @@ pub struct GetObjectIR {
 /// List objects in a bucket/store.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ListObjectsIR {
+pub struct ListObjects {
     pub bucket: String,
     pub prefix: Option<String>,
     pub limit: Option<u64>,
@@ -46,7 +46,7 @@ pub struct ListObjectsIR {
 /// Read a file from the filesystem.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ReadFileIR {
+pub struct ReadFile {
     pub path: String,
     pub encoding: Option<String>,
 }
@@ -54,7 +54,7 @@ pub struct ReadFileIR {
 /// Write content to a file.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct WriteFileIR<'a> {
+pub struct WriteFile<'a> {
     pub path: String,
     pub source: ObjectSource<'a>,
     pub create_dirs: bool,
@@ -63,7 +63,7 @@ pub struct WriteFileIR<'a> {
 /// Move/rename a file.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct MoveFileIR {
+pub struct MoveFile {
     pub from: String,
     pub to: String,
 }

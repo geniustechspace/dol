@@ -1,10 +1,10 @@
 use super::*;
-use dol_core::ir::{Statement, TransactionIR};
-use dol_core::ir::storage::{GetObjectIR, PutObjectIR, ObjectSource};
+use dol_core::op::{Statement, Transaction};
+use dol_core::op::storage::{GetObject, PutObject, ObjectSource};
 
 #[test]
 fn put_object_as_kv() {
-    let ir = PutObjectIR {
+    let ir = PutObject {
         key: "key/path".to_string(),
         source: ObjectSource::FromBytes,
         bucket: "bucket".to_string(),
@@ -19,7 +19,7 @@ fn put_object_as_kv() {
 
 #[test]
 fn get_object_as_kv() {
-    let ir = GetObjectIR {
+    let ir = GetObject {
         key: "key/path".to_string(),
         bucket: "bucket".to_string(),
     };
@@ -31,6 +31,6 @@ fn get_object_as_kv() {
 
 #[test]
 fn sql_statement_unsupported() {
-    let stmt = Statement::Transaction(TransactionIR::Begin);
+    let stmt = Statement::Transaction(Transaction::Begin);
     assert!(KvBackend.render(&stmt).is_err());
 }

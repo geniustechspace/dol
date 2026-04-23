@@ -1,4 +1,4 @@
-//! Query IR — the canonical representation of a data retrieval operation.
+//! Query operations — the canonical representation of a data retrieval operation.
 
 use super::EntityRef;
 use crate::expr::{Expr, OrderByExpr};
@@ -6,10 +6,10 @@ use crate::expr::{Expr, OrderByExpr};
 /// How to retrieve data from a source.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct QueryIR<'a> {
+pub struct Query<'a> {
     pub source: EntityRef,
     pub projections: Vec<Expr<'a>>,
-    pub joins: Vec<JoinIR>,
+    pub joins: Vec<Join>,
     pub filters: Vec<Expr<'a>>,
     pub group_by: Vec<Expr<'a>>,
     pub having: Vec<Expr<'a>>,
@@ -34,8 +34,8 @@ pub enum OffsetLimit {
 /// A JOIN clause in a query.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct JoinIR {
-    pub join_type: JoinType,
+pub struct Join {
+    pub join_type: JoinKind,
     pub target: EntityRef,
     pub on_conditions: Vec<(String, String)>,
 }
@@ -43,7 +43,7 @@ pub struct JoinIR {
 /// The type of join.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum JoinType {
+pub enum JoinKind {
     Inner,
     Left,
     Right,
@@ -66,7 +66,7 @@ pub enum LockMode {
 /// Set operation kind for compound queries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum SetOpKind {
+pub enum SetOp {
     Union,
     UnionAll,
     Intersect,
@@ -78,9 +78,9 @@ pub enum SetOpKind {
 /// A compound query (set operations: UNION, INTERSECT, EXCEPT).
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct CompoundQueryIR<'a> {
-    pub base: Box<QueryIR<'a>>,
-    pub operations: Vec<(SetOpKind, QueryIR<'a>)>,
+pub struct CompoundQuery<'a> {
+    pub base: Box<Query<'a>>,
+    pub operations: Vec<(SetOp, Query<'a>)>,
     pub order_by: Vec<OrderByExpr<'a>>,
     pub offset: Option<OffsetLimit>,
     pub limit: Option<OffsetLimit>,

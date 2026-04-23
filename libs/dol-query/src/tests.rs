@@ -151,8 +151,8 @@ fn get_from_entity_defaults() {
     let ir = Query::from(&users).get().build();
     assert_eq!(ir.source.name, "users");
     assert_eq!(ir.projections.len(), 3);
-    assert!(matches!(&ir.projections[0], Expr::Identifier(n) if n == "id"));
-    assert!(matches!(&ir.projections[2], Expr::Identifier(n) if n == "name"));
+    assert!(matches!(&ir.projections[0], Expr::Ref(p) if p.as_single() == Some("id")));
+    assert!(matches!(&ir.projections[2], Expr::Ref(p) if p.as_single() == Some("name")));
 }
 
 #[test]

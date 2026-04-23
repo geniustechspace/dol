@@ -1,5 +1,5 @@
-use core::fmt;
 use super::super::error::TypeError;
+use core::fmt;
 
 /// A time of day (no date, no timezone). Nanosecond precision.
 /// Second may be `60` for leap seconds.
@@ -15,18 +15,41 @@ pub struct Time {
 }
 
 impl Time {
-    pub const MIDNIGHT: Self = Self { hour: 0, minute: 0, second: 0, nanosecond: 0 };
+    pub const MIDNIGHT: Self = Self {
+        hour: 0,
+        minute: 0,
+        second: 0,
+        nanosecond: 0,
+    };
 
     pub const fn try_new(h: u8, m: u8, s: u8, ns: u32) -> Result<Self, TypeError> {
-        if h  > 23            { return Err(TypeError::InvalidHour(h)); }
-        if m  > 59            { return Err(TypeError::InvalidMinute(m)); }
-        if s  > 60            { return Err(TypeError::InvalidSecond(s)); }
-        if ns > 999_999_999   { return Err(TypeError::InvalidNanosecond(ns)); }
-        Ok(Self { hour: h, minute: m, second: s, nanosecond: ns })
+        if h > 23 {
+            return Err(TypeError::InvalidHour(h));
+        }
+        if m > 59 {
+            return Err(TypeError::InvalidMinute(m));
+        }
+        if s > 60 {
+            return Err(TypeError::InvalidSecond(s));
+        }
+        if ns > 999_999_999 {
+            return Err(TypeError::InvalidNanosecond(ns));
+        }
+        Ok(Self {
+            hour: h,
+            minute: m,
+            second: s,
+            nanosecond: ns,
+        })
     }
 
     pub const fn new_unchecked(hour: u8, minute: u8, second: u8, nanosecond: u32) -> Self {
-        Self { hour, minute, second, nanosecond }
+        Self {
+            hour,
+            minute,
+            second,
+            nanosecond,
+        }
     }
 }
 

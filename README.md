@@ -471,7 +471,7 @@ named instances for isolated workloads, and per-backend migration filtering.
 Implement the `Backend` trait to add support for any storage system:
 
 ```rust
-use dol_core::ir::{Backend, BackendError, RenderedOutput, Statement};
+use dol_core::op::{Backend, BackendError, RenderedOutput, Statement};
 
 struct MyCustomBackend;
 

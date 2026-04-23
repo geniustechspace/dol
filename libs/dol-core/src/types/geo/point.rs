@@ -1,5 +1,5 @@
-use core::fmt;
 use super::super::error::TypeError;
+use core::fmt;
 
 /// A 2D point `(x, y)`.
 ///
@@ -21,7 +21,9 @@ impl Point {
         Ok(Self { x, y })
     }
 
-    pub const fn new_unchecked(x: f64, y: f64) -> Self { Self { x, y } }
+    pub const fn new_unchecked(x: f64, y: f64) -> Self {
+        Self { x, y }
+    }
 }
 
 impl fmt::Display for Point {

@@ -13,16 +13,16 @@
 //! let c   = geo::circle(1.0, 2.0, 5.0).unwrap();       // Value::Circle
 //! ```
 
-pub mod point;
 pub mod line;
+pub mod point;
 pub mod shape;
 
-pub use point::Point;
 pub use line::{Line, Segment};
+pub use point::Point;
 pub use shape::{Circle, Path, Polygon, Rect};
 
-use super::value::Value;
 use super::error::TypeError;
+use super::value::Value;
 
 // ─── Factory functions ────────────────────────────────────────────────────────
 
@@ -39,13 +39,13 @@ pub fn line(a: f64, b: f64, c: f64) -> Result<Value, TypeError> {
 /// Constructs a `Value::Segment` from two endpoint pairs.
 pub fn segment(x1: f64, y1: f64, x2: f64, y2: f64) -> Result<Value, TypeError> {
     let start = Point::try_new(x1, y1)?;
-    let end   = Point::try_new(x2, y2)?;
+    let end = Point::try_new(x2, y2)?;
     Ok(Value::Segment(Box::new(Segment::new(start, end))))
 }
 
 /// Constructs a `Value::Rect` from two corner pairs (low, high).
 pub fn rect(lx: f64, ly: f64, hx: f64, hy: f64) -> Result<Value, TypeError> {
-    let low  = Point::try_new(lx, ly)?;
+    let low = Point::try_new(lx, ly)?;
     let high = Point::try_new(hx, hy)?;
     Ok(Value::Rect(Box::new(Rect::new(low, high))))
 }
@@ -58,7 +58,8 @@ pub fn circle(cx: f64, cy: f64, radius: f64) -> Result<Value, TypeError> {
 
 /// Constructs a `Value::Path` from a list of `(x, y)` pairs.
 pub fn path(closed: bool, coords: Vec<(f64, f64)>) -> Result<Value, TypeError> {
-    let points = coords.into_iter()
+    let points = coords
+        .into_iter()
         .map(|(x, y)| Point::try_new(x, y))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(Value::Path(Box::new(Path::new(closed, points))))
@@ -66,7 +67,8 @@ pub fn path(closed: bool, coords: Vec<(f64, f64)>) -> Result<Value, TypeError> {
 
 /// Constructs a `Value::Polygon` from a list of `(x, y)` pairs.
 pub fn polygon(coords: Vec<(f64, f64)>) -> Result<Value, TypeError> {
-    let points = coords.into_iter()
+    let points = coords
+        .into_iter()
         .map(|(x, y)| Point::try_new(x, y))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(Value::Polygon(Box::new(Polygon::new(points))))

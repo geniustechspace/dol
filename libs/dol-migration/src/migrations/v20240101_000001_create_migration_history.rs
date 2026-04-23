@@ -6,8 +6,8 @@
 
 use crate::{Migration, MigrationStep};
 use dol_entity::DefineEntityBuilder;
-use dol_core::ir::EntityRef;
-use dol_core::ir::definition::{DefineIndexIR, FieldDef};
+use dol_core::op::EntityRef;
+use dol_core::op::definition::{DefineIndex, FieldDef};
 use dol_entity::DataType;
 
 /// Creates the `_dol_migrations` table and an index on the `applied_at` column.
@@ -52,7 +52,7 @@ impl Migration for CreateMigrationHistory {
             // `if_not_exists` is false because `CREATE INDEX IF NOT EXISTS`
             // is not supported by MySQL. The migration runner already
             // prevents re-applying, so this is safe.
-            MigrationStep::define_index(DefineIndexIR {
+            MigrationStep::define_index(DefineIndex {
                 name: "idx_dol_migrations_applied_at".to_string(),
                 target: EntityRef {
                     name: "_dol_migrations".to_string(),

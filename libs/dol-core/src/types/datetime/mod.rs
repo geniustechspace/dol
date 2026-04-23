@@ -21,18 +21,18 @@
 pub mod date;
 #[allow(clippy::module_inception)]
 pub mod datetime;
-pub mod timestamp;
 pub mod interval;
 pub mod time;
+pub mod timestamp;
 
 pub use date::Date;
-pub use time::Time;
 pub use datetime::DateTime;
-pub use timestamp::{Offset, TimestampTz};
 pub use interval::Interval;
+pub use time::Time;
+pub use timestamp::{Offset, TimestampTz};
 
-use super::value::Value;
 use super::error::TypeError;
+use super::value::Value;
 
 // ─── Factory functions ────────────────────────────────────────────────────────
 
@@ -55,8 +55,8 @@ pub fn now_tz() -> Value {
     let (year, month, day, hour, minute, second, nano) = utc_datetime_parts();
     let date = Date::new_unchecked(year, month, day);
     let time = Time::new_unchecked(hour, minute, second, nano);
-    let dt   = DateTime::new(date, time);
-    Value::TimestampTz(TimestampTz::utc(dt))
+    let dt = DateTime::new(date, time);
+    Value::TimestampTz(Box::new(TimestampTz::utc(dt)))
 }
 
 /// Constructs a `Value::Date` from year, month, day components.
@@ -76,17 +76,17 @@ pub fn from_hms_nano(hour: u8, minute: u8, second: u8, nano: u32) -> Result<Valu
 
 /// Constructs a `Value::Interval` spanning the given number of days.
 pub fn interval_days(days: i32) -> Value {
-    Value::Interval(Interval::from_days(days))
+    Value::Interval(Box::new(Interval::from_days(days)))
 }
 
 /// Constructs a `Value::Interval` spanning the given number of months.
 pub fn interval_months(months: i32) -> Value {
-    Value::Interval(Interval::from_months(months))
+    Value::Interval(Box::new(Interval::from_months(months)))
 }
 
 /// Constructs a `Value::Interval` spanning the given number of nanoseconds.
 pub fn interval_nanos(nanos: i64) -> Value {
-    Value::Interval(Interval::from_nanos(nanos))
+    Value::Interval(Box::new(Interval::from_nanos(nanos)))
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
@@ -126,7 +126,7 @@ fn utc_datetime_parts() -> (i32, u8, u8, u8, u8, u8, u32) {
     let secs_of_day = (total_secs % 86_400) as u32;
     let days = total_secs / 86_400;
     let (year, month, day) = days_to_ymd(days);
-    let hour   = (secs_of_day / 3600) as u8;
+    let hour = (secs_of_day / 3600) as u8;
     let minute = ((secs_of_day % 3600) / 60) as u8;
     let second = (secs_of_day % 60) as u8;
     (year, month, day, hour, minute, second, nanosecond)

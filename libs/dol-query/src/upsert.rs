@@ -1,7 +1,7 @@
 //! UPSERT (INSERT ... ON CONFLICT) query builder for `dol-query`.
 
 use dol_core::expr::Expr;
-use dol_core::ir::{EntityRef, UpsertIR};
+use dol_core::op::{EntityRef, Upsert};
 
 // ===========================================================================
 // UpsertQuery
@@ -104,11 +104,11 @@ impl UpsertQuery {
         }
     }
 
-    /// Build the canonical [`UpsertIR`].
+    /// Build the canonical [`Upsert`].
     ///
     /// When no fields have been set (via `.fields()`) and Entity field
     /// metadata is available, all entity fields are included by default.
-    pub fn build(self) -> UpsertIR<'static> {
+    pub fn build(self) -> Upsert<'static> {
         // Default: include all entity fields when none were specified.
         let fields = if self.fields.is_empty() {
             self.field_names.unwrap_or_default()
@@ -116,7 +116,7 @@ impl UpsertQuery {
             self.fields
         };
 
-        UpsertIR {
+        Upsert {
             target: EntityRef {
                 name: self.name,
                 namespace: self.namespace,

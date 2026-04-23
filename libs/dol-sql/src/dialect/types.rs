@@ -116,6 +116,16 @@ fn render_postgres(dt: &DataType) -> String {
         // Meta
         DataType::TypeRef(name) => name.to_string(),
 
+        // Extension — pass through as-is
+        DataType::Extension { name, params } => {
+            if params.is_empty() {
+                name.to_string()
+            } else {
+                let p: Vec<String> = params.iter().map(|t| render_postgres(t)).collect();
+                format!("{}({})", name, p.join(", "))
+            }
+        }
+
         // Semantic — stored as text in PG
     }
 }
@@ -169,6 +179,7 @@ fn render_mysql(dt: &DataType) -> String {
             format!("ENUM({})", vs.join(", "))
         }
         DataType::TypeRef(name) => name.to_string(),
+        DataType::Extension { name, .. } => name.to_string(),
     }
 }
 
@@ -199,6 +210,7 @@ fn render_sqlite(dt: &DataType) -> String {
         | DataType::Range(_) | DataType::Tuple(_) | DataType::Struct(_) => "TEXT".into(),
         DataType::Enum(_) => "TEXT".into(),
         DataType::TypeRef(name) => name.to_string(),
+        DataType::Extension { name, .. } => name.to_string(),
     }
 }
 
@@ -247,6 +259,7 @@ fn render_mssql(dt: &DataType) -> String {
         | DataType::Range(_) | DataType::Tuple(_) | DataType::Struct(_) => "NVARCHAR(MAX)".into(),
         DataType::Enum(_)  => "NVARCHAR(100)".into(),
         DataType::TypeRef(name) => name.to_string(),
+        DataType::Extension { name, .. } => name.to_string(),
     }
 }
 
@@ -294,5 +307,6 @@ fn render_oracle(dt: &DataType) -> String {
         | DataType::Range(_) | DataType::Tuple(_) | DataType::Struct(_) => "CLOB".into(),
         DataType::Enum(_)  => "VARCHAR2(100)".into(),
         DataType::TypeRef(name) => name.to_string(),
+        DataType::Extension { name, .. } => name.to_string(),
     }
 }

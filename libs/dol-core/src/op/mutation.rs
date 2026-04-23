@@ -1,4 +1,4 @@
-//! Mutation IR — canonical representation of data modification operations.
+//! Mutation operations — canonical representation of data modification operations.
 
 use super::EntityRef;
 use crate::expr::Expr;
@@ -6,7 +6,7 @@ use crate::expr::Expr;
 /// Insert new records into a model.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct InsertIR {
+pub struct Insert {
     pub target: EntityRef,
     pub fields: Vec<String>,
     pub row_count: usize,
@@ -16,7 +16,7 @@ pub struct InsertIR {
 /// Insert from a subquery: `INSERT INTO ... SELECT ...`
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct InsertSelectIR {
+pub struct InsertSelect {
     pub target: EntityRef,
     pub fields: Vec<String>,
     pub source_query: String,
@@ -26,7 +26,7 @@ pub struct InsertSelectIR {
 /// Update existing records in a model.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct UpdateIR<'a> {
+pub struct Update<'a> {
     pub target: EntityRef,
     pub assignments: Vec<(String, Expr<'a>)>,
     pub filters: Vec<Expr<'a>>,
@@ -36,7 +36,7 @@ pub struct UpdateIR<'a> {
 /// Remove records from a model.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct RemoveIR<'a> {
+pub struct Remove<'a> {
     pub target: EntityRef,
     pub filters: Vec<Expr<'a>>,
     pub returning: Vec<String>,
@@ -45,7 +45,7 @@ pub struct RemoveIR<'a> {
 /// Upsert (insert or update on conflict).
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct UpsertIR<'a> {
+pub struct Upsert<'a> {
     pub target: EntityRef,
     pub fields: Vec<String>,
     pub conflict_fields: Vec<String>,

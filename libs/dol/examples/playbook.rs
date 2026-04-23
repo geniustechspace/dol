@@ -30,16 +30,18 @@ use dol::Render;
 use dol::TransactionRender;
 use dol::backend::sql::dialect::Dialect;
 use dol::builder::control::{GrantBuilder, Privilege, RevokeBuilder};
-use dol::builder::{DefineEntityBuilder, DefineIndexBuilder, DropIndexBuilder};
 use dol::builder::storage::{
     GetObjectBuilder, ListObjectsBuilder, MoveFileBuilder, PutObjectBuilder, ReadFileBuilder,
     WriteFileBuilder,
 };
 use dol::builder::transaction::TransactionBuilder;
+use dol::builder::{DefineEntityBuilder, DefineIndexBuilder, DropIndexBuilder};
 use dol::expr::window::FrameBound;
-use dol::expr::{Direction, Expr, bool_expr, case, field, float, func, int, param, raw_expr, string};
-use dol::ir::LockMode;
+use dol::expr::{
+    Direction, Expr, bool_expr, case, field, float, func, int, param, string,
+};
 use dol::model::{DataType, Entity, EntityConstraint, Field, FkAction};
+use dol::op::LockMode;
 
 // ============================================================================
 // 1. MODEL DEFINITION — the single source of truth for a data shape
@@ -113,7 +115,9 @@ fn audit_log() -> Entity {
     Entity::new(
         "audit_log",
         vec![
-            Field::new("id", DataType::Int64).auto_increment().primary_key(),
+            Field::new("id", DataType::Int64)
+                .auto_increment()
+                .primary_key(),
             Field::new("user_id", DataType::Uuid).references(
                 "users",
                 "id",
@@ -152,7 +156,13 @@ fn products() -> Entity {
             Field::new("id", DataType::Uuid).primary_key(),
             Field::new("name", DataType::Varchar(Some(255))),
             Field::new("sku", DataType::Char(12)).unique(),
-            Field::new("price", DataType::Decimal { precision: None, scale: None }),
+            Field::new(
+                "price",
+                DataType::Decimal {
+                    precision: None,
+                    scale: None,
+                },
+            ),
             Field::new("quantity", DataType::Int32).default("0"),
             Field::new("weight_kg", DataType::Float32).nullable(),
             Field::new("description", DataType::Text).nullable(),
@@ -174,7 +184,13 @@ fn order_items() -> Entity {
             Field::new("order_id", DataType::Uuid),
             Field::new("product_id", DataType::Uuid),
             Field::new("quantity", DataType::Int32),
-            Field::new("unit_price", DataType::Decimal { precision: None, scale: None }),
+            Field::new(
+                "unit_price",
+                DataType::Decimal {
+                    precision: None,
+                    scale: None,
+                },
+            ),
         ],
     )
     .with_constraints(vec![
@@ -225,10 +241,7 @@ fn main() {
     assert_eq!(email_field.name, "email");
     assert_eq!(email_field.data_type, DataType::Text);
     assert!(email_field.unique);
-    println!(
-        "  Field lookup: users.email -> {:?}",
-        email_field.data_type
-    );
+    println!("  Field lookup: users.email -> {:?}", email_field.data_type);
 
     // Safe field lookup
     assert!(users.try_field("nonexistent").is_none());
@@ -304,7 +317,7 @@ fn main() {
     // 2e. NULL checks
     let sql = users
         .get()
-        .filter(field("profile").is_not_null())
+        .filter(field("profile").is_null().negate())
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] IS NOT NULL: {}", sql);
@@ -320,72 +333,19 @@ fn main() {
     // 2g. IN list
     let sql = users
         .get()
-        .filter(field("status").in_list(vec![string("active"), string("pending"), string("suspended")]))
+        .filter(field("status").in_list(vec![
+            string("active"),
+            string("pending"),
+            string("suspended"),
+        ]))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] IN list: {}", sql);
 
-    // 2h. IN subquery
-    let sql = users
-        .get()
-        .filter(Expr::InSubquery {
-            expr: Box::new(field("tenant_id")),
-            subquery: "SELECT id FROM tenants WHERE status = 'active'".to_string(),
-            negated: false,
-        })
-        .render(Some(&pg))
-        .unwrap();
-    println!("  [PG] IN subquery: {}", sql);
-
-    // 2i. NOT IN subquery (via filter)
-    let subquery = "SELECT user_id FROM banned_users";
-    let sql = users
-        .get()
-        .filter(field("id").not_in_subquery(subquery))
-        .render(Some(&pg))
-        .unwrap();
-    println!("  [PG] NOT IN subquery: {}", sql);
-
-    // 2j. EXISTS subquery
-    let sql = users
-        .get()
-        .filter(Expr::Exists {
-            subquery: "SELECT 1 FROM sessions WHERE sessions.user_id = users.id".to_string(),
-            negated: false,
-        })
-        .render(Some(&pg))
-        .unwrap();
-    println!("  [PG] EXISTS: {}", sql);
-
-    // 2k. NOT EXISTS subquery
-    let sql = users
-        .get()
-        .filter(Expr::Exists {
-            subquery: "SELECT 1 FROM banned WHERE banned.user_id = users.id".to_string(),
-            negated: true,
-        })
-        .render(Some(&pg))
-        .unwrap();
-    println!("  [PG] NOT EXISTS: {}", sql);
-
-    // 2l. Scalar subquery in projection
-    let sql = users
-        .get()
-        .fields(&["id", "email"])
-        .field(
-            dol::expr::Expr::Subquery(
-                "SELECT COUNT(*) FROM sessions WHERE sessions.user_id = users.id".into(),
-            )
-            .alias("session_count"),
-        )
-        .render(Some(&pg))
-        .unwrap();
-    println!("  [PG] Scalar subquery: {}", sql);
-
     // 2m. Ordering with NULLS FIRST/LAST
     let sql = users
         .get()
-        .order_by_expr(field("display_name").asc_nulls_last())
+        .order_by_expr(field("display_name").asc().nulls_last())
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] ORDER BY NULLS LAST: {}", sql);
@@ -437,7 +397,7 @@ fn main() {
         .fields(&["tenant_id"])
         .field(Expr::CountStar.alias("cnt"))
         .group_by(&["tenant_id"])
-        .having(raw_expr("COUNT(*) > 10"))
+        .having(Expr::CountStar.gt(int(10i32)))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] GROUP BY HAVING: {}", sql);
@@ -468,7 +428,7 @@ fn main() {
 
     let sql = users
         .get()
-        .field(raw_expr("COALESCE(display_name, email) AS name"))
+        .field(func::coalesce(vec![field("display_name"), field("email")]).alias("name"))
         .filter(field("id").eq(param()))
         .render(Some(&pg))
         .unwrap();
@@ -651,7 +611,7 @@ fn main() {
     let sql = users
         .update()
         .set("status")
-        .set_literal("updated_at", "NOW()")
+        .set_expr("updated_at", func::now())
         .filter(field("id").eq(param()))
         .returning_all()
         .render(Some(&pg))
@@ -684,7 +644,7 @@ fn main() {
     let sql = users
         .update()
         .set("status")
-        .filter(raw_expr("created_at < NOW() - INTERVAL '30 days'"))
+        .filter(field("created_at").lt(param()))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Update raw WHERE: {}", sql);
@@ -718,7 +678,7 @@ fn main() {
     // 3o. DELETE with raw WHERE
     let sql = users
         .remove()
-        .filter(raw_expr("created_at < NOW() - INTERVAL '90 days'"))
+        .filter(field("created_at").lt(param()))
         .render(Some(&pg))
         .unwrap();
     println!("  [PG] Delete raw: {}", sql);
@@ -809,7 +769,16 @@ fn main() {
     let sql = DefineEntityBuilder::new("dynamic_table")
         .field(dol::FieldDef::new("id", DataType::Uuid).primary_key())
         .field(dol::FieldDef::new("name", DataType::Text))
-        .field(dol::FieldDef::new("value", DataType::Decimal { precision: None, scale: None }).nullable())
+        .field(
+            dol::FieldDef::new(
+                "value",
+                DataType::Decimal {
+                    precision: None,
+                    scale: None,
+                },
+            )
+            .nullable(),
+        )
         .if_not_exists()
         .render(Some(&pg))
         .unwrap();
@@ -948,7 +917,7 @@ fn main() {
     let sql = DefineIndexBuilder::new("idx_users_active_email")
         .on("users")
         .columns(&["email"])
-        .method(dol::ir::definition::IndexMethod::Hash)
+        .method(dol::op::definition::IndexMethod::Hash)
         .where_clause("status = 'active'")
         .render(Some(&pg))
         .unwrap();
@@ -1029,7 +998,7 @@ fn main() {
     println!("  CASE WHEN: ✓");
 
     // 5j. Field access for nested/JSON data
-    let _access = field("profile").access("address").access("city");
+    let _access = field("profile").get("address").get("city");
     println!("  Field access: profile.address.city ✓");
 
     // 5k. Qualified identifiers
@@ -1048,23 +1017,20 @@ fn main() {
 
     // 5n. IS NULL / IS NOT NULL
     let _is_null = field("profile").is_null();
-    let _is_not_null = field("profile").is_not_null();
+    let _is_not_null = field("profile").is_null().negate();
     println!("  IS NULL / IS NOT NULL ✓");
 
     // 5o. BETWEEN / NOT BETWEEN
     let _between = field("age").between(int(18), int(65));
-    let _not_between = field("age").not_between(int(0), int(17));
+    let _not_between = field("age").between(int(0), int(17)).negate();
     println!("  BETWEEN / NOT BETWEEN ✓");
 
     // 5p. IN list / NOT IN list
     let _in = field("status").in_list(vec![string("a"), string("b")]);
-    let _not_in = field("status").not_in_list(vec![string("x"), string("y")]);
+    let _not_in = field("status")
+        .in_list(vec![string("x"), string("y")])
+        .negate();
     println!("  IN / NOT IN list ✓");
-
-    // 5q. IN / NOT IN subquery
-    let _in_sub = field("id").in_subquery("SELECT user_id FROM active_users");
-    let _not_in_sub = field("id").not_in_subquery("SELECT user_id FROM banned_users");
-    println!("  IN / NOT IN subquery ✓");
 
     // 5r. All function constructors
     let _ = func::lower(field("email"));
@@ -1108,14 +1074,14 @@ fn main() {
     let _arr = dol::expr::arr(vec![int(1), int(2), int(3)]);
     println!("  Object/Array literals ✓");
 
-    // 5u. Ordering expressions (all 6 variants)
+    // 5u. Ordering expressions (chained with nulls modifiers)
     let _ = field("name").asc();
     let _ = field("name").desc();
-    let _ = field("name").asc_nulls_first();
-    let _ = field("name").asc_nulls_last();
-    let _ = field("name").desc_nulls_first();
-    let _ = field("name").desc_nulls_last();
-    println!("  All 6 ordering variants ✓");
+    let _ = field("name").asc().nulls_first();
+    let _ = field("name").asc().nulls_last();
+    let _ = field("name").desc().nulls_first();
+    let _ = field("name").desc().nulls_last();
+    println!("  All ordering variants (asc/desc + nulls_first/nulls_last) ✓");
 
     // 5v. Window builder with frame
     let _ = func::row_number()
@@ -1140,9 +1106,9 @@ fn main() {
     let _ = dol::expr::Expr::Value(dol::expr::Literal::Null); // Literal::Null
     println!("  Typed constructors: string, int, float, bool_expr, Null ✓");
 
-    // 5x. Raw expression escape hatch
-    let _raw = raw_expr("NOW() - INTERVAL '30 days'");
-    println!("  Raw expression ✓");
+    // 5x. NOW() function expression
+    let _now = func::now();
+    println!("  NOW() function expression ✓");
 
     // 5y. Param placeholder
     let _param = param();
@@ -1580,13 +1546,13 @@ fn main() {
 /// Separate function for migration examples (feature-gated).
 #[cfg(feature = "migration")]
 fn migration_examples() {
-    use dol::ir::definition::{DefineIndexIR, FieldDef};
-    use dol::ir::{AlterAction, EntityRef};
     use dol::migration::{
         InMemoryRegistry, Migration, MigrationDirection, MigrationRegistry, MigrationRunner,
         MigrationState, MigrationStep, MigrationTarget, RenderedStep,
     };
     use dol::model::DataType;
+    use dol::op::definition::{DefineIndex, FieldDef};
+    use dol::op::{AlterAction, EntityRef};
 
     println!("\n--- 12. Migration System ---");
 
@@ -1607,7 +1573,10 @@ fn migration_examples() {
                     .field(FieldDef::new("id", DataType::Uuid).primary_key())
                     .field(FieldDef::new("email", DataType::Text).unique())
                     .field(FieldDef::new("status", DataType::Text).default("'active'"))
-                    .field(FieldDef::new("created_at", DataType::TimestampTz { precision: 6 }).default("NOW()"))
+                    .field(
+                        FieldDef::new("created_at", DataType::TimestampTz { precision: 6 })
+                            .default("NOW()"),
+                    )
                     .if_not_exists()
                     .build(),
             )]
@@ -1626,7 +1595,7 @@ fn migration_examples() {
             "Add unique index on users.email"
         }
         fn up(&self) -> Vec<MigrationStep> {
-            vec![MigrationStep::define_index(DefineIndexIR {
+            vec![MigrationStep::define_index(DefineIndex {
                 name: "idx_users_email".into(),
                 target: EntityRef {
                     name: "users".into(),
@@ -1838,12 +1807,12 @@ fn migration_examples() {
 /// Schema diff examples: comparing model versions and generating alter steps.
 #[cfg(feature = "migration")]
 fn schema_diff_examples() {
-    use dol::ir::AlterAction;
     use dol::migration::schema_diff::{
         EntitySnapshot, create_entity_step, diff_entities, diff_to_steps, drop_entity_step,
         field_to_field_def,
     };
     use dol::model::DataType;
+    use dol::op::AlterAction;
 
     println!("\n--- 13. Schema Diff & Auto-Discovery ---");
 
@@ -1951,11 +1920,11 @@ fn schema_diff_examples() {
 /// Config-integrated migration examples.
 #[cfg(all(feature = "migration", feature = "config"))]
 fn config_migration_examples() {
-    use dol::ir::definition::FieldDef;
     use dol::migration::{
         InMemoryRegistry, Migration, MigrationRunner, MigrationStep, RenderedStep,
     };
     use dol::model::DataType;
+    use dol::op::definition::FieldDef;
 
     println!("\n--- 14. Config-Integrated Migrations ---");
 
@@ -1972,7 +1941,13 @@ fn config_migration_examples() {
             vec![MigrationStep::define_entity(
                 dol::builder::DefineEntityBuilder::new("orders")
                     .field(FieldDef::new("id", DataType::Uuid).primary_key())
-                    .field(FieldDef::new("total", DataType::Decimal { precision: None, scale: None }))
+                    .field(FieldDef::new(
+                        "total",
+                        DataType::Decimal {
+                            precision: None,
+                            scale: None,
+                        },
+                    ))
                     .if_not_exists()
                     .build(),
             )]

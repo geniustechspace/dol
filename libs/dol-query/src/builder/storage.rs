@@ -3,7 +3,7 @@
 //! These builders produce storage IR which has no SQL equivalent.
 //! They will be rendered by future StorageBackend implementations.
 
-use dol_core::ir::storage::*;
+use dol_core::op::storage::*;
 
 /// Builder for `PUT OBJECT` operations.
 #[derive(Debug, Clone)]
@@ -51,8 +51,8 @@ impl<'a> PutObjectBuilder<'a> {
         self
     }
 
-    pub fn build(self) -> PutObjectIR<'a> {
-        PutObjectIR {
+    pub fn build(self) -> PutObject<'a> {
+        PutObject {
             key: self.key,
             bucket: self.bucket,
             source: self.source,
@@ -82,8 +82,8 @@ impl GetObjectBuilder {
         self
     }
 
-    pub fn build(self) -> GetObjectIR {
-        GetObjectIR {
+    pub fn build(self) -> GetObject {
+        GetObject {
             key: self.key,
             bucket: self.bucket,
         }
@@ -129,8 +129,8 @@ impl ListObjectsBuilder {
         self
     }
 
-    pub fn build(self) -> ListObjectsIR {
-        ListObjectsIR {
+    pub fn build(self) -> ListObjects {
+        ListObjects {
             bucket: self.bucket,
             prefix: self.prefix,
             limit: self.limit,
@@ -165,8 +165,8 @@ impl ReadFileBuilder {
         self
     }
 
-    pub fn build(self) -> ReadFileIR {
-        ReadFileIR {
+    pub fn build(self) -> ReadFile {
+        ReadFile {
             path: self.path,
             encoding: self.encoding,
         }
@@ -205,8 +205,8 @@ impl<'a> WriteFileBuilder<'a> {
         self
     }
 
-    pub fn build(self) -> WriteFileIR<'a> {
-        WriteFileIR {
+    pub fn build(self) -> WriteFile<'a> {
+        WriteFile {
             path: self.path,
             source: self.source,
             create_dirs: self.create_dirs,
@@ -229,8 +229,8 @@ impl MoveFileBuilder {
         }
     }
 
-    pub fn build(self) -> MoveFileIR {
-        MoveFileIR {
+    pub fn build(self) -> MoveFile {
+        MoveFile {
             from: self.from,
             to: self.to,
         }

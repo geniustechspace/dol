@@ -1,11 +1,11 @@
-//! Control IR — canonical representation of access control operations.
+//! Control operations — canonical representation of access control operations.
 
 use crate::expr::Expr;
 
 /// Grant privileges on a resource to a role.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct GrantIR {
+pub struct Grant {
     pub privilege: Privilege,
     pub on_target: String,
     pub to_role: String,
@@ -14,7 +14,7 @@ pub struct GrantIR {
 /// Revoke privileges on a resource from a role.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct RevokeIR {
+pub struct Revoke {
     pub privilege: Privilege,
     pub on_target: String,
     pub from_role: String,
@@ -38,7 +38,7 @@ pub enum Privilege {
 /// Define a policy for declarative access control.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct DefinePolicyIR<'a> {
+pub struct DefinePolicy<'a> {
     pub name: String,
     pub on_model: String,
     pub action: PolicyAction,

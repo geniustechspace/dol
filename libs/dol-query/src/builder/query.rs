@@ -1,22 +1,22 @@
 //! GET (SELECT) query builder — the primary read path for DOL.
 //!
 //! `GetBuilder` borrows a `&Model` and provides chainable methods to compose
-//! a SELECT query. Call `.build()` to produce a [`QueryIR`].
+//! a SELECT query. Call `.build()` to produce a [`Query`].
 //!
 //! For SQL rendering, import the `Render` extension trait from `dol-sql`.
 
 use dol_entity::Entity;
-use dol_core::expr::{Direction, Expr, NullsPosition, OrderByExpr, field};
-use dol_core::ir::{EntityRef, JoinIR, JoinType, LockMode, OffsetLimit, QueryIR};
+use dol_core::expr::{Direction, Expr, NullsPosition, OrderByExpr, field_dyn};
+use dol_core::op::{EntityRef, Join, JoinKind, LockMode, OffsetLimit, Query};
 
 // ---------------------------------------------------------------------------
 // Private join helper
 // ---------------------------------------------------------------------------
 
-/// An internal join clause before it is lowered to [`JoinIR`].
+/// An internal join clause before it is lowered to [`Join`].
 #[derive(Debug, Clone)]
 struct JoinClause {
-    join_type: JoinType,
+    join_type: JoinKind,
     model_name: String,
     model_namespace: Option<String>,
     alias: Option<String>,
@@ -79,7 +79,7 @@ impl<'a> GetBuilder<'a> {
     /// Add named columns to the projection list.
     pub fn fields(mut self, names: &[&str]) -> Self {
         for name in names {
-            self.projections.push(field(name));
+            self.projections.push(field_dyn(name));
         }
         self
     }
@@ -107,7 +107,7 @@ impl<'a> GetBuilder<'a> {
     /// be rendered as `ON left_col = right_col AND ...`.
     pub fn join(
         mut self,
-        join_type: JoinType,
+        join_type: JoinKind,
         target: &Entity,
         on_conditions: &[(&str, &str)],
     ) -> Self {
@@ -127,7 +127,7 @@ impl<'a> GetBuilder<'a> {
     /// Add a JOIN with an explicit alias for the target table.
     pub fn join_aliased(
         mut self,
-        join_type: JoinType,
+        join_type: JoinKind,
         target: &Entity,
         alias: &str,
         on_conditions: &[(&str, &str)],
@@ -147,22 +147,22 @@ impl<'a> GetBuilder<'a> {
 
     /// Shorthand for `INNER JOIN`.
     pub fn inner_join(self, target: &Entity, on_conditions: &[(&str, &str)]) -> Self {
-        self.join(JoinType::Inner, target, on_conditions)
+        self.join(JoinKind::Inner, target, on_conditions)
     }
 
     /// Shorthand for `LEFT JOIN`.
     pub fn left_join(self, target: &Entity, on_conditions: &[(&str, &str)]) -> Self {
-        self.join(JoinType::Left, target, on_conditions)
+        self.join(JoinKind::Left, target, on_conditions)
     }
 
     /// Shorthand for `RIGHT JOIN`.
     pub fn right_join(self, target: &Entity, on_conditions: &[(&str, &str)]) -> Self {
-        self.join(JoinType::Right, target, on_conditions)
+        self.join(JoinKind::Right, target, on_conditions)
     }
 
     /// Shorthand for `FULL OUTER JOIN`.
     pub fn full_join(self, target: &Entity, on_conditions: &[(&str, &str)]) -> Self {
-        self.join(JoinType::Full, target, on_conditions)
+        self.join(JoinKind::Full, target, on_conditions)
     }
 
     // ── Filter methods ──────────────────────────────────────────────────
@@ -183,18 +183,36 @@ impl<'a> GetBuilder<'a> {
         self
     }
 
-    // ── GROUP BY / HAVING ───────────────────────────────────────────────
+    // ── Aggregation ─────────────────────────────────────────────────────
 
-    /// Set the GROUP BY columns.
-    pub fn group_by(mut self, columns: &[&str]) -> Self {
-        self.group_by = columns.iter().map(|c| field(c)).collect();
+    /// Set the fields to group by in aggregation queries.
+    ///
+    /// In SQL-backed stores this maps to GROUP BY; in document stores it
+    /// drives aggregation pipeline grouping.
+    pub fn aggregate_by(mut self, columns: &[&str]) -> Self {
+        self.group_by = columns.iter().map(|c| field_dyn(c)).collect();
         self
     }
 
-    /// Add a HAVING filter expression.
-    pub fn having(mut self, expr: Expr<'static>) -> Self {
+    #[deprecated(note = "use `aggregate_by()`")]
+    #[inline]
+    pub fn group_by(self, columns: &[&str]) -> Self {
+        self.aggregate_by(columns)
+    }
+
+    /// Add a post-aggregation filter expression.
+    ///
+    /// In SQL-backed stores this maps to HAVING; in document stores it
+    /// applies after the grouping stage.
+    pub fn aggregate_filter(mut self, expr: Expr<'static>) -> Self {
         self.having.push(expr);
         self
+    }
+
+    #[deprecated(note = "use `aggregate_filter()`")]
+    #[inline]
+    pub fn having(self, expr: Expr<'static>) -> Self {
+        self.aggregate_filter(expr)
     }
 
     // ── ORDER BY ────────────────────────────────────────────────────────
@@ -202,7 +220,7 @@ impl<'a> GetBuilder<'a> {
     /// Add `column DESC` to the ORDER BY clause.
     pub fn order_by_desc(mut self, column: &str) -> Self {
         self.order_by.push(OrderByExpr {
-            expr: field(column),
+            expr: field_dyn(column),
             direction: Direction::Desc,
             nulls: None,
         });
@@ -212,7 +230,7 @@ impl<'a> GetBuilder<'a> {
     /// Add `column ASC` to the ORDER BY clause.
     pub fn order_by_asc(mut self, column: &str) -> Self {
         self.order_by.push(OrderByExpr {
-            expr: field(column),
+            expr: field_dyn(column),
             direction: Direction::Asc,
             nulls: None,
         });
@@ -227,7 +245,7 @@ impl<'a> GetBuilder<'a> {
         nulls: Option<NullsPosition>,
     ) -> Self {
         self.order_by.push(OrderByExpr {
-            expr: field(column),
+            expr: field_dyn(column),
             direction,
             nulls,
         });
@@ -254,33 +272,65 @@ impl<'a> GetBuilder<'a> {
         self
     }
 
-    // ── DISTINCT ────────────────────────────────────────────────────────
+    // ── Deduplication ───────────────────────────────────────────────────
 
-    /// Enable `SELECT DISTINCT`.
-    pub fn distinct(mut self) -> Self {
+    /// Eliminate duplicate result rows.
+    ///
+    /// In SQL-backed stores this maps to SELECT DISTINCT.
+    pub fn deduplicate(mut self) -> Self {
         self.distinct = true;
         self
     }
 
-    /// Enable `SELECT DISTINCT ON (columns)` (PostgreSQL-specific).
-    pub fn distinct_on(mut self, columns: &[&str]) -> Self {
+    #[deprecated(note = "use `deduplicate()`")]
+    #[inline]
+    pub fn distinct(self) -> Self {
+        self.deduplicate()
+    }
+
+    /// Eliminate duplicates based on specified columns (backend-specific).
+    ///
+    /// In PostgreSQL this maps to SELECT DISTINCT ON (columns).
+    pub fn deduplicate_on(mut self, columns: &[&str]) -> Self {
         self.distinct = true;
         self.distinct_on = columns.iter().map(|c| c.to_string()).collect();
         self
     }
 
+    #[deprecated(note = "use `deduplicate_on()`")]
+    #[inline]
+    pub fn distinct_on(self, columns: &[&str]) -> Self {
+        self.deduplicate_on(columns)
+    }
+
     // ── Row-level locking ───────────────────────────────────────────────
 
-    /// Add `FOR UPDATE` locking.
-    pub fn for_update(mut self) -> Self {
+    /// Acquire an exclusive row-level lock on matched rows.
+    ///
+    /// In SQL-backed stores this maps to FOR UPDATE.
+    pub fn lock_exclusive(mut self) -> Self {
         self.lock_mode = Some(LockMode::ForUpdate);
         self
     }
 
-    /// Add `FOR SHARE` locking.
-    pub fn for_share(mut self) -> Self {
+    #[deprecated(note = "use `lock_exclusive()`")]
+    #[inline]
+    pub fn for_update(self) -> Self {
+        self.lock_exclusive()
+    }
+
+    /// Acquire a shared row-level lock on matched rows.
+    ///
+    /// In SQL-backed stores this maps to FOR SHARE.
+    pub fn lock_shared(mut self) -> Self {
         self.lock_mode = Some(LockMode::ForShare);
         self
+    }
+
+    #[deprecated(note = "use `lock_shared()`")]
+    #[inline]
+    pub fn for_share(self) -> Self {
+        self.lock_shared()
     }
 
     /// Set an arbitrary [`LockMode`].
@@ -316,11 +366,11 @@ impl<'a> GetBuilder<'a> {
 
     // ── Build to IR ─────────────────────────────────────────────────────
 
-    /// Consume the builder and produce a [`QueryIR`].
+    /// Consume the builder and produce a [`Query`].
     ///
     /// When no projections have been set (via `.fields()`, `.field()`,
     /// etc.), all entity fields are selected by default.
-    pub fn build(self) -> QueryIR<'a> {
+    pub fn build(self) -> Query<'a> {
         let source = EntityRef {
             name: self.model.name.to_string(),
             namespace: self.model.namespace.map(|s| s.to_string()),
@@ -330,7 +380,7 @@ impl<'a> GetBuilder<'a> {
         let joins = self
             .joins
             .into_iter()
-            .map(|jc| JoinIR {
+            .map(|jc| Join {
                 join_type: jc.join_type,
                 target: EntityRef {
                     name: jc.model_name,
@@ -358,13 +408,13 @@ impl<'a> GetBuilder<'a> {
             self.model
                 .fields
                 .iter()
-                .map(|f| Expr::Identifier(f.name.to_string()))
+                .map(|f| field_dyn(f.name))
                 .collect()
         } else {
             self.projections
         };
 
-        QueryIR {
+        Query {
             source,
             projections,
             joins,
@@ -396,8 +446,6 @@ pub(crate) fn count_single_expr_params(expr: &Expr<'static>) -> usize {
 
         Expr::UnaryOp { expr, .. } => count_single_expr_params(expr),
 
-        Expr::IsNull { expr, .. } => count_single_expr_params(expr),
-
         Expr::Func { args, .. } => args.iter().map(count_single_expr_params).sum(),
 
         Expr::Cast { expr, .. } => count_single_expr_params(expr),
@@ -427,10 +475,6 @@ pub(crate) fn count_single_expr_params(expr: &Expr<'static>) -> usize {
                 + count_single_expr_params(high)
         }
 
-        Expr::InSubquery { expr, .. } => count_single_expr_params(expr),
-
-        Expr::Alias { expr, .. } => count_single_expr_params(expr),
-
         Expr::Window {
             func,
             partition_by,
@@ -448,27 +492,16 @@ pub(crate) fn count_single_expr_params(expr: &Expr<'static>) -> usize {
                     .sum::<usize>()
         }
 
-        Expr::FieldAccess { base, .. } => count_single_expr_params(base),
+        Expr::Alias { expr, .. } => count_single_expr_params(expr),
 
-        Expr::TernaryOp {
-            expr,
-            first,
-            second,
-            ..
-        } => {
-            count_single_expr_params(expr)
-                + count_single_expr_params(first)
-                + count_single_expr_params(second)
-        }
+        Expr::Access { base, .. } => count_single_expr_params(base),
 
-        Expr::QuantifiedCmp { expr, .. } => count_single_expr_params(expr),
-
-        Expr::ObjectLiteral(fields) => fields
+        Expr::Object(fields) => fields
             .iter()
             .map(|(_, v)| count_single_expr_params(v))
             .sum(),
 
-        Expr::ArrayLiteral(elements) => elements.iter().map(count_single_expr_params).sum(),
+        Expr::Array(elements) => elements.iter().map(count_single_expr_params).sum(),
 
         _ => 0,
     }
