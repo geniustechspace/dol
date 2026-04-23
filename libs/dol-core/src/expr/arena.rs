@@ -15,6 +15,8 @@
 //! let node = arena.get(root);  // ExprNode::BinaryOp { … }
 //! ```
 
+use smallvec::SmallVec;
+
 use super::func_meta::FuncDef;
 use super::interner::{Interner, StrId};
 use super::node::{
@@ -28,6 +30,14 @@ use super::Expr;
 /// reference.
 ///
 /// All indices ([`NodeId`], [`OpId`], [`FuncId`]) are scoped to this arena.
+///
+/// # Reuse
+///
+/// Call [`reset`](ExprArena::reset) to clear the arena while retaining its
+/// allocated backing storage, then lower a new expression into it.  This is
+/// used internally by [`BuildSession`](crate::session::BuildSession) to avoid
+/// repeated heap allocations during multi-clause validation.
+#[derive(Debug, Clone)]
 pub struct ExprArena {
     nodes: Vec<ExprNode>,
     ops:   Vec<OpDef>,
@@ -38,6 +48,29 @@ impl ExprArena {
     /// Create an empty arena.
     pub fn new() -> Self {
         Self { nodes: Vec::new(), ops: Vec::new(), funcs: Vec::new() }
+    }
+
+    /// Create an arena with pre-allocated capacity for `nodes` node slots.
+    ///
+    /// Op and function tables default to small initial capacities since they
+    /// are deduplicated and rarely exceed 30 entries.
+    pub fn with_capacity(nodes: usize) -> Self {
+        Self {
+            nodes: Vec::with_capacity(nodes),
+            ops:   Vec::with_capacity(16),
+            funcs: Vec::with_capacity(16),
+        }
+    }
+
+    /// Clear all nodes, operators, and functions while retaining allocated
+    /// storage.
+    ///
+    /// After `reset()` the arena behaves as if freshly created but the backing
+    /// `Vec` memory is reused for the next lowering pass.
+    pub fn reset(&mut self) {
+        self.nodes.clear();
+        self.ops.clear();
+        self.funcs.clear();
     }
 
     // ── Read access ──────────────────────────────────────────────────────────
@@ -96,13 +129,13 @@ impl ExprArena {
             Expr::Value(lit) => ExprNode::Value(lit.clone().into_static()),
 
             Expr::Array(elements) => {
-                let ids: Vec<NodeId> =
+                let ids: SmallVec<[NodeId; 4]> =
                     elements.iter().map(|e| self.lower(e, interner)).collect();
                 ExprNode::Array(ids)
             }
 
             Expr::Object(fields) => {
-                let pairs: Vec<(StrId, NodeId)> = fields
+                let pairs: SmallVec<[(StrId, NodeId); 2]> = fields
                     .iter()
                     .map(|(k, v)| {
                         let kid = interner.intern(k.as_str());
@@ -147,7 +180,7 @@ impl ExprArena {
 
             Expr::Func { name, args } => {
                 let fid = self.intern_func(name);
-                let arg_ids: Vec<NodeId> =
+                let arg_ids: SmallVec<[NodeId; 4]> =
                     args.iter().map(|a| self.lower(a, interner)).collect();
                 ExprNode::Func(Box::new(FuncNode { id: fid, args: arg_ids }))
             }
@@ -161,7 +194,7 @@ impl ExprArena {
             }
 
             Expr::Case { whens, else_expr } => {
-                let when_ids: Vec<(NodeId, NodeId)> = whens
+                let when_ids: SmallVec<[(NodeId, NodeId); 2]> = whens
                     .iter()
                     .map(|(c, t)| (self.lower(c, interner), self.lower(t, interner)))
                     .collect();
@@ -193,8 +226,9 @@ impl ExprArena {
 
             Expr::Window { func, partition_by, order_by, frame } => {
                 let fid  = self.lower(func, interner);
-                let part = partition_by.iter().map(|e| self.lower(e, interner)).collect();
-                let ord: Vec<ArenaOrderBy> = order_by
+                let part: SmallVec<[NodeId; 3]> =
+                    partition_by.iter().map(|e| self.lower(e, interner)).collect();
+                let ord: SmallVec<[ArenaOrderBy; 2]> = order_by
                     .iter()
                     .map(|ob| ArenaOrderBy {
                         expr:      self.lower(&ob.expr, interner),

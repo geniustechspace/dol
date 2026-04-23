@@ -16,6 +16,7 @@
 pub mod constraint;
 pub mod expr;
 pub mod op;
+pub mod session;
 pub mod types;
 
 // ── Top-level convenience re-exports ──

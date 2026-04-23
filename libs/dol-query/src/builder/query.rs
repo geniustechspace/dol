@@ -183,18 +183,36 @@ impl<'a> GetBuilder<'a> {
         self
     }
 
-    // ── GROUP BY / HAVING ───────────────────────────────────────────────
+    // ── Aggregation ─────────────────────────────────────────────────────
 
-    /// Set the GROUP BY columns.
-    pub fn group_by(mut self, columns: &[&str]) -> Self {
+    /// Set the fields to group by in aggregation queries.
+    ///
+    /// In SQL-backed stores this maps to GROUP BY; in document stores it
+    /// drives aggregation pipeline grouping.
+    pub fn aggregate_by(mut self, columns: &[&str]) -> Self {
         self.group_by = columns.iter().map(|c| field_dyn(c)).collect();
         self
     }
 
-    /// Add a HAVING filter expression.
-    pub fn having(mut self, expr: Expr<'static>) -> Self {
+    #[deprecated(note = "use `aggregate_by()`")]
+    #[inline]
+    pub fn group_by(self, columns: &[&str]) -> Self {
+        self.aggregate_by(columns)
+    }
+
+    /// Add a post-aggregation filter expression.
+    ///
+    /// In SQL-backed stores this maps to HAVING; in document stores it
+    /// applies after the grouping stage.
+    pub fn aggregate_filter(mut self, expr: Expr<'static>) -> Self {
         self.having.push(expr);
         self
+    }
+
+    #[deprecated(note = "use `aggregate_filter()`")]
+    #[inline]
+    pub fn having(self, expr: Expr<'static>) -> Self {
+        self.aggregate_filter(expr)
     }
 
     // ── ORDER BY ────────────────────────────────────────────────────────
@@ -254,33 +272,65 @@ impl<'a> GetBuilder<'a> {
         self
     }
 
-    // ── DISTINCT ────────────────────────────────────────────────────────
+    // ── Deduplication ───────────────────────────────────────────────────
 
-    /// Enable `SELECT DISTINCT`.
-    pub fn distinct(mut self) -> Self {
+    /// Eliminate duplicate result rows.
+    ///
+    /// In SQL-backed stores this maps to SELECT DISTINCT.
+    pub fn deduplicate(mut self) -> Self {
         self.distinct = true;
         self
     }
 
-    /// Enable `SELECT DISTINCT ON (columns)` (PostgreSQL-specific).
-    pub fn distinct_on(mut self, columns: &[&str]) -> Self {
+    #[deprecated(note = "use `deduplicate()`")]
+    #[inline]
+    pub fn distinct(self) -> Self {
+        self.deduplicate()
+    }
+
+    /// Eliminate duplicates based on specified columns (backend-specific).
+    ///
+    /// In PostgreSQL this maps to SELECT DISTINCT ON (columns).
+    pub fn deduplicate_on(mut self, columns: &[&str]) -> Self {
         self.distinct = true;
         self.distinct_on = columns.iter().map(|c| c.to_string()).collect();
         self
     }
 
+    #[deprecated(note = "use `deduplicate_on()`")]
+    #[inline]
+    pub fn distinct_on(self, columns: &[&str]) -> Self {
+        self.deduplicate_on(columns)
+    }
+
     // ── Row-level locking ───────────────────────────────────────────────
 
-    /// Add `FOR UPDATE` locking.
-    pub fn for_update(mut self) -> Self {
+    /// Acquire an exclusive row-level lock on matched rows.
+    ///
+    /// In SQL-backed stores this maps to FOR UPDATE.
+    pub fn lock_exclusive(mut self) -> Self {
         self.lock_mode = Some(LockMode::ForUpdate);
         self
     }
 
-    /// Add `FOR SHARE` locking.
-    pub fn for_share(mut self) -> Self {
+    #[deprecated(note = "use `lock_exclusive()`")]
+    #[inline]
+    pub fn for_update(self) -> Self {
+        self.lock_exclusive()
+    }
+
+    /// Acquire a shared row-level lock on matched rows.
+    ///
+    /// In SQL-backed stores this maps to FOR SHARE.
+    pub fn lock_shared(mut self) -> Self {
         self.lock_mode = Some(LockMode::ForShare);
         self
+    }
+
+    #[deprecated(note = "use `lock_shared()`")]
+    #[inline]
+    pub fn for_share(self) -> Self {
+        self.lock_shared()
     }
 
     /// Set an arbitrary [`LockMode`].

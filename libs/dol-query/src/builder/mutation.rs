@@ -60,16 +60,28 @@ impl<'a> InsertBuilder<'a> {
         self
     }
 
-    /// Add `RETURNING *`.
-    pub fn returning_all(mut self) -> Self {
+    /// Return all columns from the affected rows.
+    pub fn output_all(mut self) -> Self {
         self.returning = vec!["*".to_string()];
         self
     }
 
-    /// Specify columns to return.
-    pub fn returning(mut self, cols: &[&str]) -> Self {
+    #[deprecated(note = "use `output_all()`")]
+    #[inline]
+    pub fn returning_all(self) -> Self {
+        self.output_all()
+    }
+
+    /// Return specific columns from the affected rows.
+    pub fn output(mut self, cols: &[&str]) -> Self {
         self.returning = cols.iter().map(|s| s.to_string()).collect();
         self
+    }
+
+    #[deprecated(note = "use `output()`")]
+    #[inline]
+    pub fn returning(self, cols: &[&str]) -> Self {
+        self.output(cols)
     }
 
     /// Total bind-parameter count for this INSERT.
@@ -139,16 +151,28 @@ impl<'a> InsertSelectBuilder<'a> {
         self
     }
 
-    /// Specify columns to return.
-    pub fn returning(mut self, cols: &[&str]) -> Self {
+    /// Return specific columns from the affected rows.
+    pub fn output(mut self, cols: &[&str]) -> Self {
         self.returning = cols.iter().map(|s| s.to_string()).collect();
         self
     }
 
-    /// Add `RETURNING *`.
-    pub fn returning_all(mut self) -> Self {
+    #[deprecated(note = "use `output()`")]
+    #[inline]
+    pub fn returning(self, cols: &[&str]) -> Self {
+        self.output(cols)
+    }
+
+    /// Return all columns from the affected rows.
+    pub fn output_all(mut self) -> Self {
         self.returning = vec!["*".to_string()];
         self
+    }
+
+    #[deprecated(note = "use `output_all()`")]
+    #[inline]
+    pub fn returning_all(self) -> Self {
+        self.output_all()
     }
 
     /// Build the canonical [`InsertSelect`].
@@ -223,16 +247,28 @@ impl<'a> UpdateBuilder<'a> {
         self
     }
 
-    /// Add `RETURNING *`.
-    pub fn returning_all(mut self) -> Self {
+    /// Return all columns from the affected rows.
+    pub fn output_all(mut self) -> Self {
         self.returning = vec!["*".to_string()];
         self
     }
 
-    /// Specify columns to return.
-    pub fn returning(mut self, cols: &[&str]) -> Self {
+    #[deprecated(note = "use `output_all()`")]
+    #[inline]
+    pub fn returning_all(self) -> Self {
+        self.output_all()
+    }
+
+    /// Return specific columns from the affected rows.
+    pub fn output(mut self, cols: &[&str]) -> Self {
         self.returning = cols.iter().map(|s| s.to_string()).collect();
         self
+    }
+
+    #[deprecated(note = "use `output()`")]
+    #[inline]
+    pub fn returning(self, cols: &[&str]) -> Self {
+        self.output(cols)
     }
 
     /// Total bind-parameter count for this UPDATE.
@@ -287,16 +323,28 @@ impl<'a> RemoveBuilder<'a> {
         self
     }
 
-    /// Add `RETURNING *`.
-    pub fn returning_all(mut self) -> Self {
+    /// Return all columns from the affected rows.
+    pub fn output_all(mut self) -> Self {
         self.returning = vec!["*".to_string()];
         self
     }
 
-    /// Specify columns to return.
-    pub fn returning(mut self, cols: &[&str]) -> Self {
+    #[deprecated(note = "use `output_all()`")]
+    #[inline]
+    pub fn returning_all(self) -> Self {
+        self.output_all()
+    }
+
+    /// Return specific columns from the affected rows.
+    pub fn output(mut self, cols: &[&str]) -> Self {
         self.returning = cols.iter().map(|s| s.to_string()).collect();
         self
+    }
+
+    #[deprecated(note = "use `output()`")]
+    #[inline]
+    pub fn returning(self, cols: &[&str]) -> Self {
+        self.output(cols)
     }
 
     /// Total bind-parameter count for this DELETE.
@@ -352,49 +400,100 @@ impl<'a> UpsertBuilder<'a> {
         self
     }
 
-    /// Set the conflict target columns: `ON CONFLICT (col1, col2)`.
-    pub fn on_conflict(mut self, cols: &[&str]) -> Self {
+    /// Set the conflict target columns.
+    ///
+    /// In SQL-backed stores this maps to `ON CONFLICT (col1, col2)`.
+    pub fn match_on(mut self, cols: &[&str]) -> Self {
         self.conflict_fields = cols.iter().map(|s| s.to_string()).collect();
         self
     }
 
-    /// Set the conflict target to a named constraint: `ON CONFLICT ON CONSTRAINT name`.
-    pub fn on_conflict_constraint(mut self, name: &str) -> Self {
+    #[deprecated(note = "use `match_on()`")]
+    #[inline]
+    pub fn on_conflict(self, cols: &[&str]) -> Self {
+        self.match_on(cols)
+    }
+
+    /// Set the conflict target to a named constraint.
+    ///
+    /// In SQL-backed stores this maps to `ON CONFLICT ON CONSTRAINT name`.
+    pub fn match_constraint(mut self, name: &str) -> Self {
         self.conflict_constraint = Some(name.to_string());
         self
     }
 
-    /// Set the columns to update on conflict: `DO UPDATE SET col = EXCLUDED.col`.
-    pub fn do_update(mut self, cols: &[&str]) -> Self {
+    #[deprecated(note = "use `match_constraint()`")]
+    #[inline]
+    pub fn on_conflict_constraint(self, name: &str) -> Self {
+        self.match_constraint(name)
+    }
+
+    /// Set the columns to update on conflict.
+    ///
+    /// In SQL-backed stores this maps to `DO UPDATE SET col = EXCLUDED.col`.
+    pub fn patch(mut self, cols: &[&str]) -> Self {
         self.update_fields = cols.iter().map(|s| s.to_string()).collect();
         self.do_nothing_flag = false;
         self
     }
 
-    /// Use `DO NOTHING` on conflict.
-    pub fn do_nothing(mut self) -> Self {
+    #[deprecated(note = "use `patch()`")]
+    #[inline]
+    pub fn do_update(self, cols: &[&str]) -> Self {
+        self.patch(cols)
+    }
+
+    /// Ignore the row silently on conflict.
+    ///
+    /// In SQL-backed stores this maps to `DO NOTHING`.
+    pub fn skip_on_match(mut self) -> Self {
         self.do_nothing_flag = true;
         self.update_fields.clear();
         self
     }
 
-    /// Specify columns to return.
-    pub fn returning(mut self, cols: &[&str]) -> Self {
+    #[deprecated(note = "use `skip_on_match()`")]
+    #[inline]
+    pub fn do_nothing(self) -> Self {
+        self.skip_on_match()
+    }
+
+    /// Return specific columns from the affected rows.
+    pub fn output(mut self, cols: &[&str]) -> Self {
         self.returning = cols.iter().map(|s| s.to_string()).collect();
         self
     }
 
-    /// Add `RETURNING *`.
-    pub fn returning_all(mut self) -> Self {
+    #[deprecated(note = "use `output()`")]
+    #[inline]
+    pub fn returning(self, cols: &[&str]) -> Self {
+        self.output(cols)
+    }
+
+    /// Return all columns from the affected rows.
+    pub fn output_all(mut self) -> Self {
         self.returning = vec!["*".to_string()];
         self
     }
 
-    /// Add a filter expression to the conflict's WHERE clause
-    /// (the WHERE that qualifies the DO UPDATE SET).
-    pub fn conflict_filter(mut self, expr: Expr<'static>) -> Self {
+    #[deprecated(note = "use `output_all()`")]
+    #[inline]
+    pub fn returning_all(self) -> Self {
+        self.output_all()
+    }
+
+    /// Add a filter expression that qualifies the conflict update action.
+    ///
+    /// In SQL-backed stores this maps to the WHERE clause inside `DO UPDATE SET`.
+    pub fn match_filter(mut self, expr: Expr<'static>) -> Self {
         self.conflict_filters.push(expr);
         self
+    }
+
+    #[deprecated(note = "use `match_filter()`")]
+    #[inline]
+    pub fn conflict_filter(self, expr: Expr<'static>) -> Self {
+        self.match_filter(expr)
     }
 
     /// Total bind-parameter count for this UPSERT.

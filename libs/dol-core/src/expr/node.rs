@@ -51,10 +51,14 @@ pub type PathIds = SmallVec<[StrId; 3]>;
 // ─── Boxed payloads for large variants ───────────────────────────────────────
 
 /// Payload for [`ExprNode::Func`] — boxed to keep `ExprNode` ≤ 48 bytes.
+///
+/// `args` uses `SmallVec<[NodeId; 4]>`: functions with ≤ 4 arguments (the
+/// overwhelming majority) require no heap allocation; the `SmallVec` itself
+/// is the same 24 bytes as a `Vec`, so `FuncNode`'s size is unchanged.
 #[derive(Debug, Clone)]
 pub struct FuncNode {
     pub id:   FuncId,
-    pub args: Vec<NodeId>,
+    pub args: SmallVec<[NodeId; 4]>,
 }
 
 /// Payload for [`ExprNode::Cast`] — boxed to keep `ExprNode` ≤ 48 bytes.
@@ -65,9 +69,13 @@ pub struct CastNode {
 }
 
 /// Payload for [`ExprNode::Case`] — boxed to keep `ExprNode` ≤ 48 bytes.
+///
+/// `whens` uses `SmallVec<[(NodeId, NodeId); 2]>`: CASE expressions with ≤ 2
+/// WHEN branches (the common case) avoid a heap allocation; size is
+/// unchanged at 24 bytes.
 #[derive(Debug, Clone)]
 pub struct CaseNode {
-    pub whens:     Vec<(NodeId, NodeId)>,
+    pub whens:     SmallVec<[(NodeId, NodeId); 2]>,
     pub else_expr: Option<NodeId>,
 }
 
@@ -80,11 +88,15 @@ pub struct ArenaOrderBy {
 }
 
 /// Payload for [`ExprNode::Window`] — boxed to keep `ExprNode` ≤ 48 bytes.
+///
+/// Both `partition_by` and `order_by` use `SmallVec` with small inline
+/// capacities: window functions typically partition on 1–3 keys and sort on
+/// 1–2 keys, so the common case is allocation-free.
 #[derive(Debug, Clone)]
 pub struct WindowNode {
     pub func:         NodeId,
-    pub partition_by: Vec<NodeId>,
-    pub order_by:     Vec<ArenaOrderBy>,
+    pub partition_by: SmallVec<[NodeId; 3]>,
+    pub order_by:     SmallVec<[ArenaOrderBy; 2]>,
     pub frame:        Option<WindowFrame>,
 }
 
@@ -121,10 +133,16 @@ pub enum ExprNode {
     Value(Literal<'static>),
 
     /// An array literal.
-    Array(Vec<NodeId>),
+    ///
+    /// Uses `SmallVec<[NodeId; 4]>` (same 24-byte footprint as `Vec`) to
+    /// avoid heap allocation for arrays of ≤ 4 elements.
+    Array(SmallVec<[NodeId; 4]>),
 
     /// An object / map literal: interned key ids + child node ids.
-    Object(Vec<(StrId, NodeId)>),
+    ///
+    /// Uses `SmallVec` with 2 inline slots — small literal objects (the common
+    /// case) are allocation-free.
+    Object(SmallVec<[(StrId, NodeId); 2]>),
 
     // ── Operations ───────────────────────────────────────────────────────────
 

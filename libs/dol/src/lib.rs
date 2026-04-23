@@ -162,7 +162,9 @@ pub use dol_sql::ext::TransactionRender;
 // Re-export CompoundSelectBuilder (moved from dol-builder to dol-sql).
 pub use dol_sql::ext::CompoundSelectBuilder;
 
-// Re-export GetBuilderSqlExt for union/intersect/except/as_scalar on GetBuilder.
+// Re-export GetBuilderSetOps for union/intersect/except on GetBuilder.
+pub use dol_sql::ext::GetBuilderSetOps;
+#[allow(deprecated)]
 pub use dol_sql::ext::GetBuilderSqlExt;
 
 #[cfg(test)]

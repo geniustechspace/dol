@@ -17,6 +17,14 @@ pub struct StrId(pub(crate) u32);
 ///
 /// Strings are stored as `Box<str>` in stable order; the index is their
 /// position in the insertion-ordered `strings` vec.
+///
+/// # Reuse
+///
+/// Call [`reset`](Interner::reset) to clear all entries while keeping the
+/// allocated backing storage. This is cheaper than dropping and recreating the
+/// interner when the same instance is reused across multiple validation calls
+/// (e.g. inside [`BuildSession`](crate::session::BuildSession)).
+#[derive(Debug, Clone)]
 pub struct Interner {
     strings: Vec<Box<str>>,
     map:     HashMap<Box<str>, StrId>,
@@ -26,6 +34,25 @@ impl Interner {
     /// Create an empty interner.
     pub fn new() -> Self {
         Self { strings: Vec::new(), map: HashMap::new() }
+    }
+
+    /// Create an interner with pre-allocated capacity for `n` distinct strings.
+    ///
+    /// Avoids resizes when an upper bound on distinct names is known.
+    pub fn with_capacity(n: usize) -> Self {
+        Self {
+            strings: Vec::with_capacity(n),
+            map:     HashMap::with_capacity(n),
+        }
+    }
+
+    /// Clear all interned strings while retaining the allocated backing storage.
+    ///
+    /// After `reset()` the interner behaves as if newly created, but existing
+    /// `Vec` and `HashMap` allocations are reused.
+    pub fn reset(&mut self) {
+        self.strings.clear();
+        self.map.clear();
     }
 
     /// Intern a string, returning its [`StrId`].
