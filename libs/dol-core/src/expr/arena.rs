@@ -121,6 +121,26 @@ impl ExprArena {
             }
 
             Expr::UnaryOp { op, expr: inner } => {
+                use super::ops::UnaryOp;
+                // Canonicalise NOT(InList) → NotInList and NOT(Between) → NotBetween
+                // so the post-order scan doesn't need look-ahead.
+                if *op == UnaryOp::Not {
+                    match inner.as_ref() {
+                        Expr::InList { expr, list } => {
+                            let eid = self.lower(expr, interner);
+                            let ids: Vec<NodeId> =
+                                list.iter().map(|e| self.lower(e, interner)).collect();
+                            return self.push(ExprNode::NotInList { expr: eid, list: ids });
+                        }
+                        Expr::Between { expr, low, high } => {
+                            let eid = self.lower(expr, interner);
+                            let lid = self.lower(low,  interner);
+                            let hid = self.lower(high, interner);
+                            return self.push(ExprNode::NotBetween { expr: eid, low: lid, high: hid });
+                        }
+                        _ => {}
+                    }
+                }
                 let inner_id = self.lower(inner, interner);
                 ExprNode::UnaryOp { op: *op, expr: inner_id }
             }

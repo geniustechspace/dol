@@ -152,8 +152,23 @@ pub enum ExprNode {
     /// `expr BETWEEN low AND high`.
     Between { expr: NodeId, low: NodeId, high: NodeId },
 
+    /// `expr NOT BETWEEN low AND high` — canonical arena form.
+    ///
+    /// Produced by [`lower()`] when it encounters `NOT(Between(…))`, avoiding
+    /// the look-ahead required in a post-order scan.
+    ///
+    /// [`lower()`]: super::arena::ExprArena::lower
+    NotBetween { expr: NodeId, low: NodeId, high: NodeId },
+
     /// `expr IN (list)`.
     InList { expr: NodeId, list: Vec<NodeId> },
+
+    /// `expr NOT IN (list)` — canonical arena form.
+    ///
+    /// Produced by [`lower()`] when it encounters `NOT(InList(…))`.
+    ///
+    /// [`lower()`]: super::arena::ExprArena::lower
+    NotInList { expr: NodeId, list: Vec<NodeId> },
 
     // ── Decoration ───────────────────────────────────────────────────────────
 

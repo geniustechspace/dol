@@ -447,3 +447,194 @@ fn render_frame_bound(bound: &FrameBound) -> String {
         FrameBound::UnboundedFollowing => "UNBOUNDED FOLLOWING".to_string(),
     }
 }
+
+// ── Iterative arena renderer ──────────────────────────────────────────────────
+
+/// Render a lowered expression tree using an iterative post-order scan.
+///
+/// Because [`ExprArena::lower`] inserts nodes in post-order (children at
+/// smaller indices than their parents), a single forward pass over nodes
+/// `0..=root.0` is sufficient: when processing node `i`, all children have
+/// already been rendered and their strings are available in `rendered[child.0]`.
+///
+/// This replaces the recursive `compile_expr` path for arena-lowered
+/// expressions.  The [`ExprRenderer`] trait interface is identical — backends
+/// work without modification.
+///
+/// [`ExprArena::lower`]: super::arena::ExprArena::lower
+pub fn render_arena<R: ExprRenderer + ?Sized>(
+    renderer: &mut R,
+    arena:    &crate::expr::arena::ExprArena,
+    interner: &crate::expr::interner::Interner,
+    root:     crate::expr::node::NodeId,
+) -> Result<String, BackendError> {
+    use crate::expr::node::NodeId;
+
+    let limit = root.0 as usize + 1;
+    let mut rendered: Vec<Option<String>> = vec![None; limit];
+
+    for idx in 0..limit {
+        let id  = NodeId(idx as u32);
+        let s = render_arena_node(renderer, arena, interner, id, &mut rendered)?;
+        rendered[idx] = Some(s);
+    }
+
+    rendered[root.0 as usize]
+        .take()
+        .ok_or_else(|| BackendError::Render("root node not rendered".into()))
+}
+
+/// Render a single arena node whose children are already in `rendered`.
+fn render_arena_node<R: ExprRenderer + ?Sized>(
+    renderer: &mut R,
+    arena:    &crate::expr::arena::ExprArena,
+    interner: &crate::expr::interner::Interner,
+    id:       crate::expr::node::NodeId,
+    rendered: &mut Vec<Option<String>>,
+) -> Result<String, BackendError> {
+    use crate::expr::node::{ExprNode, NodeId};
+    use super::order::Direction;
+
+    #[inline(always)]
+    fn get<'r>(rendered: &'r [Option<String>], child: NodeId) -> &'r str {
+        rendered[child.0 as usize]
+            .as_deref()
+            .expect("arena child rendered before parent (post-order guarantee)")
+    }
+
+    let node = arena.get(id);
+    match node {
+        ExprNode::Ref(path_ids) => {
+            let segs: Vec<&str> = path_ids.iter().map(|&s| interner.get(s)).collect();
+            renderer.render_ref(&segs)
+        }
+
+        ExprNode::Access { base, path } => {
+            let (base_id, path_ids) = (*base, path.clone());
+            let base_str = get(rendered, base_id).to_owned();
+            let segs: Vec<&str> = path_ids.iter().map(|&s| interner.get(s)).collect();
+            renderer.render_access(&base_str, &segs)
+        }
+
+        ExprNode::Param => renderer.render_param(),
+
+        ExprNode::Value(lit) => renderer.render_literal(lit),
+
+        ExprNode::Array(child_ids) => {
+            let ids = child_ids.clone();
+            let items: Vec<String> = ids.iter().map(|&c| get(rendered, c).to_owned()).collect();
+            renderer.render_array_literal(&items)
+        }
+
+        ExprNode::Object(pairs) => {
+            let pairs = pairs.clone();
+            let kv: Vec<(&str, String)> = pairs
+                .iter()
+                .map(|(kid, vid)| (interner.get(*kid), get(rendered, *vid).to_owned()))
+                .collect();
+            renderer.render_object_literal(&kv)
+        }
+
+        ExprNode::BinaryOp { left, op, right } => {
+            let (l, o, r_id) = (*left, *op, *right);
+            let lhs = get(rendered, l).to_owned();
+            let rhs = get(rendered, r_id).to_owned();
+            renderer.render_binary_op(&lhs, arena.op(o), &rhs)
+        }
+
+        ExprNode::UnaryOp { op, expr } => {
+            let (op, inner_id) = (*op, *expr);
+            let inner = get(rendered, inner_id).to_owned();
+            renderer.render_unary_op(op, &inner)
+        }
+
+        ExprNode::Func(func_node) => {
+            let (func_id, arg_ids) = (func_node.id, func_node.args.clone());
+            let def = arena.func(func_id);
+            if let Err(e) = def.validate_arity(arg_ids.len()) {
+                return Err(BackendError::Validation(e.to_string()));
+            }
+            let args: Vec<String> = arg_ids.iter().map(|&a| get(rendered, a).to_owned()).collect();
+            renderer.render_func(def, &args)
+        }
+
+        ExprNode::Cast(cast_node) => {
+            let (expr_id, as_type) = (cast_node.expr, cast_node.as_type.clone());
+            let inner = get(rendered, expr_id).to_owned();
+            renderer.render_cast(&inner, &as_type)
+        }
+
+        ExprNode::Case(case_node) => {
+            let (when_ids, else_id) = (case_node.whens.clone(), case_node.else_expr);
+            let whens: Vec<(String, String)> = when_ids
+                .iter()
+                .map(|(c, t)| (get(rendered, *c).to_owned(), get(rendered, *t).to_owned()))
+                .collect();
+            let else_str = else_id.map(|e| get(rendered, e).to_owned());
+            renderer.render_case(&whens, else_str.as_deref())
+        }
+
+        ExprNode::Between { expr, low, high } => {
+            let (e, lo, hi) = (*expr, *low, *high);
+            let lhs  = get(rendered, e).to_owned();
+            let lo_s = get(rendered, lo).to_owned();
+            let hi_s = get(rendered, hi).to_owned();
+            renderer.render_between(&lhs, &lo_s, &hi_s)
+        }
+
+        ExprNode::NotBetween { expr, low, high } => {
+            let (e, lo, hi) = (*expr, *low, *high);
+            let lhs  = get(rendered, e).to_owned();
+            let lo_s = get(rendered, lo).to_owned();
+            let hi_s = get(rendered, hi).to_owned();
+            renderer.render_not_between(&lhs, &lo_s, &hi_s)
+        }
+
+        ExprNode::InList { expr, list } => {
+            let (e, list_ids) = (*expr, list.clone());
+            let lhs   = get(rendered, e).to_owned();
+            let items: Vec<String> = list_ids.iter().map(|&c| get(rendered, c).to_owned()).collect();
+            renderer.render_in_list(&lhs, &items)
+        }
+
+        ExprNode::NotInList { expr, list } => {
+            let (e, list_ids) = (*expr, list.clone());
+            let lhs   = get(rendered, e).to_owned();
+            let items: Vec<String> = list_ids.iter().map(|&c| get(rendered, c).to_owned()).collect();
+            renderer.render_not_in_list(&lhs, &items)
+        }
+
+        ExprNode::Alias { expr, alias } => {
+            let (expr_id, alias_id) = (*expr, *alias);
+            let inner = get(rendered, expr_id).to_owned();
+            let alias_str = interner.get(alias_id);
+            renderer.render_alias(&inner, alias_str)
+        }
+
+        ExprNode::Star      => renderer.render_star(),
+        ExprNode::CountStar => renderer.render_count_star(),
+
+        ExprNode::Window(win) => {
+            let win = win.clone();
+            let func_str = get(rendered, win.func).to_owned();
+            let part: Vec<String> = win
+                .partition_by
+                .iter()
+                .map(|&e| get(rendered, e).to_owned())
+                .collect();
+            let ord: Vec<String> = win
+                .order_by
+                .iter()
+                .map(|ob| {
+                    let expr_s = get(rendered, ob.expr);
+                    let dir = match ob.direction {
+                        Direction::Asc  => "ASC",
+                        Direction::Desc => "DESC",
+                    };
+                    format!("{} {}", expr_s, dir)
+                })
+                .collect();
+            renderer.render_window(&func_str, &part, &ord, win.frame.as_ref())
+        }
+    }
+}

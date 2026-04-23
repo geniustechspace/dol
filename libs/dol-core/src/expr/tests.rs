@@ -1036,3 +1036,143 @@ mod pass_tests {
         assert!(matches!(errs[0], PassError::TooManyNodes { .. }));
     }
 }
+
+// ── Iterative renderer (Phase 4) ─────────────────────────────────────────────
+
+mod arena_render_tests {
+    use crate::expr::arena::ExprArena;
+    use crate::expr::compiler::{MAX_EXPR_DEPTH, compile_expr, render_arena};
+    use crate::expr::interner::Interner;
+    use crate::expr::node::NodeId;
+    use crate::expr::func::{count, row_number};
+    use crate::expr::{field, int, string, qualified, param};
+    use crate::expr::order::OrderByExpr;
+    use crate::expr::window::WindowBuilder;
+
+    // A minimal renderer that uses all default trait implementations.
+    struct DefaultRenderer {
+        param_count: u32,
+    }
+    impl DefaultRenderer {
+        fn new() -> Self { Self { param_count: 0 } }
+    }
+    impl crate::expr::compiler::ExprRenderer for DefaultRenderer {
+        fn render_literal(&mut self, lit: &crate::expr::Literal<'_>) -> Result<String, crate::op::BackendError> {
+            // Just format as debug for testing — exact format irrelevant.
+            Ok(format!("{lit}"))
+        }
+        fn render_array_literal(&mut self, elements: &[String]) -> Result<String, crate::op::BackendError> {
+            Ok(format!("[{}]", elements.join(", ")))
+        }
+        fn render_object_literal(&mut self, pairs: &[(&str, String)]) -> Result<String, crate::op::BackendError> {
+            let s: Vec<_> = pairs.iter().map(|(k, v)| format!("{k}: {v}")).collect();
+            Ok(format!("{{{}}}", s.join(", ")))
+        }
+        fn render_binary_op(&mut self, lhs: &str, op: &crate::expr::OpDef, rhs: &str) -> Result<String, crate::op::BackendError> {
+            Ok(format!("{lhs} {} {rhs}", op.name()))
+        }
+        fn render_param(&mut self) -> Result<String, crate::op::BackendError> {
+            self.param_count += 1;
+            Ok(format!("${}", self.param_count))
+        }
+    }
+
+    fn render_recursive(expr: &crate::expr::Expr<'_>) -> String {
+        let mut r = DefaultRenderer::new();
+        compile_expr(&mut r, expr, 0).unwrap()
+    }
+
+    fn render_iterative(expr: &crate::expr::Expr<'_>) -> String {
+        let mut arena = ExprArena::new();
+        let mut interner = Interner::new();
+        let root = arena.lower(expr, &mut interner);
+        let mut r = DefaultRenderer::new();
+        render_arena(&mut r, &arena, &interner, root).unwrap()
+    }
+
+    #[test]
+    fn parity_simple_field() {
+        let e = field("age");
+        assert_eq!(render_recursive(&e), render_iterative(&e));
+    }
+
+    #[test]
+    fn parity_binary_op() {
+        let e = field("age").gt(int(18i32));
+        assert_eq!(render_recursive(&e), render_iterative(&e));
+    }
+
+    #[test]
+    fn parity_qualified_ref() {
+        let e = qualified("users", "email");
+        assert_eq!(render_recursive(&e), render_iterative(&e));
+    }
+
+    #[test]
+    fn parity_logical_and() {
+        let e = field("active").eq(crate::expr::bool_expr(true))
+            & field("age").gt(int(18i32));
+        assert_eq!(render_recursive(&e), render_iterative(&e));
+    }
+
+    #[test]
+    fn parity_in_list() {
+        let e = field("status").in_list(vec![string("active"), string("pending")]);
+        assert_eq!(render_recursive(&e), render_iterative(&e));
+    }
+
+    #[test]
+    fn parity_not_in_list() {
+        let e = field("status").in_list(vec![string("deleted")]).negate();
+        // Both paths should produce "status NOT IN (deleted)" form.
+        let rec = render_recursive(&e);
+        let it  = render_iterative(&e);
+        assert!(rec.contains("NOT IN"), "recursive: {rec}");
+        assert!(it.contains("NOT IN"),  "iterative: {it}");
+        assert_eq!(rec, it);
+    }
+
+    #[test]
+    fn parity_between() {
+        let e = field("age").between(int(18i32), int(65i32));
+        assert_eq!(render_recursive(&e), render_iterative(&e));
+    }
+
+    #[test]
+    fn parity_not_between() {
+        let e = field("age").between(int(18i32), int(65i32)).negate();
+        let rec = render_recursive(&e);
+        let it  = render_iterative(&e);
+        assert!(rec.contains("NOT BETWEEN"), "recursive: {rec}");
+        assert!(it.contains("NOT BETWEEN"),  "iterative: {it}");
+        assert_eq!(rec, it);
+    }
+
+    #[test]
+    fn parity_func_call() {
+        let e = count(field("id"));
+        assert_eq!(render_recursive(&e), render_iterative(&e));
+    }
+
+    #[test]
+    fn iterative_handles_deep_chain_without_stack_overflow() {
+        // Build a chain deeper than MAX_EXPR_DEPTH (128).
+        // compile_expr will error; render_arena should succeed.
+        let depth = MAX_EXPR_DEPTH + 10;
+        let mut expr = field("x");
+        for _ in 0..depth {
+            expr = expr.gt(int(1i32)); // wraps each iteration
+        }
+
+        // compile_expr should reject due to depth limit.
+        let mut r = DefaultRenderer::new();
+        assert!(compile_expr(&mut r, &expr, 0).is_err());
+
+        // render_arena should render it without issue.
+        let mut arena = ExprArena::new();
+        let mut interner = Interner::new();
+        let root = arena.lower(&expr, &mut interner);
+        let mut r2 = DefaultRenderer::new();
+        assert!(render_arena(&mut r2, &arena, &interner, root).is_ok());
+    }
+}
