@@ -16,6 +16,7 @@
 //! let _ = param();
 //! ```
 
+pub mod arena;
 mod ast;
 mod compact_name;
 pub mod compiler;
@@ -25,7 +26,9 @@ pub mod func;
 pub mod func_def;
 mod func_meta;
 pub mod func_registry;
+pub mod interner;
 mod literal;
+mod node;
 mod op_meta;
 pub mod op_registry;
 mod ops;

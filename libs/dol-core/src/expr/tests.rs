@@ -699,3 +699,136 @@ fn test_field_dyn() {
         panic!("expected Ref, got {e:?}");
     }
 }
+
+#[test]
+#[ignore = "size probe — run manually"]
+fn size_probe() {
+    use std::mem::size_of;
+    use crate::expr::{CompactName, FuncDef, Expr, Literal, WindowFrame};
+    use crate::expr::op_meta::OpDef;
+    use crate::expr::ops::UnaryOp;
+    use crate::types::DataType;
+    println!("CompactName: {}", size_of::<CompactName>());
+    println!("FuncDef:     {}", size_of::<FuncDef>());
+    println!("OpDef:       {}", size_of::<OpDef>());
+    println!("UnaryOp:     {}", size_of::<UnaryOp>());
+    println!("Literal:     {}", size_of::<Literal<'static>>());
+    println!("DataType:    {}", size_of::<DataType>());
+    println!("WindowFrame: {}", size_of::<WindowFrame>());
+    println!("Expr:        {}", size_of::<Expr<'static>>());
+}
+
+// ── Arena (Phase 2) ──────────────────────────────────────────────────────────
+
+#[test]
+fn expr_node_size_within_budget() {
+    use std::mem::size_of;
+    use crate::expr::node::ExprNode;
+    let sz = size_of::<ExprNode>();
+    assert!(
+        sz <= 48,
+        "ExprNode size is {sz} bytes, must be ≤ 48; box a large variant",
+    );
+}
+
+#[test]
+fn interner_deduplicates_strings() {
+    use crate::expr::interner::Interner;
+    let mut i = Interner::new();
+    let a = i.intern("email");
+    let b = i.intern("email");
+    let c = i.intern("name");
+    assert_eq!(a, b, "same string should yield same StrId");
+    assert_ne!(a, c, "different strings should yield different StrIds");
+    assert_eq!(i.get(a), "email");
+    assert_eq!(i.get(c), "name");
+    assert_eq!(i.len(), 2);
+}
+
+#[test]
+fn arena_lower_ref() {
+    use crate::expr::arena::ExprArena;
+    use crate::expr::interner::Interner;
+    use crate::expr::node::ExprNode;
+
+    let mut arena    = ExprArena::new();
+    let mut interner = Interner::new();
+
+    let expr = field("age");
+    let id   = arena.lower(&expr, &mut interner);
+
+    assert_eq!(arena.len(), 1);
+    match arena.get(id) {
+        ExprNode::Ref(path) => {
+            assert_eq!(path.len(), 1);
+            assert_eq!(interner.get(path[0]), "age");
+        }
+        other => panic!("expected Ref, got {other:?}"),
+    }
+}
+
+#[test]
+fn arena_lower_binary_op() {
+    use crate::expr::arena::ExprArena;
+    use crate::expr::interner::Interner;
+    use crate::expr::node::ExprNode;
+
+    let mut arena    = ExprArena::new();
+    let mut interner = Interner::new();
+
+    let expr = field("age").gt(int(18i32));
+    let root = arena.lower(&expr, &mut interner);
+
+    // Tree: BinaryOp( Ref("age"), GT, Value(Int32(18)) )
+    // Post-order: Ref @ 0, Value @ 1, BinaryOp @ 2
+    assert_eq!(arena.len(), 3);
+    match arena.get(root) {
+        ExprNode::BinaryOp { left, op, right } => {
+            assert!(matches!(arena.get(*left),  ExprNode::Ref(_)));
+            assert!(matches!(arena.get(*right), ExprNode::Value(_)));
+            assert_eq!(arena.op(*op).name(), "GT");
+        }
+        other => panic!("expected BinaryOp, got {other:?}"),
+    }
+}
+
+#[test]
+fn arena_lower_qualified_ref() {
+    use crate::expr::arena::ExprArena;
+    use crate::expr::interner::Interner;
+    use crate::expr::node::ExprNode;
+
+    let mut arena    = ExprArena::new();
+    let mut interner = Interner::new();
+
+    let expr = qualified("users", "email");
+    let id   = arena.lower(&expr, &mut interner);
+
+    match arena.get(id) {
+        ExprNode::Ref(path) => {
+            assert_eq!(path.len(), 2);
+            assert_eq!(interner.get(path[0]), "users");
+            assert_eq!(interner.get(path[1]), "email");
+        }
+        other => panic!("expected Ref, got {other:?}"),
+    }
+}
+
+#[test]
+fn arena_string_dedup_across_nodes() {
+    use crate::expr::arena::ExprArena;
+    use crate::expr::interner::Interner;
+    use crate::expr::node::ExprNode;
+
+    let mut arena    = ExprArena::new();
+    let mut interner = Interner::new();
+
+    // Two refs to the same field name should share the same StrId.
+    let a = arena.lower(&field("id"), &mut interner);
+    let b = arena.lower(&field("id"), &mut interner);
+
+    let id_a = match arena.get(a) { ExprNode::Ref(p) => p[0], _ => panic!() };
+    let id_b = match arena.get(b) { ExprNode::Ref(p) => p[0], _ => panic!() };
+    assert_eq!(id_a, id_b, "same field name must share StrId");
+    assert_eq!(interner.len(), 1, "only one unique string");
+}

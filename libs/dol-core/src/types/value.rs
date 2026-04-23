@@ -71,6 +71,14 @@ impl<'a> LiteralRange<'a> {
             end: Bound::Unbounded,
         }
     }
+
+    /// Convert any borrowed data to owned, erasing the lifetime.
+    pub fn into_static(self) -> LiteralRange<'static> {
+        LiteralRange {
+            start: self.start.map(|b| Box::new((*b).into_static())),
+            end:   self.end.map(|b| Box::new((*b).into_static())),
+        }
+    }
 }
 
 impl ValueRange {
@@ -1033,6 +1041,83 @@ impl<'a> Literal<'a> {
 
     pub fn into_owned(self) -> Value {
         self.into()
+    }
+
+    /// Convert any borrowed string data to owned, erasing the lifetime.
+    ///
+    /// Used when lowering `Expr<'a>` into the lifetime-free expression arena.
+    pub fn into_static(self) -> Literal<'static> {
+        match self {
+            Self::Null     => Literal::Null,
+            Self::Bool(v)  => Literal::Bool(v),
+
+            Self::String(s) => Literal::String(Cow::Owned(s.into_owned())),
+            Self::Json(s)   => Literal::Json(Cow::Owned(s.into_owned())),
+            Self::Xml(s)    => Literal::Xml(Cow::Owned(s.into_owned())),
+            Self::Enum(s)   => Literal::Enum(Cow::Owned(s.into_owned())),
+
+            Self::Bytes(b)     => Literal::Bytes(Cow::Owned(b.into_owned())),
+            Self::Uuid(b)      => Literal::Uuid(b),
+            Self::BitString(b) => Literal::BitString(b),
+
+            Self::Int8(v)   => Literal::Int8(v),
+            Self::Int16(v)  => Literal::Int16(v),
+            Self::Int32(v)  => Literal::Int32(v),
+            Self::Int64(v)  => Literal::Int64(v),
+            Self::Int128(v) => Literal::Int128(v),
+            Self::UInt8(v)   => Literal::UInt8(v),
+            Self::UInt16(v)  => Literal::UInt16(v),
+            Self::UInt32(v)  => Literal::UInt32(v),
+            Self::UInt64(v)  => Literal::UInt64(v),
+            Self::UInt128(v) => Literal::UInt128(v),
+
+            Self::Float32(v) => Literal::Float32(v),
+            Self::Float64(v) => Literal::Float64(v),
+
+            Self::Decimal(d)     => Literal::Decimal(d),
+            Self::Inet(v)        => Literal::Inet(v),
+            Self::MacAddr(v)     => Literal::MacAddr(v),
+            Self::MacAddr8(v)    => Literal::MacAddr8(v),
+            Self::Date(v)        => Literal::Date(v),
+            Self::Time(v)        => Literal::Time(v),
+            Self::DateTime(v)    => Literal::DateTime(v),
+            Self::TimestampTz(v) => Literal::TimestampTz(v),
+            Self::Interval(v)    => Literal::Interval(v),
+
+            Self::Point(v)   => Literal::Point(v),
+            Self::Line(v)    => Literal::Line(v),
+            Self::Segment(v) => Literal::Segment(v),
+            Self::Rect(v)    => Literal::Rect(v),
+            Self::Circle(v)  => Literal::Circle(v),
+            Self::Path(v)    => Literal::Path(v),
+            Self::Polygon(v) => Literal::Polygon(v),
+
+            Self::Array(a) => Literal::Array(
+                Vec::from(a).into_iter().map(Literal::into_static).collect::<Vec<_>>().into_boxed_slice(),
+            ),
+            Self::Set(a) => Literal::Set(
+                Vec::from(a).into_iter().map(Literal::into_static).collect::<Vec<_>>().into_boxed_slice(),
+            ),
+            Self::Tuple(a) => Literal::Tuple(
+                Vec::from(a).into_iter().map(Literal::into_static).collect::<Vec<_>>().into_boxed_slice(),
+            ),
+            Self::Map(m) => Literal::Map(
+                Vec::from(m)
+                    .into_iter()
+                    .map(|(k, v)| (Cow::Owned(k.into_owned()), v.into_static()))
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
+            ),
+            Self::Struct(m) => Literal::Struct(
+                Vec::from(m)
+                    .into_iter()
+                    .map(|(k, v)| (Cow::Owned(k.into_owned()), v.into_static()))
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
+            ),
+            Self::Range(r) => Literal::Range(Box::new((*r).into_static())),
+            Self::Extension(e) => Literal::Extension(e),
+        }
     }
 }
 
