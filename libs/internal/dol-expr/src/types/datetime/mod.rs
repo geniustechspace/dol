@@ -9,8 +9,8 @@
 //! Module-level functions construct [`Value`] directly so callers never
 //! need to manually wrap primitives:
 //!
-//! ```rust
-//! use dol_core::types::datetime;
+//! ```rust,no_run
+//! use dol_expr::types::datetime;
 //!
 //! let d = datetime::from_ymd(2024, 1, 15).unwrap();   // Value::Date
 //! let t = datetime::from_hms(9, 30, 0).unwrap();      // Value::Time

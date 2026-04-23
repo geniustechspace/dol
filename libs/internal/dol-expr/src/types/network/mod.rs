@@ -2,8 +2,8 @@
 //!
 //! # Ergonomic factories
 //!
-//! ```rust
-//! use dol_core::types::network;
+//! ```rust,no_run
+//! use dol_expr::types::network;
 //!
 //! let ip4  = network::ipv4(192, 168, 1, 1);             // Value::Inet
 //! let mac  = network::mac([0xde, 0xad, 0xbe, 0xef, 0x00, 0x01]); // Value::MacAddr

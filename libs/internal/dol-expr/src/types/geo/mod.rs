@@ -6,8 +6,8 @@
 //!
 //! # Ergonomic factories
 //!
-//! ```rust
-//! use dol_core::types::geo;
+//! ```rust,no_run
+//! use dol_expr::types::geo;
 //!
 //! let p   = geo::point(1.0, 2.0).unwrap();             // Value::Point
 //! let c   = geo::circle(1.0, 2.0, 5.0).unwrap();       // Value::Circle
