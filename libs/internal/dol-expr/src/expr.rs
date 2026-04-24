@@ -1,7 +1,6 @@
 use smallvec::SmallVec;
 
-use crate::ids::{NodeId, StrId};
-use crate::types::value::Literal;
+use crate::ids::{CaseId, FuncId, InListId, LiteralId, MutateId, NodeId, ObjLitId, SelectId, StrId, WindowId};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BinOp {
@@ -91,22 +90,76 @@ pub enum ExprNode {
     Field(StrId),
     QualifiedField { source: StrId, field: StrId },
     Param,
-    Lit(Literal<'static>),
-    ObjectLit(SmallVec<[(StrId, NodeId); 4]>),
+    /// A literal constant. The actual [`Literal`] is stored in `ExprArena::lits`;
+    /// this variant holds only the pool index.
+    ///
+    /// [`Literal`]: crate::types::value::Literal
+    Lit(LiteralId),
+    /// An object literal. The field-pair list is stored in `ExprArena::obj_lits`;
+    /// this variant holds only the pool index.
+    ObjectLit(ObjLitId),
     ArrayLit(SmallVec<[NodeId; 4]>),
     BinOp   { op: BinOp,   lhs: NodeId, rhs: NodeId },
     UnaryOp { op: UnaryOp, operand: NodeId },
-    Func    { name: StrId, args: SmallVec<[NodeId; 4]> },
+    /// A function call. The name and argument list are stored in `ExprArena::funcs`;
+    /// this variant holds only the pool index.
+    Func(FuncId),
     Agg     { func: StrId, expr: NodeId, distinct: bool },
-    Window  { func: StrId, partition: SmallVec<[NodeId; 4]>, order: SmallVec<[(NodeId, Order); 2]> },
+    /// A window function. The payload is stored in `ExprArena::windows`;
+    /// this variant holds only the pool index.
+    Window(WindowId),
     Cast    { expr: NodeId, to: StrId },
-    Case    { branches: SmallVec<[(NodeId, NodeId); 4]>, else_: NodeId },
+    /// A `CASE WHEN … THEN … ELSE … END` expression. The payload is stored in
+    /// `ExprArena::cases`; this variant holds only the pool index.
+    Case(CaseId),
     Alias   { expr: NodeId, name: StrId },
-    InList  { expr: NodeId, list: SmallVec<[NodeId; 8]> },
+    /// An `expr IN (list)` expression. The payload is stored in
+    /// `ExprArena::in_lists`; this variant holds only the pool index.
+    InList(InListId),
     InSub   { expr: NodeId, sub: NodeId },
     Exists  { sub: NodeId },
     IsNull  { expr: NodeId },
     Between { expr: NodeId, lo: NodeId, hi: NodeId },
-    Select(SelectNode),
-    Mutate(MutateNode),
+    /// A SELECT sub-query. The payload is stored in `ExprArena::selects`;
+    /// this variant holds only the pool index.
+    Select(SelectId),
+    /// A mutating statement (INSERT/UPDATE/DELETE/UPSERT). The payload is
+    /// stored in `ExprArena::mutates`; this variant holds only the pool index.
+    Mutate(MutateId),
+}
+
+#[cfg(test)]
+mod size_tests {
+    use std::mem::size_of;
+
+    use super::ExprNode;
+    use crate::types::value::{Literal, Value};
+
+    #[test]
+    fn expr_node_fits_32_bytes() {
+        let sz = size_of::<ExprNode>();
+        assert!(
+            sz <= 32,
+            "ExprNode is {sz} bytes on this target — must be ≤ 32; \
+             pool a large variant via ExprArena",
+        );
+    }
+
+    #[test]
+    fn value_fits_24_bytes() {
+        let sz = size_of::<Value>();
+        assert!(
+            sz <= 24,
+            "Value is {sz} bytes — must be ≤ 24",
+        );
+    }
+
+    #[test]
+    fn literal_static_fits_32_bytes() {
+        let sz = size_of::<Literal<'static>>();
+        assert!(
+            sz <= 32,
+            "Literal<'static> is {sz} bytes — must be ≤ 32",
+        );
+    }
 }
