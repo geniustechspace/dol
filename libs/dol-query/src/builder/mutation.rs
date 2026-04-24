@@ -5,7 +5,7 @@
 //!
 //! For SQL rendering, import the `Render` extension trait from `dol-sql`.
 
-use dol_entity::Entity;
+use dol_schema::Entity;
 use dol_expr::tree::{Expr, field_dyn};
 
 use super::query::count_single_expr_params;

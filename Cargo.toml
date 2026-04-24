@@ -7,7 +7,7 @@ members = [
     "libs/dol-types",           # Leaf: Value, Literal, DataType
     "libs/dol-expr",            # Canonical expression layer (ExprNode ≤ 32B, arena, interner)
     "libs/dol-ir",              # Canonical IR: Statement (no lifetime), Backend trait
-    "libs/dol-entity",          # Schema: Entity, Field, constraints, DDL builders
+    "libs/dol-schema",          # Schema: Entity, Field, constraints, DDL builders
     "libs/dol-query",           # Query entry point + builders → produce dol-ir::Statement
 
     # ── Backend crates (commented out until language is settled) ───────────────
@@ -49,5 +49,5 @@ tokio = { version = "1", features = ["rt", "macros"] }
 dol-types  = { path = "libs/dol-types" }
 dol-expr   = { path = "libs/dol-expr" }
 dol-ir     = { path = "libs/dol-ir" }
-dol-entity = { path = "libs/dol-entity" }
+dol-schema = { path = "libs/dol-schema" }
 dol-query  = { path = "libs/dol-query" }

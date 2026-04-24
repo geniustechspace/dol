@@ -1,5 +1,5 @@
 [package]
-name = "dol-entity"
+name = "dol-schema"
 version.workspace = true
 edition.workspace = true
 publish = false

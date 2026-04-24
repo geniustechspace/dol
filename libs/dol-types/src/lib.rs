@@ -1,8 +1,7 @@
 //! DOL type system — the single source of truth for every type in DOL.
 //!
-//! This crate is a leaf crate with no DOL dependencies; both `dol-core` and
-//! `dol-expr` re-export from it so there is exactly one definition of every
-//! type.
+//! This crate is a leaf crate with no DOL dependencies; `dol-expr` re-exports
+//! from it so there is exactly one definition of every type.
 //!
 //! # Layers
 //!

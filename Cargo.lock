@@ -3,16 +3,6 @@
 version = 4
 
 [[package]]
-name = "dol-entity"
-version = "0.1.0"
-dependencies = [
- "dol-ir",
- "dol-types",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "dol-expr"
 version = "0.1.0"
 dependencies = [
@@ -35,10 +25,20 @@ dependencies = [
 name = "dol-query"
 version = "0.1.0"
 dependencies = [
- "dol-entity",
  "dol-expr",
  "dol-ir",
+ "dol-schema",
  "smallvec",
+]
+
+[[package]]
+name = "dol-schema"
+version = "0.1.0"
+dependencies = [
+ "dol-ir",
+ "dol-types",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

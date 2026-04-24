@@ -5,7 +5,7 @@
 //!
 //! For SQL rendering, import the `Render` extension trait from `dol-sql`.
 
-use dol_entity::Entity;
+use dol_schema::Entity;
 use dol_expr::tree::{Direction, Expr, NullsPosition, OrderByExpr, field_dyn};
 
 use crate::{JoinKind, LockMode};

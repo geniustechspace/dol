@@ -523,7 +523,7 @@ impl EntityDefineExt for Entity {
 /// Builds a `CREATE TYPE` statement for custom enum types.
 ///
 /// ```rust
-/// use dol_entity::DefineTypeBuilder;
+/// use dol_schema::DefineTypeBuilder;
 ///
 /// let ir = DefineTypeBuilder::new("order_status")
 ///     .variant("pending")
@@ -583,7 +583,7 @@ impl DefineTypeBuilder {
 /// Builds a `DROP TYPE` statement.
 ///
 /// ```rust
-/// use dol_entity::DropTypeBuilder;
+/// use dol_schema::DropTypeBuilder;
 ///
 /// let ir = DropTypeBuilder::new("order_status")
 ///     .if_exists()

@@ -6,7 +6,7 @@ publish = false
 description = "DOL Query — backend-neutral query entry point for any data source."
 
 [dependencies]
-dol-entity = { workspace = true }
+dol-schema = { workspace = true }
 dol-expr = { workspace = true }
 dol-ir = { workspace = true }
 smallvec = { workspace = true }

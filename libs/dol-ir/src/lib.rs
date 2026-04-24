@@ -1,7 +1,7 @@
 //! DOL IR — complete Statement enum covering all DOL operation types.
 //!
-//! This crate is the single IR layer for all DOL backends.  Replaces the
-//! old `dol-core::op` module which carried `Expr<'a>` lifetimes.
+//! This crate is the single IR layer for all DOL backends.  Contains
+//! the canonical Statement enum, Backend trait, and all schema constraint types.
 
 #![deny(unsafe_code)]
 

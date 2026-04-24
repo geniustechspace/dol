@@ -1,5 +1,5 @@
 use super::*;
-use dol_entity::{Field, DataType};
+use dol_schema::{Field, DataType};
 use dol_expr::tree::{field, param};
 
 fn users_entity() -> Entity {

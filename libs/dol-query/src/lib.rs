@@ -13,7 +13,7 @@
 //!
 //! ```rust
 //! use dol_query::Query;
-//! use dol_entity::{Entity, Field, DataType};
+//! use dol_schema::{Entity, Field, DataType};
 //! use dol_expr::tree::{field, param};
 //!
 //! // From an Entity — full field-aware API
@@ -97,7 +97,7 @@ pub use remove::RemoveQuery;
 pub use update::UpdateQuery;
 pub use upsert::UpsertQuery;
 
-use dol_entity::Entity;
+use dol_schema::Entity;
 
 // ---------------------------------------------------------------------------
 // Query — the universal entry point

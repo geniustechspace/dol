@@ -1,4 +1,4 @@
-//! # dol-entity — DOL Schema Language
+//! # dol-schema — DOL Schema Language
 //!
 //! Entity metadata — the universal schema definition.
 //!
@@ -35,7 +35,7 @@ use constraint::EntityConstraint as Constraint;
 /// # Example
 ///
 /// ```rust
-/// use dol_entity::{Entity, Field, DataType, FkAction, EntityConstraint};
+/// use dol_schema::{Entity, Field, DataType, FkAction, EntityConstraint};
 ///
 /// let users = Entity::new("users", vec![
 ///     Field::new("id", DataType::Uuid).primary_key(),
