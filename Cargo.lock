@@ -53,6 +53,7 @@ name = "dol-entity"
 version = "0.1.0"
 dependencies = [
  "dol-core",
+ "dol-ir",
  "serde",
  "serde_json",
 ]

@@ -7,6 +7,7 @@ description = "DOL schema language — Entity, Field, DataType, and constraints.
 
 [dependencies]
 dol-core = { path = "../dol-core" }
+dol-ir = { workspace = true }
 serde = { workspace = true, optional = true }
 
 [dev-dependencies]

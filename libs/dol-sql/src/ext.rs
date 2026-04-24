@@ -175,41 +175,10 @@ impl Render for UpsertBuilder<'_> {
 impl Render for CreateFromMeta<'_> {
     fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
-        let model = self.get_entity();
-        let mut sql = String::from("CREATE TABLE ");
-        if self.has_if_not_exists() {
-            sql.push_str("IF NOT EXISTS ");
-        }
-        sql.push_str(&model.qualified_name());
-        sql.push_str(" (\n");
-
-        let mut parts = Vec::new();
-
-        // Field definitions
-        for field in &model.fields {
-            parts.push(format!("  {}", render::render_field_def(field, dialect)));
-        }
-
-        // Primary key constraint (derived from fields marked as PK)
-        let pk_fields: Vec<&str> = model
-            .fields
-            .iter()
-            .filter(|f| f.primary_key)
-            .map(|f| f.name)
-            .collect();
-        if !pk_fields.is_empty() {
-            parts.push(format!("  PRIMARY KEY ({})", pk_fields.join(", ")));
-        }
-
-        // Model-level constraints
-        for constraint in &model.constraints {
-            let owned = dol_core::op::OwnedEntityConstraint::from(constraint);
-            parts.push(format!("  {}", render::render_model_constraint(&owned)));
-        }
-
-        sql.push_str(&parts.join(",\n"));
-        sql.push_str("\n)");
-        Ok(sql)
+        let ir = self.build();
+        render_ir::render_ir_statement(&IrStatement::DefineEntity(Box::new(ir)), None, dialect)
+            .map(|o| o.sql)
+            .map_err(|e| BackendError::Unsupported(e.to_string()))
     }
 }
 
@@ -219,7 +188,9 @@ impl Render for DefineEntityBuilder {
     fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_define_entity_ir(&ir, dialect).map(|o| o.sql)
+        render_ir::render_ir_statement(&IrStatement::DefineEntity(Box::new(ir)), None, dialect)
+            .map(|o| o.sql)
+            .map_err(|e| BackendError::Unsupported(e.to_string()))
     }
 }
 
@@ -229,7 +200,9 @@ impl Render for AlterEntityBuilder<'_> {
     fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_alter_entity_ir(&ir, dialect).map(|o| o.sql)
+        render_ir::render_ir_statement(&IrStatement::AlterEntity(ir), None, dialect)
+            .map(|o| o.sql)
+            .map_err(|e| BackendError::Unsupported(e.to_string()))
     }
 }
 
@@ -239,7 +212,9 @@ impl Render for DropEntityBuilder<'_> {
     fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_drop_entity_ir(&ir, dialect).map(|o| o.sql)
+        render_ir::render_ir_statement(&IrStatement::DropEntity(ir), None, dialect)
+            .map(|o| o.sql)
+            .map_err(|e| BackendError::Unsupported(e.to_string()))
     }
 }
 
@@ -249,7 +224,9 @@ impl Render for DefineIndexBuilder {
     fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_define_index_ir(&ir, dialect).map(|o| o.sql)
+        render_ir::render_ir_statement(&IrStatement::DefineIndex(ir), None, dialect)
+            .map(|o| o.sql)
+            .map_err(|e| BackendError::Unsupported(e.to_string()))
     }
 }
 
@@ -259,7 +236,9 @@ impl Render for DropIndexBuilder {
     fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_drop_index_ir(&ir, dialect).map(|o| o.sql)
+        render_ir::render_ir_statement(&IrStatement::DropIndex(ir), None, dialect)
+            .map(|o| o.sql)
+            .map_err(|e| BackendError::Unsupported(e.to_string()))
     }
 }
 
@@ -293,7 +272,9 @@ impl Render for DefineTypeBuilder {
     fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_define_type_ir(&ir, dialect).map(|o| o.sql)
+        render_ir::render_ir_statement(&IrStatement::DefineType(ir), None, dialect)
+            .map(|o| o.sql)
+            .map_err(|e| BackendError::Unsupported(e.to_string()))
     }
 }
 
@@ -303,7 +284,9 @@ impl Render for DropTypeBuilder {
     fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
         let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_drop_type_ir(&ir, dialect).map(|o| o.sql)
+        render_ir::render_ir_statement(&IrStatement::DropType(ir), None, dialect)
+            .map(|o| o.sql)
+            .map_err(|e| BackendError::Unsupported(e.to_string()))
     }
 }
 

@@ -12,8 +12,8 @@
 //! For SQL rendering, import the extension traits from `dol-sql`.
 
 use crate::{Entity, Field, DataType};
-use dol_core::op::EntityRef;
-use dol_core::op::definition::{
+use dol_ir::entity_ref::EntityRef;
+use dol_ir::definition::{
     AlterAction, AlterEntity, DefineEntity, DefineIndex, DefineType, DropEntity,
     DropIndex, DropType, FieldDef, IndexMethod, OwnedEntityConstraint, OwnedForeignKeyRef,
 };
