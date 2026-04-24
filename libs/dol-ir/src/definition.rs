@@ -1,6 +1,6 @@
 //! Definition operations — DDL for schema creation and modification.
 
-use dol_core::constraint::{EntityConstraint, FkAction, GeneratedKind};
+use crate::constraint::{EntityConstraint, FkAction, GeneratedKind};
 use dol_types::DataType;
 
 use crate::entity_ref::EntityRef;

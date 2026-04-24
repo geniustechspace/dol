@@ -5,7 +5,7 @@
 //! lifetime-parameterised `Expr<'a>`) and the new arena-based IR used by
 //! `dol-ir::Statement`.
 
-use dol_core::expr::{Expr, OrderByExpr, Direction};
+use dol_expr::tree::{Expr, OrderByExpr, Direction};
 use dol_expr::arena::{ExprArena, FieldNode, FuncNode, InListNode, ObjLitNode};
 use dol_expr::expr::{BinOp, ExprNode, Order, UnaryOp as ArenaUnaryOp};
 use dol_expr::ids::{NodeId, NULL_NODE};
@@ -108,7 +108,7 @@ pub fn lower_expr(
         }
 
         Expr::UnaryOp { op, expr: inner } => {
-            use dol_core::expr::UnaryOp as CoreUnaryOp;
+            use dol_expr::tree::UnaryOp as CoreUnaryOp;
 
             // Canonicalise NOT(InList) to a separate InList node.
             if *op == CoreUnaryOp::Not {
@@ -303,7 +303,7 @@ pub fn lower_filters(
 // ---------------------------------------------------------------------------
 
 /// Map `dol-core::expr::OpDef` name to `dol-expr::expr::BinOp`.
-fn lower_binop(op: &dol_core::expr::OpDef) -> BinOp {
+fn lower_binop(op: &dol_expr::tree::OpDef) -> BinOp {
     match op.name() {
         "EQ"  => BinOp::Eq,
         "NE"  => BinOp::Ne,

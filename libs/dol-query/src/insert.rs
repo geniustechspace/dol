@@ -1,7 +1,5 @@
 //! INSERT query builder for `dol-query`.
 
-use dol_core::op::{EntityRef, Insert};
-
 // ===========================================================================
 // InsertQuery
 // ===========================================================================
@@ -70,35 +68,11 @@ impl InsertQuery {
         field_count * self.row_count
     }
 
-    /// Build the canonical [`Insert`].
-    ///
-    /// When no fields have been set (via `.fields()`) and Entity field
-    /// metadata is available, all entity fields are included by default.
-    pub fn build(self) -> Insert {
-        // Default: include all entity fields when none were specified.
-        let fields = if self.fields.is_empty() {
-            self.field_names.unwrap_or_default()
-        } else {
-            self.fields
-        };
-
-        Insert {
-            target: EntityRef {
-                name: self.name,
-                namespace: self.namespace,
-                alias: None,
-            },
-            fields,
-            row_count: self.row_count,
-            returning: self.returning,
-        }
-    }
-
     /// Build the arena-based IR as a [`dol_ir::Statement`].
     ///
     /// Returns `(Statement, ExprArena, Interner)` — the arena and interner
     /// are needed by renderers to resolve expression references.
-    pub fn build_ir(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+    pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
         use dol_expr::expr::{InsertNode, ExprNode};
 
         let mut arena = dol_expr::ExprArena::new();

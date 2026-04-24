@@ -7,7 +7,7 @@
 //! - Use `.required()` as a no-op self-documenting marker
 
 use super::constraint::{FkAction, ForeignKeyRef, GeneratedKind};
-pub use dol_core::types::DataType;
+pub use dol_types::DataType;
 
 /// A field definition within an entity.
 ///

@@ -1,7 +1,6 @@
 //! REMOVE (DELETE) query builder for `dol-query`.
 
-use dol_core::expr::Expr;
-use dol_core::op::{EntityRef, Remove};
+use dol_expr::tree::Expr;
 
 // ===========================================================================
 // RemoveQuery
@@ -49,24 +48,11 @@ impl RemoveQuery {
         self
     }
 
-    /// Build the canonical [`Remove`].
-    pub fn build(self) -> Remove<'static> {
-        Remove {
-            target: EntityRef {
-                name: self.name,
-                namespace: self.namespace,
-                alias: None,
-            },
-            filters: self.filters,
-            returning: self.returning,
-        }
-    }
-
     /// Build the arena-based IR as a [`dol_ir::Statement`].
     ///
     /// Returns `(Statement, ExprArena, Interner)` — the arena and interner
     /// are needed by renderers to resolve expression references.
-    pub fn build_ir(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+    pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
         use crate::lower::lower_filters;
         use dol_expr::expr::{DeleteNode, ExprNode};
 

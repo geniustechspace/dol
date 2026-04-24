@@ -10,7 +10,7 @@ pub mod transaction;
 
 pub use control::{DefinePolicyBuilder, GrantBuilder, RevokeBuilder};
 pub use mutation::{
-    InsertBuilder, InsertSelectBuilder, RemoveBuilder, UpdateBuilder, UpsertBuilder,
+    InsertBuilder, InsertSelect, InsertSelectBuilder, RemoveBuilder, UpdateBuilder, UpsertBuilder,
 };
 pub use query::GetBuilder;
 pub use storage::{

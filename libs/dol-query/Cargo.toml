@@ -6,7 +6,6 @@ publish = false
 description = "DOL Query — backend-neutral query entry point for any data source."
 
 [dependencies]
-dol-core = { path = "../dol-core" }
 dol-entity = { workspace = true }
 dol-expr = { workspace = true }
 dol-ir = { workspace = true }

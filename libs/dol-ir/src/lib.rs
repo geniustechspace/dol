@@ -6,6 +6,7 @@
 #![deny(unsafe_code)]
 
 pub mod backend;
+pub mod constraint;
 pub mod control;
 pub mod definition;
 pub mod entity_ref;
@@ -14,6 +15,7 @@ pub mod storage;
 pub mod transaction;
 
 pub use backend::{Backend, BackendError};
+pub use constraint::{EntityConstraint, FkAction, ForeignKeyRef, GeneratedKind};
 pub use control::{DefinePolicy, Grant, PolicyAction, Privilege, Revoke};
 pub use definition::{
     AlterAction, AlterEntity, Constraint, DefineEntity, DefineIndex, DefineType, DropEntity,

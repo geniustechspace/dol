@@ -1,3 +1,3 @@
-//! Re-export of constraint types from `dol-core`.
+//! Re-export of constraint types from `dol-ir`.
 
-pub use dol_core::constraint::{EntityConstraint, FkAction, ForeignKeyRef, GeneratedKind};
+pub use dol_ir::constraint::{EntityConstraint, FkAction, ForeignKeyRef, GeneratedKind};

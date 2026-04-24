@@ -3,21 +3,27 @@
 [workspace]
 resolver = "2"
 members = [
-    "libs/dol",
-    "libs/dol-types",
-    "libs/dol-core",
-    "libs/dol-entity",
-    "libs/dol-query",
-    "libs/dol-sql",
-    "libs/dol-kv",
-    "libs/dol-objects",
-    "libs/dol-spreadsheet",
-    "libs/dol-migration",
-    "libs/dol-config",
-    # Refactored stack (arena-based expr, lean IR, new builders)
-    "libs/dol-expr",
-    "libs/dol-ir",
-    "libs/dol-builder",
+    # ── Core language crates (the DOL language itself) ────────────────────────
+    "libs/dol-types",           # Leaf: Value, Literal, DataType
+    "libs/dol-expr",            # Canonical expression layer (ExprNode ≤ 32B, arena, interner)
+    "libs/dol-ir",              # Canonical IR: Statement (no lifetime), Backend trait
+    "libs/dol-entity",          # Schema: Entity, Field, constraints, DDL builders
+    "libs/dol-query",           # Query entry point + builders → produce dol-ir::Statement
+
+    # ── Backend crates (commented out until language is settled) ───────────────
+    # "libs/dol-sql",
+    # "libs/dol-kv",
+    # "libs/dol-objects",
+    # "libs/dol-spreadsheet",
+
+    # ── Auxiliary crates (commented out until backends are restored) ───────────
+    # "libs/dol-migration",
+    # "libs/dol-config",
+
+    # ── Deprecated / to be removed ────────────────────────────────────────────
+    # "libs/dol-core",          # Superseded: expression + ops split into dol-expr & dol-ir
+    # "libs/dol-builder",       # Absorbed into dol-query
+    # "libs/dol",               # Facade — will be rebuilt after consolidation
 ]
 
 [workspace.package]
@@ -39,18 +45,9 @@ toml_crate = { package = "toml", version = "1" }
 # Async runtime (dev/test only)
 tokio = { version = "1", features = ["rt", "macros"] }
 
-# Internal crates
-dol-types = { path = "libs/dol-types" }
-dol-core = { path = "libs/dol-core" }
+# Internal crates — core language
+dol-types  = { path = "libs/dol-types" }
+dol-expr   = { path = "libs/dol-expr" }
+dol-ir     = { path = "libs/dol-ir" }
 dol-entity = { path = "libs/dol-entity" }
-dol-query = { path = "libs/dol-query" }
-dol-sql = { path = "libs/dol-sql" }
-dol-kv = { path = "libs/dol-kv" }
-dol-objects = { path = "libs/dol-objects" }
-dol-spreadsheet = { path = "libs/dol-spreadsheet" }
-dol-migration = { path = "libs/dol-migration" }
-dol-config = { path = "libs/dol-config" }
-# Internal refactored crates
-dol-expr            = { path = "libs/dol-expr" }
-dol-ir              = { path = "libs/dol-ir" }
-dol-builder         = { path = "libs/dol-builder" }
+dol-query  = { path = "libs/dol-query" }

@@ -3,8 +3,8 @@
 //! Mirrors `dol-builder::GetBuilder` but works with owned name/namespace
 //! instead of requiring a static `&Entity` reference.
 
-use dol_core::expr::{Direction, Expr, NullsPosition, OrderByExpr, field_dyn};
-use dol_core::op::{EntityRef, Join, JoinKind, LockMode, OffsetLimit, Query};
+use dol_expr::tree::{Direction, Expr, NullsPosition, OrderByExpr, field_dyn};
+use crate::{JoinKind, LockMode};
 
 // ---------------------------------------------------------------------------
 // Private join helper
@@ -294,76 +294,14 @@ impl GetQuery {
 
     // ── Build to IR ─────────────────────────────────────────────────────
 
-    /// Consume the builder and produce a [`Query`].
-    ///
-    /// When no projections have been set and Entity field metadata is
-    /// available, all entity fields are selected by default.
-    pub fn build(self) -> Query<'static> {
-        let source = EntityRef {
-            name: self.name,
-            namespace: self.namespace,
-            alias: self.table_alias,
-        };
-
-        let joins = self
-            .joins
-            .into_iter()
-            .map(|jc| Join {
-                join_type: jc.join_type,
-                target: EntityRef {
-                    name: jc.target_name,
-                    namespace: jc.target_namespace,
-                    alias: jc.alias,
-                },
-                on_conditions: jc.on_conditions,
-            })
-            .collect();
-
-        let offset = if self.has_offset {
-            Some(OffsetLimit::Param)
-        } else {
-            None
-        };
-
-        let limit = if self.has_limit {
-            Some(OffsetLimit::Param)
-        } else {
-            None
-        };
-
-        // Default: select all entity fields when no projections were specified
-        // and field metadata is available.
-        let projections = if self.projections.is_empty() {
-            if let Some(ref names) = self.field_names {
-                names.iter().map(|n| field_dyn(n)).collect()
-            } else {
-                self.projections
-            }
-        } else {
-            self.projections
-        };
-
-        Query {
-            source,
-            projections,
-            joins,
-            filters: self.filters,
-            group_by: self.group_by,
-            having: self.having,
-            order_by: self.order_by,
-            offset,
-            limit,
-            distinct: self.distinct,
-            distinct_on: self.distinct_on,
-            lock_mode: self.lock_mode,
-        }
-    }
-
-    /// Build the arena-based IR as a [`dol_ir::Statement`].
+    /// Consume the builder and produce a [`dol_ir::Statement`].
     ///
     /// Returns `(Statement, ExprArena, Interner)` — the arena and interner
     /// are needed by renderers to resolve expression references.
-    pub fn build_ir(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+    ///
+    /// When no projections have been set and Entity field metadata is
+    /// available, all entity fields are selected by default.
+    pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
         use crate::lower::{lower_expr, lower_exprs, lower_filters, lower_order_by};
         use dol_expr::expr::{ExprNode, JoinNode, JoinType as ArenaJoinType, LockHint, QueryNode};
         use dol_expr::ids::NULL_NODE;
@@ -462,15 +400,6 @@ impl GetQuery {
             .map(|ob| lower_order_by(ob, &mut arena, &mut interner))
             .collect();
 
-        // Pagination: for arena IR, offset/limit are literal u64 values.
-        // When the old builder uses Param placeholders, we leave them as None
-        // (bind-parameter pagination must be handled at the render layer).
-        let offset: Option<u64> = None;
-        let limit: Option<u64> = None;
-
-        // Note: LockHint has fewer variants than LockMode — ForShare+NoWait
-        // and ForShare+SkipLocked are approximated as NoWait/SkipLocked
-        // (losing the ForShare distinction). This is a dol-expr limitation.
         let lock = self.lock_mode.map(|m| match m {
             LockMode::ForUpdate => LockHint::ForUpdate,
             LockMode::ForShare  => LockHint::ForShare,
@@ -487,8 +416,8 @@ impl GetQuery {
             group_by,
             having,
             order_by,
-            limit,
-            offset,
+            limit: None,
+            offset: None,
             lock,
         };
 

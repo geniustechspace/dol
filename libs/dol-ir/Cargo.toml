@@ -8,10 +8,9 @@ description = "DOL IR — complete Statement enum and Backend trait"
 [dependencies]
 dol-expr  = { workspace = true }
 dol-types = { workspace = true }
-dol-core  = { workspace = true }
 smallvec  = { workspace = true }
 serde     = { workspace = true, optional = true }
 
 [features]
 default = []
-serde = ["dep:serde", "dol-core/serde"]
+serde = ["dep:serde"]

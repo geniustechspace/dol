@@ -1,7 +1,6 @@
 //! UPSERT (INSERT ... ON CONFLICT) query builder for `dol-query`.
 
-use dol_core::expr::Expr;
-use dol_core::op::{EntityRef, Upsert};
+use dol_expr::tree::Expr;
 
 // ===========================================================================
 // UpsertQuery
@@ -104,39 +103,11 @@ impl UpsertQuery {
         }
     }
 
-    /// Build the canonical [`Upsert`].
-    ///
-    /// When no fields have been set (via `.fields()`) and Entity field
-    /// metadata is available, all entity fields are included by default.
-    pub fn build(self) -> Upsert<'static> {
-        // Default: include all entity fields when none were specified.
-        let fields = if self.fields.is_empty() {
-            self.field_names.unwrap_or_default()
-        } else {
-            self.fields
-        };
-
-        Upsert {
-            target: EntityRef {
-                name: self.name,
-                namespace: self.namespace,
-                alias: None,
-            },
-            fields,
-            conflict_fields: self.conflict_fields,
-            conflict_constraint: self.conflict_constraint,
-            update_fields: self.update_fields,
-            do_nothing: self.do_nothing_flag,
-            conflict_filters: self.conflict_filters,
-            returning: self.returning,
-        }
-    }
-
     /// Build the arena-based IR as a [`dol_ir::Statement`].
     ///
     /// Returns `(Statement, ExprArena, Interner)` — the arena and interner
     /// are needed by renderers to resolve expression references.
-    pub fn build_ir(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+    pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
         use dol_expr::expr::{ConflictClause, ExprNode, UpsertNode};
 
         let mut arena = dol_expr::ExprArena::new();
