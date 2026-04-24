@@ -596,7 +596,7 @@ fn render_insert_with_counter(
         .collect::<Result<Vec<_>, _>>()?;
 
     let col_count = cols.len().max(1);
-    let val_groups: Vec<String> = if col_count > 0 && vals.len() > col_count {
+    let val_groups: Vec<String> = if vals.len() > col_count {
         // Multi-row insert: group values into (v1, v2), (v3, v4), ...
         vals.chunks(col_count)
             .map(|chunk| format!("({})", chunk.join(", ")))

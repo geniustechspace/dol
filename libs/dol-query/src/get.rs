@@ -468,6 +468,9 @@ impl GetQuery {
         let offset: Option<u64> = None;
         let limit: Option<u64> = None;
 
+        // Note: LockHint has fewer variants than LockMode — ForShare+NoWait
+        // and ForShare+SkipLocked are approximated as NoWait/SkipLocked
+        // (losing the ForShare distinction). This is a dol-expr limitation.
         let lock = self.lock_mode.map(|m| match m {
             LockMode::ForUpdate => LockHint::ForUpdate,
             LockMode::ForShare  => LockHint::ForShare,

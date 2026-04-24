@@ -135,7 +135,7 @@ pub fn lower_expr(
                 CoreUnaryOp::Neg => ArenaUnaryOp::Neg,
                 CoreUnaryOp::IsNull => ArenaUnaryOp::IsNull,
                 CoreUnaryOp::IsNotNull => ArenaUnaryOp::IsNotNull,
-                CoreUnaryOp::BitNot => ArenaUnaryOp::Not,
+                CoreUnaryOp::BitNot => ArenaUnaryOp::Not, // dol-expr has no BitNot; approximate as Not
             };
             arena.alloc(ExprNode::UnaryOp { op: arena_op, operand: inner_id })
         }
