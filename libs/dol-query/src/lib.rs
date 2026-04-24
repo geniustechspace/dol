@@ -66,6 +66,7 @@
 
 mod get;
 mod insert;
+pub mod lower;
 mod remove;
 mod update;
 mod upsert;
