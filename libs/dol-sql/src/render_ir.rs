@@ -189,10 +189,10 @@ impl<'a, 'c> ArenaRenderer<'a, 'c> {
                                 crate::dialect::JsonAccessStyle::JsonExtractFunction => {
                                     format!("json_extract({}, '$.{}')", s, k)
                                 }
-                                crate::dialect::JsonAccessStyle::ColonColon => {
-                                    format!("{}::{}", s, k)
+                                crate::dialect::JsonAccessStyle::JsonValueFunction => {
+                                    format!("JSON_VALUE({}, '$.{}')", s, k)
                                 }
-                                crate::dialect::JsonAccessStyle::DotAccess => {
+                                crate::dialect::JsonAccessStyle::Unsupported => {
                                     format!("{}.{}", s, k)
                                 }
                             };
@@ -301,8 +301,8 @@ impl<'a, 'c> ArenaRenderer<'a, 'c> {
                     let t = self.render_node(*then_id)?;
                     s.push_str(&format!(" WHEN {} THEN {}", w, t));
                 }
-                if *else_ != NULL_NODE {
-                    let e = self.render_node(*else_)?;
+                if else_ != NULL_NODE {
+                    let e = self.render_node(else_)?;
                     s.push_str(&format!(" ELSE {}", e));
                 }
                 s.push_str(" END");

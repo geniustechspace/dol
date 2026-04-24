@@ -1495,7 +1495,7 @@ mod tests {
         let err = BitString::try_new(9, vec![0u8].into_boxed_slice()).unwrap_err();
         assert!(matches!(
             err,
-            crate::types::TypeError::BitLengthMismatch {
+            crate::TypeError::BitLengthMismatch {
                 declared: 9,
                 byte_count: 1
             }

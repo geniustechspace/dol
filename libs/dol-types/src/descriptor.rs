@@ -803,7 +803,7 @@ impl fmt::Display for DataType {
 mod tests {
     use super::Value;
     use super::*;
-    use crate::types::numeric::Decimal;
+    use crate::numeric::Decimal;
 
     #[test]
     fn varchar_accepts_string_within_length() {
