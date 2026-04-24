@@ -81,8 +81,7 @@ dependencies = [
 name = "dol-kv"
 version = "0.1.0"
 dependencies = [
- "dol-core",
- "dol-entity",
+ "dol-ir",
  "dol-query",
  "serde",
 ]
@@ -133,7 +132,10 @@ version = "0.1.0"
 dependencies = [
  "dol-core",
  "dol-entity",
+ "dol-expr",
+ "dol-ir",
  "dol-query",
+ "dol-types",
  "serde",
  "serde_json",
  "serde_norway",

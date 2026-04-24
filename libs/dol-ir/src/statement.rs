@@ -18,8 +18,11 @@ use crate::transaction::Transaction;
 ///
 /// [`ExprArena`]: dol_expr::arena::ExprArena
 /// [`Interner`]:  dol_expr::interner::Interner
+///
+/// Note: Serde support for the DML variants requires the `dol-expr/serde` feature,
+/// which will be added in a future release when the arena types gain `Serialize` /
+/// `Deserialize` implementations.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Statement {
     // ── DML (arena-based) ──────────────────────────────────────────────────
     Query(QueryNode),

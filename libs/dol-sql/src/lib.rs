@@ -5,6 +5,7 @@
 pub mod dialect;
 pub mod ext;
 pub mod render;
+pub mod render_ir;
 
 use dialect::Dialect;
 use dol_core::op::*;

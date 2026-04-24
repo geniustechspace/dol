@@ -6,15 +6,18 @@ publish = false
 description = "DOL SQL backend — dialect-aware SQL rendering."
 
 [dependencies]
-dol-core = { workspace = true }
+dol-core   = { workspace = true }
 dol-entity = { workspace = true }
-dol-query = { workspace = true }
-serde = { workspace = true, optional = true }
+dol-query  = { workspace = true }
+dol-ir     = { workspace = true }
+dol-expr   = { workspace = true }
+dol-types  = { workspace = true }
+serde      = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 toml_crate = { workspace = true, optional = true }
 serde_norway = { workspace = true, optional = true }
 
 [features]
 default = ["serde"]
-serde = ["dep:serde", "dol-core/serde"]
+serde = ["dep:serde", "dol-core/serde", "dol-ir/serde"]
 config = ["serde", "dep:serde_json", "dep:toml_crate", "dep:serde_norway"]
