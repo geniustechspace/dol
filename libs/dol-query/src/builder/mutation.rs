@@ -1,28 +1,14 @@
-//! Mutation builders — INSERT, INSERT SELECT, UPDATE, REMOVE, UPSERT.
+//! Mutation builders — INSERT, INSERT SELECT, UPDATE, DELETE, UPSERT.
 //!
 //! Each builder borrows a `&Model` and provides chainable configuration
 //! and a `.build()` method to produce the canonical IR.
 //!
 //! For SQL rendering, import the `Render` extension trait from `dol-sql`.
 
-use dol_entity::Entity;
-use dol_core::expr::{Expr, field_dyn};
-use dol_core::op::{EntityRef, Insert, InsertSelect, Remove, Update, Upsert};
+use dol_schema::Entity;
+use dol_expr::tree::{Expr, field_dyn};
 
 use super::query::count_single_expr_params;
-
-// ===========================================================================
-// Helper
-// ===========================================================================
-
-/// Build a `EntityRef` from a `Model`'s static metadata.
-fn entity_ref(model: &Entity) -> EntityRef {
-    EntityRef {
-        name: model.name.to_string(),
-        namespace: model.namespace.map(|s| s.to_string()),
-        alias: None,
-    }
-}
 
 // ===========================================================================
 // InsertBuilder
@@ -94,30 +80,39 @@ impl<'a> InsertBuilder<'a> {
         field_count * self.row_count
     }
 
-    /// Build the canonical [`Insert`].
+    /// Build the arena-based IR as a [`dol_ir::Statement`].
     ///
     /// When no fields have been set (via `.fields()`), all entity fields
     /// are included by default.
-    pub fn build(self) -> Insert {
-        // Default: include all entity fields when none were specified.
-        let fields = if self.fields.is_empty() {
-            self.model.field_names().map(|s| s.to_string()).collect()
-        } else {
-            self.fields
-        };
-
-        Insert {
-            target: entity_ref(self.model),
-            fields,
-            row_count: self.row_count,
-            returning: self.returning,
+    pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+        let mut q = crate::InsertQuery::new(
+            self.model.name.to_string(),
+            self.model.namespace.map(|s| s.to_string()),
+            Some(self.model.field_names().map(|s| s.to_string()).collect()),
+        );
+        if !self.fields.is_empty() {
+            q = q.fields(&self.fields.iter().map(|s| s.as_str()).collect::<Vec<_>>());
         }
+        q = q.rows(self.row_count);
+        if !self.returning.is_empty() {
+            q = q.returning(&self.returning.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+        }
+        q.build()
     }
 }
 
 // ===========================================================================
 // InsertSelectBuilder
 // ===========================================================================
+
+/// INSERT ... SELECT ... operation.
+#[derive(Debug, Clone)]
+pub struct InsertSelect {
+    pub target: dol_ir::EntityRef,
+    pub fields: Vec<String>,
+    pub source_query: String,
+    pub returning: Vec<String>,
+}
 
 /// Builder for `INSERT INTO ... SELECT ...` statements.
 #[derive(Debug, Clone)]
@@ -175,10 +170,14 @@ impl<'a> InsertSelectBuilder<'a> {
         self.output_all()
     }
 
-    /// Build the canonical [`InsertSelect`].
+    /// Build the [`InsertSelect`].
     pub fn build(self) -> InsertSelect {
         InsertSelect {
-            target: entity_ref(self.model),
+            target: dol_ir::EntityRef {
+                name: self.model.name.to_string(),
+                namespace: self.model.namespace.map(|s| s.to_string()),
+                alias: None,
+            },
             fields: self.fields,
             source_query: self.source_query,
             returning: self.returning,
@@ -282,31 +281,39 @@ impl<'a> UpdateBuilder<'a> {
         set_params + filter_params
     }
 
-    /// Build the canonical [`Update`].
-    pub fn build(self) -> Update<'static> {
-        Update {
-            target: entity_ref(self.model),
-            assignments: self.assignments,
-            filters: self.filters,
-            returning: self.returning,
+    /// Build the arena-based IR as a [`dol_ir::Statement`].
+    pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+        let mut q = crate::UpdateQuery::new(
+            self.model.name.to_string(),
+            self.model.namespace.map(|s| s.to_string()),
+        );
+        for (col, expr) in self.assignments {
+            q = q.set_expr(&col, expr);
         }
+        for f in self.filters {
+            q = q.filter(f);
+        }
+        if !self.returning.is_empty() {
+            q = q.returning(&self.returning.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+        }
+        q.build()
     }
 }
 
 // ===========================================================================
-// RemoveBuilder
+// DeleteBuilder
 // ===========================================================================
 
 /// Builder for `DELETE FROM ... WHERE ...` statements.
 #[derive(Debug, Clone)]
 #[must_use = "builders do nothing until .build() is called"]
-pub struct RemoveBuilder<'a> {
+pub struct DeleteBuilder<'a> {
     model: &'a Entity,
     filters: Vec<Expr<'static>>,
     returning: Vec<String>,
 }
 
-impl<'a> RemoveBuilder<'a> {
+impl<'a> DeleteBuilder<'a> {
     pub fn new(model: &'a Entity) -> Self {
         Self {
             model,
@@ -352,15 +359,25 @@ impl<'a> RemoveBuilder<'a> {
         self.filters.iter().map(count_single_expr_params).sum()
     }
 
-    /// Build the canonical [`Remove`].
-    pub fn build(self) -> Remove<'static> {
-        Remove {
-            target: entity_ref(self.model),
-            filters: self.filters,
-            returning: self.returning,
+    /// Build the arena-based IR as a [`dol_ir::Statement`].
+    pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+        let mut q = crate::DeleteQuery::new(
+            self.model.name.to_string(),
+            self.model.namespace.map(|s| s.to_string()),
+        );
+        for f in self.filters {
+            q = q.filter(f);
         }
+        if !self.returning.is_empty() {
+            q = q.returning(&self.returning.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+        }
+        q.build()
     }
 }
+
+/// Deprecated alias for [`DeleteBuilder`].
+#[deprecated(note = "renamed to `DeleteBuilder`")]
+pub type RemoveBuilder<'a> = DeleteBuilder<'a>;
 
 // ===========================================================================
 // UpsertBuilder
@@ -514,27 +531,38 @@ impl<'a> UpsertBuilder<'a> {
         insert_params + conflict_params
     }
 
-    /// Build the canonical [`Upsert`].
+    /// Build the arena-based IR as a [`dol_ir::Statement`].
     ///
     /// When no fields have been set (via `.fields()`), all entity fields
     /// are included by default.
-    pub fn build(self) -> Upsert<'static> {
-        // Default: include all entity fields when none were specified.
-        let fields = if self.fields.is_empty() {
-            self.model.field_names().map(|s| s.to_string()).collect()
-        } else {
-            self.fields
-        };
-
-        Upsert {
-            target: entity_ref(self.model),
-            fields,
-            conflict_fields: self.conflict_fields,
-            conflict_constraint: self.conflict_constraint,
-            update_fields: self.update_fields,
-            do_nothing: self.do_nothing_flag,
-            conflict_filters: self.conflict_filters,
-            returning: self.returning,
+    pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+        let field_names: Vec<String> = self.model.field_names().map(|s| s.to_string()).collect();
+        let mut q = crate::UpsertQuery::new(
+            self.model.name.to_string(),
+            self.model.namespace.map(|s| s.to_string()),
+            Some(field_names),
+        );
+        if !self.fields.is_empty() {
+            q = q.fields(&self.fields.iter().map(|s| s.as_str()).collect::<Vec<_>>());
         }
+        if !self.conflict_fields.is_empty() {
+            q = q.on_conflict(&self.conflict_fields.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+        }
+        if let Some(ref constraint) = self.conflict_constraint {
+            q = q.on_conflict_constraint(constraint);
+        }
+        if !self.update_fields.is_empty() {
+            q = q.do_update(&self.update_fields.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+        }
+        if self.do_nothing_flag {
+            q = q.do_nothing();
+        }
+        for f in self.conflict_filters {
+            q = q.conflict_filter(f);
+        }
+        if !self.returning.is_empty() {
+            q = q.returning(&self.returning.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+        }
+        q.build()
     }
 }

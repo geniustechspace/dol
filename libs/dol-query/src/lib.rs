@@ -13,8 +13,8 @@
 //!
 //! ```rust
 //! use dol_query::Query;
-//! use dol_entity::{Entity, Field, DataType};
-//! use dol_core::expr::{field, param};
+//! use dol_schema::{Entity, Field, DataType};
+//! use dol_expr::tree::{field, param};
 //!
 //! // From an Entity — full field-aware API
 //! let users = Entity::new("users", vec![
@@ -22,43 +22,61 @@
 //!     Field::new("email", DataType::Text),
 //! ]);
 //!
-//! let ir = Query::from(&users)
+//! let (stmt, _arena, interner) = Query::from(&users)
 //!     .get()
 //!     .filter(field("id").eq(param()))
 //!     .build();
-//! assert_eq!(ir.source.name, "users");
-//! assert_eq!(ir.projections.len(), 2);
+//! match stmt {
+//!     dol_ir::Statement::Query(q) => {
+//!         assert_eq!(interner.get(q.from), "users");
+//!         assert_eq!(q.columns.len(), 2);
+//!     }
+//!     _ => panic!("expected Query"),
+//! }
 //!
 //! // From a plain string — no field metadata needed
-//! let ir = Query::from("users")
+//! let (stmt, _arena, interner) = Query::from("users")
 //!     .get()
 //!     .fields(&["id", "email"])
 //!     .filter(field("id").eq(param()))
 //!     .build();
-//! assert_eq!(ir.source.name, "users");
+//! match stmt {
+//!     dol_ir::Statement::Query(q) => {
+//!         assert_eq!(interner.get(q.from), "users");
+//!     }
+//!     _ => panic!("expected Query"),
+//! }
 //!
 //! // From a namespaced string
-//! let ir = Query::from("identity.users")
+//! let (stmt, _arena, interner) = Query::from("identity.users")
 //!     .get()
 //!     .fields(&["id"])
 //!     .build();
-//! assert_eq!(ir.source.name, "users");
-//! assert_eq!(ir.source.namespace.as_deref(), Some("identity"));
+//! match stmt {
+//!     dol_ir::Statement::Query(q) => {
+//!         assert_eq!(interner.get(q.from), "identity.users");
+//!     }
+//!     _ => panic!("expected Query"),
+//! }
 //!
 //! // Namespace chaining — builds hierarchical paths
-//! let ir = Query::from("api")
+//! let (stmt, _arena, interner) = Query::from("api")
 //!     .namespace("v1")
 //!     .namespace("users")
 //!     .get()
 //!     .fields(&["id"])
 //!     .build();
-//! assert_eq!(ir.source.namespace.as_deref(), Some("api.v1"));
-//! assert_eq!(ir.source.name, "users");
+//! match stmt {
+//!     dol_ir::Statement::Query(q) => {
+//!         assert_eq!(interner.get(q.from), "api.v1.users");
+//!     }
+//!     _ => panic!("expected Query"),
+//! }
 //! ```
 //!
 //! # Backend Neutrality
 //!
-//! `dol-query` produces backend-agnostic IR types (`Query`, `Insert`, etc.)
+//! `dol-query` produces backend-agnostic IR types (`Statement`, `Query`, etc.)
 //! from `dol-ir`. These can be rendered by **any** backend — SQL, key-value,
 //! file system, API, or custom engines.
 
@@ -66,7 +84,8 @@
 
 mod get;
 mod insert;
-mod remove;
+pub mod lower;
+mod delete;
 mod update;
 mod upsert;
 
@@ -74,11 +93,13 @@ pub mod builder;
 
 pub use get::GetQuery;
 pub use insert::InsertQuery;
-pub use remove::RemoveQuery;
+pub use delete::DeleteQuery;
+#[allow(deprecated)]
+pub use delete::RemoveQuery;
 pub use update::UpdateQuery;
 pub use upsert::UpsertQuery;
 
-use dol_entity::Entity;
+use dol_schema::Entity;
 
 // ---------------------------------------------------------------------------
 // Query — the universal entry point
@@ -87,7 +108,7 @@ use dol_entity::Entity;
 /// Backend-neutral query entry point.
 ///
 /// Construct via `Query::from(&entity)` or `Query::from("entity_name")`.
-/// Then call `.get()`, `.insert()`, `.update()`, `.remove()`, or `.upsert()`
+/// Then call `.get()`, `.insert()`, `.update()`, `.delete()`, or `.upsert()`
 /// to begin building a specific operation.
 ///
 /// # Namespace chaining
@@ -100,23 +121,31 @@ use dol_entity::Entity;
 /// use dol_query::Query;
 ///
 /// // Single namespace
-/// let ir = Query::from("api")
+/// let (stmt, _arena, interner) = Query::from("api")
 ///     .namespace("users")
 ///     .get()
 ///     .fields(&["id"])
 ///     .build();
-/// assert_eq!(ir.source.namespace.as_deref(), Some("api"));
-/// assert_eq!(ir.source.name, "users");
+/// match stmt {
+///     dol_ir::Statement::Query(q) => {
+///         assert_eq!(interner.get(q.from), "api.users");
+///     }
+///     _ => panic!("expected Query"),
+/// }
 ///
 /// // Chained namespaces — builds "api.v1.users"
-/// let ir = Query::from("api")
+/// let (stmt, _arena, interner) = Query::from("api")
 ///     .namespace("v1")
 ///     .namespace("users")
 ///     .get()
 ///     .fields(&["id"])
 ///     .build();
-/// assert_eq!(ir.source.namespace.as_deref(), Some("api.v1"));
-/// assert_eq!(ir.source.name, "users");
+/// match stmt {
+///     dol_ir::Statement::Query(q) => {
+///         assert_eq!(interner.get(q.from), "api.v1.users");
+///     }
+///     _ => panic!("expected Query"),
+/// }
 /// ```
 #[derive(Debug, Clone)]
 pub struct Query {
@@ -164,9 +193,15 @@ impl Query {
         UpdateQuery::new(self.name, self.namespace)
     }
 
-    /// Start building a REMOVE (DELETE) statement.
-    pub fn remove(self) -> RemoveQuery {
-        RemoveQuery::new(self.name, self.namespace)
+    /// Start building a DELETE statement.
+    pub fn delete(self) -> DeleteQuery {
+        DeleteQuery::new(self.name, self.namespace)
+    }
+
+    /// Deprecated: use [`delete()`](Self::delete) instead.
+    #[deprecated(note = "use `delete()`")]
+    pub fn remove(self) -> DeleteQuery {
+        DeleteQuery::new(self.name, self.namespace)
     }
 
     /// Start building an UPSERT (INSERT ... ON CONFLICT) statement.
@@ -213,6 +248,31 @@ impl From<String> for Query {
     fn from(s: String) -> Self {
         Self::from(s.as_str())
     }
+}
+
+// ---------------------------------------------------------------------------
+// JoinKind / LockMode — locally defined
+// ---------------------------------------------------------------------------
+
+/// The kind of JOIN to perform.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum JoinKind {
+    Inner,
+    Left,
+    Right,
+    Full,
+    Cross,
+}
+
+/// Row-level locking mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LockMode {
+    ForUpdate,
+    ForShare,
+    ForUpdateNoWait,
+    ForShareNoWait,
+    ForUpdateSkipLocked,
+    ForShareSkipLocked,
 }
 
 // ===========================================================================

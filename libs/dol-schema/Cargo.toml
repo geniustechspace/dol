@@ -1,0 +1,18 @@
+[package]
+name = "dol-schema"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "DOL schema language — Entity, Field, DataType, and constraints."
+
+[dependencies]
+dol-ir = { workspace = true }
+dol-types = { workspace = true }
+serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[features]
+default = []
+serde = ["dep:serde", "dol-ir/serde"]

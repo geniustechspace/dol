@@ -1,13 +1,14 @@
 //! GET (SELECT) query builder — the primary read path for DOL.
 //!
 //! `GetBuilder` borrows a `&Model` and provides chainable methods to compose
-//! a SELECT query. Call `.build()` to produce a [`Query`].
+//! a SELECT query. Call `.build()` to produce a [`dol_ir::Statement`].
 //!
 //! For SQL rendering, import the `Render` extension trait from `dol-sql`.
 
-use dol_entity::Entity;
-use dol_core::expr::{Direction, Expr, NullsPosition, OrderByExpr, field_dyn};
-use dol_core::op::{EntityRef, Join, JoinKind, LockMode, OffsetLimit, Query};
+use dol_schema::Entity;
+use dol_expr::tree::{Direction, Expr, NullsPosition, OrderByExpr, field_dyn};
+
+use crate::{JoinKind, LockMode};
 
 // ---------------------------------------------------------------------------
 // Private join helper
@@ -366,68 +367,145 @@ impl<'a> GetBuilder<'a> {
 
     // ── Build to IR ─────────────────────────────────────────────────────
 
-    /// Consume the builder and produce a [`Query`].
+    /// Consume the builder and produce a [`dol_ir::Statement`].
     ///
     /// When no projections have been set (via `.fields()`, `.field()`,
     /// etc.), all entity fields are selected by default.
-    pub fn build(self) -> Query<'a> {
-        let source = EntityRef {
-            name: self.model.name.to_string(),
-            namespace: self.model.namespace.map(|s| s.to_string()),
-            alias: self.table_alias,
+    pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+        use crate::lower::{lower_expr, lower_filters, lower_order_by};
+        use dol_expr::expr::{
+            BinOp, ExprNode, JoinNode, JoinType as ArenaJoinType, LockHint, QueryNode,
         };
+        use dol_expr::ids::NULL_NODE;
+        use smallvec::SmallVec;
 
-        let joins = self
-            .joins
-            .into_iter()
-            .map(|jc| Join {
-                join_type: jc.join_type,
-                target: EntityRef {
-                    name: jc.model_name,
-                    namespace: jc.model_namespace,
-                    alias: jc.alias,
-                },
-                on_conditions: jc.on_conditions,
-            })
-            .collect();
+        let mut arena = dol_expr::ExprArena::new();
+        let mut interner = dol_expr::Interner::new();
 
-        let offset = if self.has_offset {
-            Some(OffsetLimit::Param)
-        } else {
-            None
-        };
+        let from = interner.intern(&crate::lower::qualified_name(
+            &self.model.name.to_string(),
+            &self.model.namespace.map(|s| s.to_string()),
+        ));
+        let alias = self.table_alias.as_deref().map(|a| interner.intern(a));
 
-        let limit = if self.has_limit {
-            Some(OffsetLimit::Param)
-        } else {
-            None
-        };
-
-        // Default: select all entity fields when no projections were specified.
-        let projections = if self.projections.is_empty() {
-            self.model
-                .fields
-                .iter()
-                .map(|f| field_dyn(f.name))
-                .collect()
+        // Default projections.
+        let proj_exprs: Vec<Expr<'static>> = if self.projections.is_empty() {
+            self.model.fields.iter().map(|f| field_dyn(f.name)).collect()
         } else {
             self.projections
         };
+        let columns: SmallVec<[u32; 8]> = proj_exprs
+            .iter()
+            .map(|e| lower_expr(e, &mut arena, &mut interner))
+            .collect();
 
-        Query {
-            source,
-            projections,
+        // Joins.
+        let joins: SmallVec<[JoinNode; 2]> = self
+            .joins
+            .into_iter()
+            .map(|jc| {
+                let source = interner.intern(&jc.model_name);
+                let jalias = jc.alias.as_deref().map(|a| interner.intern(a));
+                let join_type = match jc.join_type {
+                    JoinKind::Inner => ArenaJoinType::Inner,
+                    JoinKind::Left => ArenaJoinType::Left,
+                    JoinKind::Right => ArenaJoinType::Right,
+                    JoinKind::Full => ArenaJoinType::Full,
+                    JoinKind::Cross => ArenaJoinType::Cross,
+                };
+                let on = if jc.on_conditions.is_empty() {
+                    NULL_NODE
+                } else {
+                    let mut cond_ids: Vec<u32> = Vec::new();
+                    for (l, r) in &jc.on_conditions {
+                        let lid = {
+                            let col = interner.intern(l);
+                            let fid = arena.alloc_field(dol_expr::FieldNode {
+                                namespace: None,
+                                column: col,
+                                steps: SmallVec::new(),
+                            });
+                            arena.alloc(ExprNode::Field(fid))
+                        };
+                        let rid = {
+                            let col = interner.intern(r);
+                            let fid = arena.alloc_field(dol_expr::FieldNode {
+                                namespace: None,
+                                column: col,
+                                steps: SmallVec::new(),
+                            });
+                            arena.alloc(ExprNode::Field(fid))
+                        };
+                        cond_ids.push(arena.alloc(ExprNode::BinOp {
+                            op: BinOp::Eq,
+                            lhs: lid,
+                            rhs: rid,
+                        }));
+                    }
+                    let mut result = cond_ids[0];
+                    for id in &cond_ids[1..] {
+                        result = arena.alloc(ExprNode::BinOp {
+                            op: BinOp::And,
+                            lhs: result,
+                            rhs: *id,
+                        });
+                    }
+                    result
+                };
+                JoinNode {
+                    source,
+                    alias: jalias,
+                    join_type,
+                    on,
+                }
+            })
+            .collect();
+
+        let filter = lower_filters(&self.filters, &mut arena, &mut interner);
+
+        let group_by: SmallVec<[u32; 4]> = self
+            .group_by
+            .iter()
+            .map(|e| lower_expr(e, &mut arena, &mut interner))
+            .collect();
+
+        let having = if self.having.is_empty() {
+            NULL_NODE
+        } else {
+            lower_filters(&self.having, &mut arena, &mut interner)
+        };
+
+        let order_by: SmallVec<[(u32, dol_expr::expr::Order); 4]> = self
+            .order_by
+            .iter()
+            .map(|ob| lower_order_by(ob, &mut arena, &mut interner))
+            .collect();
+
+        // Note: LockHint has fewer variants than LockMode — ForShare+NoWait
+        // and ForShare+SkipLocked are approximated as NoWait/SkipLocked
+        // (losing the ForShare distinction). This is a dol-expr limitation.
+        let lock = self.lock_mode.map(|m| match m {
+            LockMode::ForUpdate => LockHint::ForUpdate,
+            LockMode::ForShare => LockHint::ForShare,
+            LockMode::ForUpdateNoWait | LockMode::ForShareNoWait => LockHint::NoWait,
+            LockMode::ForUpdateSkipLocked | LockMode::ForShareSkipLocked => LockHint::SkipLocked,
+        });
+
+        let node = QueryNode {
+            from,
+            alias,
             joins,
-            filters: self.filters,
-            group_by: self.group_by,
-            having: self.having,
-            order_by: self.order_by,
-            offset,
-            limit,
-            distinct: self.distinct,
-            distinct_on: self.distinct_on,
-            lock_mode: self.lock_mode,
-        }
+            filter,
+            columns,
+            group_by,
+            having,
+            order_by,
+            limit: None,
+            offset: None,
+            lock,
+        };
+
+        (dol_ir::Statement::Query(node), arena, interner)
     }
 }
 
@@ -494,7 +572,7 @@ pub(crate) fn count_single_expr_params(expr: &Expr<'static>) -> usize {
 
         Expr::Alias { expr, .. } => count_single_expr_params(expr),
 
-        Expr::Access { base, .. } => count_single_expr_params(base),
+        Expr::Field { base, .. } => count_single_expr_params(base),
 
         Expr::Object(fields) => fields
             .iter()

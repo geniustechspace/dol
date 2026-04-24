@@ -1,7 +1,11 @@
 //! Control builders — GRANT, REVOKE, DEFINE POLICY.
 
-use dol_core::expr::Expr;
-use dol_core::op::control::{DefinePolicy, Grant, PolicyAction, Revoke};
+use dol_expr::tree::Expr;
+use dol_ir::control::{Grant, Revoke};
+
+// Re-export Privilege and PolicyAction from dol-ir
+pub use dol_ir::control::PolicyAction;
+pub use dol_ir::control::Privilege;
 
 /// Builder for `GRANT` statements.
 #[derive(Debug, Clone)]
@@ -40,9 +44,6 @@ impl GrantBuilder {
     }
 }
 
-// Re-export Privilege for convenience
-pub use dol_core::op::control::Privilege;
-
 /// Builder for `REVOKE` statements.
 #[derive(Debug, Clone)]
 pub struct RevokeBuilder {
@@ -70,7 +71,7 @@ impl RevokeBuilder {
         self
     }
 
-    /// Build the canonical Revoke.
+    /// Build the canonical [`Revoke`] (dol-ir).
     pub fn build(&self) -> Revoke {
         Revoke {
             privilege: self.privilege.clone(),
@@ -88,10 +89,10 @@ impl RevokeBuilder {
 ///
 /// ```rust
 /// use dol_query::builder::control::DefinePolicyBuilder;
-/// use dol_core::expr::{field, param};
-/// use dol_core::op::control::PolicyAction;
+/// use dol_expr::tree::{field, param};
+/// use dol_query::builder::control::PolicyAction;
 ///
-/// let ir = DefinePolicyBuilder::new("tenant_isolation")
+/// let (stmt, _arena, _interner) = DefinePolicyBuilder::new("tenant_isolation")
 ///     .on("orders")
 ///     .for_action(PolicyAction::All)
 ///     .using(field("tenant_id").eq(param()))
@@ -143,14 +144,30 @@ impl DefinePolicyBuilder {
         self
     }
 
-    /// Build the canonical [`DefinePolicy`].
-    pub fn build(&self) -> DefinePolicy<'static> {
-        DefinePolicy {
+    /// Build the arena-based IR as a [`dol_ir::Statement`].
+    pub fn build(&self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+        use crate::lower::lower_expr;
+
+        let mut arena = dol_expr::ExprArena::new();
+        let mut interner = dol_expr::Interner::new();
+
+        let ir_action = match self.action {
+            PolicyAction::Read  => dol_ir::PolicyAction::Read,
+            PolicyAction::Write => dol_ir::PolicyAction::Write,
+            PolicyAction::All   => dol_ir::PolicyAction::All,
+        };
+
+        let using_id = self.using_expr.as_ref().map(|e| lower_expr(e, &mut arena, &mut interner));
+        let check_id = self.check_expr.as_ref().map(|e| lower_expr(e, &mut arena, &mut interner));
+
+        let policy = dol_ir::DefinePolicy {
             name: self.name.clone(),
             on_model: self.on_model.clone(),
-            action: self.action,
-            using_expr: self.using_expr.clone(),
-            check_expr: self.check_expr.clone(),
-        }
+            action: ir_action,
+            using_expr: using_id,
+            check_expr: check_id,
+        };
+
+        (dol_ir::Statement::DefinePolicy(policy), arena, interner)
     }
 }
