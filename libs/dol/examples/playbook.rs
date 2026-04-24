@@ -917,7 +917,7 @@ fn main() {
     let sql = DefineIndexBuilder::new("idx_users_active_email")
         .on("users")
         .columns(&["email"])
-        .method(dol::op::definition::IndexMethod::Hash)
+        .method(dol::ir::definition::IndexMethod::Hash)
         .where_clause("status = 'active'")
         .render(Some(&pg))
         .unwrap();
@@ -1551,8 +1551,8 @@ fn migration_examples() {
         MigrationState, MigrationStep, MigrationTarget, RenderedStep,
     };
     use dol::model::DataType;
-    use dol::op::definition::{DefineIndex, FieldDef};
-    use dol::op::{AlterAction, EntityRef};
+    use dol::ir::definition::{DefineIndex, FieldDef};
+    use dol::ir::{AlterAction, EntityRef};
 
     println!("\n--- 12. Migration System ---");
 
@@ -1812,7 +1812,7 @@ fn schema_diff_examples() {
         field_to_field_def,
     };
     use dol::model::DataType;
-    use dol::op::AlterAction;
+    use dol::ir::AlterAction;
 
     println!("\n--- 13. Schema Diff & Auto-Discovery ---");
 
@@ -1924,7 +1924,7 @@ fn config_migration_examples() {
         InMemoryRegistry, Migration, MigrationRunner, MigrationStep, RenderedStep,
     };
     use dol::model::DataType;
-    use dol::op::definition::FieldDef;
+    use dol::ir::definition::FieldDef;
 
     println!("\n--- 14. Config-Integrated Migrations ---");
 

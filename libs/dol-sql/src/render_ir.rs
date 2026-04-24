@@ -787,6 +787,21 @@ pub fn render_define_entity(ir: &DefineEntity, dialect: &Dialect) -> Result<SqlO
     for fd in &ir.fields {
         parts.push(format!("  {}", render_field_def_ir(fd, dialect)));
     }
+
+    // Derive a table-level PRIMARY KEY constraint from fields if none is present.
+    let has_explicit_pk = ir.constraints.iter().any(|c| {
+        matches!(c, OwnedEntityConstraint::PrimaryKey(_))
+    });
+    if !has_explicit_pk {
+        let pk_cols: Vec<String> = ir.fields.iter()
+            .filter(|f| f.primary_key)
+            .map(|f| f.name.clone())
+            .collect();
+        if !pk_cols.is_empty() {
+            parts.push(format!("  PRIMARY KEY ({})", pk_cols.join(", ")));
+        }
+    }
+
     for c in &ir.constraints {
         parts.push(format!("  {}", render_entity_constraint(c)));
     }

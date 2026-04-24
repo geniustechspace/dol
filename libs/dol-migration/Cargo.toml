@@ -7,6 +7,7 @@ description = "DOL migration system — type-safe schema migrations across all s
 
 [dependencies]
 dol-core = { workspace = true }
+dol-ir = { workspace = true }
 dol-entity = { workspace = true }
 dol-query = { workspace = true }
 dol-sql = { workspace = true }

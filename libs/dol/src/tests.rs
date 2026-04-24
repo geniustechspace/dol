@@ -2384,7 +2384,7 @@ fn expr_array_literal() {
 
 #[test]
 fn define_model_via_static_method() {
-    use crate::op::definition::FieldDef;
+    use dol_ir::definition::FieldDef;
 
     let ir = Entity::define("users")
         .field(FieldDef::new("id", DataType::Uuid).primary_key())

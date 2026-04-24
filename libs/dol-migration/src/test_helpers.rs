@@ -1,7 +1,7 @@
 use super::*;
 use dol_entity::DefineEntityBuilder;
-use dol_core::op::EntityRef;
-use dol_core::op::definition::{DefineIndex, FieldDef};
+use dol_ir::entity_ref::EntityRef;
+use dol_ir::definition::{DefineIndex, FieldDef};
 use dol_entity::DataType;
 
 /// Test migration: Create users table.

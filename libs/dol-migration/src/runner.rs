@@ -3,10 +3,9 @@
 use super::plan::{self, MigrationDirection, MigrationPlan, MigrationTarget, PlannedStep};
 use super::registry::{AppliedMigration, MigrationRegistry};
 use super::{KvMigrationOp, Migration, MigrationError, MigrationStep, StorageMigrationOp};
-use dol_core::op::BackendError;
-use dol_core::op::Statement;
+use dol_ir::Statement;
 use dol_sql::dialect::{self, Dialect};
-use dol_sql::render;
+use dol_sql::render_ir;
 
 // ===========================================================================
 // RenderedStep — the output of rendering a migration step
@@ -118,7 +117,7 @@ pub struct RenderedMigration {
 ///     Migration, MigrationStep, MigrationRunner, MigrationTarget,
 ///     InMemoryRegistry, MigrationRegistry,
 /// };
-/// use dol_core::op::definition::FieldDef;
+/// use dol_ir::definition::FieldDef;
 /// use dol_entity::DataType;
 ///
 /// struct CreateUsers;
@@ -495,31 +494,7 @@ fn render_step(step: &MigrationStep, dialect: &Dialect) -> RenderedStep {
 
 /// Render a SQL statement to a [`RenderedStep`].
 fn render_sql_step(stmt: &Statement, dialect: &Dialect) -> RenderedStep {
-    let result: Result<dol_sql::SqlOutput, BackendError> = match stmt {
-        Statement::DefineEntity(ir) => render::render_define_entity_ir(ir, dialect),
-        Statement::AlterEntity(ir) => render::render_alter_entity_ir(ir, dialect),
-        Statement::DropEntity(ir) => render::render_drop_entity_ir(ir, dialect),
-        Statement::DefineIndex(ir) => render::render_define_index_ir(ir, dialect),
-        Statement::DropIndex(ir) => render::render_drop_index_ir(ir, dialect),
-        Statement::DefineType(ir) => render::render_define_type_ir(ir, dialect),
-        Statement::DropType(ir) => render::render_drop_type_ir(ir, dialect),
-        Statement::DefinePolicy(ir) => render::render_define_policy_ir(ir, dialect),
-        Statement::Grant(ir) => render::render_grant_ir(ir),
-        Statement::Revoke(ir) => render::render_revoke_ir(ir),
-        Statement::Transaction(ir) => render::render_transaction_ir(ir, dialect),
-        Statement::Insert(ir) => render::render_insert_ir(ir, dialect),
-        Statement::InsertSelect(ir) => render::render_insert_select_ir(ir, dialect),
-        Statement::Update(ir) => render::render_update_ir(ir, dialect),
-        Statement::Remove(ir) => render::render_remove_ir(ir, dialect),
-        Statement::Upsert(ir) => render::render_upsert_ir(ir, dialect),
-        Statement::Query(ir) => render::render_query_ir(ir, dialect),
-        Statement::Compound(ir) => render::render_compound_query_ir(ir, dialect),
-        _ => Err(BackendError::Unsupported(format!(
-            "unsupported statement in migration: {:?}",
-            std::mem::discriminant(stmt)
-        ))),
-    };
-
+    let result = render_ir::render_ir_statement(stmt, None, dialect);
     match result {
         Ok(output) => RenderedStep::Sql {
             sql: output.sql,

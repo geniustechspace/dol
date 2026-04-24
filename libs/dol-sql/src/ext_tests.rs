@@ -1,7 +1,7 @@
 use super::*;
 use dol_query::builder::EntityBuilderExt;
 use dol_core::expr::{field, param};
-use dol_core::op::definition::FieldDef;
+use dol_ir::definition::FieldDef;
 use dol_entity::{Entity, Field, DataType};
 
 fn pg() -> Dialect {

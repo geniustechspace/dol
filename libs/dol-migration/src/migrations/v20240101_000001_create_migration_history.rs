@@ -6,8 +6,8 @@
 
 use crate::{Migration, MigrationStep};
 use dol_entity::DefineEntityBuilder;
-use dol_core::op::EntityRef;
-use dol_core::op::definition::{DefineIndex, FieldDef};
+use dol_ir::entity_ref::EntityRef;
+use dol_ir::definition::{DefineIndex, FieldDef};
 use dol_entity::DataType;
 
 /// Creates the `_dol_migrations` table and an index on the `applied_at` column.

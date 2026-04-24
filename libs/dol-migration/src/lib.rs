@@ -34,9 +34,8 @@
 //!
 //! ```rust
 //! use dol_migration::{Migration, MigrationStep, MigrationRunner, InMemoryRegistry};
-//! use dol_core::op::definition::FieldDef;
+//! use dol_ir::definition::FieldDef;
 //! use dol_entity::DataType;
-//! use dol_core::op::Statement;
 //!
 //! // Define a migration in pure Rust
 //! struct CreateUsersTable;
@@ -93,7 +92,10 @@ pub use schema_diff::{
     drop_entity_step, field_to_field_def,
 };
 
-use dol_core::op;
+use dol_ir;
+use dol_ir::definition::{AlterAction, AlterEntity, DefineEntity, DefineIndex, DefineType, DropEntity, DropIndex, DropType};
+use dol_ir::entity_ref::EntityRef;
+use dol_ir::control::{Grant, Revoke};
 
 use std::fmt;
 
@@ -117,7 +119,7 @@ use std::fmt;
 ///
 /// ```rust
 /// use dol_migration::{Migration, MigrationStep};
-/// use dol_core::op::definition::FieldDef;
+/// use dol_ir::definition::{AlterAction, FieldDef};
 /// use dol_entity::DataType;
 ///
 /// struct AddProfileColumn;
@@ -129,7 +131,7 @@ use std::fmt;
 ///     fn up(&self) -> Vec<MigrationStep> {
 ///         vec![MigrationStep::alter_entity(
 ///             "users",
-///             vec![dol_core::op::AlterAction::AddField(
+///             vec![AlterAction::AddField(
 ///                 FieldDef::new("profile", DataType::Json).nullable()
 ///             )]
 ///         )]
@@ -138,7 +140,7 @@ use std::fmt;
 ///     fn down(&self) -> Vec<MigrationStep> {
 ///         vec![MigrationStep::alter_entity(
 ///             "users",
-///             vec![dol_core::op::AlterAction::DropField("profile".into())]
+///             vec![AlterAction::DropField("profile".into())]
 ///         )]
 ///     }
 /// }
@@ -164,14 +166,14 @@ pub trait Migration: Send + Sync {
 /// A single step within a migration.
 ///
 /// Steps map to DOL IR operations and cover all three storage backends:
-/// - **SQL**: DDL operations via [`op::Statement`] (CREATE, ALTER, DROP, INDEX, etc.)
+/// - **SQL**: DDL operations via [`dol_ir::Statement`] (CREATE, ALTER, DROP, INDEX, etc.)
 /// - **KV**: Key-value namespace and key-pattern operations via [`KvMigrationOp`]
 /// - **Storage**: Object storage bucket and prefix operations via [`StorageMigrationOp`]
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum MigrationStep {
-    /// A DOL IR statement (SQL DDL, DML, indexes, grants, transactions, etc.).
-    Sql(op::Statement<'static>),
+    /// A DOL IR statement (SQL DDL, indexes, grants, transactions, etc.).
+    Sql(dol_ir::Statement),
 
     /// A key-value specific migration operation.
     Kv(KvMigrationOp),
@@ -183,15 +185,15 @@ pub enum MigrationStep {
 impl MigrationStep {
     // -- SQL convenience constructors --
 
-    /// Create a table from a [`DefineEntity`](op::DefineEntity).
-    pub fn define_entity(ir: op::DefineEntity) -> Self {
-        Self::Sql(op::Statement::DefineEntity(Box::new(ir)))
+    /// Create a table from a [`DefineEntity`].
+    pub fn define_entity(ir: DefineEntity) -> Self {
+        Self::Sql(dol_ir::Statement::DefineEntity(Box::new(ir)))
     }
 
     /// Drop a table by name (with IF EXISTS).
     pub fn drop_entity(name: &str) -> Self {
-        Self::Sql(op::Statement::DropEntity(op::DropEntity {
-            target: op::EntityRef {
+        Self::Sql(dol_ir::Statement::DropEntity(DropEntity {
+            target: EntityRef {
                 name: name.to_string(),
                 namespace: None,
                 alias: None,
@@ -203,8 +205,8 @@ impl MigrationStep {
 
     /// Drop a table by name with CASCADE.
     pub fn drop_model_cascade(name: &str) -> Self {
-        Self::Sql(op::Statement::DropEntity(op::DropEntity {
-            target: op::EntityRef {
+        Self::Sql(dol_ir::Statement::DropEntity(DropEntity {
+            target: EntityRef {
                 name: name.to_string(),
                 namespace: None,
                 alias: None,
@@ -215,9 +217,9 @@ impl MigrationStep {
     }
 
     /// Alter a table with the given actions.
-    pub fn alter_entity(name: &str, actions: Vec<op::AlterAction>) -> Self {
-        Self::Sql(op::Statement::AlterEntity(op::AlterEntity {
-            target: op::EntityRef {
+    pub fn alter_entity(name: &str, actions: Vec<AlterAction>) -> Self {
+        Self::Sql(dol_ir::Statement::AlterEntity(AlterEntity {
+            target: EntityRef {
                 name: name.to_string(),
                 namespace: None,
                 alias: None,
@@ -226,14 +228,14 @@ impl MigrationStep {
         }))
     }
 
-    /// Create an index from a [`DefineIndex`](op::DefineIndex).
-    pub fn define_index(ir: op::DefineIndex) -> Self {
-        Self::Sql(op::Statement::DefineIndex(ir))
+    /// Create an index from a [`DefineIndex`].
+    pub fn define_index(ir: DefineIndex) -> Self {
+        Self::Sql(dol_ir::Statement::DefineIndex(ir))
     }
 
     /// Drop an index by name (with IF EXISTS).
     pub fn drop_index(name: &str) -> Self {
-        Self::Sql(op::Statement::DropIndex(op::DropIndex {
+        Self::Sql(dol_ir::Statement::DropIndex(DropIndex {
             name: name.to_string(),
             if_exists: true,
             concurrently: false,
@@ -243,7 +245,7 @@ impl MigrationStep {
 
     /// Create a custom type (e.g., enum).
     pub fn define_type(name: &str, variants: Vec<String>) -> Self {
-        Self::Sql(op::Statement::DefineType(op::DefineType {
+        Self::Sql(dol_ir::Statement::DefineType(DefineType {
             name: name.to_string(),
             namespace: None,
             variants,
@@ -252,24 +254,24 @@ impl MigrationStep {
 
     /// Drop a custom type by name.
     pub fn drop_type(name: &str) -> Self {
-        Self::Sql(op::Statement::DropType(op::DropType {
+        Self::Sql(dol_ir::Statement::DropType(DropType {
             name: name.to_string(),
             if_exists: true,
         }))
     }
 
     /// Grant privileges.
-    pub fn grant(ir: op::Grant) -> Self {
-        Self::Sql(op::Statement::Grant(ir))
+    pub fn grant(ir: Grant) -> Self {
+        Self::Sql(dol_ir::Statement::Grant(ir))
     }
 
     /// Revoke privileges.
-    pub fn revoke(ir: op::Revoke) -> Self {
-        Self::Sql(op::Statement::Revoke(ir))
+    pub fn revoke(ir: Revoke) -> Self {
+        Self::Sql(dol_ir::Statement::Revoke(ir))
     }
 
-    /// Wrap any raw [`op::Statement`].
-    pub fn raw_statement(stmt: op::Statement<'static>) -> Self {
+    /// Wrap any raw [`dol_ir::Statement`].
+    pub fn raw_statement(stmt: dol_ir::Statement) -> Self {
         Self::Sql(stmt)
     }
 

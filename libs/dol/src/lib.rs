@@ -84,6 +84,9 @@ pub use dol_entity as model;
 /// Backend-agnostic AST — operations, statements, and error types.
 pub use dol_core::op;
 
+/// DOL IR — the new IR layer (owned, lifetime-free DDL/control/storage types).
+pub use dol_ir as ir;
+
 /// Builder API — composable method-chain builders that produce IR.
 pub mod builder {
     pub use dol_entity::{
@@ -131,8 +134,8 @@ pub use dol_config as config;
 
 // ── Top-level re-exports for ergonomic use ──
 
-pub use dol_core::op::definition::FieldDef;
-pub use dol_core::op::definition::OwnedEntityConstraint;
+pub use dol_ir::definition::FieldDef;
+pub use dol_ir::definition::OwnedEntityConstraint;
 pub use dol_core::constraint::{EntityConstraint, FkAction, ForeignKeyRef, GeneratedKind};
 pub use dol_entity::{Entity, Field, DataType};
 pub use dol_sql::dialect::Dialect;
