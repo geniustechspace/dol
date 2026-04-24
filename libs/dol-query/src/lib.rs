@@ -90,6 +90,7 @@ mod upsert;
 
 pub mod builder;
 pub mod ddl;
+pub mod prelude;
 
 pub use ddl::{
     AlterEntityBuilder, CreateFromMeta, DefineEntityBuilder, DefineIndexBuilder, DefineTypeBuilder,

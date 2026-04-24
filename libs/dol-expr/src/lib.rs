@@ -16,6 +16,7 @@ pub mod expr;
 pub mod ids;
 pub mod interner;
 pub mod lower;
+pub mod prelude;
 pub mod session;
 pub mod tree;
 pub mod types;

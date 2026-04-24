@@ -31,13 +31,18 @@
 #![deny(unsafe_code)]
 
 pub mod binary;
+pub mod data_type;
 pub mod datetime;
-pub mod descriptor;
 pub mod error;
 pub mod geo;
 pub mod network;
 pub mod numeric;
+pub mod prelude;
 pub mod value;
+
+/// Compatibility re-export — the old `descriptor` module has moved to [`data_type`].
+#[doc(hidden)]
+pub use data_type as descriptor;
 
 // ─── Re-exports ───────────────────────────────────────────────────────────────
 
@@ -49,6 +54,6 @@ pub use geo::{Circle, Line, Path, Point, Polygon, Rect, Segment};
 pub use network::{IpAddr, MacAddr, MacAddr8};
 pub use numeric::Decimal;
 
-pub use descriptor::{DataType, StructField};
+pub use data_type::{DataType, StructField};
 
 pub use value::{Literal, LiteralRange, Value, ValueRange};

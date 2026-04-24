@@ -13,6 +13,7 @@ pub mod backend;
 pub mod control;
 pub mod definition;
 pub mod entity_ref;
+pub mod prelude;
 pub mod statement;
 pub mod storage;
 pub mod transaction;

@@ -17,6 +17,7 @@
 pub mod constraint;
 pub mod field;
 pub mod field_type;
+pub mod prelude;
 
 pub use constraint::{EntityConstraint, FkAction, ForeignKeyRef, GeneratedKind};
 pub use field::Field;

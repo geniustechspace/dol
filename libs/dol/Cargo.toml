@@ -1,0 +1,34 @@
+[package]
+name = "dol"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "DOL — umbrella facade re-exporting the dol-* crates behind feature flags."
+
+[dependencies]
+dol-types  = { workspace = true }
+dol-expr   = { workspace = true, optional = true }
+dol-schema = { workspace = true, optional = true }
+dol-ir     = { workspace = true, optional = true }
+dol-query  = { workspace = true, optional = true }
+
+[features]
+default = []
+
+# Turn on each layer's public surface independently.
+expr   = ["dep:dol-expr"]
+schema = ["dep:dol-schema"]
+ir     = ["dep:dol-ir", "dep:dol-expr", "dep:dol-schema"]
+query  = ["dep:dol-query", "dep:dol-ir", "dep:dol-expr", "dep:dol-schema"]
+
+# Convenience: turn everything on.
+full = ["expr", "schema", "ir", "query"]
+
+# Universal serde — turns on the `serde` feature on every active sub-crate.
+serde = [
+    "dol-types/serde",
+    "dol-expr?/serde",
+    "dol-schema?/serde",
+    "dol-ir?/serde",
+    "dol-query?/serde",
+]

@@ -3,6 +3,17 @@
 version = 4
 
 [[package]]
+name = "dol"
+version = "0.1.0"
+dependencies = [
+ "dol-expr",
+ "dol-ir",
+ "dol-query",
+ "dol-schema",
+ "dol-types",
+]
+
+[[package]]
 name = "dol-expr"
 version = "0.1.0"
 dependencies = [
