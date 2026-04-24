@@ -198,7 +198,7 @@ impl Query {
         DeleteQuery::new(self.name, self.namespace)
     }
 
-    /// Start building a DELETE statement.
+    /// Deprecated: use [`delete()`](Self::delete) instead.
     #[deprecated(note = "use `delete()`")]
     pub fn remove(self) -> DeleteQuery {
         DeleteQuery::new(self.name, self.namespace)
