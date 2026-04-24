@@ -10,7 +10,7 @@ use super::window::CaseBuilder;
 ///
 /// The name is a string literal → stored as `CompactName::Static` (zero alloc).
 pub fn field(name: &'static str) -> Expr<'static> {
-    Expr::Ref(PathExpr::one(name))
+    Expr::Namespace(PathExpr::one(name))
 }
 
 /// Create a runtime field reference from a non-static `&str` (allocates).
@@ -21,14 +21,14 @@ pub fn field(name: &'static str) -> Expr<'static> {
 ///
 /// Prefer [`field`] for compile-time-known names.
 pub fn field_dyn(name: &str) -> Expr<'static> {
-    Expr::Ref(PathExpr::from_str(name))
+    Expr::Namespace(PathExpr::from_str(name))
 }
 
 /// Create a qualified reference: `scope.name` (e.g. `"users"`, `"email"`).
 ///
 /// Both segments are string literals → zero alloc.
 pub fn qualified(scope: &'static str, name: &'static str) -> Expr<'static> {
-    Expr::Ref(PathExpr::from_segments([scope, name]))
+    Expr::Namespace(PathExpr::from_segments([scope, name]))
 }
 
 /// Create a null literal.
@@ -83,13 +83,13 @@ pub fn arr<'a>(elements: Vec<Expr<'a>>) -> Expr<'a> {
     Expr::Array(elements)
 }
 
-/// Convert `&str` to `Expr::Ref` for ergonomic builder use.
+/// Convert `&str` to `Expr::Namespace` for ergonomic builder use.
 ///
 /// String literals use `CompactName::Static` (zero alloc). Non-static `&str`
 /// creates an `Owned` variant.
 impl<'a> From<&str> for Expr<'a> {
     fn from(s: &str) -> Self {
-        Expr::Ref(PathExpr::from_str(s))
+        Expr::Namespace(PathExpr::from_str(s))
     }
 }
 

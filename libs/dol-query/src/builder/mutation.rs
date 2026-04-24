@@ -1,4 +1,4 @@
-//! Mutation builders — INSERT, INSERT SELECT, UPDATE, REMOVE, UPSERT.
+//! Mutation builders — INSERT, INSERT SELECT, UPDATE, DELETE, UPSERT.
 //!
 //! Each builder borrows a `&Model` and provides chainable configuration
 //! and a `.build()` method to produce the canonical IR.
@@ -301,19 +301,19 @@ impl<'a> UpdateBuilder<'a> {
 }
 
 // ===========================================================================
-// RemoveBuilder
+// DeleteBuilder
 // ===========================================================================
 
 /// Builder for `DELETE FROM ... WHERE ...` statements.
 #[derive(Debug, Clone)]
 #[must_use = "builders do nothing until .build() is called"]
-pub struct RemoveBuilder<'a> {
+pub struct DeleteBuilder<'a> {
     model: &'a Entity,
     filters: Vec<Expr<'static>>,
     returning: Vec<String>,
 }
 
-impl<'a> RemoveBuilder<'a> {
+impl<'a> DeleteBuilder<'a> {
     pub fn new(model: &'a Entity) -> Self {
         Self {
             model,
@@ -361,7 +361,7 @@ impl<'a> RemoveBuilder<'a> {
 
     /// Build the arena-based IR as a [`dol_ir::Statement`].
     pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
-        let mut q = crate::RemoveQuery::new(
+        let mut q = crate::DeleteQuery::new(
             self.model.name.to_string(),
             self.model.namespace.map(|s| s.to_string()),
         );
@@ -374,6 +374,10 @@ impl<'a> RemoveBuilder<'a> {
         q.build()
     }
 }
+
+/// Deprecated alias for [`DeleteBuilder`].
+#[deprecated(note = "renamed to `DeleteBuilder`")]
+pub type RemoveBuilder<'a> = DeleteBuilder<'a>;
 
 // ===========================================================================
 // UpsertBuilder

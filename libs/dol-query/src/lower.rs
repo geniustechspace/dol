@@ -22,7 +22,7 @@ pub fn lower_expr(
     interner: &mut Interner,
 ) -> NodeId {
     match expr {
-        Expr::Ref(path) => {
+        Expr::Namespace(path) => {
             let segments: Vec<&str> = path.iter().collect();
             if segments.len() == 1 {
                 let col = interner.intern(segments[0]);
@@ -54,7 +54,7 @@ pub fn lower_expr(
             }
         }
 
-        Expr::Access { base, path } => {
+        Expr::Field { base, path } => {
             let base_id = lower_expr(base, arena, interner);
             let segments: Vec<&str> = path.iter().collect();
             let mut result = base_id;
