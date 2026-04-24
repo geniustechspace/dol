@@ -1,13 +1,14 @@
 //! GET (SELECT) query builder — the primary read path for DOL.
 //!
 //! `GetBuilder` borrows a `&Model` and provides chainable methods to compose
-//! a SELECT query. Call `.build()` to produce a [`Query`].
+//! a SELECT query. Call `.build()` to produce a [`dol_ir::Statement`].
 //!
 //! For SQL rendering, import the `Render` extension trait from `dol-sql`.
 
 use dol_entity::Entity;
-use dol_core::expr::{Direction, Expr, NullsPosition, OrderByExpr, field_dyn};
-use dol_core::op::{EntityRef, Join, JoinKind, LockMode, OffsetLimit, Query};
+use dol_expr::tree::{Direction, Expr, NullsPosition, OrderByExpr, field_dyn};
+
+use crate::{JoinKind, LockMode};
 
 // ---------------------------------------------------------------------------
 // Private join helper
@@ -366,72 +367,11 @@ impl<'a> GetBuilder<'a> {
 
     // ── Build to IR ─────────────────────────────────────────────────────
 
-    /// Consume the builder and produce a [`Query`].
+    /// Consume the builder and produce a [`dol_ir::Statement`].
     ///
     /// When no projections have been set (via `.fields()`, `.field()`,
     /// etc.), all entity fields are selected by default.
-    pub fn build(self) -> Query<'a> {
-        let source = EntityRef {
-            name: self.model.name.to_string(),
-            namespace: self.model.namespace.map(|s| s.to_string()),
-            alias: self.table_alias,
-        };
-
-        let joins = self
-            .joins
-            .into_iter()
-            .map(|jc| Join {
-                join_type: jc.join_type,
-                target: EntityRef {
-                    name: jc.model_name,
-                    namespace: jc.model_namespace,
-                    alias: jc.alias,
-                },
-                on_conditions: jc.on_conditions,
-            })
-            .collect();
-
-        let offset = if self.has_offset {
-            Some(OffsetLimit::Param)
-        } else {
-            None
-        };
-
-        let limit = if self.has_limit {
-            Some(OffsetLimit::Param)
-        } else {
-            None
-        };
-
-        // Default: select all entity fields when no projections were specified.
-        let projections = if self.projections.is_empty() {
-            self.model
-                .fields
-                .iter()
-                .map(|f| field_dyn(f.name))
-                .collect()
-        } else {
-            self.projections
-        };
-
-        Query {
-            source,
-            projections,
-            joins,
-            filters: self.filters,
-            group_by: self.group_by,
-            having: self.having,
-            order_by: self.order_by,
-            offset,
-            limit,
-            distinct: self.distinct,
-            distinct_on: self.distinct_on,
-            lock_mode: self.lock_mode,
-        }
-    }
-
-    /// Build the arena-based IR as a [`dol_ir::Statement`].
-    pub fn build_ir(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+    pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
         use crate::lower::{lower_expr, lower_filters, lower_order_by};
         use dol_expr::expr::{
             BinOp, ExprNode, JoinNode, JoinType as ArenaJoinType, LockHint, QueryNode,
