@@ -27,7 +27,8 @@ pub use control::Privilege;
 // EntityBuilderExt — CRUD + DDL builder entry-points on Entity
 // ---------------------------------------------------------------------------
 
-use dol_schema::{AlterEntityBuilder, CreateFromMeta, DropEntityBuilder, Entity};
+use crate::ddl::{AlterEntityBuilder, CreateFromMeta, DropEntityBuilder};
+use dol_schema::Entity;
 
 /// Extension trait providing builder entry-point methods on [`Entity`].
 ///

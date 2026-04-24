@@ -4,12 +4,44 @@
 //! the data-model layer. They use owned strings (`Arc<str>`) so they can
 //! implement `Deserialize` and survive round-trips through serde.
 //!
-//! The `Copy` unit enums (`FkAction`, `GeneratedKind`) are re-exported from
-//! `dol-ir` to avoid duplication.
+//! `dol-schema` is the single owner of constraint types; `dol-ir` re-exports
+//! the names it needs to embed in DDL `Statement` variants.
 
+use std::fmt;
 use std::sync::Arc;
 
-pub use dol_ir::constraint::{FkAction, GeneratedKind};
+/// Action to take when a referenced record is deleted or updated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum FkAction {
+    NoAction,
+    Cascade,
+    SetNull,
+    Restrict,
+    SetDefault,
+}
+
+impl fmt::Display for FkAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NoAction => write!(f, "NO ACTION"),
+            Self::Cascade => write!(f, "CASCADE"),
+            Self::SetNull => write!(f, "SET NULL"),
+            Self::Restrict => write!(f, "RESTRICT"),
+            Self::SetDefault => write!(f, "SET DEFAULT"),
+        }
+    }
+}
+
+/// How a generated (computed) column is defined.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum GeneratedKind {
+    /// `GENERATED ALWAYS AS (expr) STORED` — materialized on write.
+    Stored,
+    /// `GENERATED ALWAYS AS (expr) VIRTUAL` — computed on read.
+    Virtual,
+}
 
 /// An inline foreign key reference on a single field.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -1,65 +1,30 @@
-//! Definition builders — CREATE, ALTER, DROP for models, indexes, and types.
+//! Definition builders — CREATE, ALTER, DROP for entities, indexes, and types.
 //!
-//! - [`CreateFromMeta`]: builds a `DefineEntity` from static [`Model`] metadata.
+//! - [`CreateFromMeta`]: builds a `DefineEntity` from static [`Entity`] metadata.
 //! - [`DefineEntityBuilder`]: builds a CREATE TABLE from owned [`FieldDef`]s (runtime-defined).
-//! - [`AlterEntityBuilder`]: builds ALTER TABLE statements from a Model reference.
-//! - [`DropEntityBuilder`]: builds DROP TABLE from a Model reference.
+//! - [`AlterEntityBuilder`]: builds ALTER TABLE statements from an [`Entity`] reference.
+//! - [`DropEntityBuilder`]: builds DROP TABLE from an [`Entity`] reference.
 //! - [`DefineIndexBuilder`]: builds CREATE INDEX.
 //! - [`DropIndexBuilder`]: builds DROP INDEX.
 //! - [`DefineTypeBuilder`]: builds CREATE TYPE (enum types).
 //! - [`DropTypeBuilder`]: builds DROP TYPE.
-//!
-//! For SQL rendering, import the extension traits from `dol-sql`.
 
-use crate::constraint::{EntityConstraint, ForeignKeyRef};
-use crate::{DataType, Entity, Field};
 use dol_ir::definition::{
     AlterAction, AlterEntity, DefineEntity, DefineIndex, DefineType, DropEntity, DropIndex,
-    DropType, FieldDef, IndexMethod, OwnedEntityConstraint, OwnedForeignKeyRef,
+    DropType, FieldDef, IndexMethod,
 };
 use dol_ir::entity_ref::EntityRef;
+use dol_schema::{DataType, Entity, EntityConstraint, Field};
 
 // ---------------------------------------------------------------------------
 // Field -> FieldDef conversion helper
 // ---------------------------------------------------------------------------
 
-/// Convert a `dol_schema::ForeignKeyRef` (owned, `Arc<str>`) to the IR's
-/// `OwnedForeignKeyRef` (owned, `String`).
-fn fk_to_ir(fk: &ForeignKeyRef) -> OwnedForeignKeyRef {
-    OwnedForeignKeyRef {
-        table: fk.table.to_string(),
-        column: fk.column.to_string(),
-        on_delete: fk.on_delete,
-        on_update: fk.on_update,
-    }
-}
-
-/// Convert a `dol_schema::EntityConstraint` (owned, `Arc<str>`) to the IR's
-/// `OwnedEntityConstraint` (owned, `String`).
-fn constraint_to_ir(c: &EntityConstraint) -> OwnedEntityConstraint {
-    match c {
-        EntityConstraint::Unique(cols) => {
-            OwnedEntityConstraint::Unique(cols.iter().map(|s| s.to_string()).collect())
-        }
-        EntityConstraint::ForeignKey {
-            columns,
-            ref_table,
-            ref_columns,
-            on_delete,
-        } => OwnedEntityConstraint::ForeignKey {
-            columns: columns.iter().map(|s| s.to_string()).collect(),
-            ref_table: ref_table.to_string(),
-            ref_columns: ref_columns.iter().map(|s| s.to_string()).collect(),
-            on_delete: *on_delete,
-        },
-        EntityConstraint::Check(expr) => OwnedEntityConstraint::Check(expr.to_string()),
-        EntityConstraint::PrimaryKey(cols) => {
-            OwnedEntityConstraint::PrimaryKey(cols.iter().map(|s| s.to_string()).collect())
-        }
-    }
-}
-
-/// Converts a static [`Field`] into an owned [`FieldDef`].
+/// Converts a [`Field`] into an owned IR [`FieldDef`].
+///
+/// `dol_schema::ForeignKeyRef` and `dol_schema::EntityConstraint` are reused
+/// directly in the IR, so this helper only converts the surrounding `Arc<str>`
+/// scalars to `String` to match the IR's DDL string policy.
 fn field_to_field_def(f: &Field) -> FieldDef {
     FieldDef {
         name: f.name.to_string(),
@@ -68,7 +33,7 @@ fn field_to_field_def(f: &Field) -> FieldDef {
         nullable: f.nullable,
         default_expr: f.default_expr.as_ref().map(|s| s.to_string()),
         unique: f.unique,
-        references: f.references.as_ref().map(fk_to_ir),
+        references: f.references.clone(),
         check: f.check.as_ref().map(|s| s.to_string()),
         comment: f.comment.as_ref().map(|s| s.to_string()),
         collation: f.collation.as_ref().map(|s| s.to_string()),
@@ -128,12 +93,7 @@ impl<'a> CreateFromMeta<'a> {
             name: self.model.name.to_string(),
             namespace: self.model.namespace.as_ref().map(|s| s.to_string()),
             fields,
-            constraints: self
-                .model
-                .constraints
-                .iter()
-                .map(constraint_to_ir)
-                .collect(),
+            constraints: self.model.constraints.to_vec(),
             if_not_exists: self.if_not_exists,
         }
     }
@@ -153,7 +113,7 @@ pub struct DefineEntityBuilder {
     name: String,
     namespace: Option<String>,
     fields: Vec<FieldDef>,
-    constraints: Vec<OwnedEntityConstraint>,
+    constraints: Vec<EntityConstraint>,
     if_not_exists: bool,
 }
 
@@ -183,7 +143,7 @@ impl DefineEntityBuilder {
         self
     }
 
-    pub fn constraint(mut self, c: impl Into<OwnedEntityConstraint>) -> Self {
+    pub fn constraint(mut self, c: impl Into<EntityConstraint>) -> Self {
         self.constraints.push(c.into());
         self
     }
@@ -294,7 +254,7 @@ impl<'a> AlterEntityBuilder<'a> {
     // -- Constraint operations --
 
     /// Add a model-level constraint.
-    pub fn add_constraint(mut self, c: impl Into<OwnedEntityConstraint>) -> Self {
+    pub fn add_constraint(mut self, c: impl Into<EntityConstraint>) -> Self {
         self.actions.push(AlterAction::AddConstraint(c.into()));
         self
     }
@@ -555,7 +515,7 @@ impl EntityDefineExt for Entity {
 /// Builds a `CREATE TYPE` statement for custom enum types.
 ///
 /// ```rust
-/// use dol_schema::DefineTypeBuilder;
+/// use dol_query::DefineTypeBuilder;
 ///
 /// let ir = DefineTypeBuilder::new("order_status")
 ///     .variant("pending")
@@ -615,7 +575,7 @@ impl DefineTypeBuilder {
 /// Builds a `DROP TYPE` statement.
 ///
 /// ```rust
-/// use dol_schema::DropTypeBuilder;
+/// use dol_query::DropTypeBuilder;
 ///
 /// let ir = DropTypeBuilder::new("order_status")
 ///     .if_exists()

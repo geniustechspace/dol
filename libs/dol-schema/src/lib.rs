@@ -15,18 +15,12 @@
 #![deny(unsafe_code)]
 
 pub mod constraint;
-pub mod definition;
 pub mod field;
 pub mod field_type;
 
 pub use constraint::{EntityConstraint, FkAction, ForeignKeyRef, GeneratedKind};
 pub use field::Field;
 pub use field_type::DataType;
-
-pub use definition::{
-    AlterEntityBuilder, CreateFromMeta, DefineEntityBuilder, DefineIndexBuilder, DefineTypeBuilder,
-    DropEntityBuilder, DropIndexBuilder, DropTypeBuilder, EntityDefineExt,
-};
 
 use std::sync::Arc;
 

@@ -89,6 +89,12 @@ mod update;
 mod upsert;
 
 pub mod builder;
+pub mod ddl;
+
+pub use ddl::{
+    AlterEntityBuilder, CreateFromMeta, DefineEntityBuilder, DefineIndexBuilder, DefineTypeBuilder,
+    DropEntityBuilder, DropIndexBuilder, DropTypeBuilder, EntityDefineExt,
+};
 
 pub use delete::DeleteQuery;
 #[allow(deprecated)]

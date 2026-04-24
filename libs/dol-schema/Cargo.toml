@@ -6,7 +6,6 @@ publish = false
 description = "DOL schema language — Entity, Field, DataType, and constraints."
 
 [dependencies]
-dol-ir = { workspace = true }
 dol-types = { workspace = true }
 serde = { workspace = true, optional = true }
 
@@ -15,4 +14,4 @@ serde_json = { workspace = true }
 
 [features]
 default = []
-serde = ["dep:serde", "dol-ir/serde"]
+serde = ["dep:serde", "dol-types/serde"]

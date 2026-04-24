@@ -1,102 +1,27 @@
 //! Definition operations — DDL for schema creation and modification.
+//!
+//! These owned, runtime-friendly DDL types embed the schema-layer constraint
+//! types (`dol_schema::EntityConstraint`, `dol_schema::ForeignKeyRef`)
+//! directly — there is no longer a borrowed/owned mirror split.
 
-use crate::constraint::{EntityConstraint, FkAction, GeneratedKind};
+use dol_schema::{EntityConstraint, ForeignKeyRef, GeneratedKind};
 use dol_types::DataType;
 
 use crate::entity_ref::EntityRef;
 
-/// An owned constraint for use in DDL operations (owned Strings instead of `&'static str`).
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum OwnedEntityConstraint {
-    Unique(Vec<String>),
-    ForeignKey {
-        columns: Vec<String>,
-        ref_table: String,
-        ref_columns: Vec<String>,
-        on_delete: FkAction,
-    },
-    Check(String),
-    PrimaryKey(Vec<String>),
-}
-
-impl From<&EntityConstraint> for OwnedEntityConstraint {
-    fn from(c: &EntityConstraint) -> Self {
-        match c {
-            EntityConstraint::Unique(cols) => {
-                Self::Unique(cols.iter().map(|s| (*s).to_string()).collect())
-            }
-            EntityConstraint::ForeignKey {
-                columns,
-                ref_table,
-                ref_columns,
-                on_delete,
-            } => Self::ForeignKey {
-                columns: columns.iter().map(|s| (*s).to_string()).collect(),
-                ref_table: (*ref_table).to_string(),
-                ref_columns: ref_columns.iter().map(|s| (*s).to_string()).collect(),
-                on_delete: *on_delete,
-            },
-            EntityConstraint::Check(expr) => Self::Check((*expr).to_string()),
-            EntityConstraint::PrimaryKey(cols) => {
-                Self::PrimaryKey(cols.iter().map(|s| (*s).to_string()).collect())
-            }
-        }
-    }
-}
-
-impl From<EntityConstraint> for OwnedEntityConstraint {
-    fn from(c: EntityConstraint) -> Self {
-        Self::from(&c)
-    }
-}
-
-pub type Constraint = OwnedEntityConstraint;
-pub type ForeignKeyDef = OwnedForeignKeyRef;
-
-/// An owned foreign key reference (String fields instead of `&'static str`).
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct OwnedForeignKeyRef {
-    pub table: String,
-    pub column: String,
-    pub on_delete: FkAction,
-    pub on_update: FkAction,
-}
-
-impl OwnedForeignKeyRef {
-    pub fn new(table: &str, column: &str) -> Self {
-        Self {
-            table: table.to_string(),
-            column: column.to_string(),
-            on_delete: FkAction::NoAction,
-            on_update: FkAction::NoAction,
-        }
-    }
-
-    pub fn on_delete(mut self, action: FkAction) -> Self {
-        self.on_delete = action;
-        self
-    }
-    pub fn on_update(mut self, action: FkAction) -> Self {
-        self.on_update = action;
-        self
-    }
-}
-
 /// Define (create) a new entity / table.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DefineEntity {
     pub name: String,
     pub namespace: Option<String>,
     pub fields: Vec<FieldDef>,
-    pub constraints: Vec<OwnedEntityConstraint>,
+    pub constraints: Vec<EntityConstraint>,
     pub if_not_exists: bool,
 }
 
 /// An owned field definition for use in DDL operations.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FieldDef {
     pub name: String,
@@ -105,7 +30,7 @@ pub struct FieldDef {
     pub nullable: bool,
     pub default_expr: Option<String>,
     pub unique: bool,
-    pub references: Option<OwnedForeignKeyRef>,
+    pub references: Option<ForeignKeyRef>,
     pub check: Option<String>,
     pub comment: Option<String>,
     pub collation: Option<String>,
@@ -175,7 +100,7 @@ impl FieldDef {
         self.check = Some(expr.to_string());
         self
     }
-    pub fn references(mut self, fk: OwnedForeignKeyRef) -> Self {
+    pub fn references(mut self, fk: ForeignKeyRef) -> Self {
         self.references = Some(fk);
         self
     }
@@ -192,7 +117,7 @@ impl FieldDef {
 }
 
 /// Alter an existing entity.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AlterEntity {
     pub target: EntityRef,
@@ -200,7 +125,7 @@ pub struct AlterEntity {
 }
 
 /// A single action within an ALTER ENTITY statement.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum AlterAction {
     AddField(FieldDef),
@@ -211,13 +136,13 @@ pub enum AlterAction {
     DropFieldDefault(String),
     SetFieldNotNull(String),
     DropFieldNotNull(String),
-    AddConstraint(OwnedEntityConstraint),
+    AddConstraint(EntityConstraint),
     DropConstraint(String),
     RenameEntity(String),
 }
 
 /// Drop (remove) an entity.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DropEntity {
     pub target: EntityRef,
@@ -226,7 +151,7 @@ pub struct DropEntity {
 }
 
 /// Define (create) an index.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DefineIndex {
     pub name: String,
@@ -251,7 +176,7 @@ pub enum IndexMethod {
 }
 
 /// Drop an index.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DropIndex {
     pub name: String,
@@ -261,7 +186,7 @@ pub struct DropIndex {
 }
 
 /// Define a custom type (e.g., an enum).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DefineType {
     pub name: String,
@@ -270,7 +195,7 @@ pub struct DefineType {
 }
 
 /// Drop a custom type.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DropType {
     pub name: String,

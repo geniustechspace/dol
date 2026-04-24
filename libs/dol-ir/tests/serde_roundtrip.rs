@@ -5,12 +5,12 @@
 
 #![cfg(feature = "serde")]
 
-use dol_ir::constraint::FkAction;
 use dol_ir::definition::{
     AlterAction, AlterEntity, DefineEntity, DefineIndex, DefineType, DropEntity, DropIndex,
-    DropType, FieldDef, IndexMethod, OwnedEntityConstraint, OwnedForeignKeyRef,
+    DropType, FieldDef, IndexMethod,
 };
 use dol_ir::entity_ref::EntityRef;
+use dol_ir::{EntityConstraint, FkAction, ForeignKeyRef};
 use dol_types::DataType;
 
 fn round_trip<T>(value: &T) -> T
@@ -38,7 +38,7 @@ fn field_def_round_trip() {
         .default("gen_random_uuid()")
         .comment("primary key")
         .references(
-            OwnedForeignKeyRef::new("users", "id").on_delete(FkAction::Cascade),
+            ForeignKeyRef::new("users", "id").on_delete(FkAction::Cascade),
         );
     assert_eq!(fd, round_trip(&fd));
 }
@@ -46,10 +46,10 @@ fn field_def_round_trip() {
 #[test]
 fn owned_entity_constraint_round_trip() {
     let cs = vec![
-        OwnedEntityConstraint::Unique(vec!["a".into(), "b".into()]),
-        OwnedEntityConstraint::PrimaryKey(vec!["id".into()]),
-        OwnedEntityConstraint::Check("x > 0".into()),
-        OwnedEntityConstraint::ForeignKey {
+        EntityConstraint::Unique(vec!["a".into(), "b".into()]),
+        EntityConstraint::PrimaryKey(vec!["id".into()]),
+        EntityConstraint::Check("x > 0".into()),
+        EntityConstraint::ForeignKey {
             columns: vec!["user_id".into()],
             ref_table: "users".into(),
             ref_columns: vec!["id".into()],
@@ -70,7 +70,7 @@ fn define_entity_round_trip() {
             FieldDef::new("id", DataType::Uuid).primary_key(),
             FieldDef::new("email", DataType::Text).unique(),
         ],
-        constraints: vec![OwnedEntityConstraint::Unique(vec![
+        constraints: vec![EntityConstraint::Unique(vec![
             "email".into(),
         ])],
         if_not_exists: true,
@@ -104,7 +104,7 @@ fn alter_entity_round_trip() {
             AlterAction::DropFieldDefault("age".into()),
             AlterAction::SetFieldNotNull("age".into()),
             AlterAction::DropFieldNotNull("age".into()),
-            AlterAction::AddConstraint(OwnedEntityConstraint::Unique(vec!["age".into()])),
+            AlterAction::AddConstraint(EntityConstraint::Unique(vec!["age".into()])),
             AlterAction::DropConstraint("uniq_age".into()),
             AlterAction::RenameEntity("people".into()),
         ],
