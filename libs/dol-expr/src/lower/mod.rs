@@ -1,15 +1,15 @@
-//! Lowering bridge: converts `dol_expr::tree::Expr<'static>` into the
-//! arena-based `dol-expr` representation (`ExprArena` + `NodeId`).
+//! Lowering bridge: converts `crate::tree::Expr<'static>` into the
+//! arena-based representation (`ExprArena` + `NodeId`).
 //!
 //! This module bridges the gap between the tree-based expression AST (with
 //! lifetime-parameterised `Expr<'a>`) and the arena-based IR used by
 //! `dol-ir::Statement`.
 
-use dol_expr::arena::{ExprArena, FieldNode, FuncNode, InListNode, ObjLitNode};
-use dol_expr::expr::{BinOp, ExprNode, Order, UnaryOp as ArenaUnaryOp};
-use dol_expr::ids::{NULL_NODE, NodeId};
-use dol_expr::interner::Interner;
-use dol_expr::tree::{Direction, Expr, OrderByExpr};
+use crate::arena::{ExprArena, FieldNode, FuncNode, InListNode, ObjLitNode};
+use crate::expr::{BinOp, ExprNode, Order, UnaryOp as ArenaUnaryOp};
+use crate::ids::{NULL_NODE, NodeId};
+use crate::interner::Interner;
+use crate::tree::{Direction, Expr, OrderByExpr};
 use smallvec::SmallVec;
 
 /// Lowers an `Expr<'static>` into the arena, returning the root `NodeId`.
@@ -107,7 +107,7 @@ pub fn lower_expr(expr: &Expr<'static>, arena: &mut ExprArena, interner: &mut In
         }
 
         Expr::UnaryOp { op, expr: inner } => {
-            use dol_expr::tree::UnaryOp as CoreUnaryOp;
+            use crate::tree::UnaryOp as CoreUnaryOp;
 
             // Canonicalise NOT(InList) to a separate InList node.
             if *op == CoreUnaryOp::Not {
@@ -181,7 +181,7 @@ pub fn lower_expr(expr: &Expr<'static>, arena: &mut ExprArena, interner: &mut In
                 .as_deref()
                 .map(|e| lower_expr(e, arena, interner))
                 .unwrap_or(NULL_NODE);
-            let cid = arena.alloc_case(dol_expr::CaseNode {
+            let cid = arena.alloc_case(crate::CaseNode {
                 branches,
                 else_: else_id,
             });
@@ -272,7 +272,7 @@ pub fn lower_expr(expr: &Expr<'static>, arena: &mut ExprArena, interner: &mut In
                     (eid, dir)
                 })
                 .collect();
-            let wid = arena.alloc_window(dol_expr::WindowNode {
+            let wid = arena.alloc_window(crate::WindowNode {
                 func: func_name,
                 partition,
                 order,
@@ -345,8 +345,8 @@ pub fn lower_filters(
 // Private helpers
 // ---------------------------------------------------------------------------
 
-/// Map `dol_expr::tree::OpDef` name to `dol-expr::expr::BinOp`.
-fn lower_binop(op: &dol_expr::tree::OpDef) -> BinOp {
+/// Map `crate::tree::OpDef` name to `dol-expr::expr::BinOp`.
+fn lower_binop(op: &crate::tree::OpDef) -> BinOp {
     match op.name() {
         "EQ" => BinOp::Eq,
         "NE" => BinOp::Ne,

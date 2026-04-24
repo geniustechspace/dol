@@ -373,7 +373,7 @@ impl<'a> GetBuilder<'a> {
     /// When no projections have been set (via `.fields()`, `.field()`,
     /// etc.), all entity fields are selected by default.
     pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
-        use crate::lower::{lower_expr, lower_filters, lower_order_by};
+        use dol_expr::lower::{lower_expr, lower_filters, lower_order_by};
         use dol_expr::expr::{
             BinOp, ExprNode, JoinNode, JoinType as ArenaJoinType, LockHint, QueryNode,
         };
@@ -383,7 +383,7 @@ impl<'a> GetBuilder<'a> {
         let mut arena = dol_expr::ExprArena::new();
         let mut interner = dol_expr::Interner::new();
 
-        let from = interner.intern(&crate::lower::qualified_name(
+        let from = interner.intern(&dol_expr::lower::qualified_name(
             self.model.name,
             &self.model.namespace.map(|s| s.to_string()),
         ));

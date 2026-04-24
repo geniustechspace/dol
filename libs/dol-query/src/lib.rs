@@ -85,7 +85,6 @@
 mod delete;
 mod get;
 mod insert;
-pub mod lower;
 mod update;
 mod upsert;
 

@@ -146,7 +146,7 @@ impl DefinePolicyBuilder {
 
     /// Build the arena-based IR as a [`dol_ir::Statement`].
     pub fn build(&self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
-        use crate::lower::lower_expr;
+        use dol_expr::lower::lower_expr;
 
         let mut arena = dol_expr::ExprArena::new();
         let mut interner = dol_expr::Interner::new();
