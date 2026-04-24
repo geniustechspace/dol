@@ -61,4 +61,40 @@ impl RemoveQuery {
             returning: self.returning,
         }
     }
+
+    /// Build the arena-based IR as a [`dol_ir::Statement`].
+    ///
+    /// Returns `(Statement, ExprArena, Interner)` — the arena and interner
+    /// are needed by renderers to resolve expression references.
+    pub fn build_ir(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+        use crate::lower::lower_filters;
+        use dol_expr::expr::{DeleteNode, ExprNode};
+
+        let mut arena = dol_expr::ExprArena::new();
+        let mut interner = dol_expr::Interner::new();
+
+        let target = interner.intern(&self.name);
+        let filter = lower_filters(&self.filters, &mut arena, &mut interner);
+
+        let returning: smallvec::SmallVec<[u32; 4]> = self.returning
+            .iter()
+            .map(|r| {
+                let col = interner.intern(r);
+                let fid = arena.alloc_field(dol_expr::FieldNode {
+                    namespace: None,
+                    column: col,
+                    steps: smallvec::SmallVec::new(),
+                });
+                arena.alloc(ExprNode::Field(fid))
+            })
+            .collect();
+
+        let node = DeleteNode {
+            target,
+            filter,
+            returning,
+        };
+
+        (dol_ir::Statement::Delete(node), arena, interner)
+    }
 }

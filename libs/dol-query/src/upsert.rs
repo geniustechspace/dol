@@ -131,4 +131,80 @@ impl UpsertQuery {
             returning: self.returning,
         }
     }
+
+    /// Build the arena-based IR as a [`dol_ir::Statement`].
+    ///
+    /// Returns `(Statement, ExprArena, Interner)` — the arena and interner
+    /// are needed by renderers to resolve expression references.
+    pub fn build_ir(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+        use dol_expr::expr::{ConflictClause, ExprNode, UpsertNode};
+
+        let mut arena = dol_expr::ExprArena::new();
+        let mut interner = dol_expr::Interner::new();
+
+        let fields = if self.fields.is_empty() {
+            self.field_names.unwrap_or_default()
+        } else {
+            self.fields
+        };
+
+        let target = interner.intern(&self.name);
+        let columns: smallvec::SmallVec<[u32; 8]> = fields
+            .iter()
+            .map(|f| interner.intern(f))
+            .collect();
+
+        // One Param per field.
+        let values: smallvec::SmallVec<[u32; 8]> = fields
+            .iter()
+            .map(|_| arena.alloc(ExprNode::Param))
+            .collect();
+
+        let returning: smallvec::SmallVec<[u32; 4]> = self.returning
+            .iter()
+            .map(|r| {
+                let col = interner.intern(r);
+                let fid = arena.alloc_field(dol_expr::FieldNode {
+                    namespace: None,
+                    column: col,
+                    steps: smallvec::SmallVec::new(),
+                });
+                arena.alloc(ExprNode::Field(fid))
+            })
+            .collect();
+
+        let conflict = if self.do_nothing_flag {
+            Some(ConflictClause::DoNothing)
+        } else if !self.update_fields.is_empty() {
+            let assignments: smallvec::SmallVec<[(u32, u32); 4]> = self.update_fields
+                .iter()
+                .map(|col| {
+                    let col_id = interner.intern(col);
+                    // EXCLUDED.col reference
+                    let ns = interner.intern("EXCLUDED");
+                    let c  = interner.intern(col);
+                    let fid = arena.alloc_field(dol_expr::FieldNode {
+                        namespace: Some(ns),
+                        column: c,
+                        steps: smallvec::SmallVec::new(),
+                    });
+                    let val_id = arena.alloc(ExprNode::Field(fid));
+                    (col_id, val_id)
+                })
+                .collect();
+            Some(ConflictClause::DoUpdate { assignments })
+        } else {
+            None
+        };
+
+        let node = UpsertNode {
+            target,
+            columns,
+            values,
+            returning,
+            conflict,
+        };
+
+        (dol_ir::Statement::Upsert(node), arena, interner)
+    }
 }
