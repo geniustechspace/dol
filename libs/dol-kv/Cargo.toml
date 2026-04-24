@@ -6,13 +6,12 @@ publish = false
 description = "DOL key-value backend — renders IR into KV operation descriptors."
 
 [dependencies]
-dol-core = { workspace = true }
-serde = { workspace = true, optional = true }
-dol-entity = { workspace = true }
+dol-ir  = { workspace = true }
+serde   = { workspace = true, optional = true }
 
 [features]
 default = []
-serde = ["dep:serde", "dol-core/serde"]
+serde = ["dep:serde", "dol-ir/serde"]
 
 [dev-dependencies]
 dol-query = { workspace = true }

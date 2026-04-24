@@ -1,9 +1,9 @@
 [package]
-name = "dol-core"
+name = "dol-expr"
 version.workspace = true
 edition.workspace = true
 publish = false
-description = "DOL Core — type system, expressions, IR, Backend trait, and constraint types."
+description = "DOL expression AST, type system, arena, and interner (internal)"
 
 [dependencies]
 dol-types = { workspace = true }

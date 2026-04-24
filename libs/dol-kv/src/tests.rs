@@ -1,15 +1,16 @@
 use super::*;
-use dol_core::op::{Statement, Transaction};
-use dol_core::op::storage::{GetObject, PutObject, ObjectSource};
+use dol_ir::statement::Statement;
+use dol_ir::transaction::Transaction;
+use dol_ir::storage::{GetObject, ObjectSource, PutObject};
 
 #[test]
 fn put_object_as_kv() {
     let ir = PutObject {
-        key: "key/path".to_string(),
-        source: ObjectSource::FromBytes,
-        bucket: "bucket".to_string(),
+        key:          "key/path".to_string(),
+        source:       ObjectSource::FromBytes,
+        bucket:       "bucket".to_string(),
         content_type: None,
-        metadata: vec![],
+        metadata:     vec![],
     };
     let stmt = Statement::PutObject(ir);
     let result = KvBackend.render(&stmt).unwrap();
@@ -20,7 +21,7 @@ fn put_object_as_kv() {
 #[test]
 fn get_object_as_kv() {
     let ir = GetObject {
-        key: "key/path".to_string(),
+        key:    "key/path".to_string(),
         bucket: "bucket".to_string(),
     };
     let stmt = Statement::GetObject(ir);
