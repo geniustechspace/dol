@@ -1,7 +1,12 @@
 //! Control builders — GRANT, REVOKE, DEFINE POLICY.
 
 use dol_core::expr::Expr;
-use dol_core::op::control::{DefinePolicy, Grant, PolicyAction, Revoke};
+use dol_core::op::control::{DefinePolicy, PolicyAction as CorePolicyAction};
+use dol_ir::control::{Grant, Revoke};
+
+// Re-export Privilege and PolicyAction from dol-ir
+pub use dol_ir::control::PolicyAction;
+pub use dol_ir::control::Privilege;
 
 /// Builder for `GRANT` statements.
 #[derive(Debug, Clone)]
@@ -40,9 +45,6 @@ impl GrantBuilder {
     }
 }
 
-// Re-export Privilege for convenience
-pub use dol_core::op::control::Privilege;
-
 /// Builder for `REVOKE` statements.
 #[derive(Debug, Clone)]
 pub struct RevokeBuilder {
@@ -70,7 +72,7 @@ impl RevokeBuilder {
         self
     }
 
-    /// Build the canonical Revoke.
+    /// Build the canonical [`Revoke`] (dol-ir).
     pub fn build(&self) -> Revoke {
         Revoke {
             privilege: self.privilege.clone(),
@@ -89,7 +91,7 @@ impl RevokeBuilder {
 /// ```rust
 /// use dol_query::builder::control::DefinePolicyBuilder;
 /// use dol_core::expr::{field, param};
-/// use dol_core::op::control::PolicyAction;
+/// use dol_query::builder::control::PolicyAction;
 ///
 /// let ir = DefinePolicyBuilder::new("tenant_isolation")
 ///     .on("orders")
@@ -143,12 +145,17 @@ impl DefinePolicyBuilder {
         self
     }
 
-    /// Build the canonical [`DefinePolicy`].
+    /// Build the canonical [`DefinePolicy`] (old dol-core IR, until expr migration is complete).
     pub fn build(&self) -> DefinePolicy<'static> {
+        let core_action = match self.action {
+            PolicyAction::Read  => CorePolicyAction::Read,
+            PolicyAction::Write => CorePolicyAction::Write,
+            PolicyAction::All   => CorePolicyAction::All,
+        };
         DefinePolicy {
             name: self.name.clone(),
             on_model: self.on_model.clone(),
-            action: self.action,
+            action: core_action,
             using_expr: self.using_expr.clone(),
             check_expr: self.check_expr.clone(),
         }

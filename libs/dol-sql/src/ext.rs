@@ -6,6 +6,7 @@
 
 use crate::dialect::{self, Dialect};
 use crate::render;
+use crate::render_ir;
 use dol_entity::{
     AlterEntityBuilder, CreateFromMeta, DefineEntityBuilder, DefineIndexBuilder, DefineTypeBuilder,
     DropEntityBuilder, DropIndexBuilder, DropTypeBuilder,
@@ -23,6 +24,7 @@ use dol_core::op::OffsetLimit;
 use dol_core::op::query::{CompoundQuery, Query, SetOp};
 use dol_core::op::transaction::Transaction;
 use dol_core::session::{BuildError, BuildSession};
+use dol_ir::statement::Statement as IrStatement;
 
 // ===========================================================================
 // Render — fallible SQL rendering trait
@@ -265,9 +267,11 @@ impl Render for DropIndexBuilder {
 
 impl Render for GrantBuilder {
     fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
-        let _dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
+        let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_grant_ir(&ir).map(|o| o.sql)
+        render_ir::render_ir_statement(&IrStatement::Grant(ir), None, dialect)
+            .map(|o| o.sql)
+            .map_err(|e| BackendError::Unsupported(e.to_string()))
     }
 }
 
@@ -275,9 +279,11 @@ impl Render for GrantBuilder {
 
 impl Render for RevokeBuilder {
     fn render(&self, dialect: Option<&Dialect>) -> Result<String, BackendError> {
-        let _dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
+        let dialect = dialect.unwrap_or_else(|| dialect::default_dialect());
         let ir = self.build();
-        render::render_revoke_ir(&ir).map(|o| o.sql)
+        render_ir::render_ir_statement(&IrStatement::Revoke(ir), None, dialect)
+            .map(|o| o.sql)
+            .map_err(|e| BackendError::Unsupported(e.to_string()))
     }
 }
 

@@ -8,3 +8,4 @@ description = "DOL Query — backend-neutral query entry point for any data sour
 [dependencies]
 dol-core = { path = "../dol-core" }
 dol-entity = { workspace = true }
+dol-ir = { workspace = true }

@@ -3,19 +3,21 @@
 //! These builders produce storage IR which has no SQL equivalent.
 //! They will be rendered by future StorageBackend implementations.
 
-use dol_core::op::storage::*;
+use dol_ir::storage::{
+    GetObject, ListObjects, MoveFile, ObjectSource, PutObject, ReadFile, WriteFile,
+};
 
 /// Builder for `PUT OBJECT` operations.
 #[derive(Debug, Clone)]
-pub struct PutObjectBuilder<'a> {
+pub struct PutObjectBuilder {
     key: String,
     bucket: String,
-    source: ObjectSource<'a>,
+    source: ObjectSource,
     content_type: Option<String>,
     metadata: Vec<(String, String)>,
 }
 
-impl<'a> PutObjectBuilder<'a> {
+impl PutObjectBuilder {
     pub fn new(key: &str) -> Self {
         Self {
             key: key.to_string(),
@@ -51,7 +53,7 @@ impl<'a> PutObjectBuilder<'a> {
         self
     }
 
-    pub fn build(self) -> PutObject<'a> {
+    pub fn build(self) -> PutObject {
         PutObject {
             key: self.key,
             bucket: self.bucket,
@@ -175,13 +177,13 @@ impl ReadFileBuilder {
 
 /// Builder for `WRITE FILE` operations.
 #[derive(Debug, Clone)]
-pub struct WriteFileBuilder<'a> {
+pub struct WriteFileBuilder {
     path: String,
-    source: ObjectSource<'a>,
+    source: ObjectSource,
     create_dirs: bool,
 }
 
-impl<'a> WriteFileBuilder<'a> {
+impl WriteFileBuilder {
     pub fn new(path: &str) -> Self {
         Self {
             path: path.to_string(),
@@ -205,7 +207,7 @@ impl<'a> WriteFileBuilder<'a> {
         self
     }
 
-    pub fn build(self) -> WriteFile<'a> {
+    pub fn build(self) -> WriteFile {
         WriteFile {
             path: self.path,
             source: self.source,

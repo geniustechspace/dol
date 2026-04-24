@@ -422,7 +422,7 @@ fn drop_type_mysql_is_comment() {
 fn define_policy_postgres() {
     use dol_query::builder::DefinePolicyBuilder;
     use dol_core::expr::{field, param};
-    use dol_core::op::control::PolicyAction;
+    use dol_ir::control::PolicyAction;
 
     let sql = DefinePolicyBuilder::new("tenant_isolation")
         .on("orders")
@@ -443,7 +443,7 @@ fn define_policy_postgres() {
 fn define_policy_read_only() {
     use dol_query::builder::DefinePolicyBuilder;
     use dol_core::expr::{field, bool_expr};
-    use dol_core::op::control::PolicyAction;
+    use dol_ir::control::PolicyAction;
 
     let sql = DefinePolicyBuilder::new("public_read")
         .on("posts")
@@ -462,7 +462,7 @@ fn define_policy_read_only() {
 #[test]
 fn define_policy_no_expressions() {
     use dol_query::builder::DefinePolicyBuilder;
-    use dol_core::op::control::PolicyAction;
+    use dol_ir::control::PolicyAction;
 
     let sql = DefinePolicyBuilder::new("allow_all")
         .on("logs")

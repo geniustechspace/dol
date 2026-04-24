@@ -116,6 +116,7 @@ version = "0.1.0"
 dependencies = [
  "dol-core",
  "dol-entity",
+ "dol-ir",
 ]
 
 [[package]]
