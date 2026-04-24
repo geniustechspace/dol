@@ -1,24 +1,24 @@
-//! REMOVE (DELETE) query builder for `dol-query`.
+//! DELETE query builder for `dol-query`.
 
 use dol_expr::tree::Expr;
 
 // ===========================================================================
-// RemoveQuery
+// DeleteQuery
 // ===========================================================================
 
 /// A composable DELETE builder that works with any entity source.
 ///
-/// Construct via [`Query::from(...).remove()`](crate::Query::remove).
+/// Construct via [`Query::from(...).delete()`](crate::Query::delete).
 #[derive(Debug, Clone)]
 #[must_use = "builders do nothing until .build() is called"]
-pub struct RemoveQuery {
+pub struct DeleteQuery {
     name: String,
     namespace: Option<String>,
     filters: Vec<Expr<'static>>,
     returning: Vec<String>,
 }
 
-impl RemoveQuery {
+impl DeleteQuery {
     pub(crate) fn new(name: String, namespace: Option<String>) -> Self {
         Self {
             name,
@@ -84,3 +84,7 @@ impl RemoveQuery {
         (dol_ir::Statement::Delete(node), arena, interner)
     }
 }
+
+/// Deprecated alias for [`DeleteQuery`].
+#[deprecated(note = "renamed to `DeleteQuery`")]
+pub type RemoveQuery = DeleteQuery;

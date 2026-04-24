@@ -17,16 +17,16 @@ impl<'a> Expr<'a> {
     ///
     /// Consecutive `.get()` calls extend the path rather than nesting boxes:
     /// `field("profile").get("address").get("city")` →
-    /// `Access { base: Ref(["profile"]), path: ["address", "city"] }`.
+    /// `Field { base: Namespace(["profile"]), path: ["address", "city"] }`.
     pub fn get(self, name: &str) -> Expr<'a> {
         match self {
-            // Extend an existing Access node's path — avoids an extra Box.
-            Expr::Access { base, mut path } => {
+            // Extend an existing Field node's path — avoids an extra Box.
+            Expr::Field { base, mut path } => {
                 path.segments.push(CompactName::from_str(name));
-                Expr::Access { base, path }
+                Expr::Field { base, path }
             }
-            // Any other base (including Ref) creates a new Access node.
-            other => Expr::Access {
+            // Any other base (including Namespace) creates a new Field node.
+            other => Expr::Field {
                 base: Box::new(other),
                 path: PathExpr::from_str(name),
             },

@@ -132,10 +132,10 @@ fn namespace_propagates_to_update_ir() {
 }
 
 #[test]
-fn namespace_propagates_to_remove_ir() {
+fn namespace_propagates_to_delete_ir() {
     let (stmt, _arena, interner) = Query::from("api")
         .namespace("users")
-        .remove()
+        .delete()
         .filter(field("id").eq(param()))
         .build();
     match stmt {
@@ -284,12 +284,12 @@ fn update_from_string() {
     }
 }
 
-// ── RemoveQuery ─────────────────────────────────────────────────
+// ── DeleteQuery ─────────────────────────────────────────────────
 
 #[test]
-fn remove_from_string() {
+fn delete_from_string() {
     let (stmt, _arena, interner) = Query::from("users")
-        .remove()
+        .delete()
         .filter(field("id").eq(param()))
         .returning_all()
         .build();
@@ -435,9 +435,9 @@ fn update_build_produces_update_statement() {
 }
 
 #[test]
-fn remove_build_produces_delete_statement() {
+fn delete_build_produces_delete_statement() {
     let (stmt, _arena, interner) = Query::from("users")
-        .remove()
+        .delete()
         .filter(field("id").eq(param()))
         .build();
     match stmt {

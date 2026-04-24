@@ -572,7 +572,7 @@ pub(crate) fn count_single_expr_params(expr: &Expr<'static>) -> usize {
 
         Expr::Alias { expr, .. } => count_single_expr_params(expr),
 
-        Expr::Access { base, .. } => count_single_expr_params(base),
+        Expr::Field { base, .. } => count_single_expr_params(base),
 
         Expr::Object(fields) => fields
             .iter()

@@ -10,8 +10,10 @@ pub mod transaction;
 
 pub use control::{DefinePolicyBuilder, GrantBuilder, RevokeBuilder};
 pub use mutation::{
-    InsertBuilder, InsertSelect, InsertSelectBuilder, RemoveBuilder, UpdateBuilder, UpsertBuilder,
+    InsertBuilder, InsertSelect, InsertSelectBuilder, DeleteBuilder, UpdateBuilder, UpsertBuilder,
 };
+#[allow(deprecated)]
+pub use mutation::RemoveBuilder;
 pub use query::GetBuilder;
 pub use storage::{
     GetObjectBuilder, ListObjectsBuilder, MoveFileBuilder, PutObjectBuilder, ReadFileBuilder,
@@ -35,7 +37,7 @@ pub trait EntityBuilderExt {
     fn insert(&self) -> InsertBuilder<'_>;
     fn insert_select(&self) -> InsertSelectBuilder<'_>;
     fn update(&self) -> UpdateBuilder<'_>;
-    fn remove(&self) -> RemoveBuilder<'_>;
+    fn delete(&self) -> DeleteBuilder<'_>;
     fn upsert(&self) -> UpsertBuilder<'_>;
     fn alter(&self) -> AlterEntityBuilder<'_>;
     fn drop_entity(&self) -> DropEntityBuilder<'_>;
@@ -59,8 +61,8 @@ impl EntityBuilderExt for Entity {
         UpdateBuilder::new(self)
     }
 
-    fn remove(&self) -> RemoveBuilder<'_> {
-        RemoveBuilder::new(self)
+    fn delete(&self) -> DeleteBuilder<'_> {
+        DeleteBuilder::new(self)
     }
 
     fn upsert(&self) -> UpsertBuilder<'_> {

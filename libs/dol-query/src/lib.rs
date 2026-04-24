@@ -85,7 +85,7 @@
 mod get;
 mod insert;
 pub mod lower;
-mod remove;
+mod delete;
 mod update;
 mod upsert;
 
@@ -93,7 +93,9 @@ pub mod builder;
 
 pub use get::GetQuery;
 pub use insert::InsertQuery;
-pub use remove::RemoveQuery;
+pub use delete::DeleteQuery;
+#[allow(deprecated)]
+pub use delete::RemoveQuery;
 pub use update::UpdateQuery;
 pub use upsert::UpsertQuery;
 
@@ -106,7 +108,7 @@ use dol_schema::Entity;
 /// Backend-neutral query entry point.
 ///
 /// Construct via `Query::from(&entity)` or `Query::from("entity_name")`.
-/// Then call `.get()`, `.insert()`, `.update()`, `.remove()`, or `.upsert()`
+/// Then call `.get()`, `.insert()`, `.update()`, `.delete()`, or `.upsert()`
 /// to begin building a specific operation.
 ///
 /// # Namespace chaining
@@ -191,9 +193,15 @@ impl Query {
         UpdateQuery::new(self.name, self.namespace)
     }
 
-    /// Start building a REMOVE (DELETE) statement.
-    pub fn remove(self) -> RemoveQuery {
-        RemoveQuery::new(self.name, self.namespace)
+    /// Start building a DELETE statement.
+    pub fn delete(self) -> DeleteQuery {
+        DeleteQuery::new(self.name, self.namespace)
+    }
+
+    /// Start building a DELETE statement.
+    #[deprecated(note = "use `delete()`")]
+    pub fn remove(self) -> DeleteQuery {
+        DeleteQuery::new(self.name, self.namespace)
     }
 
     /// Start building an UPSERT (INSERT ... ON CONFLICT) statement.

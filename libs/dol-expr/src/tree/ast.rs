@@ -31,17 +31,21 @@ use super::window::WindowFrame;
 pub enum Expr<'a> {
     // ── References ──────────────────────────────────────────────────────────
 
-    /// A path reference: `field`, `table.field`, `schema.table.field`.
+    /// A namespace path reference: `field`, `table.field`, `schema.table.field`.
     ///
     /// Use [`field()`] for single-segment, [`qualified()`] for multi-segment.
     /// Rendered by backends as a dotted identifier path.
-    Ref(PathExpr),
+    ///
+    /// At the arena level this is lowered to either `ExprNode::Namespace` or
+    /// `ExprNode::Field` depending on segment count and context.
+    Namespace(PathExpr),
 
-    /// Sub-path access on an expression result: `expr.field`, `expr.a.b`.
+    /// Sub-path / field traversal on an expression result: `expr.key`,
+    /// `expr.a.b`.
     ///
     /// Built by chaining [`Expr::get()`]. For SQL this typically renders as
     /// JSON access (`->>`, `json_extract`, etc.) depending on the dialect.
-    Access {
+    Field {
         base: Box<Expr<'a>>,
         path: PathExpr,
     },
