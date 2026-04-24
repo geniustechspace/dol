@@ -5,8 +5,8 @@
 //!
 //! For SQL rendering, import the `Render` extension trait from `dol-sql`.
 
-use dol_schema::Entity;
 use dol_expr::tree::{Expr, field_dyn};
+use dol_schema::Entity;
 
 use super::query::count_single_expr_params;
 
@@ -95,7 +95,13 @@ impl<'a> InsertBuilder<'a> {
         }
         q = q.rows(self.row_count);
         if !self.returning.is_empty() {
-            q = q.returning(&self.returning.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+            q = q.returning(
+                &self
+                    .returning
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>(),
+            );
         }
         q.build()
     }
@@ -294,7 +300,13 @@ impl<'a> UpdateBuilder<'a> {
             q = q.filter(f);
         }
         if !self.returning.is_empty() {
-            q = q.returning(&self.returning.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+            q = q.returning(
+                &self
+                    .returning
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>(),
+            );
         }
         q.build()
     }
@@ -369,7 +381,13 @@ impl<'a> DeleteBuilder<'a> {
             q = q.filter(f);
         }
         if !self.returning.is_empty() {
-            q = q.returning(&self.returning.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+            q = q.returning(
+                &self
+                    .returning
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>(),
+            );
         }
         q.build()
     }
@@ -546,13 +564,25 @@ impl<'a> UpsertBuilder<'a> {
             q = q.fields(&self.fields.iter().map(|s| s.as_str()).collect::<Vec<_>>());
         }
         if !self.conflict_fields.is_empty() {
-            q = q.on_conflict(&self.conflict_fields.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+            q = q.on_conflict(
+                &self
+                    .conflict_fields
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>(),
+            );
         }
         if let Some(ref constraint) = self.conflict_constraint {
             q = q.on_conflict_constraint(constraint);
         }
         if !self.update_fields.is_empty() {
-            q = q.do_update(&self.update_fields.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+            q = q.do_update(
+                &self
+                    .update_fields
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>(),
+            );
         }
         if self.do_nothing_flag {
             q = q.do_nothing();
@@ -561,7 +591,13 @@ impl<'a> UpsertBuilder<'a> {
             q = q.conflict_filter(f);
         }
         if !self.returning.is_empty() {
-            q = q.returning(&self.returning.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+            q = q.returning(
+                &self
+                    .returning
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>(),
+            );
         }
         q.build()
     }

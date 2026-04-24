@@ -24,12 +24,12 @@ pub use arena::{
     WindowNode,
 };
 pub use expr::{
-    BinOp, ConflictClause, DeleteNode, ExprNode, InsertNode, JoinNode, JoinType, LockHint,
-    Order, QueryNode, UnaryOp, UpdateNode, UpsertNode,
+    BinOp, ConflictClause, DeleteNode, ExprNode, InsertNode, JoinNode, JoinType, LockHint, Order,
+    QueryNode, UnaryOp, UpdateNode, UpsertNode,
 };
 pub use ids::{
-    CaseId, DeleteId, FieldId, FuncId, InListId, InsertId, LiteralId, NodeId, ObjLitId, QueryId,
-    SpanId, StrId, TypeId, UpdateId, UpsertId, WindowId, NULL_NODE,
+    CaseId, DeleteId, FieldId, FuncId, InListId, InsertId, LiteralId, NULL_NODE, NodeId, ObjLitId,
+    QueryId, SpanId, StrId, TypeId, UpdateId, UpsertId, WindowId,
 };
 pub use interner::Interner;
 pub use session::BuildSession;

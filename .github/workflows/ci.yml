@@ -102,9 +102,8 @@ jobs:
       matrix:
         features:
           - "" # default features only
-          - "--features config" # default features + config
-          - "--features migration" # default features + migration
-          - "--features full" # default features + full
+          - "--no-default-features" # no default features
+          - "--all-features" # every feature enabled
     steps:
       - uses: actions/checkout@v4
 
@@ -119,7 +118,7 @@ jobs:
           shared-key: feature-matrix
 
       - name: Run tests (${{ matrix.features || 'default' }})
-        run: cargo test -p dol ${{ matrix.features }}
+        run: cargo test --workspace ${{ matrix.features }}
 
   deny:
     name: Cargo Deny (Security Audit)

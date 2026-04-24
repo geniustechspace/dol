@@ -42,6 +42,7 @@ impl PathExpr {
     ///
     /// Use `PathExpr::one` with a string literal when the name is known at
     /// compile time.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(name: &str) -> Self {
         let mut segments = SmallVec::new();
         segments.push(CompactName::from_str(name));
@@ -50,20 +51,37 @@ impl PathExpr {
 
     /// Create a multi-segment path from an iterator of `CompactName`-compatible values.
     ///
-    /// # Panics (debug only)
+    /// # Panics
     ///
-    /// Panics in debug builds if the iterator is empty.
+    /// Panics if the iterator is empty. `PathExpr` is a non-empty path by
+    /// construction; use [`PathExpr::try_from_segments`] for a fallible
+    /// alternative that returns `None` on empty input.
     pub fn from_segments<I, S>(iter: I) -> Self
     where
         I: IntoIterator<Item = S>,
         S: Into<CompactName>,
     {
         let segments: SmallVec<[CompactName; 3]> = iter.into_iter().map(Into::into).collect();
-        debug_assert!(
+        assert!(
             !segments.is_empty(),
             "PathExpr must have at least one segment"
         );
         Self { segments }
+    }
+
+    /// Fallible variant of [`PathExpr::from_segments`] — returns `None` when
+    /// the iterator is empty instead of panicking.
+    pub fn try_from_segments<I, S>(iter: I) -> Option<Self>
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<CompactName>,
+    {
+        let segments: SmallVec<[CompactName; 3]> = iter.into_iter().map(Into::into).collect();
+        if segments.is_empty() {
+            None
+        } else {
+            Some(Self { segments })
+        }
     }
 
     /// Append a segment, returning the extended path.

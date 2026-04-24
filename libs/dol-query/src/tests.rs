@@ -1,6 +1,6 @@
 use super::*;
-use dol_schema::{Field, DataType};
 use dol_expr::tree::{field, param};
+use dol_schema::{DataType, Field};
 
 fn users_entity() -> Entity {
     Entity::new(
@@ -215,10 +215,7 @@ fn get_from_string_columns() {
 
 #[test]
 fn get_from_namespaced_string() {
-    let (stmt, _arena, interner) = Query::from("identity.users")
-        .get()
-        .fields(&["id"])
-        .build();
+    let (stmt, _arena, interner) = Query::from("identity.users").get().fields(&["id"]).build();
     match stmt {
         dol_ir::Statement::Query(q) => {
             assert_eq!(interner.get(q.from), "identity.users");
@@ -338,7 +335,10 @@ fn upsert_do_nothing() {
         .build();
     match stmt {
         dol_ir::Statement::Upsert(ups) => {
-            assert!(matches!(ups.conflict, Some(dol_expr::expr::ConflictClause::DoNothing)));
+            assert!(matches!(
+                ups.conflict,
+                Some(dol_expr::expr::ConflictClause::DoNothing)
+            ));
         }
         _ => panic!("expected Statement::Upsert"),
     }
@@ -367,10 +367,7 @@ fn get_build_produces_query_statement() {
 
 #[test]
 fn get_build_with_namespace() {
-    let (stmt, _arena, interner) = Query::from("identity.users")
-        .get()
-        .fields(&["id"])
-        .build();
+    let (stmt, _arena, interner) = Query::from("identity.users").get().fields(&["id"]).build();
     match stmt {
         dol_ir::Statement::Query(q) => {
             assert_eq!(interner.get(q.from), "identity.users");
@@ -461,7 +458,10 @@ fn upsert_build_do_nothing() {
         dol_ir::Statement::Upsert(ups) => {
             assert_eq!(interner.get(ups.target), "users");
             assert_eq!(ups.columns.len(), 2);
-            assert!(matches!(ups.conflict, Some(dol_expr::expr::ConflictClause::DoNothing)));
+            assert!(matches!(
+                ups.conflict,
+                Some(dol_expr::expr::ConflictClause::DoNothing)
+            ));
         }
         _ => panic!("expected Statement::Upsert"),
     }
@@ -492,9 +492,7 @@ fn upsert_build_do_update() {
 #[test]
 fn get_build_default_entity_fields() {
     let users = users_entity();
-    let (stmt, _arena, interner) = Query::from(&users)
-        .get()
-        .build();
+    let (stmt, _arena, interner) = Query::from(&users).get().build();
     match stmt {
         dol_ir::Statement::Query(q) => {
             assert_eq!(interner.get(q.from), "users");

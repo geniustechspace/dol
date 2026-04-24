@@ -21,11 +21,11 @@ pub enum ObjectSource {
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PutObject {
-    pub bucket:       String,
-    pub key:          String,
-    pub source:       ObjectSource,
+    pub bucket: String,
+    pub key: String,
+    pub source: ObjectSource,
     pub content_type: Option<String>,
-    pub metadata:     Vec<(String, String)>,
+    pub metadata: Vec<(String, String)>,
 }
 
 /// Download / read an object from object storage.
@@ -33,16 +33,16 @@ pub struct PutObject {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GetObject {
     pub bucket: String,
-    pub key:    String,
+    pub key: String,
 }
 
 /// List objects in a bucket (with optional prefix filter).
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ListObjects {
-    pub bucket:             String,
-    pub prefix:             Option<String>,
-    pub limit:              Option<u64>,
+    pub bucket: String,
+    pub prefix: Option<String>,
+    pub limit: Option<u64>,
     pub continuation_token: Option<String>,
 }
 
@@ -50,7 +50,7 @@ pub struct ListObjects {
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ReadFile {
-    pub path:     String,
+    pub path: String,
     pub encoding: Option<String>,
 }
 
@@ -58,8 +58,8 @@ pub struct ReadFile {
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WriteFile {
-    pub path:        String,
-    pub source:      ObjectSource,
+    pub path: String,
+    pub source: ObjectSource,
     pub create_dirs: bool,
 }
 
@@ -68,6 +68,5 @@ pub struct WriteFile {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MoveFile {
     pub from: String,
-    pub to:   String,
+    pub to: String,
 }
-

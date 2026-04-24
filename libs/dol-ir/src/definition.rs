@@ -11,10 +11,10 @@ use crate::entity_ref::EntityRef;
 pub enum OwnedEntityConstraint {
     Unique(Vec<String>),
     ForeignKey {
-        columns:     Vec<String>,
-        ref_table:   String,
+        columns: Vec<String>,
+        ref_table: String,
         ref_columns: Vec<String>,
-        on_delete:   FkAction,
+        on_delete: FkAction,
     },
     Check(String),
     PrimaryKey(Vec<String>),
@@ -26,15 +26,18 @@ impl From<&EntityConstraint> for OwnedEntityConstraint {
             EntityConstraint::Unique(cols) => {
                 Self::Unique(cols.iter().map(|s| (*s).to_string()).collect())
             }
-            EntityConstraint::ForeignKey { columns, ref_table, ref_columns, on_delete } => {
-                Self::ForeignKey {
-                    columns:     columns.iter().map(|s| (*s).to_string()).collect(),
-                    ref_table:   (*ref_table).to_string(),
-                    ref_columns: ref_columns.iter().map(|s| (*s).to_string()).collect(),
-                    on_delete:   *on_delete,
-                }
-            }
-            EntityConstraint::Check(expr)    => Self::Check((*expr).to_string()),
+            EntityConstraint::ForeignKey {
+                columns,
+                ref_table,
+                ref_columns,
+                on_delete,
+            } => Self::ForeignKey {
+                columns: columns.iter().map(|s| (*s).to_string()).collect(),
+                ref_table: (*ref_table).to_string(),
+                ref_columns: ref_columns.iter().map(|s| (*s).to_string()).collect(),
+                on_delete: *on_delete,
+            },
+            EntityConstraint::Check(expr) => Self::Check((*expr).to_string()),
             EntityConstraint::PrimaryKey(cols) => {
                 Self::PrimaryKey(cols.iter().map(|s| (*s).to_string()).collect())
             }
@@ -43,18 +46,20 @@ impl From<&EntityConstraint> for OwnedEntityConstraint {
 }
 
 impl From<EntityConstraint> for OwnedEntityConstraint {
-    fn from(c: EntityConstraint) -> Self { Self::from(&c) }
+    fn from(c: EntityConstraint) -> Self {
+        Self::from(&c)
+    }
 }
 
-pub type Constraint    = OwnedEntityConstraint;
+pub type Constraint = OwnedEntityConstraint;
 pub type ForeignKeyDef = OwnedForeignKeyRef;
 
 /// An owned foreign key reference (String fields instead of `&'static str`).
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OwnedForeignKeyRef {
-    pub table:     String,
-    pub column:    String,
+    pub table: String,
+    pub column: String,
     pub on_delete: FkAction,
     pub on_update: FkAction,
 }
@@ -62,25 +67,31 @@ pub struct OwnedForeignKeyRef {
 impl OwnedForeignKeyRef {
     pub fn new(table: &str, column: &str) -> Self {
         Self {
-            table:     table.to_string(),
-            column:    column.to_string(),
+            table: table.to_string(),
+            column: column.to_string(),
             on_delete: FkAction::NoAction,
             on_update: FkAction::NoAction,
         }
     }
 
-    pub fn on_delete(mut self, action: FkAction) -> Self { self.on_delete = action; self }
-    pub fn on_update(mut self, action: FkAction) -> Self { self.on_update = action; self }
+    pub fn on_delete(mut self, action: FkAction) -> Self {
+        self.on_delete = action;
+        self
+    }
+    pub fn on_update(mut self, action: FkAction) -> Self {
+        self.on_update = action;
+        self
+    }
 }
 
 /// Define (create) a new entity / table.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DefineEntity {
-    pub name:          String,
-    pub namespace:     Option<String>,
-    pub fields:        Vec<FieldDef>,
-    pub constraints:   Vec<OwnedEntityConstraint>,
+    pub name: String,
+    pub namespace: Option<String>,
+    pub fields: Vec<FieldDef>,
+    pub constraints: Vec<OwnedEntityConstraint>,
     pub if_not_exists: bool,
 }
 
@@ -88,18 +99,18 @@ pub struct DefineEntity {
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FieldDef {
-    pub name:           String,
-    pub data_type:      DataType,
-    pub primary_key:    bool,
-    pub nullable:       bool,
-    pub default_expr:   Option<String>,
-    pub unique:         bool,
-    pub references:     Option<OwnedForeignKeyRef>,
-    pub check:          Option<String>,
-    pub comment:        Option<String>,
-    pub collation:      Option<String>,
-    pub generated:      Option<(GeneratedKind, String)>,
-    pub indexed:        bool,
+    pub name: String,
+    pub data_type: DataType,
+    pub primary_key: bool,
+    pub nullable: bool,
+    pub default_expr: Option<String>,
+    pub unique: bool,
+    pub references: Option<OwnedForeignKeyRef>,
+    pub check: Option<String>,
+    pub comment: Option<String>,
+    pub collation: Option<String>,
+    pub generated: Option<(GeneratedKind, String)>,
+    pub indexed: bool,
     pub auto_increment: bool,
 }
 
@@ -108,32 +119,66 @@ impl FieldDef {
         Self {
             name: name.to_string(),
             data_type,
-            primary_key:    false,
-            nullable:       false,
-            default_expr:   None,
-            unique:         false,
-            references:     None,
-            check:          None,
-            comment:        None,
-            collation:      None,
-            generated:      None,
-            indexed:        false,
+            primary_key: false,
+            nullable: false,
+            default_expr: None,
+            unique: false,
+            references: None,
+            check: None,
+            comment: None,
+            collation: None,
+            generated: None,
+            indexed: false,
             auto_increment: false,
         }
     }
 
-    pub fn primary_key(mut self)            -> Self { self.primary_key = true; self }
-    pub fn nullable(mut self)               -> Self { self.nullable = true; self }
-    pub fn optional(self)                   -> Self { self.nullable() }
-    pub fn required(self)                   -> Self { self }
-    pub fn unique(mut self)                 -> Self { self.unique = true; self }
-    pub fn auto_increment(mut self)         -> Self { self.auto_increment = true; self }
-    pub fn index(mut self)                  -> Self { self.indexed = true; self }
-    pub fn default(mut self, expr: &str)    -> Self { self.default_expr = Some(expr.to_string()); self }
-    pub fn comment(mut self, text: &str)    -> Self { self.comment = Some(text.to_string()); self }
-    pub fn collation(mut self, c: &str)     -> Self { self.collation = Some(c.to_string()); self }
-    pub fn check(mut self, expr: &str)      -> Self { self.check = Some(expr.to_string()); self }
-    pub fn references(mut self, fk: OwnedForeignKeyRef) -> Self { self.references = Some(fk); self }
+    pub fn primary_key(mut self) -> Self {
+        self.primary_key = true;
+        self
+    }
+    pub fn nullable(mut self) -> Self {
+        self.nullable = true;
+        self
+    }
+    pub fn optional(self) -> Self {
+        self.nullable()
+    }
+    pub fn required(self) -> Self {
+        self
+    }
+    pub fn unique(mut self) -> Self {
+        self.unique = true;
+        self
+    }
+    pub fn auto_increment(mut self) -> Self {
+        self.auto_increment = true;
+        self
+    }
+    pub fn index(mut self) -> Self {
+        self.indexed = true;
+        self
+    }
+    pub fn default(mut self, expr: &str) -> Self {
+        self.default_expr = Some(expr.to_string());
+        self
+    }
+    pub fn comment(mut self, text: &str) -> Self {
+        self.comment = Some(text.to_string());
+        self
+    }
+    pub fn collation(mut self, c: &str) -> Self {
+        self.collation = Some(c.to_string());
+        self
+    }
+    pub fn check(mut self, expr: &str) -> Self {
+        self.check = Some(expr.to_string());
+        self
+    }
+    pub fn references(mut self, fk: OwnedForeignKeyRef) -> Self {
+        self.references = Some(fk);
+        self
+    }
 
     pub fn generated_stored(mut self, expr: &str) -> Self {
         self.generated = Some((GeneratedKind::Stored, expr.to_string()));
@@ -150,7 +195,7 @@ impl FieldDef {
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AlterEntity {
-    pub target:  EntityRef,
+    pub target: EntityRef,
     pub actions: Vec<AlterAction>,
 }
 
@@ -175,23 +220,23 @@ pub enum AlterAction {
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DropEntity {
-    pub target:    EntityRef,
+    pub target: EntityRef,
     pub if_exists: bool,
-    pub cascade:   bool,
+    pub cascade: bool,
 }
 
 /// Define (create) an index.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DefineIndex {
-    pub name:          String,
-    pub target:        EntityRef,
-    pub columns:       Vec<String>,
-    pub unique:        bool,
+    pub name: String,
+    pub target: EntityRef,
+    pub columns: Vec<String>,
+    pub unique: bool,
     pub if_not_exists: bool,
-    pub concurrently:  bool,
-    pub method:        Option<IndexMethod>,
-    pub where_clause:  Option<String>,
+    pub concurrently: bool,
+    pub method: Option<IndexMethod>,
+    pub where_clause: Option<String>,
 }
 
 /// Index access method — backend-agnostic.
@@ -209,25 +254,25 @@ pub enum IndexMethod {
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DropIndex {
-    pub name:         String,
-    pub if_exists:    bool,
+    pub name: String,
+    pub if_exists: bool,
     pub concurrently: bool,
-    pub cascade:      bool,
+    pub cascade: bool,
 }
 
 /// Define a custom type (e.g., an enum).
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DefineType {
-    pub name:      String,
+    pub name: String,
     pub namespace: Option<String>,
-    pub variants:  Vec<String>,
+    pub variants: Vec<String>,
 }
 
 /// Drop a custom type.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DropType {
-    pub name:      String,
+    pub name: String,
     pub if_exists: bool,
 }

@@ -36,7 +36,7 @@ impl<'a> Expr<'a> {
     /// Internal helper: build a non-negated binary op.
     fn binop(self, op: OpDef, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
         Expr::BinaryOp {
-            left:  Box::new(self),
+            left: Box::new(self),
             op,
             right: Box::new(rhs.into()),
         }
@@ -49,12 +49,28 @@ impl<'a> Expr<'a> {
     /// - All other expressions are wrapped in `UnaryOp::Not`.
     pub fn negate(self) -> Expr<'a> {
         match self {
-            Expr::UnaryOp { op: UnaryOp::IsNull,    expr } =>
-                Expr::UnaryOp { op: UnaryOp::IsNotNull, expr },
-            Expr::UnaryOp { op: UnaryOp::IsNotNull, expr } =>
-                Expr::UnaryOp { op: UnaryOp::IsNull, expr },
-            Expr::UnaryOp { op: UnaryOp::Not, expr } => *expr,
-            other => Expr::UnaryOp { op: UnaryOp::Not, expr: Box::new(other) },
+            Expr::UnaryOp {
+                op: UnaryOp::IsNull,
+                expr,
+            } => Expr::UnaryOp {
+                op: UnaryOp::IsNotNull,
+                expr,
+            },
+            Expr::UnaryOp {
+                op: UnaryOp::IsNotNull,
+                expr,
+            } => Expr::UnaryOp {
+                op: UnaryOp::IsNull,
+                expr,
+            },
+            Expr::UnaryOp {
+                op: UnaryOp::Not,
+                expr,
+            } => *expr,
+            other => Expr::UnaryOp {
+                op: UnaryOp::Not,
+                expr: Box::new(other),
+            },
         }
     }
 
@@ -132,7 +148,7 @@ impl<'a> Expr<'a> {
     /// `self IS NULL`. Chain `.negate()` for `IS NOT NULL`.
     pub fn is_null(self) -> Expr<'a> {
         Expr::UnaryOp {
-            op:   UnaryOp::IsNull,
+            op: UnaryOp::IsNull,
             expr: Box::new(self),
         }
     }
@@ -140,14 +156,10 @@ impl<'a> Expr<'a> {
     // ── Range / set ──────────────────────────────────────────────────────────
 
     /// `self BETWEEN low AND high`. Chain `.negate()` for `NOT BETWEEN`.
-    pub fn between(
-        self,
-        low:  impl Into<Expr<'a>>,
-        high: impl Into<Expr<'a>>,
-    ) -> Expr<'a> {
+    pub fn between(self, low: impl Into<Expr<'a>>, high: impl Into<Expr<'a>>) -> Expr<'a> {
         Expr::Between {
             expr: Box::new(self),
-            low:  Box::new(low.into()),
+            low: Box::new(low.into()),
             high: Box::new(high.into()),
         }
     }
@@ -165,7 +177,7 @@ impl<'a> Expr<'a> {
     /// `CAST(self AS as_type)`.
     pub fn cast(self, as_type: crate::types::DataType) -> Expr<'a> {
         Expr::Cast {
-            expr:    Box::new(self),
+            expr: Box::new(self),
             as_type,
         }
     }
@@ -173,7 +185,7 @@ impl<'a> Expr<'a> {
     /// `self AS alias`.
     pub fn alias(self, name: &str) -> Expr<'a> {
         Expr::Alias {
-            expr:  Box::new(self),
+            expr: Box::new(self),
             alias: CompactName::from_str(name),
         }
     }
@@ -188,18 +200,18 @@ impl<'a> Expr<'a> {
     /// Ascending `ORDER BY`.
     pub fn asc(self) -> OrderByExpr<'a> {
         OrderByExpr {
-            expr:      self,
+            expr: self,
             direction: Direction::Asc,
-            nulls:     None,
+            nulls: None,
         }
     }
 
     /// Descending `ORDER BY`.
     pub fn desc(self) -> OrderByExpr<'a> {
         OrderByExpr {
-            expr:      self,
+            expr: self,
             direction: Direction::Desc,
-            nulls:     None,
+            nulls: None,
         }
     }
 
@@ -215,8 +227,8 @@ impl<'a> std_ops::BitAnd for Expr<'a> {
     type Output = Expr<'a>;
     fn bitand(self, rhs: Expr<'a>) -> Expr<'a> {
         Expr::BinaryOp {
-            left:  Box::new(self),
-            op:    op_registry::OpAnd::def(),
+            left: Box::new(self),
+            op: op_registry::OpAnd::def(),
             right: Box::new(rhs),
         }
     }
@@ -226,8 +238,8 @@ impl<'a> std_ops::BitOr for Expr<'a> {
     type Output = Expr<'a>;
     fn bitor(self, rhs: Expr<'a>) -> Expr<'a> {
         Expr::BinaryOp {
-            left:  Box::new(self),
-            op:    op_registry::OpOr::def(),
+            left: Box::new(self),
+            op: op_registry::OpOr::def(),
             right: Box::new(rhs),
         }
     }
@@ -236,48 +248,74 @@ impl<'a> std_ops::BitOr for Expr<'a> {
 impl<'a> std_ops::Not for Expr<'a> {
     type Output = Expr<'a>;
     fn not(self) -> Expr<'a> {
-        Expr::UnaryOp { op: UnaryOp::Not, expr: Box::new(self) }
+        Expr::UnaryOp {
+            op: UnaryOp::Not,
+            expr: Box::new(self),
+        }
     }
 }
 
 impl<'a> std_ops::Add for Expr<'a> {
     type Output = Expr<'a>;
     fn add(self, rhs: Expr<'a>) -> Expr<'a> {
-        Expr::BinaryOp { left: Box::new(self), op: op_registry::OpAdd::def(), right: Box::new(rhs) }
+        Expr::BinaryOp {
+            left: Box::new(self),
+            op: op_registry::OpAdd::def(),
+            right: Box::new(rhs),
+        }
     }
 }
 
 impl<'a> std_ops::Sub for Expr<'a> {
     type Output = Expr<'a>;
     fn sub(self, rhs: Expr<'a>) -> Expr<'a> {
-        Expr::BinaryOp { left: Box::new(self), op: op_registry::OpSub::def(), right: Box::new(rhs) }
+        Expr::BinaryOp {
+            left: Box::new(self),
+            op: op_registry::OpSub::def(),
+            right: Box::new(rhs),
+        }
     }
 }
 
 impl<'a> std_ops::Mul for Expr<'a> {
     type Output = Expr<'a>;
     fn mul(self, rhs: Expr<'a>) -> Expr<'a> {
-        Expr::BinaryOp { left: Box::new(self), op: op_registry::OpMul::def(), right: Box::new(rhs) }
+        Expr::BinaryOp {
+            left: Box::new(self),
+            op: op_registry::OpMul::def(),
+            right: Box::new(rhs),
+        }
     }
 }
 
 impl<'a> std_ops::Div for Expr<'a> {
     type Output = Expr<'a>;
     fn div(self, rhs: Expr<'a>) -> Expr<'a> {
-        Expr::BinaryOp { left: Box::new(self), op: op_registry::OpDiv::def(), right: Box::new(rhs) }
+        Expr::BinaryOp {
+            left: Box::new(self),
+            op: op_registry::OpDiv::def(),
+            right: Box::new(rhs),
+        }
     }
 }
 
 impl<'a> std_ops::Rem for Expr<'a> {
     type Output = Expr<'a>;
     fn rem(self, rhs: Expr<'a>) -> Expr<'a> {
-        Expr::BinaryOp { left: Box::new(self), op: op_registry::OpMod::def(), right: Box::new(rhs) }
+        Expr::BinaryOp {
+            left: Box::new(self),
+            op: op_registry::OpMod::def(),
+            right: Box::new(rhs),
+        }
     }
 }
 
 impl<'a> std_ops::Neg for Expr<'a> {
     type Output = Expr<'a>;
     fn neg(self) -> Expr<'a> {
-        Expr::UnaryOp { op: UnaryOp::Neg, expr: Box::new(self) }
+        Expr::UnaryOp {
+            op: UnaryOp::Neg,
+            expr: Box::new(self),
+        }
     }
 }

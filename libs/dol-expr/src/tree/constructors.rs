@@ -110,15 +110,15 @@ macro_rules! impl_into_int {
     };
 }
 
-impl_into_int!(i8,   Int8);
-impl_into_int!(i16,  Int16);
-impl_into_int!(i32,  Int32);
-impl_into_int!(i64,  Int64);
+impl_into_int!(i8, Int8);
+impl_into_int!(i16, Int16);
+impl_into_int!(i32, Int32);
+impl_into_int!(i64, Int64);
 impl_into_int!(i128, Int128);
-impl_into_int!(u8,   UInt8);
-impl_into_int!(u16,  UInt16);
-impl_into_int!(u32,  UInt32);
-impl_into_int!(u64,  UInt64);
+impl_into_int!(u8, UInt8);
+impl_into_int!(u16, UInt16);
+impl_into_int!(u32, UInt32);
+impl_into_int!(u64, UInt64);
 impl_into_int!(u128, UInt128);
 
 // ── Float coercion ───────────────────────────────────────────────────────────

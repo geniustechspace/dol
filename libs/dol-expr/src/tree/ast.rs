@@ -30,7 +30,6 @@ use super::window::WindowFrame;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Expr<'a> {
     // ── References ──────────────────────────────────────────────────────────
-
     /// A namespace path reference: `field`, `table.field`, `schema.table.field`.
     ///
     /// Use [`field()`] for single-segment, [`qualified()`] for multi-segment.
@@ -45,13 +44,9 @@ pub enum Expr<'a> {
     ///
     /// Built by chaining [`Expr::get()`]. For SQL this typically renders as
     /// JSON access (`->>`, `json_extract`, etc.) depending on the dialect.
-    Field {
-        base: Box<Expr<'a>>,
-        path: PathExpr,
-    },
+    Field { base: Box<Expr<'a>>, path: PathExpr },
 
     // ── Values ───────────────────────────────────────────────────────────────
-
     /// A positional bind parameter (`$1`, `?`, `@p1`, `:1`).
     Param,
 
@@ -65,7 +60,6 @@ pub enum Expr<'a> {
     Object(Vec<(CompactName, Expr<'a>)>),
 
     // ── Operations ───────────────────────────────────────────────────────────
-
     /// A binary operation: `left op right`.
     ///
     /// Negation (`NOT LIKE`, `NOT IN`, etc.) is expressed by wrapping in
@@ -79,21 +73,13 @@ pub enum Expr<'a> {
     /// A unary operation: `op expr`.
     ///
     /// Includes `NOT`, `-`, `~`, `IS NULL`, `IS NOT NULL`.
-    UnaryOp {
-        op: UnaryOp,
-        expr: Box<Expr<'a>>,
-    },
+    UnaryOp { op: UnaryOp, expr: Box<Expr<'a>> },
 
     // ── Calls ────────────────────────────────────────────────────────────────
-
     /// A function call: `name(args…)`.
-    Func {
-        name: FuncDef,
-        args: Vec<Expr<'a>>,
-    },
+    Func { name: FuncDef, args: Vec<Expr<'a>> },
 
     // ── Structural ───────────────────────────────────────────────────────────
-
     /// A type cast: `CAST(expr AS type)`.
     Cast {
         expr: Box<Expr<'a>>,
@@ -111,7 +97,7 @@ pub enum Expr<'a> {
     /// For `NOT BETWEEN`, wrap with [`Expr::negate()`].
     Between {
         expr: Box<Expr<'a>>,
-        low:  Box<Expr<'a>>,
+        low: Box<Expr<'a>>,
         high: Box<Expr<'a>>,
     },
 
@@ -124,10 +110,9 @@ pub enum Expr<'a> {
     },
 
     // ── Decoration ───────────────────────────────────────────────────────────
-
     /// `expr AS alias`.
     Alias {
-        expr:  Box<Expr<'a>>,
+        expr: Box<Expr<'a>>,
         alias: CompactName,
     },
 
@@ -139,9 +124,9 @@ pub enum Expr<'a> {
 
     /// A window function: `func OVER (PARTITION BY … ORDER BY … frame)`.
     Window {
-        func:         Box<Expr<'a>>,
+        func: Box<Expr<'a>>,
         partition_by: Vec<Expr<'a>>,
-        order_by:     Vec<OrderByExpr<'a>>,
-        frame:        Option<WindowFrame>,
+        order_by: Vec<OrderByExpr<'a>>,
+        frame: Option<WindowFrame>,
     },
 }

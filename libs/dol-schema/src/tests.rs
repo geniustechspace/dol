@@ -22,7 +22,9 @@ fn constrained_model() -> Entity {
     Entity::new(
         "orders",
         vec![
-            Field::new("id", DataType::Int32).primary_key().auto_increment(),
+            Field::new("id", DataType::Int32)
+                .primary_key()
+                .auto_increment(),
             Field::new("user_id", DataType::Uuid),
             Field::new("product", DataType::Text),
         ],
@@ -288,7 +290,9 @@ fn field_index_hint() {
 
 #[test]
 fn field_auto_increment() {
-    let f = Field::new("id", DataType::Int32).auto_increment().primary_key();
+    let f = Field::new("id", DataType::Int32)
+        .auto_increment()
+        .primary_key();
     assert!(f.auto_increment);
     assert!(f.primary_key);
     assert_eq!(f.data_type, DataType::Int32);

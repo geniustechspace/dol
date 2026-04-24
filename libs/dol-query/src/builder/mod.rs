@@ -9,11 +9,11 @@ pub mod storage;
 pub mod transaction;
 
 pub use control::{DefinePolicyBuilder, GrantBuilder, RevokeBuilder};
-pub use mutation::{
-    InsertBuilder, InsertSelect, InsertSelectBuilder, DeleteBuilder, UpdateBuilder, UpsertBuilder,
-};
 #[allow(deprecated)]
 pub use mutation::RemoveBuilder;
+pub use mutation::{
+    DeleteBuilder, InsertBuilder, InsertSelect, InsertSelectBuilder, UpdateBuilder, UpsertBuilder,
+};
 pub use query::GetBuilder;
 pub use storage::{
     GetObjectBuilder, ListObjectsBuilder, MoveFileBuilder, PutObjectBuilder, ReadFileBuilder,
@@ -27,7 +27,7 @@ pub use control::Privilege;
 // EntityBuilderExt — CRUD + DDL builder entry-points on Entity
 // ---------------------------------------------------------------------------
 
-use dol_schema::{Entity, AlterEntityBuilder, CreateFromMeta, DropEntityBuilder};
+use dol_schema::{AlterEntityBuilder, CreateFromMeta, DropEntityBuilder, Entity};
 
 /// Extension trait providing builder entry-point methods on [`Entity`].
 ///
@@ -38,6 +38,11 @@ pub trait EntityBuilderExt {
     fn insert_select(&self) -> InsertSelectBuilder<'_>;
     fn update(&self) -> UpdateBuilder<'_>;
     fn delete(&self) -> DeleteBuilder<'_>;
+    /// Deprecated: use [`delete()`](Self::delete) instead.
+    #[deprecated(note = "renamed to `delete()`")]
+    fn remove(&self) -> DeleteBuilder<'_> {
+        self.delete()
+    }
     fn upsert(&self) -> UpsertBuilder<'_>;
     fn alter(&self) -> AlterEntityBuilder<'_>;
     fn drop_entity(&self) -> DropEntityBuilder<'_>;

@@ -152,13 +152,19 @@ impl DefinePolicyBuilder {
         let mut interner = dol_expr::Interner::new();
 
         let ir_action = match self.action {
-            PolicyAction::Read  => dol_ir::PolicyAction::Read,
+            PolicyAction::Read => dol_ir::PolicyAction::Read,
             PolicyAction::Write => dol_ir::PolicyAction::Write,
-            PolicyAction::All   => dol_ir::PolicyAction::All,
+            PolicyAction::All => dol_ir::PolicyAction::All,
         };
 
-        let using_id = self.using_expr.as_ref().map(|e| lower_expr(e, &mut arena, &mut interner));
-        let check_id = self.check_expr.as_ref().map(|e| lower_expr(e, &mut arena, &mut interner));
+        let using_id = self
+            .using_expr
+            .as_ref()
+            .map(|e| lower_expr(e, &mut arena, &mut interner));
+        let check_id = self
+            .check_expr
+            .as_ref()
+            .map(|e| lower_expr(e, &mut arena, &mut interner));
 
         let policy = dol_ir::DefinePolicy {
             name: self.name.clone(),

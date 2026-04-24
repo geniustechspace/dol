@@ -4,14 +4,18 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EntityRef {
-    pub name:      String,
+    pub name: String,
     pub namespace: Option<String>,
-    pub alias:     Option<String>,
+    pub alias: Option<String>,
 }
 
 impl EntityRef {
     pub fn new(name: impl Into<String>) -> Self {
-        Self { name: name.into(), namespace: None, alias: None }
+        Self {
+            name: name.into(),
+            namespace: None,
+            alias: None,
+        }
     }
 
     pub fn with_namespace(mut self, ns: impl Into<String>) -> Self {

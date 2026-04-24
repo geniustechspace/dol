@@ -40,8 +40,13 @@ pub enum GeneratedKind {
 }
 
 /// An inline foreign key reference on a single field.
+///
+/// Note: Only `Serialize` is derived under the `serde` feature because this
+/// type carries `&'static str` fields that cannot be deserialized into
+/// `'static` references. For round-trippable representations, use an owned
+/// equivalent in the DDL/runtime layer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ForeignKeyRef {
     pub table: &'static str,
     pub column: &'static str,
@@ -71,8 +76,13 @@ impl ForeignKeyRef {
 }
 
 /// A model-level constraint (composite UNIQUE, multi-field FK, CHECK, composite PK).
+///
+/// Note: Only `Serialize` is derived under the `serde` feature because this
+/// enum carries `&'static str` / `&'static [&'static str]` payloads that
+/// cannot be deserialized into `'static` references. For round-trippable
+/// representations, use an owned equivalent in the DDL/runtime layer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum EntityConstraint {
     /// `UNIQUE (field1, field2, ...)`
     Unique(&'static [&'static str]),

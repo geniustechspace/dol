@@ -37,11 +37,11 @@ pub use constructors::{
     IntoFloatLiteral, IntoIntLiteral, arr, bool_expr, case, field, field_dyn, float, int, null,
     obj, param, qualified, string,
 };
-pub use path::PathExpr;
 pub use func_def::{
     Arity, ArityError, CompactName, DolFunc, DolOp, FuncDef, FuncKind, OpDef, OpKind,
 };
 pub use literal::{Literal, TypeError, Value};
 pub use ops::UnaryOp;
 pub use order::{Direction, NullsPosition, OrderByExpr};
+pub use path::PathExpr;
 pub use window::{CaseBuilder, FrameBound, FrameKind, WindowBuilder, WindowFrame};

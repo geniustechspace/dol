@@ -120,10 +120,8 @@ impl UpsertQuery {
         };
 
         let target = interner.intern(&crate::lower::qualified_name(&self.name, &self.namespace));
-        let columns: smallvec::SmallVec<[u32; 8]> = fields
-            .iter()
-            .map(|f| interner.intern(f))
-            .collect();
+        let columns: smallvec::SmallVec<[u32; 8]> =
+            fields.iter().map(|f| interner.intern(f)).collect();
 
         // One Param per field.
         let values: smallvec::SmallVec<[u32; 8]> = fields
@@ -131,7 +129,8 @@ impl UpsertQuery {
             .map(|_| arena.alloc(ExprNode::Param))
             .collect();
 
-        let returning: smallvec::SmallVec<[u32; 4]> = self.returning
+        let returning: smallvec::SmallVec<[u32; 4]> = self
+            .returning
             .iter()
             .map(|r| {
                 let col = interner.intern(r);
@@ -147,13 +146,14 @@ impl UpsertQuery {
         let conflict = if self.do_nothing_flag {
             Some(ConflictClause::DoNothing)
         } else if !self.update_fields.is_empty() {
-            let assignments: smallvec::SmallVec<[(u32, u32); 4]> = self.update_fields
+            let assignments: smallvec::SmallVec<[(u32, u32); 4]> = self
+                .update_fields
                 .iter()
                 .map(|col| {
                     let col_id = interner.intern(col);
                     // EXCLUDED.col reference
                     let ns = interner.intern("EXCLUDED");
-                    let c  = interner.intern(col);
+                    let c = interner.intern(col);
                     let fid = arena.alloc_field(dol_expr::FieldNode {
                         namespace: Some(ns),
                         column: c,

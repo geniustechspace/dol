@@ -46,9 +46,9 @@ pub struct FieldNode {
     /// Optional table/alias qualifier (`None` = unqualified).
     pub namespace: Option<StrId>,
     /// Base column or attribute name (first step from the container).
-    pub column:    StrId,
+    pub column: StrId,
     /// Traversal steps that follow the column (empty = bare column reference).
-    pub steps:     SmallVec<[FieldStep; 4]>,
+    pub steps: SmallVec<[FieldStep; 4]>,
 }
 
 // ─── Pooled payload structs ───────────────────────────────────────────────────
@@ -78,9 +78,9 @@ pub struct ObjLitNode(pub SmallVec<[(StrId, NodeId); 4]>);
 /// of payload — pooled to keep `ExprNode` ≤ 32 bytes.
 #[derive(Debug, Clone, PartialEq)]
 pub struct WindowNode {
-    pub func:      StrId,
+    pub func: StrId,
     pub partition: SmallVec<[NodeId; 4]>,
-    pub order:     SmallVec<[(NodeId, Order); 2]>,
+    pub order: SmallVec<[(NodeId, Order); 2]>,
 }
 
 /// Payload for [`ExprNode::Case`], stored in [`ExprArena::cases`].
@@ -90,7 +90,7 @@ pub struct WindowNode {
 #[derive(Debug, Clone, PartialEq)]
 pub struct CaseNode {
     pub branches: SmallVec<[(NodeId, NodeId); 4]>,
-    pub else_:    NodeId,
+    pub else_: NodeId,
 }
 
 /// Payload for [`ExprNode::InList`], stored in [`ExprArena::in_lists`].
@@ -108,7 +108,7 @@ pub struct InListNode {
 #[derive(Debug, Clone, Default)]
 pub struct Span {
     pub start: u32,
-    pub end:   u32,
+    pub end: u32,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -132,36 +132,38 @@ impl SpanTable {
 
 #[derive(Debug, Clone, Default)]
 pub struct ExprArena {
-    nodes:      Vec<ExprNode>,
+    nodes: Vec<ExprNode>,
     span_table: SpanTable,
     /// Pooled literal values — indexed by [`LiteralId`].
-    lits:       Vec<Literal<'static>>,
+    lits: Vec<Literal<'static>>,
     /// Pooled function-call payloads — indexed by [`FuncId`].
-    funcs:      Vec<FuncNode>,
+    funcs: Vec<FuncNode>,
     /// Pooled object-literal payloads — indexed by [`ObjLitId`].
-    obj_lits:   Vec<ObjLitNode>,
+    obj_lits: Vec<ObjLitNode>,
     /// Pooled window-function payloads — indexed by [`WindowId`].
-    windows:    Vec<WindowNode>,
+    windows: Vec<WindowNode>,
     /// Pooled CASE expression payloads — indexed by [`CaseId`].
-    cases:      Vec<CaseNode>,
+    cases: Vec<CaseNode>,
     /// Pooled IN-list payloads — indexed by [`InListId`].
-    in_lists:   Vec<InListNode>,
+    in_lists: Vec<InListNode>,
     /// Pooled SELECT/query statement payloads — indexed by [`QueryId`].
-    queries:    Vec<QueryNode>,
+    queries: Vec<QueryNode>,
     /// Pooled INSERT statement payloads — indexed by [`InsertId`].
-    inserts:    Vec<InsertNode>,
+    inserts: Vec<InsertNode>,
     /// Pooled UPDATE statement payloads — indexed by [`UpdateId`].
-    updates:    Vec<UpdateNode>,
+    updates: Vec<UpdateNode>,
     /// Pooled DELETE statement payloads — indexed by [`DeleteId`].
-    deletes:    Vec<DeleteNode>,
+    deletes: Vec<DeleteNode>,
     /// Pooled UPSERT statement payloads — indexed by [`UpsertId`].
-    upserts:    Vec<UpsertNode>,
+    upserts: Vec<UpsertNode>,
     /// Pooled field-reference payloads — indexed by [`FieldId`].
-    fields:     Vec<FieldNode>,
+    fields: Vec<FieldNode>,
 }
 
 impl ExprArena {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     // ── ExprNode pool ────────────────────────────────────────────────────────
 
@@ -171,11 +173,17 @@ impl ExprArena {
         id
     }
 
-    pub fn get(&self, id: NodeId) -> &ExprNode { &self.nodes[id as usize] }
+    pub fn get(&self, id: NodeId) -> &ExprNode {
+        &self.nodes[id as usize]
+    }
 
-    pub fn len(&self) -> usize { self.nodes.len() }
+    pub fn len(&self) -> usize {
+        self.nodes.len()
+    }
 
-    pub fn is_empty(&self) -> bool { self.nodes.is_empty() }
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
+    }
 
     pub fn attach_span(&mut self, _id: NodeId, span: Span) -> SpanId {
         self.span_table.push(span)

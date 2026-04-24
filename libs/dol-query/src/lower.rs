@@ -5,22 +5,18 @@
 //! lifetime-parameterised `Expr<'a>`) and the arena-based IR used by
 //! `dol-ir::Statement`.
 
-use dol_expr::tree::{Expr, OrderByExpr, Direction};
 use dol_expr::arena::{ExprArena, FieldNode, FuncNode, InListNode, ObjLitNode};
 use dol_expr::expr::{BinOp, ExprNode, Order, UnaryOp as ArenaUnaryOp};
-use dol_expr::ids::{NodeId, NULL_NODE};
+use dol_expr::ids::{NULL_NODE, NodeId};
 use dol_expr::interner::Interner;
+use dol_expr::tree::{Direction, Expr, OrderByExpr};
 use smallvec::SmallVec;
 
 /// Lowers an `Expr<'static>` into the arena, returning the root `NodeId`.
 ///
 /// All strings are interned into `interner`.  Sub-expressions are recursively
 /// lowered in post-order.
-pub fn lower_expr(
-    expr: &Expr<'static>,
-    arena: &mut ExprArena,
-    interner: &mut Interner,
-) -> NodeId {
+pub fn lower_expr(expr: &Expr<'static>, arena: &mut ExprArena, interner: &mut Interner) -> NodeId {
     match expr {
         Expr::Namespace(path) => {
             let segments: Vec<&str> = path.iter().collect();
@@ -33,7 +29,7 @@ pub fn lower_expr(
                 });
                 arena.alloc(ExprNode::Field(fid))
             } else if segments.len() == 2 {
-                let ns  = interner.intern(segments[0]);
+                let ns = interner.intern(segments[0]);
                 let col = interner.intern(segments[1]);
                 let fid = arena.alloc_field(FieldNode {
                     namespace: Some(ns),
@@ -43,7 +39,7 @@ pub fn lower_expr(
                 arena.alloc(ExprNode::Field(fid))
             } else {
                 let prefix = segments[..segments.len() - 1].join(".");
-                let ns  = interner.intern(&prefix);
+                let ns = interner.intern(&prefix);
                 let col = interner.intern(segments[segments.len() - 1]);
                 let fid = arena.alloc_field(FieldNode {
                     namespace: Some(ns),
@@ -103,7 +99,11 @@ pub fn lower_expr(
             let lhs = lower_expr(left, arena, interner);
             let rhs = lower_expr(right, arena, interner);
             let bin_op = lower_binop(op);
-            arena.alloc(ExprNode::BinOp { op: bin_op, lhs, rhs })
+            arena.alloc(ExprNode::BinOp {
+                op: bin_op,
+                lhs,
+                rhs,
+            })
         }
 
         Expr::UnaryOp { op, expr: inner } => {
@@ -136,7 +136,10 @@ pub fn lower_expr(
                 CoreUnaryOp::IsNotNull => ArenaUnaryOp::IsNotNull,
                 CoreUnaryOp::BitNot => ArenaUnaryOp::Not, // dol-expr has no BitNot; approximate as Not
             };
-            arena.alloc(ExprNode::UnaryOp { op: arena_op, operand: inner_id })
+            arena.alloc(ExprNode::UnaryOp {
+                op: arena_op,
+                operand: inner_id,
+            })
         }
 
         Expr::Func { name, args } => {
@@ -145,35 +148,54 @@ pub fn lower_expr(
                 .iter()
                 .map(|a| lower_expr(a, arena, interner))
                 .collect();
-            let fid = arena.alloc_func(FuncNode { name: func_name, args: arg_ids });
+            let fid = arena.alloc_func(FuncNode {
+                name: func_name,
+                args: arg_ids,
+            });
             arena.alloc(ExprNode::Func(fid))
         }
 
-        Expr::Cast { expr: inner, as_type } => {
+        Expr::Cast {
+            expr: inner,
+            as_type,
+        } => {
             let inner_id = lower_expr(inner, arena, interner);
             let type_name = interner.intern(&format!("{:?}", as_type));
-            arena.alloc(ExprNode::Cast { expr: inner_id, to: type_name })
+            arena.alloc(ExprNode::Cast {
+                expr: inner_id,
+                to: type_name,
+            })
         }
 
         Expr::Case { whens, else_expr } => {
             let branches: SmallVec<[(NodeId, NodeId); 4]> = whens
                 .iter()
                 .map(|(c, t)| {
-                    (lower_expr(c, arena, interner), lower_expr(t, arena, interner))
+                    (
+                        lower_expr(c, arena, interner),
+                        lower_expr(t, arena, interner),
+                    )
                 })
                 .collect();
             let else_id = else_expr
                 .as_deref()
                 .map(|e| lower_expr(e, arena, interner))
                 .unwrap_or(NULL_NODE);
-            let cid = arena.alloc_case(dol_expr::CaseNode { branches, else_: else_id });
+            let cid = arena.alloc_case(dol_expr::CaseNode {
+                branches,
+                else_: else_id,
+            });
             arena.alloc(ExprNode::Case(cid))
         }
 
-        Expr::Between { expr: inner, low, high } => {
+        Expr::Between {
+            expr: inner,
+            low,
+            high,
+        } => {
             let eid = lower_expr(inner, arena, interner);
-            let lo  = lower_expr(low, arena, interner);
-            let hi  = lower_expr(high, arena, interner);
+            let lo = lower_expr(low, arena, interner);
+            let hi = lower_expr(high, arena, interner);
             arena.alloc(ExprNode::Between { expr: eid, lo, hi })
         }
 
@@ -183,14 +205,20 @@ pub fn lower_expr(
                 .iter()
                 .map(|e| lower_expr(e, arena, interner))
                 .collect();
-            let in_id = arena.alloc_in_list(InListNode { expr: eid, list: ids });
+            let in_id = arena.alloc_in_list(InListNode {
+                expr: eid,
+                list: ids,
+            });
             arena.alloc(ExprNode::InList(in_id))
         }
 
         Expr::Alias { expr: inner, alias } => {
             let inner_id = lower_expr(inner, arena, interner);
             let aid = interner.intern(alias.as_str());
-            arena.alloc(ExprNode::Alias { expr: inner_id, name: aid })
+            arena.alloc(ExprNode::Alias {
+                expr: inner_id,
+                name: aid,
+            })
         }
 
         Expr::Star => {
@@ -212,10 +240,19 @@ pub fn lower_expr(
                 steps: SmallVec::new(),
             });
             let star_node = arena.alloc(ExprNode::Field(star_fid));
-            arena.alloc(ExprNode::Agg { func: func_name, expr: star_node, distinct: false })
+            arena.alloc(ExprNode::Agg {
+                func: func_name,
+                expr: star_node,
+                distinct: false,
+            })
         }
 
-        Expr::Window { func, partition_by, order_by, .. } => {
+        Expr::Window {
+            func,
+            partition_by,
+            order_by,
+            ..
+        } => {
             let func_name = match func.as_ref() {
                 Expr::Func { name, .. } => interner.intern(name.name()),
                 _ => interner.intern("unknown"),
@@ -265,7 +302,10 @@ pub fn lower_exprs(
     arena: &mut ExprArena,
     interner: &mut Interner,
 ) -> SmallVec<[NodeId; 8]> {
-    exprs.iter().map(|e| lower_expr(e, arena, interner)).collect()
+    exprs
+        .iter()
+        .map(|e| lower_expr(e, arena, interner))
+        .collect()
 }
 
 /// Format a qualified entity name (e.g. "namespace.name" or just "name").
@@ -292,7 +332,11 @@ pub fn lower_filters(
         .collect();
     let mut result = ids.remove(0);
     for id in ids {
-        result = arena.alloc(ExprNode::BinOp { op: BinOp::And, lhs: result, rhs: id });
+        result = arena.alloc(ExprNode::BinOp {
+            op: BinOp::And,
+            lhs: result,
+            rhs: id,
+        });
     }
     result
 }
@@ -304,28 +348,28 @@ pub fn lower_filters(
 /// Map `dol_expr::tree::OpDef` name to `dol-expr::expr::BinOp`.
 fn lower_binop(op: &dol_expr::tree::OpDef) -> BinOp {
     match op.name() {
-        "EQ"  => BinOp::Eq,
-        "NE"  => BinOp::Ne,
-        "LT"  => BinOp::Lt,
-        "GT"  => BinOp::Gt,
-        "LE"  => BinOp::Le,
-        "GE"  => BinOp::Ge,
+        "EQ" => BinOp::Eq,
+        "NE" => BinOp::Ne,
+        "LT" => BinOp::Lt,
+        "GT" => BinOp::Gt,
+        "LE" => BinOp::Le,
+        "GE" => BinOp::Ge,
         "ADD" => BinOp::Add,
         "SUB" => BinOp::Sub,
         "MUL" => BinOp::Mul,
         "DIV" => BinOp::Div,
         "MOD" => BinOp::Rem,
         "AND" => BinOp::And,
-        "OR"  => BinOp::Or,
-        "LIKE"       => BinOp::Like,
-        "ILIKE"      => BinOp::ILike,
+        "OR" => BinOp::Or,
+        "LIKE" => BinOp::Like,
+        "ILIKE" => BinOp::ILike,
         "SIMILAR_TO" => BinOp::Similar,
-        "CONCAT"     => BinOp::Concat,
-        "BIT_AND"      => BinOp::BitAnd,
-        "BIT_OR"       => BinOp::BitOr,
-        "BIT_XOR"      => BinOp::BitXor,
-        "SHIFT_LEFT"   => BinOp::Shl,
-        "SHIFT_RIGHT"  => BinOp::Shr,
+        "CONCAT" => BinOp::Concat,
+        "BIT_AND" => BinOp::BitAnd,
+        "BIT_OR" => BinOp::BitOr,
+        "BIT_XOR" => BinOp::BitXor,
+        "SHIFT_LEFT" => BinOp::Shl,
+        "SHIFT_RIGHT" => BinOp::Shr,
         _ => BinOp::Eq, // Fallback for unknown operators.
     }
 }

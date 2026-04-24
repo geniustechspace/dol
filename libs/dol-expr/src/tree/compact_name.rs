@@ -27,6 +27,7 @@ impl CompactName {
     ///
     /// Prefer `CompactName::Static("name")` or `From<&'static str>` for
     /// compile-time-known names.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         Self::Owned(s.into())
     }

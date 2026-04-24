@@ -8,16 +8,16 @@ use dol_expr::ids::NodeId;
 pub struct Grant {
     pub privilege: Privilege,
     pub on_target: String,
-    pub to_role:   String,
+    pub to_role: String,
 }
 
 /// Revoke privileges on a resource from a role.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Revoke {
-    pub privilege:  Privilege,
-    pub on_target:  String,
-    pub from_role:  String,
+    pub privilege: Privilege,
+    pub on_target: String,
+    pub from_role: String,
 }
 
 /// Privilege types that can be granted or revoked.
@@ -42,9 +42,9 @@ pub enum Privilege {
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DefinePolicy {
-    pub name:       String,
-    pub on_model:   String,
-    pub action:     PolicyAction,
+    pub name: String,
+    pub on_model: String,
+    pub action: PolicyAction,
     /// Arena-based USING filter expression, or `None`.
     pub using_expr: Option<NodeId>,
     /// Arena-based CHECK expression, or `None`.

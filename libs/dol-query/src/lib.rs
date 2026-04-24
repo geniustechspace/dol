@@ -82,20 +82,20 @@
 
 #![deny(unsafe_code)]
 
+mod delete;
 mod get;
 mod insert;
 pub mod lower;
-mod delete;
 mod update;
 mod upsert;
 
 pub mod builder;
 
-pub use get::GetQuery;
-pub use insert::InsertQuery;
 pub use delete::DeleteQuery;
 #[allow(deprecated)]
 pub use delete::RemoveQuery;
+pub use get::GetQuery;
+pub use insert::InsertQuery;
 pub use update::UpdateQuery;
 pub use upsert::UpsertQuery;
 

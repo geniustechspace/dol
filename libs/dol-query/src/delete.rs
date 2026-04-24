@@ -62,7 +62,8 @@ impl DeleteQuery {
         let target = interner.intern(&crate::lower::qualified_name(&self.name, &self.namespace));
         let filter = lower_filters(&self.filters, &mut arena, &mut interner);
 
-        let returning: smallvec::SmallVec<[u32; 4]> = self.returning
+        let returning: smallvec::SmallVec<[u32; 4]> = self
+            .returning
             .iter()
             .map(|r| {
                 let col = interner.intern(r);

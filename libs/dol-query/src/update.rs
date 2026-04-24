@@ -83,7 +83,7 @@ impl UpdateQuery {
     /// are needed by renderers to resolve expression references.
     pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
         use crate::lower::{lower_expr, lower_filters};
-        use dol_expr::expr::{UpdateNode, ExprNode};
+        use dol_expr::expr::{ExprNode, UpdateNode};
 
         let mut arena = dol_expr::ExprArena::new();
         let mut interner = dol_expr::Interner::new();
@@ -91,7 +91,7 @@ impl UpdateQuery {
         let target = interner.intern(&crate::lower::qualified_name(&self.name, &self.namespace));
 
         let mut columns = smallvec::SmallVec::new();
-        let mut values  = smallvec::SmallVec::new();
+        let mut values = smallvec::SmallVec::new();
         for (col, expr) in &self.assignments {
             columns.push(interner.intern(col));
             values.push(lower_expr(expr, &mut arena, &mut interner));
@@ -99,7 +99,8 @@ impl UpdateQuery {
 
         let filter = lower_filters(&self.filters, &mut arena, &mut interner);
 
-        let returning: smallvec::SmallVec<[u32; 4]> = self.returning
+        let returning: smallvec::SmallVec<[u32; 4]> = self
+            .returning
             .iter()
             .map(|r| {
                 let col = interner.intern(r);

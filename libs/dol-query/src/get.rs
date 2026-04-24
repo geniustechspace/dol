@@ -3,8 +3,8 @@
 //! Mirrors `dol-builder::GetBuilder` but works with owned name/namespace
 //! instead of requiring a static `&Entity` reference.
 
-use dol_expr::tree::{Direction, Expr, NullsPosition, OrderByExpr, field_dyn};
 use crate::{JoinKind, LockMode};
+use dol_expr::tree::{Direction, Expr, NullsPosition, OrderByExpr, field_dyn};
 
 // ---------------------------------------------------------------------------
 // Private join helper
@@ -14,6 +14,7 @@ use crate::{JoinKind, LockMode};
 struct JoinClause {
     join_type: JoinKind,
     target_name: String,
+    #[allow(dead_code)] // captured by the builder API for future use
     target_namespace: Option<String>,
     alias: Option<String>,
     on_conditions: Vec<(String, String)>,
@@ -326,16 +327,17 @@ impl GetQuery {
         let columns: SmallVec<[u32; 8]> = lower_exprs(&proj_exprs, &mut arena, &mut interner);
 
         // Joins.
-        let joins: SmallVec<[JoinNode; 2]> = self.joins
+        let joins: SmallVec<[JoinNode; 2]> = self
+            .joins
             .into_iter()
             .map(|jc| {
                 let source = interner.intern(&jc.target_name);
                 let alias = jc.alias.as_deref().map(|a| interner.intern(a));
                 let join_type = match jc.join_type {
                     JoinKind::Inner => ArenaJoinType::Inner,
-                    JoinKind::Left  => ArenaJoinType::Left,
+                    JoinKind::Left => ArenaJoinType::Left,
                     JoinKind::Right => ArenaJoinType::Right,
-                    JoinKind::Full  => ArenaJoinType::Full,
+                    JoinKind::Full => ArenaJoinType::Full,
                     JoinKind::Cross => ArenaJoinType::Cross,
                 };
                 // Build ON condition from pairs.
@@ -378,13 +380,19 @@ impl GetQuery {
                     }
                     result
                 };
-                JoinNode { source, alias, join_type, on }
+                JoinNode {
+                    source,
+                    alias,
+                    join_type,
+                    on,
+                }
             })
             .collect();
 
         let filter = lower_filters(&self.filters, &mut arena, &mut interner);
 
-        let group_by: SmallVec<[u32; 4]> = self.group_by
+        let group_by: SmallVec<[u32; 4]> = self
+            .group_by
             .iter()
             .map(|e| lower_expr(e, &mut arena, &mut interner))
             .collect();
@@ -395,14 +403,15 @@ impl GetQuery {
             lower_filters(&self.having, &mut arena, &mut interner)
         };
 
-        let order_by: SmallVec<[(u32, dol_expr::expr::Order); 4]> = self.order_by
+        let order_by: SmallVec<[(u32, dol_expr::expr::Order); 4]> = self
+            .order_by
             .iter()
             .map(|ob| lower_order_by(ob, &mut arena, &mut interner))
             .collect();
 
         let lock = self.lock_mode.map(|m| match m {
             LockMode::ForUpdate => LockHint::ForUpdate,
-            LockMode::ForShare  => LockHint::ForShare,
+            LockMode::ForShare => LockHint::ForShare,
             LockMode::ForUpdateNoWait | LockMode::ForShareNoWait => LockHint::NoWait,
             LockMode::ForUpdateSkipLocked | LockMode::ForShareSkipLocked => LockHint::SkipLocked,
         });

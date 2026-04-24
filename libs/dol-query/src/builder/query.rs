@@ -5,8 +5,8 @@
 //!
 //! For SQL rendering, import the `Render` extension trait from `dol-sql`.
 
-use dol_schema::Entity;
 use dol_expr::tree::{Direction, Expr, NullsPosition, OrderByExpr, field_dyn};
+use dol_schema::Entity;
 
 use crate::{JoinKind, LockMode};
 
@@ -19,6 +19,7 @@ use crate::{JoinKind, LockMode};
 struct JoinClause {
     join_type: JoinKind,
     model_name: String,
+    #[allow(dead_code)] // captured by the builder API for future use
     model_namespace: Option<String>,
     alias: Option<String>,
     on_conditions: Vec<(String, String)>,
@@ -383,14 +384,18 @@ impl<'a> GetBuilder<'a> {
         let mut interner = dol_expr::Interner::new();
 
         let from = interner.intern(&crate::lower::qualified_name(
-            &self.model.name.to_string(),
+            self.model.name,
             &self.model.namespace.map(|s| s.to_string()),
         ));
         let alias = self.table_alias.as_deref().map(|a| interner.intern(a));
 
         // Default projections.
         let proj_exprs: Vec<Expr<'static>> = if self.projections.is_empty() {
-            self.model.fields.iter().map(|f| field_dyn(f.name)).collect()
+            self.model
+                .fields
+                .iter()
+                .map(|f| field_dyn(f.name))
+                .collect()
         } else {
             self.projections
         };

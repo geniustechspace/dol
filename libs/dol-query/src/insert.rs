@@ -73,7 +73,7 @@ impl InsertQuery {
     /// Returns `(Statement, ExprArena, Interner)` — the arena and interner
     /// are needed by renderers to resolve expression references.
     pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
-        use dol_expr::expr::{InsertNode, ExprNode};
+        use dol_expr::expr::{ExprNode, InsertNode};
 
         let mut arena = dol_expr::ExprArena::new();
         let mut interner = dol_expr::Interner::new();
@@ -85,10 +85,8 @@ impl InsertQuery {
         };
 
         let target = interner.intern(&crate::lower::qualified_name(&self.name, &self.namespace));
-        let columns: smallvec::SmallVec<[u32; 8]> = fields
-            .iter()
-            .map(|f| interner.intern(f))
-            .collect();
+        let columns: smallvec::SmallVec<[u32; 8]> =
+            fields.iter().map(|f| interner.intern(f)).collect();
 
         // Generate one Param node per field per row.
         let mut values = smallvec::SmallVec::new();
@@ -97,7 +95,8 @@ impl InsertQuery {
         }
 
         // Returning columns as field-reference expressions.
-        let returning: smallvec::SmallVec<[u32; 4]> = self.returning
+        let returning: smallvec::SmallVec<[u32; 4]> = self
+            .returning
             .iter()
             .map(|r| {
                 let col = interner.intern(r);
