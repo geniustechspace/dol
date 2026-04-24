@@ -10,15 +10,16 @@ pub mod session;
 pub mod types;
 
 pub use arena::{
-    CaseNode, ExprArena, FuncNode, InListNode, ObjLitNode, Span, SpanTable, WindowNode,
+    CaseNode, ExprArena, FieldNode, FieldStep, FuncNode, InListNode, ObjLitNode, Span, SpanTable,
+    WindowNode,
 };
 pub use expr::{
     BinOp, ConflictClause, ExprNode, JoinNode, JoinType, LockHint, MutateKind, MutateNode,
     Order, SelectNode, UnaryOp,
 };
 pub use ids::{
-    CaseId, FuncId, InListId, LiteralId, MutateId, NodeId, ObjLitId, SelectId, SpanId, StrId,
-    TypeId, WindowId, NULL_NODE,
+    CaseId, FieldId, FuncId, InListId, LiteralId, MutateId, NodeId, ObjLitId, SelectId, SpanId,
+    StrId, TypeId, WindowId, NULL_NODE,
 };
 pub use interner::Interner;
 pub use session::BuildSession;

@@ -22,5 +22,7 @@ pub type InListId = u32;
 pub type SelectId = u32;
 /// Index into ExprArena::mutates — identifies a pooled MutateNode.
 pub type MutateId = u32;
+/// Index into ExprArena::fields — identifies a pooled FieldNode.
+pub type FieldId = u32;
 /// Sentinel for "no node" — use instead of Option<NodeId> where size matters.
 pub const NULL_NODE: NodeId = u32::MAX;

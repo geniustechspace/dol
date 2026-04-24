@@ -2,10 +2,54 @@ use smallvec::SmallVec;
 
 use crate::expr::{ExprNode, Order, MutateNode, SelectNode};
 use crate::ids::{
-    CaseId, FuncId, InListId, LiteralId, MutateId, NodeId, ObjLitId, SelectId, SpanId, StrId,
-    WindowId,
+    CaseId, FieldId, FuncId, InListId, LiteralId, MutateId, NodeId, ObjLitId, SelectId, SpanId,
+    StrId, WindowId,
 };
 use crate::types::value::Literal;
+
+// ─── FieldStep / FieldNode ───────────────────────────────────────────────────
+
+/// A single traversal step inside a [`FieldNode`] path.
+///
+/// Steps allow a [`ExprNode::Field`] to express arbitrarily deep navigation
+/// through JSON/object structures or arrays, independent of the backing store:
+///
+/// | Step | SQL (Postgres JSONB) | REST / document |
+/// |---|---|---|
+/// | `Key("name")` | `col->>'name'` | `.name` |
+/// | `Index(0)`    | `col->>0`      | `[0]`   |
+#[derive(Debug, Clone, PartialEq)]
+pub enum FieldStep {
+    /// Named key access: `.key`, `->>'key'`, `["key"]`.
+    Key(StrId),
+    /// Positional array index: `[n]`, `->>n`.
+    Index(u32),
+}
+
+/// Payload for [`ExprNode::Field`], stored in [`ExprArena::fields`].
+///
+/// `namespace` is an optional table/schema qualifier (e.g. the alias `u` in
+/// `u.profile_json`, or a fully-qualified `public.users`). `column` is the
+/// base column or attribute name. `steps` is the optional traversal chain
+/// that follows the column — empty means a bare column reference.
+///
+/// # Backend rendering examples
+///
+/// | `namespace` | `column`       | `steps`          | SQL (Postgres)                    |
+/// |-------------|----------------|------------------|-----------------------------------|
+/// | `None`      | `"id"`         | `[]`             | `id`                              |
+/// | `Some("u")` | `"id"`         | `[]`             | `u.id`                            |
+/// | `None`      | `"profile_json"` | `[Key("name")]` | `profile_json->>'name'`           |
+/// | `Some("u")` | `"data"`       | `[Key("x"), Index(0)]` | `u.data->'x'->>0`         |
+#[derive(Debug, Clone, PartialEq)]
+pub struct FieldNode {
+    /// Optional table/alias qualifier (`None` = unqualified).
+    pub namespace: Option<StrId>,
+    /// Base column or attribute name (first step from the container).
+    pub column:    StrId,
+    /// Traversal steps that follow the column (empty = bare column reference).
+    pub steps:     SmallVec<[FieldStep; 4]>,
+}
 
 // ─── Pooled payload structs ───────────────────────────────────────────────────
 
@@ -106,6 +150,8 @@ pub struct ExprArena {
     selects:    Vec<SelectNode>,
     /// Pooled mutate (INSERT/UPDATE/DELETE/UPSERT) payloads — indexed by [`MutateId`].
     mutates:    Vec<MutateNode>,
+    /// Pooled field-reference payloads — indexed by [`FieldId`].
+    fields:     Vec<FieldNode>,
 }
 
 impl ExprArena {
@@ -239,5 +285,19 @@ impl ExprArena {
     /// Retrieve a [`MutateNode`] by its [`MutateId`].
     pub fn get_mutate(&self, id: MutateId) -> &MutateNode {
         &self.mutates[id as usize]
+    }
+
+    // ── FieldNode pool ────────────────────────────────────────────────────────
+
+    /// Store a [`FieldNode`] in the pool and return its [`FieldId`].
+    pub fn alloc_field(&mut self, field: FieldNode) -> FieldId {
+        let id = self.fields.len() as FieldId;
+        self.fields.push(field);
+        id
+    }
+
+    /// Retrieve a [`FieldNode`] by its [`FieldId`].
+    pub fn get_field(&self, id: FieldId) -> &FieldNode {
+        &self.fields[id as usize]
     }
 }
