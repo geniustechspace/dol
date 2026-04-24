@@ -15,7 +15,7 @@ use super::compact_name::CompactName;
 /// # Examples
 ///
 /// ```rust
-/// use dol_core::expr::PathExpr;
+/// use dol_expr::tree::PathExpr;
 ///
 /// let p = PathExpr::one("email");
 /// let q = PathExpr::from_segments(["profile", "address", "city"]);

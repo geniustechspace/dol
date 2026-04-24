@@ -20,7 +20,7 @@ use super::window::WindowFrame;
 /// # Constructors
 ///
 /// ```rust
-/// use dol_core::expr::{field, string, int};
+/// use dol_expr::tree::{field, string, int};
 ///
 /// let expr = field("age").gt(int(18i32));
 /// let expr = field("age").gt(int(18i32)) & field("status").eq(string("active"));
