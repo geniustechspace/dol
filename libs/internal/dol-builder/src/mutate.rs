@@ -1,6 +1,6 @@
 use dol_expr::{
     ExprArena, Interner,
-    expr::{MutateKind, MutateNode},
+    expr::{DeleteNode, InsertNode, UpdateNode, UpsertNode},
     ids::{NodeId, NULL_NODE},
 };
 use dol_ir::Statement;
@@ -9,7 +9,7 @@ use smallvec::SmallVec;
 pub struct InsertBuilder {
     pub arena:    ExprArena,
     pub interner: Interner,
-    node: MutateNode,
+    node: InsertNode,
 }
 
 impl InsertBuilder {
@@ -19,12 +19,10 @@ impl InsertBuilder {
         Self {
             arena: ExprArena::new(),
             interner,
-            node: MutateNode {
-                kind:      MutateKind::Insert,
+            node: InsertNode {
                 target,
                 columns:   SmallVec::new(),
                 values:    SmallVec::new(),
-                filter:    NULL_NODE,
                 returning: SmallVec::new(),
                 conflict:  None,
             },
@@ -50,7 +48,7 @@ impl InsertBuilder {
 pub struct UpdateBuilder {
     pub arena:    ExprArena,
     pub interner: Interner,
-    node: MutateNode,
+    node: UpdateNode,
 }
 
 impl UpdateBuilder {
@@ -60,14 +58,12 @@ impl UpdateBuilder {
         Self {
             arena: ExprArena::new(),
             interner,
-            node: MutateNode {
-                kind:      MutateKind::Update,
+            node: UpdateNode {
                 target,
                 columns:   SmallVec::new(),
                 values:    SmallVec::new(),
                 filter:    NULL_NODE,
                 returning: SmallVec::new(),
-                conflict:  None,
             },
         }
     }
@@ -92,7 +88,7 @@ impl UpdateBuilder {
 pub struct DeleteBuilder {
     pub arena:    ExprArena,
     pub interner: Interner,
-    node: MutateNode,
+    node: DeleteNode,
 }
 
 impl DeleteBuilder {
@@ -102,14 +98,10 @@ impl DeleteBuilder {
         Self {
             arena: ExprArena::new(),
             interner,
-            node: MutateNode {
-                kind:      MutateKind::Delete,
+            node: DeleteNode {
                 target,
-                columns:   SmallVec::new(),
-                values:    SmallVec::new(),
                 filter:    NULL_NODE,
                 returning: SmallVec::new(),
-                conflict:  None,
             },
         }
     }
@@ -123,3 +115,43 @@ impl DeleteBuilder {
         Statement::Delete(self.node)
     }
 }
+
+pub struct UpsertBuilder {
+    pub arena:    ExprArena,
+    pub interner: Interner,
+    node: UpsertNode,
+}
+
+impl UpsertBuilder {
+    pub fn into(table: &str) -> Self {
+        let mut interner = Interner::new();
+        let target = interner.intern(table);
+        Self {
+            arena: ExprArena::new(),
+            interner,
+            node: UpsertNode {
+                target,
+                columns:   SmallVec::new(),
+                values:    SmallVec::new(),
+                returning: SmallVec::new(),
+                conflict:  None,
+            },
+        }
+    }
+
+    pub fn column(mut self, col: &str) -> Self {
+        let id = self.interner.intern(col);
+        self.node.columns.push(id);
+        self
+    }
+
+    pub fn value(mut self, val: NodeId) -> Self {
+        self.node.values.push(val);
+        self
+    }
+
+    pub fn build(self) -> Statement {
+        Statement::Upsert(self.node)
+    }
+}
+

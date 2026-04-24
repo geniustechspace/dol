@@ -18,10 +18,16 @@ pub type WindowId = u32;
 pub type CaseId = u32;
 /// Index into ExprArena::in_lists — identifies a pooled InListNode.
 pub type InListId = u32;
-/// Index into ExprArena::selects — identifies a pooled SelectNode.
-pub type SelectId = u32;
-/// Index into ExprArena::mutates — identifies a pooled MutateNode.
-pub type MutateId = u32;
+/// Index into ExprArena::queries — identifies a pooled QueryNode.
+pub type QueryId = u32;
+/// Index into ExprArena::inserts — identifies a pooled InsertNode.
+pub type InsertId = u32;
+/// Index into ExprArena::updates — identifies a pooled UpdateNode.
+pub type UpdateId = u32;
+/// Index into ExprArena::deletes — identifies a pooled DeleteNode.
+pub type DeleteId = u32;
+/// Index into ExprArena::upserts — identifies a pooled UpsertNode.
+pub type UpsertId = u32;
 /// Index into ExprArena::fields — identifies a pooled FieldNode.
 pub type FieldId = u32;
 /// Sentinel for "no node" — use instead of Option<NodeId> where size matters.

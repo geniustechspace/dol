@@ -1,9 +1,9 @@
 use smallvec::SmallVec;
 
-use crate::expr::{ExprNode, Order, MutateNode, SelectNode};
+use crate::expr::{DeleteNode, ExprNode, InsertNode, Order, QueryNode, UpdateNode, UpsertNode};
 use crate::ids::{
-    CaseId, FieldId, FuncId, InListId, LiteralId, MutateId, NodeId, ObjLitId, SelectId, SpanId,
-    StrId, WindowId,
+    CaseId, DeleteId, FieldId, FuncId, InListId, InsertId, LiteralId, NodeId, ObjLitId, QueryId,
+    SpanId, StrId, UpdateId, UpsertId, WindowId,
 };
 use crate::types::value::Literal;
 
@@ -146,10 +146,16 @@ pub struct ExprArena {
     cases:      Vec<CaseNode>,
     /// Pooled IN-list payloads — indexed by [`InListId`].
     in_lists:   Vec<InListNode>,
-    /// Pooled SELECT statement payloads — indexed by [`SelectId`].
-    selects:    Vec<SelectNode>,
-    /// Pooled mutate (INSERT/UPDATE/DELETE/UPSERT) payloads — indexed by [`MutateId`].
-    mutates:    Vec<MutateNode>,
+    /// Pooled SELECT/query statement payloads — indexed by [`QueryId`].
+    queries:    Vec<QueryNode>,
+    /// Pooled INSERT statement payloads — indexed by [`InsertId`].
+    inserts:    Vec<InsertNode>,
+    /// Pooled UPDATE statement payloads — indexed by [`UpdateId`].
+    updates:    Vec<UpdateNode>,
+    /// Pooled DELETE statement payloads — indexed by [`DeleteId`].
+    deletes:    Vec<DeleteNode>,
+    /// Pooled UPSERT statement payloads — indexed by [`UpsertId`].
+    upserts:    Vec<UpsertNode>,
     /// Pooled field-reference payloads — indexed by [`FieldId`].
     fields:     Vec<FieldNode>,
 }
@@ -259,32 +265,74 @@ impl ExprArena {
         &self.in_lists[id as usize]
     }
 
-    // ── SelectNode pool ───────────────────────────────────────────────────────
+    // ── QueryNode pool ────────────────────────────────────────────────────────
 
-    /// Store a [`SelectNode`] in the pool and return its [`SelectId`].
-    pub fn alloc_select(&mut self, sel: SelectNode) -> SelectId {
-        let id = self.selects.len() as SelectId;
-        self.selects.push(sel);
+    /// Store a [`QueryNode`] in the pool and return its [`QueryId`].
+    pub fn alloc_query(&mut self, query: QueryNode) -> QueryId {
+        let id = self.queries.len() as QueryId;
+        self.queries.push(query);
         id
     }
 
-    /// Retrieve a [`SelectNode`] by its [`SelectId`].
-    pub fn get_select(&self, id: SelectId) -> &SelectNode {
-        &self.selects[id as usize]
+    /// Retrieve a [`QueryNode`] by its [`QueryId`].
+    pub fn get_query(&self, id: QueryId) -> &QueryNode {
+        &self.queries[id as usize]
     }
 
-    // ── MutateNode pool ───────────────────────────────────────────────────────
+    // ── InsertNode pool ───────────────────────────────────────────────────────
 
-    /// Store a [`MutateNode`] in the pool and return its [`MutateId`].
-    pub fn alloc_mutate(&mut self, mut_node: MutateNode) -> MutateId {
-        let id = self.mutates.len() as MutateId;
-        self.mutates.push(mut_node);
+    /// Store an [`InsertNode`] in the pool and return its [`InsertId`].
+    pub fn alloc_insert(&mut self, node: InsertNode) -> InsertId {
+        let id = self.inserts.len() as InsertId;
+        self.inserts.push(node);
         id
     }
 
-    /// Retrieve a [`MutateNode`] by its [`MutateId`].
-    pub fn get_mutate(&self, id: MutateId) -> &MutateNode {
-        &self.mutates[id as usize]
+    /// Retrieve an [`InsertNode`] by its [`InsertId`].
+    pub fn get_insert(&self, id: InsertId) -> &InsertNode {
+        &self.inserts[id as usize]
+    }
+
+    // ── UpdateNode pool ───────────────────────────────────────────────────────
+
+    /// Store an [`UpdateNode`] in the pool and return its [`UpdateId`].
+    pub fn alloc_update(&mut self, node: UpdateNode) -> UpdateId {
+        let id = self.updates.len() as UpdateId;
+        self.updates.push(node);
+        id
+    }
+
+    /// Retrieve an [`UpdateNode`] by its [`UpdateId`].
+    pub fn get_update(&self, id: UpdateId) -> &UpdateNode {
+        &self.updates[id as usize]
+    }
+
+    // ── DeleteNode pool ───────────────────────────────────────────────────────
+
+    /// Store a [`DeleteNode`] in the pool and return its [`DeleteId`].
+    pub fn alloc_delete(&mut self, node: DeleteNode) -> DeleteId {
+        let id = self.deletes.len() as DeleteId;
+        self.deletes.push(node);
+        id
+    }
+
+    /// Retrieve a [`DeleteNode`] by its [`DeleteId`].
+    pub fn get_delete(&self, id: DeleteId) -> &DeleteNode {
+        &self.deletes[id as usize]
+    }
+
+    // ── UpsertNode pool ───────────────────────────────────────────────────────
+
+    /// Store an [`UpsertNode`] in the pool and return its [`UpsertId`].
+    pub fn alloc_upsert(&mut self, node: UpsertNode) -> UpsertId {
+        let id = self.upserts.len() as UpsertId;
+        self.upserts.push(node);
+        id
+    }
+
+    /// Retrieve an [`UpsertNode`] by its [`UpsertId`].
+    pub fn get_upsert(&self, id: UpsertId) -> &UpsertNode {
+        &self.upserts[id as usize]
     }
 
     // ── FieldNode pool ────────────────────────────────────────────────────────

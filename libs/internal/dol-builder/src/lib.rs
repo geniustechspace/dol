@@ -3,7 +3,7 @@
 #![deny(unsafe_code)]
 
 pub mod mutate;
-pub mod select;
+pub mod query;
 
-pub use mutate::{DeleteBuilder, InsertBuilder, UpdateBuilder};
-pub use select::SelectBuilder;
+pub use mutate::{DeleteBuilder, InsertBuilder, UpdateBuilder, UpsertBuilder};
+pub use query::QueryBuilder;

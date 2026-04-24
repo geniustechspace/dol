@@ -1,6 +1,6 @@
 use smallvec::SmallVec;
 
-use crate::ids::{CaseId, FieldId, FuncId, InListId, LiteralId, MutateId, NodeId, ObjLitId, SelectId, StrId, WindowId};
+use crate::ids::{CaseId, DeleteId, FieldId, FuncId, InListId, InsertId, LiteralId, NodeId, ObjLitId, QueryId, StrId, UpdateId, UpsertId, WindowId};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BinOp {
@@ -52,7 +52,7 @@ pub enum JoinType {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct SelectNode {
+pub struct QueryNode {
     pub from:     StrId,
     pub alias:    Option<StrId>,
     pub joins:    SmallVec<[JoinNode; 2]>,
@@ -67,20 +67,35 @@ pub struct SelectNode {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum MutateKind {
-    Insert,
-    Update,
-    Delete,
-    Upsert,
+pub struct InsertNode {
+    pub target:    StrId,
+    pub columns:   SmallVec<[StrId; 8]>,
+    pub values:    SmallVec<[NodeId; 8]>,
+    pub returning: SmallVec<[NodeId; 4]>,
+    pub conflict:  Option<ConflictClause>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct MutateNode {
-    pub kind:      MutateKind,
+pub struct UpdateNode {
     pub target:    StrId,
     pub columns:   SmallVec<[StrId; 8]>,
     pub values:    SmallVec<[NodeId; 8]>,
     pub filter:    NodeId,
+    pub returning: SmallVec<[NodeId; 4]>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DeleteNode {
+    pub target:    StrId,
+    pub filter:    NodeId,
+    pub returning: SmallVec<[NodeId; 4]>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct UpsertNode {
+    pub target:    StrId,
+    pub columns:   SmallVec<[StrId; 8]>,
+    pub values:    SmallVec<[NodeId; 8]>,
     pub returning: SmallVec<[NodeId; 4]>,
     pub conflict:  Option<ConflictClause>,
 }
@@ -141,12 +156,21 @@ pub enum ExprNode {
     Exists  { sub: NodeId },
     IsNull  { expr: NodeId },
     Between { expr: NodeId, lo: NodeId, hi: NodeId },
-    /// A SELECT sub-query. The payload is stored in `ExprArena::selects`;
+    /// A SELECT sub-query. The payload is stored in [`ExprArena::queries`];
     /// this variant holds only the pool index.
-    Select(SelectId),
-    /// A mutating statement (INSERT/UPDATE/DELETE/UPSERT). The payload is
-    /// stored in `ExprArena::mutates`; this variant holds only the pool index.
-    Mutate(MutateId),
+    Query(QueryId),
+    /// An INSERT statement. The payload is stored in [`ExprArena::inserts`];
+    /// this variant holds only the pool index.
+    Insert(InsertId),
+    /// An UPDATE statement. The payload is stored in [`ExprArena::updates`];
+    /// this variant holds only the pool index.
+    Update(UpdateId),
+    /// A DELETE statement. The payload is stored in [`ExprArena::deletes`];
+    /// this variant holds only the pool index.
+    Delete(DeleteId),
+    /// An UPSERT statement. The payload is stored in [`ExprArena::upserts`];
+    /// this variant holds only the pool index.
+    Upsert(UpsertId),
 }
 
 #[cfg(test)]

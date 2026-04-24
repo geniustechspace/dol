@@ -1,11 +1,11 @@
-use dol_expr::expr::{MutateNode, SelectNode};
+use dol_expr::expr::{DeleteNode, InsertNode, QueryNode, UpdateNode, UpsertNode};
 
 #[derive(Debug, Clone)]
 pub enum Statement {
-    Select(SelectNode),
-    Insert(MutateNode),
-    Update(MutateNode),
-    Delete(MutateNode),
-    Upsert(MutateNode),
+    Query(QueryNode),
+    Insert(InsertNode),
+    Update(UpdateNode),
+    Delete(DeleteNode),
+    Upsert(UpsertNode),
     Raw(String),
 }
