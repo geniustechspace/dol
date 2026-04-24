@@ -1,4 +1,11 @@
 //! Operators for DOL expressions.
+//!
+//! Submodules:
+//! - [`meta`]     — operator metadata: kind, arity, symbol
+//! - [`registry`] — built-in operator registry
+
+pub mod meta;
+pub mod registry;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Unary operators

@@ -21,13 +21,8 @@ pub mod compact_name;
 mod constructors;
 mod dsl;
 pub mod func;
-pub mod func_def;
-mod func_meta;
-pub mod func_registry;
 mod literal;
-mod op_meta;
-pub mod op_registry;
-mod ops;
+pub mod op;
 pub mod order;
 mod path;
 pub mod window;
@@ -37,11 +32,11 @@ pub use constructors::{
     IntoFloatLiteral, IntoIntLiteral, arr, bool_expr, case, field, field_dyn, float, int, null,
     obj, param, qualified, string,
 };
-pub use func_def::{
+pub use func::def::{
     Arity, ArityError, CompactName, DolFunc, DolOp, FuncDef, FuncKind, OpDef, OpKind,
 };
 pub use literal::{Literal, TypeError, Value};
-pub use ops::UnaryOp;
+pub use op::UnaryOp;
 pub use order::{Direction, NullsPosition, OrderByExpr};
 pub use path::PathExpr;
 pub use window::{CaseBuilder, FrameBound, FrameKind, WindowBuilder, WindowFrame};

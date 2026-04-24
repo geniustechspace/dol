@@ -1,10 +1,10 @@
 //! Expression AST definitions.
 
 use super::compact_name::CompactName;
-use super::func_meta::FuncDef;
+use super::func::meta::FuncDef;
 use super::literal::Literal;
-use super::op_meta::OpDef;
-use super::ops::UnaryOp;
+use super::op::meta::OpDef;
+use super::op::UnaryOp;
 use super::order::OrderByExpr;
 use super::path::PathExpr;
 use super::window::WindowFrame;

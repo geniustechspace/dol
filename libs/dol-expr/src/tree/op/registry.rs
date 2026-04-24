@@ -3,7 +3,7 @@
 //! Each struct implements [`DolOp`] via the [`define_op!`] macro,
 //! providing a canonical name and operator kind.
 
-use super::op_meta::OpKind;
+use super::meta::OpKind;
 use crate::define_op;
 
 // ═══════════════════════════════════════════════════════════════════════════

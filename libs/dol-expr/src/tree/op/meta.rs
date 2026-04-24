@@ -2,7 +2,7 @@
 
 use core::fmt;
 
-use super::compact_name::CompactName;
+use super::super::compact_name::CompactName;
 
 /// Classification of a DOL binary operator.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -146,9 +146,9 @@ macro_rules! define_op {
         #[derive(Debug, Clone, Copy)]
         pub struct $struct_name;
 
-        impl $crate::tree::func_def::DolOp for $struct_name {
+        impl $crate::tree::func::def::DolOp for $struct_name {
             const NAME: &'static str = $name;
-            const KIND: $crate::tree::func_def::OpKind = $kind;
+            const KIND: $crate::tree::func::def::OpKind = $kind;
         }
     };
 }

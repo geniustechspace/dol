@@ -3,7 +3,7 @@
 use core::fmt;
 use std::borrow::Cow;
 
-use super::compact_name::CompactName;
+use super::super::compact_name::CompactName;
 
 /// Describes the expected argument count for a function.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -405,10 +405,10 @@ macro_rules! define_func {
         #[derive(Debug, Clone, Copy)]
         pub struct $struct_name;
 
-        impl $crate::tree::func_def::DolFunc for $struct_name {
+        impl $crate::tree::func::def::DolFunc for $struct_name {
             const NAME: &'static str = $name;
-            const ARITY: $crate::tree::func_def::Arity = $arity;
-            const KIND: $crate::tree::func_def::FuncKind = $kind;
+            const ARITY: $crate::tree::func::def::Arity = $arity;
+            const KIND: $crate::tree::func::def::FuncKind = $kind;
         }
     };
 }

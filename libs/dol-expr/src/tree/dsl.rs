@@ -4,10 +4,9 @@ use std::ops as std_ops;
 
 use super::ast::Expr;
 use super::compact_name::CompactName;
-use super::func_def::DolOp;
-use super::op_meta::OpDef;
-use super::op_registry;
-use super::ops::UnaryOp;
+use super::func::def::DolOp;
+use super::op::UnaryOp;
+use super::op::meta::OpDef;
 use super::order::{Direction, OrderByExpr};
 use super::path::PathExpr;
 use super::window::WindowBuilder;
@@ -78,69 +77,69 @@ impl<'a> Expr<'a> {
 
     /// `self = rhs`
     pub fn eq(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(op_registry::OpEq::def(), rhs)
+        self.binop(super::op::registry::OpEq::def(), rhs)
     }
 
     /// `self != rhs`
     pub fn ne(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(op_registry::OpNe::def(), rhs)
+        self.binop(super::op::registry::OpNe::def(), rhs)
     }
 
     /// `self < rhs`
     pub fn lt(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(op_registry::OpLt::def(), rhs)
+        self.binop(super::op::registry::OpLt::def(), rhs)
     }
 
     /// `self > rhs`
     pub fn gt(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(op_registry::OpGt::def(), rhs)
+        self.binop(super::op::registry::OpGt::def(), rhs)
     }
 
     /// `self <= rhs`
     pub fn le(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(op_registry::OpLe::def(), rhs)
+        self.binop(super::op::registry::OpLe::def(), rhs)
     }
 
     /// `self >= rhs`
     pub fn ge(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(op_registry::OpGe::def(), rhs)
+        self.binop(super::op::registry::OpGe::def(), rhs)
     }
 
     /// `self IS DISTINCT FROM rhs` (null-safe inequality).
     pub fn is_distinct_from(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(op_registry::OpIsDistinctFrom::def(), rhs)
+        self.binop(super::op::registry::OpIsDistinctFrom::def(), rhs)
     }
 
     /// `self IS NOT DISTINCT FROM rhs` (null-safe equality).
     pub fn is_not_distinct_from(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(op_registry::OpIsNotDistinctFrom::def(), rhs)
+        self.binop(super::op::registry::OpIsNotDistinctFrom::def(), rhs)
     }
 
     // ── Pattern matching ─────────────────────────────────────────────────────
 
     /// `self LIKE rhs`. Chain `.negate()` for `NOT LIKE`.
     pub fn like(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(op_registry::OpLike::def(), rhs)
+        self.binop(super::op::registry::OpLike::def(), rhs)
     }
 
     /// `self ILIKE rhs`. Chain `.negate()` for `NOT ILIKE`.
     pub fn ilike(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(op_registry::OpIlike::def(), rhs)
+        self.binop(super::op::registry::OpIlike::def(), rhs)
     }
 
     /// `self SIMILAR TO rhs`. Chain `.negate()` for `NOT SIMILAR TO`.
     pub fn similar_to(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(op_registry::OpSimilarTo::def(), rhs)
+        self.binop(super::op::registry::OpSimilarTo::def(), rhs)
     }
 
     /// `self ~ rhs` (POSIX regex match). Chain `.negate()` for `!~`.
     pub fn regex_match(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(op_registry::OpRegexMatch::def(), rhs)
+        self.binop(super::op::registry::OpRegexMatch::def(), rhs)
     }
 
     /// `self ~* rhs` (case-insensitive POSIX regex). Chain `.negate()` for `!~*`.
     pub fn regex_match_insensitive(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(op_registry::OpRegexMatchInsensitive::def(), rhs)
+        self.binop(super::op::registry::OpRegexMatchInsensitive::def(), rhs)
     }
 
     // ── Null checks ──────────────────────────────────────────────────────────
@@ -192,7 +191,7 @@ impl<'a> Expr<'a> {
 
     /// String concatenation: `self || rhs`.
     pub fn concat(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(op_registry::OpConcat::def(), rhs)
+        self.binop(super::op::registry::OpConcat::def(), rhs)
     }
 
     // ── Ordering ─────────────────────────────────────────────────────────────
@@ -228,7 +227,7 @@ impl<'a> std_ops::BitAnd for Expr<'a> {
     fn bitand(self, rhs: Expr<'a>) -> Expr<'a> {
         Expr::BinaryOp {
             left: Box::new(self),
-            op: op_registry::OpAnd::def(),
+            op: super::op::registry::OpAnd::def(),
             right: Box::new(rhs),
         }
     }
@@ -239,7 +238,7 @@ impl<'a> std_ops::BitOr for Expr<'a> {
     fn bitor(self, rhs: Expr<'a>) -> Expr<'a> {
         Expr::BinaryOp {
             left: Box::new(self),
-            op: op_registry::OpOr::def(),
+            op: super::op::registry::OpOr::def(),
             right: Box::new(rhs),
         }
     }
@@ -260,7 +259,7 @@ impl<'a> std_ops::Add for Expr<'a> {
     fn add(self, rhs: Expr<'a>) -> Expr<'a> {
         Expr::BinaryOp {
             left: Box::new(self),
-            op: op_registry::OpAdd::def(),
+            op: super::op::registry::OpAdd::def(),
             right: Box::new(rhs),
         }
     }
@@ -271,7 +270,7 @@ impl<'a> std_ops::Sub for Expr<'a> {
     fn sub(self, rhs: Expr<'a>) -> Expr<'a> {
         Expr::BinaryOp {
             left: Box::new(self),
-            op: op_registry::OpSub::def(),
+            op: super::op::registry::OpSub::def(),
             right: Box::new(rhs),
         }
     }
@@ -282,7 +281,7 @@ impl<'a> std_ops::Mul for Expr<'a> {
     fn mul(self, rhs: Expr<'a>) -> Expr<'a> {
         Expr::BinaryOp {
             left: Box::new(self),
-            op: op_registry::OpMul::def(),
+            op: super::op::registry::OpMul::def(),
             right: Box::new(rhs),
         }
     }
@@ -293,7 +292,7 @@ impl<'a> std_ops::Div for Expr<'a> {
     fn div(self, rhs: Expr<'a>) -> Expr<'a> {
         Expr::BinaryOp {
             left: Box::new(self),
-            op: op_registry::OpDiv::def(),
+            op: super::op::registry::OpDiv::def(),
             right: Box::new(rhs),
         }
     }
@@ -304,7 +303,7 @@ impl<'a> std_ops::Rem for Expr<'a> {
     fn rem(self, rhs: Expr<'a>) -> Expr<'a> {
         Expr::BinaryOp {
             left: Box::new(self),
-            op: op_registry::OpMod::def(),
+            op: super::op::registry::OpMod::def(),
             right: Box::new(rhs),
         }
     }

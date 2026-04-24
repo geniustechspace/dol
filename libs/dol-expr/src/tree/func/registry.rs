@@ -14,7 +14,7 @@
 //! }
 //! ```
 
-use super::func_meta::{Arity, FuncKind};
+use super::meta::{Arity, FuncKind};
 use crate::define_func;
 
 // ═══════════════════════════════════════════════════════════════════════════
