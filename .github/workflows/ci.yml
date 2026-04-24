@@ -93,6 +93,14 @@ jobs:
       - name: Run tests (all features)
         run: cargo test --workspace --all-features
 
+      # Dedicated gate: every public IR / schema / value type must
+      # serde-round-trip. Failing this gate is a regression on universal
+      # serde — see the project restructuring plan.
+      - name: Serde round-trip gate
+        run: |
+          cargo test --all-features -p dol-schema --test serde_roundtrip
+          cargo test --all-features -p dol-ir --test serde_roundtrip
+
   test-features:
     name: Feature Matrix
     runs-on: ubuntu-latest

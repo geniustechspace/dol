@@ -146,9 +146,9 @@ macro_rules! define_op {
         #[derive(Debug, Clone, Copy)]
         pub struct $struct_name;
 
-        impl $crate::tree::func::def::DolOp for $struct_name {
+        impl $crate::tree::op::meta::DolOp for $struct_name {
             const NAME: &'static str = $name;
-            const KIND: $crate::tree::func::def::OpKind = $kind;
+            const KIND: $crate::tree::op::meta::OpKind = $kind;
         }
     };
 }
