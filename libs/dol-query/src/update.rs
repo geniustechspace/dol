@@ -103,7 +103,7 @@ impl UpdateQuery {
         let mut arena = dol_expr::ExprArena::new();
         let mut interner = dol_expr::Interner::new();
 
-        let target = interner.intern(&self.name);
+        let target = interner.intern(&crate::lower::qualified_name(&self.name, &self.namespace));
 
         let mut columns = smallvec::SmallVec::new();
         let mut values  = smallvec::SmallVec::new();

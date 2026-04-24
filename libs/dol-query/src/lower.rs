@@ -269,6 +269,14 @@ pub fn lower_exprs(
     exprs.iter().map(|e| lower_expr(e, arena, interner)).collect()
 }
 
+/// Format a qualified entity name (e.g. "namespace.name" or just "name").
+pub fn qualified_name(name: &str, namespace: &Option<String>) -> String {
+    match namespace {
+        Some(ns) => format!("{}.{}", ns, name),
+        None => name.to_string(),
+    }
+}
+
 /// Lower multiple expressions and AND-join them, returning a single filter
 /// `NodeId` (or `NULL_NODE` if the list is empty).
 pub fn lower_filters(

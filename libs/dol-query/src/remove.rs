@@ -73,7 +73,7 @@ impl RemoveQuery {
         let mut arena = dol_expr::ExprArena::new();
         let mut interner = dol_expr::Interner::new();
 
-        let target = interner.intern(&self.name);
+        let target = interner.intern(&crate::lower::qualified_name(&self.name, &self.namespace));
         let filter = lower_filters(&self.filters, &mut arena, &mut interner);
 
         let returning: smallvec::SmallVec<[u32; 4]> = self.returning

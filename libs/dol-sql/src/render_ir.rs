@@ -595,11 +595,21 @@ fn render_insert_with_counter(
         .map(|id| r.render_node(*id))
         .collect::<Result<Vec<_>, _>>()?;
 
+    let col_count = cols.len().max(1);
+    let val_groups: Vec<String> = if col_count > 0 && vals.len() > col_count {
+        // Multi-row insert: group values into (v1, v2), (v3, v4), ...
+        vals.chunks(col_count)
+            .map(|chunk| format!("({})", chunk.join(", ")))
+            .collect()
+    } else {
+        vec![format!("({})", vals.join(", "))]
+    };
+
     let mut sql = format!(
-        "INSERT INTO {} ({}) VALUES ({})",
+        "INSERT INTO {} ({}) VALUES {}",
         table,
         cols.join(", "),
-        vals.join(", ")
+        val_groups.join(", ")
     );
 
     // ON CONFLICT

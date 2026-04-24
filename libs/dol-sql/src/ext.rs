@@ -311,6 +311,9 @@ impl Render for DefinePolicyBuilder {
 pub trait TransactionRender {
     /// Render a Transaction to SQL for the given dialect.
     fn render(ir: &Transaction, dialect: Option<&Dialect>) -> Result<String, BackendError>;
+
+    /// Render a `dol_ir::Transaction` to SQL for the given dialect.
+    fn render_ir(ir: &dol_ir::Transaction, dialect: Option<&Dialect>) -> Result<String, BackendError>;
 }
 
 impl TransactionRender for TransactionBuilder {
@@ -320,6 +323,17 @@ impl TransactionRender for TransactionBuilder {
             None => dialect::default_dialect(),
         };
         render::render_transaction_ir(ir, d).map(|o| o.sql)
+    }
+
+    fn render_ir(ir: &dol_ir::Transaction, dialect: Option<&Dialect>) -> Result<String, BackendError> {
+        let d = match dialect {
+            Some(d) => d,
+            None => dialect::default_dialect(),
+        };
+        let stmt = IrStatement::Transaction(ir.clone());
+        render_ir::render_ir_statement(&stmt, None, d)
+            .map(|o| o.sql)
+            .map_err(|e| BackendError::Unsupported(e.to_string()))
     }
 }
 

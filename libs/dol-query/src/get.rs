@@ -372,7 +372,7 @@ impl GetQuery {
         let mut arena = dol_expr::ExprArena::new();
         let mut interner = dol_expr::Interner::new();
 
-        let from = interner.intern(&self.name);
+        let from = interner.intern(&crate::lower::qualified_name(&self.name, &self.namespace));
         let alias = self.table_alias.as_deref().map(|a| interner.intern(a));
 
         // Default projections.

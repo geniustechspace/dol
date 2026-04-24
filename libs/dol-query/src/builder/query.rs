@@ -442,7 +442,10 @@ impl<'a> GetBuilder<'a> {
         let mut arena = dol_expr::ExprArena::new();
         let mut interner = dol_expr::Interner::new();
 
-        let from = interner.intern(&self.model.name.to_string());
+        let from = interner.intern(&crate::lower::qualified_name(
+            &self.model.name.to_string(),
+            &self.model.namespace.map(|s| s.to_string()),
+        ));
         let alias = self.table_alias.as_deref().map(|a| interner.intern(a));
 
         // Default projections.
