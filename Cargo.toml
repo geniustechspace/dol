@@ -3,27 +3,11 @@
 [workspace]
 resolver = "2"
 members = [
-    # ── Core language crates (the DOL language itself) ────────────────────────
     "libs/dol-types",           # Leaf: Value, Literal, DataType
     "libs/dol-expr",            # Canonical expression layer (ExprNode ≤ 32B, arena, interner)
     "libs/dol-ir",              # Canonical IR: Statement (no lifetime), Backend trait
     "libs/dol-schema",          # Schema: Entity, Field, constraints, DDL builders
     "libs/dol-query",           # Query entry point + builders → produce dol-ir::Statement
-
-    # ── Backend crates (commented out until language is settled) ───────────────
-    # "libs/dol-sql",
-    # "libs/dol-kv",
-    # "libs/dol-objects",
-    # "libs/dol-spreadsheet",
-
-    # ── Auxiliary crates (commented out until backends are restored) ───────────
-    # "libs/dol-migration",
-    # "libs/dol-config",
-
-    # ── Deprecated / to be removed ────────────────────────────────────────────
-    # "libs/dol-core",          # Superseded: expression + ops split into dol-expr & dol-ir
-    # "libs/dol-builder",       # Absorbed into dol-query
-    # "libs/dol",               # Facade — will be rebuilt after consolidation
 ]
 
 [workspace.package]
@@ -39,11 +23,6 @@ smallvec = { version = "1", features = ["union", "serde"] }
 # Serialisation
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-serde_norway = "0.9"
-toml_crate = { package = "toml", version = "1" }
-
-# Async runtime (dev/test only)
-tokio = { version = "1", features = ["rt", "macros"] }
 
 # Internal crates — core language
 dol-types  = { path = "libs/dol-types" }

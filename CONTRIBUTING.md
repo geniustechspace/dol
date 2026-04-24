@@ -71,18 +71,18 @@ refactor: simplify dialect type resolution
 ## Crate Architecture
 
 ```markdown
-dol-core/
-├── dol-expr — Expression AST (leaf, no deps)
-├── dol-model — Model/Field/FieldType (leaf, no deps)
-├── dol-ir — IR + Backend trait (depends on expr, model)
-└── dol-builder — Builder API (depends on expr, model, ir)
-dol-sql — SQL rendering + dialect system
-dol-kv — Key-value backend
-dol-objects — Object storage backend
-dol-migration — Migration system
-dol-config — Unified configuration
-dol — Umbrella crate (re-exports everything)
+dol-types  →  dol-expr  →  dol-ir
+                              ↑
+                          dol-schema  →  dol-query
 ```
+
+| Crate        | Role                                                        |
+| ------------ | ----------------------------------------------------------- |
+| `dol-types`  | Leaf: `Value`, `Literal`, `DataType`                        |
+| `dol-expr`   | Composable expression AST — operators, functions, windows   |
+| `dol-ir`     | Intermediate representation — `Statement` enum, `Backend` trait |
+| `dol-schema` | Schema language — `Entity`, `Field`, constraints, DDL       |
+| `dol-query`  | Query entry point + builders → produce IR                   |
 
 When adding a new feature, place it in the lowest appropriate crate to minimize
 coupling.
