@@ -429,6 +429,138 @@ impl<'a> GetBuilder<'a> {
             lock_mode: self.lock_mode,
         }
     }
+
+    /// Build the arena-based IR as a [`dol_ir::Statement`].
+    pub fn build_ir(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+        use crate::lower::{lower_expr, lower_filters, lower_order_by};
+        use dol_expr::expr::{
+            BinOp, ExprNode, JoinNode, JoinType as ArenaJoinType, LockHint, QueryNode,
+        };
+        use dol_expr::ids::NULL_NODE;
+        use smallvec::SmallVec;
+
+        let mut arena = dol_expr::ExprArena::new();
+        let mut interner = dol_expr::Interner::new();
+
+        let from = interner.intern(&self.model.name.to_string());
+        let alias = self.table_alias.as_deref().map(|a| interner.intern(a));
+
+        // Default projections.
+        let proj_exprs: Vec<Expr<'static>> = if self.projections.is_empty() {
+            self.model.fields.iter().map(|f| field_dyn(f.name)).collect()
+        } else {
+            self.projections
+        };
+        let columns: SmallVec<[u32; 8]> = proj_exprs
+            .iter()
+            .map(|e| lower_expr(e, &mut arena, &mut interner))
+            .collect();
+
+        // Joins.
+        let joins: SmallVec<[JoinNode; 2]> = self
+            .joins
+            .into_iter()
+            .map(|jc| {
+                let source = interner.intern(&jc.model_name);
+                let jalias = jc.alias.as_deref().map(|a| interner.intern(a));
+                let join_type = match jc.join_type {
+                    JoinKind::Inner => ArenaJoinType::Inner,
+                    JoinKind::Left => ArenaJoinType::Left,
+                    JoinKind::Right => ArenaJoinType::Right,
+                    JoinKind::Full => ArenaJoinType::Full,
+                    JoinKind::Cross => ArenaJoinType::Cross,
+                };
+                let on = if jc.on_conditions.is_empty() {
+                    NULL_NODE
+                } else {
+                    let mut cond_ids: Vec<u32> = Vec::new();
+                    for (l, r) in &jc.on_conditions {
+                        let lid = {
+                            let col = interner.intern(l);
+                            let fid = arena.alloc_field(dol_expr::FieldNode {
+                                namespace: None,
+                                column: col,
+                                steps: SmallVec::new(),
+                            });
+                            arena.alloc(ExprNode::Field(fid))
+                        };
+                        let rid = {
+                            let col = interner.intern(r);
+                            let fid = arena.alloc_field(dol_expr::FieldNode {
+                                namespace: None,
+                                column: col,
+                                steps: SmallVec::new(),
+                            });
+                            arena.alloc(ExprNode::Field(fid))
+                        };
+                        cond_ids.push(arena.alloc(ExprNode::BinOp {
+                            op: BinOp::Eq,
+                            lhs: lid,
+                            rhs: rid,
+                        }));
+                    }
+                    let mut result = cond_ids[0];
+                    for id in &cond_ids[1..] {
+                        result = arena.alloc(ExprNode::BinOp {
+                            op: BinOp::And,
+                            lhs: result,
+                            rhs: *id,
+                        });
+                    }
+                    result
+                };
+                JoinNode {
+                    source,
+                    alias: jalias,
+                    join_type,
+                    on,
+                }
+            })
+            .collect();
+
+        let filter = lower_filters(&self.filters, &mut arena, &mut interner);
+
+        let group_by: SmallVec<[u32; 4]> = self
+            .group_by
+            .iter()
+            .map(|e| lower_expr(e, &mut arena, &mut interner))
+            .collect();
+
+        let having = if self.having.is_empty() {
+            NULL_NODE
+        } else {
+            lower_filters(&self.having, &mut arena, &mut interner)
+        };
+
+        let order_by: SmallVec<[(u32, dol_expr::expr::Order); 4]> = self
+            .order_by
+            .iter()
+            .map(|ob| lower_order_by(ob, &mut arena, &mut interner))
+            .collect();
+
+        let lock = self.lock_mode.map(|m| match m {
+            LockMode::ForUpdate => LockHint::ForUpdate,
+            LockMode::ForShare => LockHint::ForShare,
+            LockMode::ForUpdateNoWait | LockMode::ForShareNoWait => LockHint::NoWait,
+            LockMode::ForUpdateSkipLocked | LockMode::ForShareSkipLocked => LockHint::SkipLocked,
+        });
+
+        let node = QueryNode {
+            from,
+            alias,
+            joins,
+            filter,
+            columns,
+            group_by,
+            having,
+            order_by,
+            limit: None,
+            offset: None,
+            lock,
+        };
+
+        (dol_ir::Statement::Query(node), arena, interner)
+    }
 }
 
 // ===========================================================================

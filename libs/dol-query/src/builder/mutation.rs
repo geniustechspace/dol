@@ -113,6 +113,23 @@ impl<'a> InsertBuilder<'a> {
             returning: self.returning,
         }
     }
+
+    /// Build the arena-based IR as a [`dol_ir::Statement`].
+    pub fn build_ir(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+        let mut q = crate::InsertQuery::new(
+            self.model.name.to_string(),
+            self.model.namespace.map(|s| s.to_string()),
+            Some(self.model.field_names().map(|s| s.to_string()).collect()),
+        );
+        if !self.fields.is_empty() {
+            q = q.fields(&self.fields.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+        }
+        q = q.rows(self.row_count);
+        if !self.returning.is_empty() {
+            q = q.returning(&self.returning.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+        }
+        q.build_ir()
+    }
 }
 
 // ===========================================================================
@@ -291,6 +308,24 @@ impl<'a> UpdateBuilder<'a> {
             returning: self.returning,
         }
     }
+
+    /// Build the arena-based IR as a [`dol_ir::Statement`].
+    pub fn build_ir(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+        let mut q = crate::UpdateQuery::new(
+            self.model.name.to_string(),
+            self.model.namespace.map(|s| s.to_string()),
+        );
+        for (col, expr) in self.assignments {
+            q = q.set_expr(&col, expr);
+        }
+        for f in self.filters {
+            q = q.filter(f);
+        }
+        if !self.returning.is_empty() {
+            q = q.returning(&self.returning.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+        }
+        q.build_ir()
+    }
 }
 
 // ===========================================================================
@@ -359,6 +394,21 @@ impl<'a> RemoveBuilder<'a> {
             filters: self.filters,
             returning: self.returning,
         }
+    }
+
+    /// Build the arena-based IR as a [`dol_ir::Statement`].
+    pub fn build_ir(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+        let mut q = crate::RemoveQuery::new(
+            self.model.name.to_string(),
+            self.model.namespace.map(|s| s.to_string()),
+        );
+        for f in self.filters {
+            q = q.filter(f);
+        }
+        if !self.returning.is_empty() {
+            q = q.returning(&self.returning.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+        }
+        q.build_ir()
     }
 }
 
@@ -536,5 +586,37 @@ impl<'a> UpsertBuilder<'a> {
             conflict_filters: self.conflict_filters,
             returning: self.returning,
         }
+    }
+
+    /// Build the arena-based IR as a [`dol_ir::Statement`].
+    pub fn build_ir(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+        let field_names: Vec<String> = self.model.field_names().map(|s| s.to_string()).collect();
+        let mut q = crate::UpsertQuery::new(
+            self.model.name.to_string(),
+            self.model.namespace.map(|s| s.to_string()),
+            Some(field_names),
+        );
+        if !self.fields.is_empty() {
+            q = q.fields(&self.fields.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+        }
+        if !self.conflict_fields.is_empty() {
+            q = q.on_conflict(&self.conflict_fields.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+        }
+        if let Some(ref constraint) = self.conflict_constraint {
+            q = q.on_conflict_constraint(constraint);
+        }
+        if !self.update_fields.is_empty() {
+            q = q.do_update(&self.update_fields.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+        }
+        if self.do_nothing_flag {
+            q = q.do_nothing();
+        }
+        for f in self.conflict_filters {
+            q = q.conflict_filter(f);
+        }
+        if !self.returning.is_empty() {
+            q = q.returning(&self.returning.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+        }
+        q.build_ir()
     }
 }

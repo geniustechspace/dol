@@ -160,4 +160,31 @@ impl DefinePolicyBuilder {
             check_expr: self.check_expr.clone(),
         }
     }
+
+    /// Build the arena-based IR as a [`dol_ir::Statement`].
+    pub fn build_ir(&self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+        use crate::lower::lower_expr;
+
+        let mut arena = dol_expr::ExprArena::new();
+        let mut interner = dol_expr::Interner::new();
+
+        let ir_action = match self.action {
+            PolicyAction::Read  => dol_ir::PolicyAction::Read,
+            PolicyAction::Write => dol_ir::PolicyAction::Write,
+            PolicyAction::All   => dol_ir::PolicyAction::All,
+        };
+
+        let using_id = self.using_expr.as_ref().map(|e| lower_expr(e, &mut arena, &mut interner));
+        let check_id = self.check_expr.as_ref().map(|e| lower_expr(e, &mut arena, &mut interner));
+
+        let policy = dol_ir::DefinePolicy {
+            name: self.name.clone(),
+            on_model: self.on_model.clone(),
+            action: ir_action,
+            using_expr: using_id,
+            check_expr: check_id,
+        };
+
+        (dol_ir::Statement::DefinePolicy(policy), arena, interner)
+    }
 }

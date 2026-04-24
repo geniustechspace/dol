@@ -35,4 +35,36 @@ impl TransactionBuilder {
     pub fn block<'a>(stmts: Vec<Statement<'a>>) -> Transaction<'a> {
         Transaction::Block(stmts)
     }
+
+    // ── IR methods ──────────────────────────────────────────────────────
+
+    /// Build a BEGIN as a [`dol_ir::Statement`].
+    pub fn begin_ir() -> dol_ir::Statement {
+        dol_ir::Statement::Transaction(dol_ir::Transaction::Begin)
+    }
+
+    /// Build a COMMIT as a [`dol_ir::Statement`].
+    pub fn commit_ir() -> dol_ir::Statement {
+        dol_ir::Statement::Transaction(dol_ir::Transaction::Commit)
+    }
+
+    /// Build a ROLLBACK as a [`dol_ir::Statement`].
+    pub fn rollback_ir() -> dol_ir::Statement {
+        dol_ir::Statement::Transaction(dol_ir::Transaction::Rollback)
+    }
+
+    /// Build a SAVEPOINT as a [`dol_ir::Statement`].
+    pub fn savepoint_ir(name: &str) -> dol_ir::Statement {
+        dol_ir::Statement::Transaction(dol_ir::Transaction::Savepoint(name.to_string()))
+    }
+
+    /// Build a RELEASE SAVEPOINT as a [`dol_ir::Statement`].
+    pub fn release_savepoint_ir(name: &str) -> dol_ir::Statement {
+        dol_ir::Statement::Transaction(dol_ir::Transaction::ReleaseSavepoint(name.to_string()))
+    }
+
+    /// Build a ROLLBACK TO SAVEPOINT as a [`dol_ir::Statement`].
+    pub fn rollback_to_savepoint_ir(name: &str) -> dol_ir::Statement {
+        dol_ir::Statement::Transaction(dol_ir::Transaction::RollbackToSavepoint(name.to_string()))
+    }
 }
