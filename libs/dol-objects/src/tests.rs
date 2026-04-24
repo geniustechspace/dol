@@ -1,6 +1,6 @@
 use super::*;
-use dol_core::op::{Statement, Transaction};
-use dol_core::op::storage::{GetObject, ListObjects, PutObject, ObjectSource};
+use dol_ir::{Statement, Transaction};
+use dol_ir::storage::{GetObject, ListObjects, PutObject, ObjectSource};
 
 #[test]
 fn put_object_renders() {
