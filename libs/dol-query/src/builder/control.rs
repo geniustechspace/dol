@@ -1,7 +1,6 @@
 //! Control builders — GRANT, REVOKE, DEFINE POLICY.
 
-use dol_core::expr::Expr;
-use dol_core::op::control::{DefinePolicy, PolicyAction as CorePolicyAction};
+use dol_expr::tree::Expr;
 use dol_ir::control::{Grant, Revoke};
 
 // Re-export Privilege and PolicyAction from dol-ir
@@ -90,10 +89,10 @@ impl RevokeBuilder {
 ///
 /// ```rust
 /// use dol_query::builder::control::DefinePolicyBuilder;
-/// use dol_core::expr::{field, param};
+/// use dol_expr::tree::{field, param};
 /// use dol_query::builder::control::PolicyAction;
 ///
-/// let ir = DefinePolicyBuilder::new("tenant_isolation")
+/// let (stmt, _arena, _interner) = DefinePolicyBuilder::new("tenant_isolation")
 ///     .on("orders")
 ///     .for_action(PolicyAction::All)
 ///     .using(field("tenant_id").eq(param()))
@@ -145,24 +144,8 @@ impl DefinePolicyBuilder {
         self
     }
 
-    /// Build the canonical [`DefinePolicy`] (old dol-core IR, until expr migration is complete).
-    pub fn build(&self) -> DefinePolicy<'static> {
-        let core_action = match self.action {
-            PolicyAction::Read  => CorePolicyAction::Read,
-            PolicyAction::Write => CorePolicyAction::Write,
-            PolicyAction::All   => CorePolicyAction::All,
-        };
-        DefinePolicy {
-            name: self.name.clone(),
-            on_model: self.on_model.clone(),
-            action: core_action,
-            using_expr: self.using_expr.clone(),
-            check_expr: self.check_expr.clone(),
-        }
-    }
-
     /// Build the arena-based IR as a [`dol_ir::Statement`].
-    pub fn build_ir(&self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+    pub fn build(&self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
         use crate::lower::lower_expr;
 
         let mut arena = dol_expr::ExprArena::new();

@@ -243,7 +243,7 @@ impl From<String> for Query {
 }
 
 // ---------------------------------------------------------------------------
-// JoinKind / LockMode — locally defined (formerly in dol-core)
+// JoinKind / LockMode — locally defined
 // ---------------------------------------------------------------------------
 
 /// The kind of JOIN to perform.

@@ -105,7 +105,7 @@ impl<'a> InsertBuilder<'a> {
 // InsertSelectBuilder
 // ===========================================================================
 
-/// INSERT ... SELECT ... operation (local type replacing dol_core).
+/// INSERT ... SELECT ... operation.
 #[derive(Debug, Clone)]
 pub struct InsertSelect {
     pub target: dol_ir::EntityRef,

@@ -1,8 +1,8 @@
-//! Lowering bridge: converts `dol-core::expr::Expr<'static>` into the
+//! Lowering bridge: converts `dol_expr::tree::Expr<'static>` into the
 //! arena-based `dol-expr` representation (`ExprArena` + `NodeId`).
 //!
-//! This module bridges the gap between the old expression AST (with
-//! lifetime-parameterised `Expr<'a>`) and the new arena-based IR used by
+//! This module bridges the gap between the tree-based expression AST (with
+//! lifetime-parameterised `Expr<'a>`) and the arena-based IR used by
 //! `dol-ir::Statement`.
 
 use dol_expr::tree::{Expr, OrderByExpr, Direction};
@@ -73,8 +73,7 @@ pub fn lower_expr(
         Expr::Param => arena.alloc(ExprNode::Param),
 
         Expr::Value(lit) => {
-            // dol-core::Literal and dol-expr::Literal are the same type
-            // (both re-exported from dol-types), so we can clone directly.
+            // dol-expr::Literal — clone directly.
             let lid = arena.alloc_lit(lit.clone().into_static());
             arena.alloc(ExprNode::Lit(lid))
         }
@@ -302,7 +301,7 @@ pub fn lower_filters(
 // Private helpers
 // ---------------------------------------------------------------------------
 
-/// Map `dol-core::expr::OpDef` name to `dol-expr::expr::BinOp`.
+/// Map `dol_expr::tree::OpDef` name to `dol-expr::expr::BinOp`.
 fn lower_binop(op: &dol_expr::tree::OpDef) -> BinOp {
     match op.name() {
         "EQ"  => BinOp::Eq,
