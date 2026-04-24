@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use super::*;
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -30,8 +32,8 @@ fn constrained_model() -> Entity {
         ],
     )
     .with_constraints(vec![
-        EntityConstraint::Unique(&["user_id", "product"]),
-        EntityConstraint::Check("user_id IS NOT NULL"),
+        EntityConstraint::unique(["user_id", "product"]),
+        EntityConstraint::check("user_id IS NOT NULL"),
     ])
 }
 
@@ -40,8 +42,8 @@ fn constrained_model() -> Entity {
 #[test]
 fn model_new_defaults() {
     let m = Entity::new("items", vec![]);
-    assert_eq!(m.name, "items");
-    assert_eq!(m.namespace, None);
+    assert_eq!(&*m.name, "items");
+    assert!(m.namespace.is_none());
     assert_eq!(m.fields.len(), 0);
     assert_eq!(m.constraints.len(), 0);
 }
@@ -51,8 +53,8 @@ fn model_new_defaults() {
 #[test]
 fn model_with_namespace() {
     let m = ns_model();
-    assert_eq!(m.namespace, Some("public"));
-    assert_eq!(m.name, "users");
+    assert_eq!(m.namespace.as_deref(), Some("public"));
+    assert_eq!(&*m.name, "users");
 }
 
 // ── 3. Entity::with_constraints ──────────────────────────────────────
@@ -63,11 +65,11 @@ fn model_with_constraints() {
     assert_eq!(m.constraints.len(), 2);
     assert_eq!(
         m.constraints[0],
-        EntityConstraint::Unique(&["user_id", "product"]),
+        EntityConstraint::unique(["user_id", "product"]),
     );
     assert_eq!(
         m.constraints[1],
-        EntityConstraint::Check("user_id IS NOT NULL"),
+        EntityConstraint::check("user_id IS NOT NULL"),
     );
 }
 
@@ -89,7 +91,7 @@ fn qualified_name_with_namespace() {
 fn field_lookup_success() {
     let m = basic_model();
     let f = m.field("email");
-    assert_eq!(f.name, "email");
+    assert_eq!(&*f.name, "email");
     assert!(f.nullable);
 }
 
@@ -115,7 +117,8 @@ fn try_field_none() {
 
 #[test]
 fn field_names_iterator() {
-    let names: Vec<_> = basic_model().field_names().collect();
+    let m = basic_model();
+    let names: Vec<&str> = m.field_names().collect();
     assert_eq!(names, vec!["id", "name", "email"]);
 }
 
@@ -126,7 +129,7 @@ fn primary_keys_filter() {
     let m = basic_model();
     let pks: Vec<_> = m.primary_keys().collect();
     assert_eq!(pks.len(), 1);
-    assert_eq!(pks[0].name, "id");
+    assert_eq!(&*pks[0].name, "id");
     assert!(pks[0].primary_key);
 }
 
@@ -137,8 +140,8 @@ fn non_pk_fields_filter() {
     let m = basic_model();
     let non_pk: Vec<_> = m.non_pk_fields().collect();
     assert_eq!(non_pk.len(), 2);
-    assert_eq!(non_pk[0].name, "name");
-    assert_eq!(non_pk[1].name, "email");
+    assert_eq!(&*non_pk[0].name, "name");
+    assert_eq!(&*non_pk[1].name, "email");
 }
 
 // ── 11. Entity::field_list ───────────────────────────────────────────
@@ -159,18 +162,18 @@ fn field_list_empty_model() {
 #[test]
 fn field_new_defaults() {
     let f = Field::new("col", DataType::Int32);
-    assert_eq!(f.name, "col");
+    assert_eq!(&*f.name, "col");
     assert_eq!(f.data_type, DataType::Int32);
     assert!(!f.primary_key);
     assert!(!f.nullable);
     assert!(!f.has_default);
-    assert_eq!(f.default_expr, None);
+    assert!(f.default_expr.is_none());
     assert!(!f.unique);
-    assert_eq!(f.references, None);
-    assert_eq!(f.check, None);
-    assert_eq!(f.comment, None);
-    assert_eq!(f.collation, None);
-    assert_eq!(f.generated, None);
+    assert!(f.references.is_none());
+    assert!(f.check.is_none());
+    assert!(f.comment.is_none());
+    assert!(f.collation.is_none());
+    assert!(f.generated.is_none());
     assert!(!f.indexed);
     assert!(!f.auto_increment);
 }
@@ -192,10 +195,10 @@ fn field_builder_chain() {
     assert!(f.nullable);
     assert!(f.unique);
     assert!(f.has_default);
-    assert_eq!(f.default_expr, Some("'active'"));
-    assert_eq!(f.check, Some("status IN ('active','inactive')"));
-    assert_eq!(f.comment, Some("User account status"));
-    assert_eq!(f.collation, Some("C"));
+    assert_eq!(f.default_expr.as_deref(), Some("'active'"));
+    assert_eq!(f.check.as_deref(), Some("status IN ('active','inactive')"));
+    assert_eq!(f.comment.as_deref(), Some("User account status"));
+    assert_eq!(f.collation.as_deref(), Some("C"));
 }
 
 // ── 14. Field::optional ─────────────────────────────────────────────
@@ -221,14 +224,14 @@ fn field_required_is_noop() {
 fn field_has_default_metadata() {
     let f = Field::new("seq", DataType::Int32).has_default();
     assert!(f.has_default);
-    assert_eq!(f.default_expr, None);
+    assert!(f.default_expr.is_none());
 }
 
 #[test]
 fn field_default_sets_expr() {
     let f = Field::new("ts", DataType::TimestampTz { precision: 6 }).default("NOW()");
     assert!(f.has_default);
-    assert_eq!(f.default_expr, Some("NOW()"));
+    assert_eq!(f.default_expr.as_deref(), Some("NOW()"));
 }
 
 // ── Field::references ───────────────────────────────────────────────
@@ -242,8 +245,8 @@ fn field_references_inline() {
         FkAction::NoAction,
     );
     let fk = f.references.unwrap();
-    assert_eq!(fk.table, "users");
-    assert_eq!(fk.column, "id");
+    assert_eq!(&*fk.table, "users");
+    assert_eq!(&*fk.column, "id");
     assert_eq!(fk.on_delete, FkAction::Cascade);
     assert_eq!(fk.on_update, FkAction::NoAction);
 }
@@ -255,8 +258,8 @@ fn field_references_full_from_builder() {
         .on_update(FkAction::Restrict);
     let f = Field::new("org_id", DataType::Uuid).references_full(fk);
     let got = f.references.unwrap();
-    assert_eq!(got.table, "orgs");
-    assert_eq!(got.column, "org_id");
+    assert_eq!(&*got.table, "orgs");
+    assert_eq!(&*got.column, "org_id");
     assert_eq!(got.on_delete, FkAction::SetNull);
     assert_eq!(got.on_update, FkAction::Restrict);
 }
@@ -266,16 +269,17 @@ fn field_references_full_from_builder() {
 #[test]
 fn field_generated_stored() {
     let f = Field::new("total", DataType::Int32).generated_stored("price * qty");
-    assert_eq!(f.generated, Some((GeneratedKind::Stored, "price * qty")));
+    let (kind, expr) = f.generated.as_ref().unwrap();
+    assert_eq!(*kind, GeneratedKind::Stored);
+    assert_eq!(&**expr, "price * qty");
 }
 
 #[test]
 fn field_generated_virtual() {
     let f = Field::new("full_name", DataType::Text).generated_virtual("first || ' ' || last");
-    assert_eq!(
-        f.generated,
-        Some((GeneratedKind::Virtual, "first || ' ' || last")),
-    );
+    let (kind, expr) = f.generated.as_ref().unwrap();
+    assert_eq!(*kind, GeneratedKind::Virtual);
+    assert_eq!(&**expr, "first || ' ' || last");
 }
 
 // ── Field::index ────────────────────────────────────────────────────
@@ -332,8 +336,8 @@ fn generated_kind_debug_clone_copy() {
 #[test]
 fn foreign_key_ref_defaults() {
     let fk = ForeignKeyRef::new("users", "id");
-    assert_eq!(fk.table, "users");
-    assert_eq!(fk.column, "id");
+    assert_eq!(&*fk.table, "users");
+    assert_eq!(&*fk.column, "id");
     assert_eq!(fk.on_delete, FkAction::NoAction);
     assert_eq!(fk.on_update, FkAction::NoAction);
 }
@@ -351,29 +355,31 @@ fn foreign_key_ref_builder() {
 
 #[test]
 fn model_constraint_unique() {
-    let c = EntityConstraint::Unique(&["a", "b"]);
-    assert_eq!(c, EntityConstraint::Unique(&["a", "b"]));
+    let c = EntityConstraint::unique(["a", "b"]);
+    assert_eq!(c, EntityConstraint::unique(["a", "b"]));
 }
 
 #[test]
 fn model_constraint_foreign_key() {
-    let c = EntityConstraint::ForeignKey {
-        columns: &["user_id"],
-        ref_table: "users",
-        ref_columns: &["id"],
-        on_delete: FkAction::Cascade,
-    };
+    let c = EntityConstraint::foreign_key(
+        ["user_id"],
+        "users",
+        ["id"],
+        FkAction::Cascade,
+    );
     if let EntityConstraint::ForeignKey {
         columns,
         ref_table,
         ref_columns,
         on_delete,
-    } = c
+    } = &c
     {
-        assert_eq!(columns, &["user_id"]);
-        assert_eq!(ref_table, "users");
-        assert_eq!(ref_columns, &["id"]);
-        assert_eq!(on_delete, FkAction::Cascade);
+        let cols: Vec<&str> = columns.iter().map(|s| s.as_ref()).collect();
+        let refs: Vec<&str> = ref_columns.iter().map(|s| s.as_ref()).collect();
+        assert_eq!(cols, vec!["user_id"]);
+        assert_eq!(&**ref_table, "users");
+        assert_eq!(refs, vec!["id"]);
+        assert_eq!(*on_delete, FkAction::Cascade);
     } else {
         panic!("expected ForeignKey variant");
     }
@@ -381,14 +387,14 @@ fn model_constraint_foreign_key() {
 
 #[test]
 fn model_constraint_check() {
-    let c = EntityConstraint::Check("age > 0");
-    assert_eq!(c, EntityConstraint::Check("age > 0"));
+    let c = EntityConstraint::check("age > 0");
+    assert_eq!(c, EntityConstraint::check("age > 0"));
 }
 
 #[test]
 fn model_constraint_primary_key() {
-    let c = EntityConstraint::PrimaryKey(&["tenant_id", "user_id"]);
-    assert_eq!(c, EntityConstraint::PrimaryKey(&["tenant_id", "user_id"]));
+    let c = EntityConstraint::primary_key(["tenant_id", "user_id"]);
+    assert_eq!(c, EntityConstraint::primary_key(["tenant_id", "user_id"]));
 }
 
 // ── Entity equality ─────────────────────────────────────────────────
@@ -405,6 +411,24 @@ fn model_inequality() {
     let a = Entity::new("t1", vec![]);
     let b = Entity::new("t2", vec![]);
     assert_ne!(a, b);
+}
+
+// ── Arc<str> ergonomics ─────────────────────────────────────────────
+
+#[test]
+fn entity_accepts_arc_str_input() {
+    let name: Arc<str> = Arc::from("dynamic_table");
+    let e = Entity::new(name.clone(), vec![]);
+    assert_eq!(&*e.name, "dynamic_table");
+    // Same Arc reused, no extra allocation.
+    assert!(Arc::ptr_eq(&name, &e.name));
+}
+
+#[test]
+fn entity_accepts_string_input() {
+    let name = String::from("dynamic_table");
+    let e = Entity::new(name, vec![]);
+    assert_eq!(&*e.name, "dynamic_table");
 }
 
 // ── DataType used through entity ────────────────────────────────────

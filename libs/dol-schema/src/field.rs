@@ -6,6 +6,8 @@
 //! - Use `.optional()` or `.nullable()` to make them nullable
 //! - Use `.required()` as a no-op self-documenting marker
 
+use std::sync::Arc;
+
 use super::constraint::{FkAction, ForeignKeyRef, GeneratedKind};
 pub use dol_types::DataType;
 
@@ -23,24 +25,24 @@ pub use dol_types::DataType;
 /// - `generated_stored(expr)` / `generated_virtual(expr)` — computed fields
 /// - `auto_increment()` — marks as auto-incrementing (replaces Serial/BigSerial)
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Field {
-    pub name: &'static str,
+    pub name: Arc<str>,
     pub data_type: DataType,
     pub primary_key: bool,
     pub nullable: bool,
     pub has_default: bool,
-    pub default_expr: Option<&'static str>,
+    pub default_expr: Option<Arc<str>>,
     pub unique: bool,
     pub references: Option<ForeignKeyRef>,
     /// Inline CHECK constraint expression.
-    pub check: Option<&'static str>,
+    pub check: Option<Arc<str>>,
     /// Human-readable description / comment.
-    pub comment: Option<&'static str>,
+    pub comment: Option<Arc<str>>,
     /// Collation override (e.g. `"C"`, `"en_US.UTF-8"`).
-    pub collation: Option<&'static str>,
+    pub collation: Option<Arc<str>>,
     /// Generated (computed) field: `(kind, expression)`.
-    pub generated: Option<(GeneratedKind, &'static str)>,
+    pub generated: Option<(GeneratedKind, Arc<str>)>,
     /// Hint that this field should be indexed (for schema generation tooling).
     pub indexed: bool,
     /// Auto-incrementing field (replaces the old Serial/BigSerial types).
@@ -48,9 +50,9 @@ pub struct Field {
 }
 
 impl Field {
-    pub fn new(name: &'static str, data_type: DataType) -> Self {
+    pub fn new(name: impl Into<Arc<str>>, data_type: DataType) -> Self {
         Self {
-            name,
+            name: name.into(),
             data_type,
             primary_key: false,
             nullable: false,
@@ -95,9 +97,9 @@ impl Field {
     }
 
     /// Set a DEFAULT expression that will be rendered in DDL.
-    pub fn default(mut self, expr: &'static str) -> Self {
+    pub fn default(mut self, expr: impl Into<Arc<str>>) -> Self {
         self.has_default = true;
-        self.default_expr = Some(expr);
+        self.default_expr = Some(expr.into());
         self
     }
 
@@ -109,14 +111,14 @@ impl Field {
     /// Add an inline REFERENCES constraint with ON DELETE and ON UPDATE actions.
     pub fn references(
         mut self,
-        table: &'static str,
-        column: &'static str,
+        table: impl Into<Arc<str>>,
+        column: impl Into<Arc<str>>,
         on_delete: FkAction,
         on_update: FkAction,
     ) -> Self {
         self.references = Some(ForeignKeyRef {
-            table,
-            column,
+            table: table.into(),
+            column: column.into(),
             on_delete,
             on_update,
         });
@@ -130,20 +132,20 @@ impl Field {
     }
 
     /// Add an inline CHECK constraint expression.
-    pub fn check(mut self, expr: &'static str) -> Self {
-        self.check = Some(expr);
+    pub fn check(mut self, expr: impl Into<Arc<str>>) -> Self {
+        self.check = Some(expr.into());
         self
     }
 
     /// Set a human-readable comment / description for this field.
-    pub fn comment(mut self, text: &'static str) -> Self {
-        self.comment = Some(text);
+    pub fn comment(mut self, text: impl Into<Arc<str>>) -> Self {
+        self.comment = Some(text.into());
         self
     }
 
     /// Override the collation for this field.
-    pub fn collation(mut self, collation: &'static str) -> Self {
-        self.collation = Some(collation);
+    pub fn collation(mut self, collation: impl Into<Arc<str>>) -> Self {
+        self.collation = Some(collation.into());
         self
     }
 
@@ -154,14 +156,14 @@ impl Field {
     }
 
     /// Mark as a stored generated (computed) field.
-    pub fn generated_stored(mut self, expr: &'static str) -> Self {
-        self.generated = Some((GeneratedKind::Stored, expr));
+    pub fn generated_stored(mut self, expr: impl Into<Arc<str>>) -> Self {
+        self.generated = Some((GeneratedKind::Stored, expr.into()));
         self
     }
 
     /// Mark as a virtual generated (computed) field.
-    pub fn generated_virtual(mut self, expr: &'static str) -> Self {
-        self.generated = Some((GeneratedKind::Virtual, expr));
+    pub fn generated_virtual(mut self, expr: impl Into<Arc<str>>) -> Self {
+        self.generated = Some((GeneratedKind::Virtual, expr.into()));
         self
     }
 

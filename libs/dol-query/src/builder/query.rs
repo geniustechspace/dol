@@ -116,7 +116,7 @@ impl<'a> GetBuilder<'a> {
         self.joins.push(JoinClause {
             join_type,
             model_name: target.name.to_string(),
-            model_namespace: target.namespace.map(|s| s.to_string()),
+            model_namespace: target.namespace.as_ref().map(|s| s.to_string()),
             alias: None,
             on_conditions: on_conditions
                 .iter()
@@ -137,7 +137,7 @@ impl<'a> GetBuilder<'a> {
         self.joins.push(JoinClause {
             join_type,
             model_name: target.name.to_string(),
-            model_namespace: target.namespace.map(|s| s.to_string()),
+            model_namespace: target.namespace.as_ref().map(|s| s.to_string()),
             alias: Some(alias.to_string()),
             on_conditions: on_conditions
                 .iter()
@@ -384,8 +384,8 @@ impl<'a> GetBuilder<'a> {
         let mut interner = dol_expr::Interner::new();
 
         let from = interner.intern(&dol_expr::lower::qualified_name(
-            self.model.name,
-            &self.model.namespace.map(|s| s.to_string()),
+            &self.model.name,
+            &self.model.namespace.as_ref().map(|s| s.to_string()),
         ));
         let alias = self.table_alias.as_deref().map(|a| interner.intern(a));
 
@@ -394,7 +394,7 @@ impl<'a> GetBuilder<'a> {
             self.model
                 .fields
                 .iter()
-                .map(|f| field_dyn(f.name))
+                .map(|f| field_dyn(&f.name))
                 .collect()
         } else {
             self.projections

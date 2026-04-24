@@ -215,7 +215,7 @@ impl From<&Entity> for Query {
     fn from(entity: &Entity) -> Self {
         Self {
             name: entity.name.to_string(),
-            namespace: entity.namespace.map(|s| s.to_string()),
+            namespace: entity.namespace.as_ref().map(|s| s.to_string()),
             field_names: Some(entity.field_names().map(|s| s.to_string()).collect()),
         }
     }

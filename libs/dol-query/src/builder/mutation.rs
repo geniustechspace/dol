@@ -87,7 +87,7 @@ impl<'a> InsertBuilder<'a> {
     pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
         let mut q = crate::InsertQuery::new(
             self.model.name.to_string(),
-            self.model.namespace.map(|s| s.to_string()),
+            self.model.namespace.as_ref().map(|s| s.to_string()),
             Some(self.model.field_names().map(|s| s.to_string()).collect()),
         );
         if !self.fields.is_empty() {
@@ -181,7 +181,7 @@ impl<'a> InsertSelectBuilder<'a> {
         InsertSelect {
             target: dol_ir::EntityRef {
                 name: self.model.name.to_string(),
-                namespace: self.model.namespace.map(|s| s.to_string()),
+                namespace: self.model.namespace.as_ref().map(|s| s.to_string()),
                 alias: None,
             },
             fields: self.fields,
@@ -291,7 +291,7 @@ impl<'a> UpdateBuilder<'a> {
     pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
         let mut q = crate::UpdateQuery::new(
             self.model.name.to_string(),
-            self.model.namespace.map(|s| s.to_string()),
+            self.model.namespace.as_ref().map(|s| s.to_string()),
         );
         for (col, expr) in self.assignments {
             q = q.set_expr(&col, expr);
@@ -375,7 +375,7 @@ impl<'a> DeleteBuilder<'a> {
     pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
         let mut q = crate::DeleteQuery::new(
             self.model.name.to_string(),
-            self.model.namespace.map(|s| s.to_string()),
+            self.model.namespace.as_ref().map(|s| s.to_string()),
         );
         for f in self.filters {
             q = q.filter(f);
@@ -557,7 +557,7 @@ impl<'a> UpsertBuilder<'a> {
         let field_names: Vec<String> = self.model.field_names().map(|s| s.to_string()).collect();
         let mut q = crate::UpsertQuery::new(
             self.model.name.to_string(),
-            self.model.namespace.map(|s| s.to_string()),
+            self.model.namespace.as_ref().map(|s| s.to_string()),
             Some(field_names),
         );
         if !self.fields.is_empty() {

@@ -28,6 +28,8 @@ pub use definition::{
     DropEntityBuilder, DropIndexBuilder, DropTypeBuilder, EntityDefineExt,
 };
 
+use std::sync::Arc;
+
 use constraint::EntityConstraint as Constraint;
 
 /// A model definition — the single source of truth for a data shape's schema.
@@ -44,30 +46,30 @@ use constraint::EntityConstraint as Constraint;
 ///     Field::new("status", DataType::Text).default("'active'"),
 ///     Field::new("seq", DataType::Int32).auto_increment(),
 /// ]).with_constraints(vec![
-///     EntityConstraint::Unique(&["tenant_id", "email"]),
+///     EntityConstraint::unique(["tenant_id", "email"]),
 /// ]);
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Entity {
-    pub name: &'static str,
-    pub namespace: Option<&'static str>,
+    pub name: Arc<str>,
+    pub namespace: Option<Arc<str>>,
     pub fields: Vec<Field>,
     pub constraints: Vec<Constraint>,
 }
 
 impl Entity {
-    pub fn new(name: &'static str, fields: Vec<Field>) -> Self {
+    pub fn new(name: impl Into<Arc<str>>, fields: Vec<Field>) -> Self {
         Self {
-            name,
+            name: name.into(),
             namespace: None,
             fields,
             constraints: Vec::new(),
         }
     }
 
-    pub fn with_namespace(mut self, namespace: &'static str) -> Self {
-        self.namespace = Some(namespace);
+    pub fn with_namespace(mut self, namespace: impl Into<Arc<str>>) -> Self {
+        self.namespace = Some(namespace.into());
         self
     }
 
@@ -78,7 +80,7 @@ impl Entity {
 
     /// Returns the fully-qualified model name (`namespace.name` or just `name`).
     pub fn qualified_name(&self) -> String {
-        match self.namespace {
+        match &self.namespace {
             Some(ns) => format!("{}.{}", ns, self.name),
             None => self.name.to_string(),
         }
@@ -88,18 +90,18 @@ impl Entity {
     pub fn field(&self, name: &str) -> &Field {
         self.fields
             .iter()
-            .find(|f| f.name == name)
+            .find(|f| &*f.name == name)
             .unwrap_or_else(|| panic!("field '{}' not found in entity '{}'", name, self.name))
     }
 
     /// Look up a field by name, returning `None` if not found.
     pub fn try_field(&self, name: &str) -> Option<&Field> {
-        self.fields.iter().find(|f| f.name == name)
+        self.fields.iter().find(|f| &*f.name == name)
     }
 
     /// Returns an iterator over field names.
-    pub fn field_names(&self) -> impl Iterator<Item = &'static str> + '_ {
-        self.fields.iter().map(|f| f.name)
+    pub fn field_names(&self) -> impl Iterator<Item = &str> + '_ {
+        self.fields.iter().map(|f| &*f.name)
     }
 
     /// Returns an iterator over primary-key fields.
@@ -116,7 +118,7 @@ impl Entity {
     pub fn field_list(&self) -> String {
         self.fields
             .iter()
-            .map(|f| f.name)
+            .map(|f| f.name.as_ref())
             .collect::<Vec<_>>()
             .join(", ")
     }

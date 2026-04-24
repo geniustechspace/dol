@@ -11,6 +11,7 @@
 //!
 //! For SQL rendering, import the extension traits from `dol-sql`.
 
+use crate::constraint::{EntityConstraint, ForeignKeyRef};
 use crate::{DataType, Entity, Field};
 use dol_ir::definition::{
     AlterAction, AlterEntity, DefineEntity, DefineIndex, DefineType, DropEntity, DropIndex,
@@ -22,6 +23,42 @@ use dol_ir::entity_ref::EntityRef;
 // Field -> FieldDef conversion helper
 // ---------------------------------------------------------------------------
 
+/// Convert a `dol_schema::ForeignKeyRef` (owned, `Arc<str>`) to the IR's
+/// `OwnedForeignKeyRef` (owned, `String`).
+fn fk_to_ir(fk: &ForeignKeyRef) -> OwnedForeignKeyRef {
+    OwnedForeignKeyRef {
+        table: fk.table.to_string(),
+        column: fk.column.to_string(),
+        on_delete: fk.on_delete,
+        on_update: fk.on_update,
+    }
+}
+
+/// Convert a `dol_schema::EntityConstraint` (owned, `Arc<str>`) to the IR's
+/// `OwnedEntityConstraint` (owned, `String`).
+fn constraint_to_ir(c: &EntityConstraint) -> OwnedEntityConstraint {
+    match c {
+        EntityConstraint::Unique(cols) => {
+            OwnedEntityConstraint::Unique(cols.iter().map(|s| s.to_string()).collect())
+        }
+        EntityConstraint::ForeignKey {
+            columns,
+            ref_table,
+            ref_columns,
+            on_delete,
+        } => OwnedEntityConstraint::ForeignKey {
+            columns: columns.iter().map(|s| s.to_string()).collect(),
+            ref_table: ref_table.to_string(),
+            ref_columns: ref_columns.iter().map(|s| s.to_string()).collect(),
+            on_delete: *on_delete,
+        },
+        EntityConstraint::Check(expr) => OwnedEntityConstraint::Check(expr.to_string()),
+        EntityConstraint::PrimaryKey(cols) => {
+            OwnedEntityConstraint::PrimaryKey(cols.iter().map(|s| s.to_string()).collect())
+        }
+    }
+}
+
 /// Converts a static [`Field`] into an owned [`FieldDef`].
 fn field_to_field_def(f: &Field) -> FieldDef {
     FieldDef {
@@ -29,18 +66,13 @@ fn field_to_field_def(f: &Field) -> FieldDef {
         data_type: f.data_type.clone(),
         primary_key: f.primary_key,
         nullable: f.nullable,
-        default_expr: f.default_expr.map(|s| s.to_string()),
+        default_expr: f.default_expr.as_ref().map(|s| s.to_string()),
         unique: f.unique,
-        references: f.references.as_ref().map(|fk| OwnedForeignKeyRef {
-            table: fk.table.to_string(),
-            column: fk.column.to_string(),
-            on_delete: fk.on_delete,
-            on_update: fk.on_update,
-        }),
-        check: f.check.map(|s| s.to_string()),
-        comment: f.comment.map(|s| s.to_string()),
-        collation: f.collation.map(|s| s.to_string()),
-        generated: f.generated.map(|(k, e)| (k, e.to_string())),
+        references: f.references.as_ref().map(fk_to_ir),
+        check: f.check.as_ref().map(|s| s.to_string()),
+        comment: f.comment.as_ref().map(|s| s.to_string()),
+        collation: f.collation.as_ref().map(|s| s.to_string()),
+        generated: f.generated.as_ref().map(|(k, e)| (*k, e.to_string())),
         auto_increment: f.auto_increment,
         indexed: f.indexed,
     }
@@ -94,13 +126,13 @@ impl<'a> CreateFromMeta<'a> {
         let fields = self.model.fields.iter().map(field_to_field_def).collect();
         DefineEntity {
             name: self.model.name.to_string(),
-            namespace: self.model.namespace.map(|s| s.to_string()),
+            namespace: self.model.namespace.as_ref().map(|s| s.to_string()),
             fields,
             constraints: self
                 .model
                 .constraints
                 .iter()
-                .map(OwnedEntityConstraint::from)
+                .map(constraint_to_ir)
                 .collect(),
             if_not_exists: self.if_not_exists,
         }
@@ -290,7 +322,7 @@ impl<'a> AlterEntityBuilder<'a> {
         AlterEntity {
             target: EntityRef {
                 name: self.model.name.to_string(),
-                namespace: self.model.namespace.map(|s| s.to_string()),
+                namespace: self.model.namespace.as_ref().map(|s| s.to_string()),
                 alias: None,
             },
             actions: self.actions.clone(),
@@ -335,7 +367,7 @@ impl<'a> DropEntityBuilder<'a> {
         DropEntity {
             target: EntityRef {
                 name: self.model.name.to_string(),
-                namespace: self.model.namespace.map(|s| s.to_string()),
+                namespace: self.model.namespace.as_ref().map(|s| s.to_string()),
                 alias: None,
             },
             if_exists: self.if_exists,

@@ -18,6 +18,7 @@ dependencies = [
  "dol-expr",
  "dol-types",
  "serde",
+ "serde_json",
  "smallvec",
 ]
 
