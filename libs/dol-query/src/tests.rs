@@ -268,3 +268,164 @@ fn upsert_do_nothing() {
     assert!(ir.do_nothing);
     assert!(ir.update_fields.is_empty());
 }
+
+// ===========================================================================
+// build_ir() tests — verify arena-based IR construction
+// ===========================================================================
+
+#[test]
+fn get_build_ir_produces_query_statement() {
+    let (stmt, _arena, interner) = Query::from("users")
+        .get()
+        .fields(&["id", "email"])
+        .filter(field("id").eq(param()))
+        .build_ir();
+    match stmt {
+        dol_ir::Statement::Query(q) => {
+            assert_eq!(interner.get(q.from), "users");
+            assert_eq!(q.columns.len(), 2);
+            assert_ne!(q.filter, dol_expr::NULL_NODE);
+        }
+        _ => panic!("expected Statement::Query"),
+    }
+}
+
+#[test]
+fn get_build_ir_with_namespace() {
+    let (stmt, _arena, interner) = Query::from("identity.users")
+        .get()
+        .fields(&["id"])
+        .build_ir();
+    match stmt {
+        dol_ir::Statement::Query(q) => {
+            assert_eq!(interner.get(q.from), "identity.users");
+            assert_eq!(q.columns.len(), 1);
+        }
+        _ => panic!("expected Statement::Query"),
+    }
+}
+
+#[test]
+fn insert_build_ir_produces_insert_statement() {
+    let (stmt, _arena, interner) = Query::from("users")
+        .insert()
+        .fields(&["id", "email"])
+        .rows(2)
+        .build_ir();
+    match stmt {
+        dol_ir::Statement::Insert(ins) => {
+            assert_eq!(interner.get(ins.target), "users");
+            assert_eq!(ins.columns.len(), 2);
+            // 2 rows × 2 columns = 4 param nodes
+            assert_eq!(ins.values.len(), 4);
+        }
+        _ => panic!("expected Statement::Insert"),
+    }
+}
+
+#[test]
+fn insert_build_ir_returning() {
+    let (stmt, _arena, interner) = Query::from("users")
+        .insert()
+        .fields(&["id"])
+        .returning_all()
+        .build_ir();
+    match stmt {
+        dol_ir::Statement::Insert(ins) => {
+            assert_eq!(ins.returning.len(), 1);
+            // The "*" returning column
+            let ret_col = interner.get(ins.columns[0]);
+            assert_eq!(ret_col, "id");
+        }
+        _ => panic!("expected Statement::Insert"),
+    }
+}
+
+#[test]
+fn update_build_ir_produces_update_statement() {
+    let (stmt, _arena, interner) = Query::from("users")
+        .update()
+        .set("email")
+        .filter(field("id").eq(param()))
+        .build_ir();
+    match stmt {
+        dol_ir::Statement::Update(upd) => {
+            assert_eq!(interner.get(upd.target), "users");
+            assert_eq!(upd.columns.len(), 1);
+            assert_eq!(upd.values.len(), 1);
+            assert_ne!(upd.filter, dol_expr::NULL_NODE);
+        }
+        _ => panic!("expected Statement::Update"),
+    }
+}
+
+#[test]
+fn remove_build_ir_produces_delete_statement() {
+    let (stmt, _arena, interner) = Query::from("users")
+        .remove()
+        .filter(field("id").eq(param()))
+        .build_ir();
+    match stmt {
+        dol_ir::Statement::Delete(del) => {
+            assert_eq!(interner.get(del.target), "users");
+            assert_ne!(del.filter, dol_expr::NULL_NODE);
+        }
+        _ => panic!("expected Statement::Delete"),
+    }
+}
+
+#[test]
+fn upsert_build_ir_do_nothing() {
+    let (stmt, _arena, interner) = Query::from("users")
+        .upsert()
+        .fields(&["id", "email"])
+        .on_conflict(&["id"])
+        .do_nothing()
+        .build_ir();
+    match stmt {
+        dol_ir::Statement::Upsert(ups) => {
+            assert_eq!(interner.get(ups.target), "users");
+            assert_eq!(ups.columns.len(), 2);
+            assert!(matches!(ups.conflict, Some(dol_expr::expr::ConflictClause::DoNothing)));
+        }
+        _ => panic!("expected Statement::Upsert"),
+    }
+}
+
+#[test]
+fn upsert_build_ir_do_update() {
+    let (stmt, _arena, _interner) = Query::from("users")
+        .upsert()
+        .fields(&["id", "email", "name"])
+        .on_conflict(&["id"])
+        .do_update(&["email", "name"])
+        .build_ir();
+    match stmt {
+        dol_ir::Statement::Upsert(ups) => {
+            assert_eq!(ups.columns.len(), 3);
+            match ups.conflict {
+                Some(dol_expr::expr::ConflictClause::DoUpdate { assignments }) => {
+                    assert_eq!(assignments.len(), 2);
+                }
+                _ => panic!("expected DoUpdate conflict"),
+            }
+        }
+        _ => panic!("expected Statement::Upsert"),
+    }
+}
+
+#[test]
+fn get_build_ir_default_entity_fields() {
+    let users = users_entity();
+    let (stmt, _arena, interner) = Query::from(&users)
+        .get()
+        .build_ir();
+    match stmt {
+        dol_ir::Statement::Query(q) => {
+            assert_eq!(interner.get(q.from), "users");
+            // Should select all 3 entity fields by default.
+            assert_eq!(q.columns.len(), 3);
+        }
+        _ => panic!("expected Statement::Query"),
+    }
+}
