@@ -55,7 +55,7 @@ fn owned_entity_constraint_round_trip() {
         },
     ];
     for c in &cs {
-        assert_eq!(*c, round_trip(c));
+        assert_eq!(c, &round_trip(c));
     }
 }
 

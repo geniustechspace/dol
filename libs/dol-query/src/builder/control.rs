@@ -45,6 +45,15 @@ impl GrantBuilder {
             to_role: self.to_role,
         }
     }
+
+    /// Build a [`dol_ir::Program`] wrapping `Statement::Grant`.
+    ///
+    /// Convenience helper that mirrors [`DefinePolicyBuilder::build`] so
+    /// callers can feed the result directly into a backend without manually
+    /// wrapping with [`dol_ir::Program::from_stmt`].
+    pub fn build_program(self) -> dol_ir::Program {
+        dol_ir::Program::from_stmt(dol_ir::Statement::Grant(self.build()))
+    }
 }
 
 /// Builder for `REVOKE` statements.
@@ -84,6 +93,15 @@ impl RevokeBuilder {
             on_target: self.on_target,
             from_role: self.from_role,
         }
+    }
+
+    /// Build a [`dol_ir::Program`] wrapping `Statement::Revoke`.
+    ///
+    /// Convenience helper that mirrors [`DefinePolicyBuilder::build`] so
+    /// callers can feed the result directly into a backend without manually
+    /// wrapping with [`dol_ir::Program::from_stmt`].
+    pub fn build_program(self) -> dol_ir::Program {
+        dol_ir::Program::from_stmt(dol_ir::Statement::Revoke(self.build()))
     }
 }
 
