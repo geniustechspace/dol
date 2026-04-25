@@ -4,6 +4,4 @@
 //! use dol_schema::prelude::*;
 //! ```
 
-pub use crate::{
-    DataType, Entity, EntityConstraint, Field, RefAction, RelationRef, ComputedKind,
-};
+pub use crate::{ComputedKind, DataType, Entity, EntityConstraint, Field, RefAction, RelationRef};

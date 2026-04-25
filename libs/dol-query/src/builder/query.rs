@@ -366,11 +366,9 @@ impl<'a> GetBuilder<'a> {
     /// When no projections have been set (via `.fields()`, `.field()`,
     /// etc.), all entity fields are selected by default.
     pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
-        use dol_expr::lower::{lower_expr, lower_filters, lower_order_by};
-        use dol_expr::expr::{
-            BinOp, ExprNode, JoinNode, JoinType as ArenaJoinType, QueryNode,
-        };
+        use dol_expr::expr::{BinOp, ExprNode, JoinNode, JoinType as ArenaJoinType, QueryNode};
         use dol_expr::ids::NULL_NODE;
+        use dol_expr::lower::{lower_expr, lower_filters, lower_order_by};
         use smallvec::SmallVec;
 
         let mut arena = dol_expr::ExprArena::new();
@@ -565,10 +563,7 @@ pub(crate) fn count_single_expr_params(expr: &Expr<'static>) -> usize {
 
         Expr::Alias { expr, .. } => count_single_expr_params(expr),
 
-        Expr::Field { base, .. } => base
-            .as_deref()
-            .map(count_single_expr_params)
-            .unwrap_or(0),
+        Expr::Field { base, .. } => base.as_deref().map(count_single_expr_params).unwrap_or(0),
 
         Expr::Object(fields) => fields
             .iter()

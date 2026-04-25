@@ -24,9 +24,7 @@ fn constrained_model() -> Entity {
     Entity::new(
         "orders",
         vec![
-            Field::new("id", DataType::Int32)
-                .identity()
-                .auto_assign(),
+            Field::new("id", DataType::Int32).identity().auto_assign(),
             Field::new("user_id", DataType::Uuid),
             Field::new("product", DataType::unbounded_string()),
         ],
@@ -276,7 +274,8 @@ fn field_generated_stored() {
 
 #[test]
 fn field_generated_virtual() {
-    let f = Field::new("full_name", DataType::unbounded_string()).generated_virtual("first || ' ' || last");
+    let f = Field::new("full_name", DataType::unbounded_string())
+        .generated_virtual("first || ' ' || last");
     let (kind, expr) = f.generated.as_ref().unwrap();
     assert_eq!(*kind, ComputedKind::OnDemand);
     assert_eq!(&**expr, "first || ' ' || last");
@@ -294,9 +293,7 @@ fn field_index_hint() {
 
 #[test]
 fn field_auto_increment() {
-    let f = Field::new("id", DataType::Int32)
-        .auto_assign()
-        .identity();
+    let f = Field::new("id", DataType::Int32).auto_assign().identity();
     assert!(f.auto_assign);
     assert!(f.identity);
     assert_eq!(f.data_type, DataType::Int32);
@@ -350,12 +347,7 @@ fn model_constraint_unique() {
 
 #[test]
 fn model_constraint_foreign_key() {
-    let c = EntityConstraint::relation(
-        ["user_id"],
-        "users",
-        ["id"],
-        RefAction::Cascade,
-    );
+    let c = EntityConstraint::relation(["user_id"], "users", ["id"], RefAction::Cascade);
     if let EntityConstraint::Relation {
         fields,
         ref_entity,

@@ -82,13 +82,16 @@ impl UpdateQuery {
     /// Returns `(Statement, ExprArena, Interner)` — the arena and interner
     /// are needed by renderers to resolve expression references.
     pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
-        use dol_expr::lower::{lower_expr, lower_filters};
         use dol_expr::expr::{ExprNode, UpdateNode};
+        use dol_expr::lower::{lower_expr, lower_filters};
 
         let mut arena = dol_expr::ExprArena::new();
         let mut interner = dol_expr::Interner::new();
 
-        let target = interner.intern(&dol_expr::lower::qualified_name(&self.name, &self.namespace));
+        let target = interner.intern(&dol_expr::lower::qualified_name(
+            &self.name,
+            &self.namespace,
+        ));
 
         let mut columns = smallvec::SmallVec::new();
         let mut values = smallvec::SmallVec::new();

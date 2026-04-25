@@ -30,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed backend crates: `dol-sql`, `dol-kv`, `dol-objects`, `dol-spreadsheet`
 - Removed auxiliary crates: `dol-migration`, `dol-config`
-- Removed deprecated crates: `dol-core`, `dol-builder`, `dol` (facade)
+- Removed deprecated crates: `dol-core`, `dol-builder`
 - Removed unused workspace dependencies: `serde_norway`, `toml_crate`, `tokio`
 - Stale `crates/` directory (duplicate Cargo.toml stubs with broken `serde_yaml` refs)
 - Irrelevant `docker.yml` workflow (referenced non-existent `idp-host`/`edge-oidc` binaries)

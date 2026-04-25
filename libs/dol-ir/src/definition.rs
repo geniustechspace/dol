@@ -4,7 +4,7 @@
 //! types (`dol_schema::EntityConstraint`, `dol_schema::RelationRef`)
 //! directly — there is no longer a borrowed/owned mirror split.
 
-use dol_schema::{EntityConstraint, RelationRef, ComputedKind};
+use dol_schema::{ComputedKind, EntityConstraint, RelationRef};
 use dol_types::DataType;
 
 use crate::entity_ref::EntityRef;

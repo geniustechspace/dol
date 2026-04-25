@@ -129,10 +129,7 @@ pub fn coalesce<'a>(args: Vec<Expr<'a>>) -> Expr<'a> {
 }
 
 pub fn nullif<'a>(expr1: impl Into<Expr<'a>>, expr2: impl Into<Expr<'a>>) -> Expr<'a> {
-    known_def(
-        registry::Nullif::def(),
-        vec![expr1.into(), expr2.into()],
-    )
+    known_def(registry::Nullif::def(), vec![expr1.into(), expr2.into()])
 }
 
 // ---------------------------------------------------------------------------
@@ -234,17 +231,11 @@ pub fn least<'a>(args: Vec<Expr<'a>>) -> Expr<'a> {
 // ---------------------------------------------------------------------------
 
 pub fn json_get<'a>(doc: impl Into<Expr<'a>>, key: impl Into<Expr<'a>>) -> Expr<'a> {
-    known_def(
-        registry::JsonGet::def(),
-        vec![doc.into(), key.into()],
-    )
+    known_def(registry::JsonGet::def(), vec![doc.into(), key.into()])
 }
 
 pub fn json_has_key<'a>(doc: impl Into<Expr<'a>>, key: impl Into<Expr<'a>>) -> Expr<'a> {
-    known_def(
-        registry::JsonHasKey::def(),
-        vec![doc.into(), key.into()],
-    )
+    known_def(registry::JsonHasKey::def(), vec![doc.into(), key.into()])
 }
 
 // ---------------------------------------------------------------------------
@@ -252,17 +243,11 @@ pub fn json_has_key<'a>(doc: impl Into<Expr<'a>>, key: impl Into<Expr<'a>>) -> E
 // ---------------------------------------------------------------------------
 
 pub fn array_append<'a>(arr: impl Into<Expr<'a>>, elem: impl Into<Expr<'a>>) -> Expr<'a> {
-    known_def(
-        registry::ArrayAppend::def(),
-        vec![arr.into(), elem.into()],
-    )
+    known_def(registry::ArrayAppend::def(), vec![arr.into(), elem.into()])
 }
 
 pub fn array_prepend<'a>(elem: impl Into<Expr<'a>>, arr: impl Into<Expr<'a>>) -> Expr<'a> {
-    known_def(
-        registry::ArrayPrepend::def(),
-        vec![elem.into(), arr.into()],
-    )
+    known_def(registry::ArrayPrepend::def(), vec![elem.into(), arr.into()])
 }
 
 pub fn array_length<'a>(arr: impl Into<Expr<'a>>) -> Expr<'a> {
@@ -278,8 +263,5 @@ pub fn unnest<'a>(arr: impl Into<Expr<'a>>) -> Expr<'a> {
 // ---------------------------------------------------------------------------
 
 pub fn st_distance<'a>(a: impl Into<Expr<'a>>, b: impl Into<Expr<'a>>) -> Expr<'a> {
-    known_def(
-        registry::StDistance::def(),
-        vec![a.into(), b.into()],
-    )
+    known_def(registry::StDistance::def(), vec![a.into(), b.into()])
 }

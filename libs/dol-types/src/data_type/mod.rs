@@ -231,10 +231,7 @@ impl DataType {
     }
 
     pub const fn is_textual(&self) -> bool {
-        matches!(
-            self,
-            Self::String { .. } | Self::Json | Self::Xml
-        )
+        matches!(self, Self::String { .. } | Self::Json | Self::Xml)
     }
 
     pub const fn is_binary(&self) -> bool {
@@ -762,7 +759,6 @@ impl DataType {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {

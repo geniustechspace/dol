@@ -12,8 +12,10 @@ use crate::transaction::Transaction;
 /// Variants are split into three groups:
 /// - **DML** (arena-based): `Query`, `Insert`, `Update`, `Delete`, `Upsert` — contain
 ///   [`dol_expr`] arena IDs and require an [`ExprArena`] + [`Interner`] for rendering.
-/// - **DDL / control / storage / transaction**: contain only owned data; renderable
-///   without an arena.
+/// - **DDL / control / storage / transaction**: mostly owned data, but some control
+///   and storage variants can also contain expression arena IDs (for example,
+///   `DefinePolicy` or storage sources derived from expressions) and may therefore
+///   require an [`ExprArena`] + [`Interner`] for rendering.
 /// - **Raw**: an escape hatch for pre-built SQL / KV / other backend strings.
 ///
 /// [`ExprArena`]: dol_expr::arena::ExprArena

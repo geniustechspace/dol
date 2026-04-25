@@ -8,7 +8,7 @@
 
 use std::sync::Arc;
 
-use super::constraint::{RefAction, RelationRef, ComputedKind};
+use super::constraint::{ComputedKind, RefAction, RelationRef};
 pub use dol_types::DataType;
 
 /// A field definition within an entity.

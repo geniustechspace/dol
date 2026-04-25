@@ -53,13 +53,16 @@ impl DeleteQuery {
     /// Returns `(Statement, ExprArena, Interner)` — the arena and interner
     /// are needed by renderers to resolve expression references.
     pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
-        use dol_expr::lower::lower_filters;
         use dol_expr::expr::{DeleteNode, ExprNode};
+        use dol_expr::lower::lower_filters;
 
         let mut arena = dol_expr::ExprArena::new();
         let mut interner = dol_expr::Interner::new();
 
-        let target = interner.intern(&dol_expr::lower::qualified_name(&self.name, &self.namespace));
+        let target = interner.intern(&dol_expr::lower::qualified_name(
+            &self.name,
+            &self.namespace,
+        ));
         let filter = lower_filters(&self.filters, &mut arena, &mut interner);
 
         let returning: smallvec::SmallVec<[u32; 4]> = self

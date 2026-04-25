@@ -102,9 +102,7 @@ fn entity_round_trip_with_namespace_and_constraints() {
     let e = Entity::new(
         "orders",
         vec![
-            Field::new("id", DataType::Int64)
-                .identity()
-                .auto_assign(),
+            Field::new("id", DataType::Int64).identity().auto_assign(),
             Field::new("user_id", DataType::Uuid),
             Field::new("product", DataType::unbounded_string()),
         ],

@@ -19,7 +19,7 @@ pub mod field;
 pub mod field_type;
 pub mod prelude;
 
-pub use constraint::{EntityConstraint, RefAction, RelationRef, ComputedKind};
+pub use constraint::{ComputedKind, EntityConstraint, RefAction, RelationRef};
 pub use field::Field;
 pub use field_type::DataType;
 

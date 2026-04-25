@@ -126,7 +126,10 @@ impl UpsertQuery {
             self.fields
         };
 
-        let target = interner.intern(&dol_expr::lower::qualified_name(&self.name, &self.namespace));
+        let target = interner.intern(&dol_expr::lower::qualified_name(
+            &self.name,
+            &self.namespace,
+        ));
         let columns: smallvec::SmallVec<[u32; 8]> =
             fields.iter().map(|f| interner.intern(f)).collect();
 

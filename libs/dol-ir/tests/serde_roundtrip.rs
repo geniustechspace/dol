@@ -1,7 +1,7 @@
 //! Round-trip serde tests for `dol-ir` owned (non-arena) types.
 //!
-//! Verifies that the DDL, storage, transaction, and control variants
-//! survive a JSON encode → decode cycle.
+//! Verifies that representative owned definition, constraint, and
+//! reference types survive a JSON encode → decode cycle.
 
 #![cfg(feature = "serde")]
 
@@ -37,9 +37,7 @@ fn field_def_round_trip() {
         .identity()
         .default("gen_random_uuid()")
         .comment("primary key")
-        .references(
-            RelationRef::new("users", "id").on_delete(RefAction::Cascade),
-        );
+        .references(RelationRef::new("users", "id").on_delete(RefAction::Cascade));
     assert_eq!(fd, round_trip(&fd));
 }
 
@@ -70,9 +68,7 @@ fn define_entity_round_trip() {
             FieldDef::new("id", DataType::Uuid).identity(),
             FieldDef::new("email", DataType::unbounded_string()).unique(),
         ],
-        constraints: vec![EntityConstraint::Unique(vec![
-            "email".into(),
-        ])],
+        constraints: vec![EntityConstraint::Unique(vec!["email".into()])],
         if_not_exists: true,
     };
     assert_eq!(de, round_trip(&de));

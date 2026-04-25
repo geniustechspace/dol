@@ -93,8 +93,8 @@ pub mod ddl;
 pub mod prelude;
 
 pub use ddl::{
-    AlterEntityBuilder, CreateFromMeta, DefineEntityBuilder, DefineLookupBuilder, DefineTypeBuilder,
-    DropEntityBuilder, DropLookupBuilder, DropTypeBuilder, EntityDefineExt,
+    AlterEntityBuilder, CreateFromMeta, DefineEntityBuilder, DefineLookupBuilder,
+    DefineTypeBuilder, DropEntityBuilder, DropLookupBuilder, DropTypeBuilder, EntityDefineExt,
 };
 
 pub use delete::DeleteQuery;

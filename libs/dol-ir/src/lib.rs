@@ -20,11 +20,11 @@ pub mod transaction;
 
 /// Schema constraint types — re-exported from `dol-schema`, the canonical home.
 pub mod constraint {
-    pub use dol_schema::constraint::{EntityConstraint, RefAction, RelationRef, ComputedKind};
+    pub use dol_schema::constraint::{ComputedKind, EntityConstraint, RefAction, RelationRef};
 }
 
 pub use backend::{Backend, BackendError};
-pub use constraint::{EntityConstraint, RefAction, RelationRef, ComputedKind};
+pub use constraint::{ComputedKind, EntityConstraint, RefAction, RelationRef};
 pub use control::{DefinePolicy, Grant, PolicyAction, Privilege, Revoke};
 pub use definition::{
     AlterAction, AlterEntity, DefineEntity, DefineLookup, DefineType, DropEntity, DropLookup,

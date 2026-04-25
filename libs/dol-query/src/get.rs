@@ -316,15 +316,18 @@ impl GetQuery {
     /// When no projections have been set and Entity field metadata is
     /// available, all entity fields are selected by default.
     pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
-        use dol_expr::lower::{lower_expr, lower_exprs, lower_filters, lower_order_by};
         use dol_expr::expr::{ExprNode, JoinNode, JoinType as ArenaJoinType, QueryNode};
         use dol_expr::ids::NULL_NODE;
+        use dol_expr::lower::{lower_expr, lower_exprs, lower_filters, lower_order_by};
         use smallvec::SmallVec;
 
         let mut arena = dol_expr::ExprArena::new();
         let mut interner = dol_expr::Interner::new();
 
-        let from = interner.intern(&dol_expr::lower::qualified_name(&self.name, &self.namespace));
+        let from = interner.intern(&dol_expr::lower::qualified_name(
+            &self.name,
+            &self.namespace,
+        ));
         let alias = self.table_alias.as_deref().map(|a| interner.intern(a));
 
         // Default projections.
