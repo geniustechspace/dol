@@ -180,3 +180,43 @@ impl<'a> DefinePolicyBuilder<'a> {
         dol_ir::Program::new(dol_ir::Statement::DefinePolicy(policy), arena, interner)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use dol_expr::tree::bool_expr;
+
+    #[test]
+    fn define_policy_build_lowers_using_and_check_exprs() {
+        let program = DefinePolicyBuilder::new("tenant_isolation")
+            .on("accounts")
+            .for_action(PolicyAction::Read)
+            .using(bool_expr(true))
+            .check(bool_expr(false))
+            .build();
+
+        let policy = match &program.stmt {
+            dol_ir::Statement::DefinePolicy(policy) => policy,
+            stmt => panic!("expected Statement::DefinePolicy, got {stmt:?}"),
+        };
+
+        assert_eq!(policy.name, "tenant_isolation");
+        assert_eq!(policy.on_model, "accounts");
+        assert_eq!(policy.action, PolicyAction::Read);
+        assert!(
+            policy.using_expr.is_some(),
+            "expected using_expr to be lowered into a NodeId"
+        );
+        assert!(
+            policy.check_expr.is_some(),
+            "expected check_expr to be lowered into a NodeId"
+        );
+
+        let rendered_once = format!("{:?}", &program.stmt);
+        let rendered_twice = format!("{:?}", &program.stmt);
+        assert_eq!(rendered_once, rendered_twice);
+        assert!(rendered_once.contains("DefinePolicy"));
+        assert!(rendered_once.contains("using_expr: Some("));
+        assert!(rendered_once.contains("check_expr: Some("));
+    }
+}

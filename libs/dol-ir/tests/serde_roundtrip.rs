@@ -123,7 +123,7 @@ fn drop_entity_round_trip() {
 }
 
 #[test]
-fn define_index_round_trip() {
+fn define_lookup_round_trip() {
     let i = DefineLookup {
         name: "idx_email".into(),
         target: EntityRef {
@@ -142,7 +142,7 @@ fn define_index_round_trip() {
 }
 
 #[test]
-fn drop_index_round_trip() {
+fn drop_lookup_round_trip() {
     let d = DropLookup {
         name: "idx_email".into(),
         if_exists: true,
@@ -153,7 +153,7 @@ fn drop_index_round_trip() {
 }
 
 #[test]
-fn index_method_round_trip() {
+fn lookup_method_round_trip() {
     for m in [
         LookupMethod::Ordered,
         LookupMethod::Equality,
