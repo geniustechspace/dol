@@ -10,11 +10,11 @@ mod literal;
 
 pub use literal::*;
 
+use alloc::boxed::Box;
+use alloc::string::String;
+use alloc::vec::Vec;
 use core::fmt;
-use std::ops::Bound;
-
-#[cfg(test)]
-use std::borrow::Cow;
+use core::ops::Bound;
 
 use super::binary::BitString;
 use super::datetime::{Date, DateTime, Interval, Time, TimestampTz};
@@ -703,7 +703,8 @@ impl From<Point> for Value {
 mod tests {
     use super::super::geo::Point;
     use super::*;
-    use std::mem::size_of;
+    use alloc::borrow::Cow;
+    use core::mem::size_of;
 
     #[test]
     fn value_size_is_exactly_24_bytes() {
@@ -729,7 +730,7 @@ mod tests {
     fn xml_is_distinct_from_string() {
         let s = Literal::string_borrowed("<a/>");
         let x = Literal::xml_borrowed("<a/>");
-        assert_ne!(std::mem::discriminant(&s), std::mem::discriminant(&x));
+        assert_ne!(core::mem::discriminant(&s), core::mem::discriminant(&x));
         assert_eq!(x.as_str(), Some("<a/>"));
     }
 
@@ -786,7 +787,7 @@ mod tests {
     fn set_is_distinct_from_array() {
         let arr = Literal::array(vec![Literal::from(1i32)]);
         let set = Literal::set(vec![Literal::from(1i32)]);
-        assert_ne!(std::mem::discriminant(&arr), std::mem::discriminant(&set));
+        assert_ne!(core::mem::discriminant(&arr), core::mem::discriminant(&set));
         assert_eq!(set.to_string(), "set[1i32]");
     }
 
@@ -800,7 +801,7 @@ mod tests {
     fn struct_is_distinct_from_map() {
         let m = Literal::map(vec![(Cow::Borrowed("k"), Literal::from(1i32))]);
         let s = Literal::struct_value(vec![(Cow::Borrowed("k"), Literal::from(1i32))]);
-        assert_ne!(std::mem::discriminant(&m), std::mem::discriminant(&s));
+        assert_ne!(core::mem::discriminant(&m), core::mem::discriminant(&s));
         assert!(s.to_string().starts_with("struct{"));
     }
 

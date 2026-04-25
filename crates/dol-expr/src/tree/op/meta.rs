@@ -1,5 +1,7 @@
 //! Operator metadata and traits for well-known DOL operators.
 
+use alloc::boxed::Box;
+
 use core::fmt;
 
 use super::super::compact_name::CompactName;

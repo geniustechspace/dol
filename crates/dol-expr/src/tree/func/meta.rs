@@ -1,7 +1,10 @@
 //! Function metadata and traits for well-known DOL functions.
 
+use alloc::borrow::Cow;
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::string::{String, ToString};
 use core::fmt;
-use std::borrow::Cow;
 
 use super::super::compact_name::CompactName;
 

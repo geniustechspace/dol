@@ -247,7 +247,7 @@ pub enum ExprNode {
 
 #[cfg(test)]
 mod size_tests {
-    use std::mem::size_of;
+    use core::mem::size_of;
 
     use super::ExprNode;
     use crate::types::value::{Literal, Value};

@@ -1,5 +1,7 @@
 //! Window function builders and frame specifications.
 
+use alloc::{boxed::Box, vec::Vec};
+
 use super::Expr;
 use super::order::OrderByExpr;
 

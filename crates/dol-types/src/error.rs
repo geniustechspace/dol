@@ -1,5 +1,6 @@
 //! Errors produced by type construction, validation, and conformance checks.
 
+use alloc::boxed::Box;
 use core::fmt;
 
 /// All errors that can arise from the DOL type layer.
@@ -184,8 +185,8 @@ impl fmt::Display for TypeError {
     }
 }
 
-impl std::error::Error for TypeError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl core::error::Error for TypeError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
             Self::ElementInvalid { source, .. }
             | Self::MapValueInvalid { source, .. }

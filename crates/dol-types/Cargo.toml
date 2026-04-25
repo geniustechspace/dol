@@ -10,11 +10,16 @@ readme = "README.md"
 serde = { workspace = true, optional = true }
 
 [features]
-# `serde` is on by default: this is a leaf primitive crate, the cost is
-# negligible, and downstream consumers almost always want round-tripping.
-# Embedded users can opt out with `default-features = false`.
-default = ["serde"]
+# `serde` and `std` are on by default. The crate is `no_std + alloc`-clean
+# when both are disabled, suitable for embedded targets that cannot link
+# `std`. Embedded users opt out with `default-features = false`.
+default = ["std", "serde"]
 serde = ["dep:serde"]
+# Enables the wall-clock factory helpers (`datetime::today`, `datetime::now`,
+# `datetime::now_tz`) that require `std::time::SystemTime`. The
+# `core::error::Error` impl on `TypeError` is always available
+# (stable since Rust 1.81).
+std = []
 
 [dev-dependencies]
 serde_json = { workspace = true }

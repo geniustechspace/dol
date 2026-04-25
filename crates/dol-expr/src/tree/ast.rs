@@ -1,5 +1,7 @@
 //! Expression AST definitions.
 
+use alloc::{boxed::Box, vec::Vec};
+
 use super::compact_name::CompactName;
 use super::func::meta::FuncDef;
 use super::literal::Literal;

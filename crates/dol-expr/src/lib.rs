@@ -8,16 +8,36 @@
 //! - **`ExprNode`** — A flat, arena-based node (≤ 32 bytes) for efficient
 //!   storage and backend processing. Tree expressions are lowered into this
 //!   form before rendering.
+//!
+//! # Cargo features
+//!
+//! | feature | default | effect                                                                          |
+//! | ------- | :-----: | ------------------------------------------------------------------------------- |
+//! | `std`   |         | Forwards `std` to `dol-types`. Disable for `no_std + alloc` targets (default).  |
+//! | `serde` |         | `Serialize` / `Deserialize` for every AST/arena type and `Interner`.            |
+//!
+//! Building with the default feature set already produces a `no_std + alloc`
+//! library suitable for embedded targets.
 
+#![cfg_attr(not(feature = "std"), no_std)]
 #![deny(unsafe_code)]
+#![warn(missing_docs)]
 
+extern crate alloc;
+
+#[allow(missing_docs)] // tracking: docs follow-up
 pub mod arena;
+#[allow(missing_docs)] // tracking: docs follow-up
 pub mod expr;
 pub mod ids;
+#[allow(missing_docs)] // tracking: docs follow-up
 pub mod interner;
+#[allow(missing_docs)] // tracking: docs follow-up
 pub mod lower;
 pub mod prelude;
+#[allow(missing_docs)] // tracking: docs follow-up
 pub mod session;
+#[allow(missing_docs)] // tracking: docs follow-up
 pub mod tree;
 pub mod types;
 

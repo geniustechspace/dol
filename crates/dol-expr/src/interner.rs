@@ -1,5 +1,6 @@
-use std::collections::HashMap;
-use std::sync::Arc;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
+use hashbrown::HashMap;
 
 use crate::ids::StrId;
 

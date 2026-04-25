@@ -1,4 +1,6 @@
 use super::{super::error::TypeError, Point};
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 use core::fmt;
 
 /// An axis-aligned 2D rectangle defined by two corners.

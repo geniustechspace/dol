@@ -1,6 +1,8 @@
 //! Fixed-point decimal type.
 
 use super::error::TypeError;
+use alloc::format;
+use alloc::string::ToString;
 use core::fmt;
 
 /// Fixed-point decimal: `real = unscaled × 10^−scale`.

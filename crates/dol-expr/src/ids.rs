@@ -1,3 +1,9 @@
+//! Typed identifier newtypes used throughout the expression IR.
+//!
+//! Each `*Id` is a 32-bit index into a specific arena pool — never a raw
+//! pointer or borrowed reference. Tagging IDs by purpose prevents accidental
+//! cross-pool aliasing while preserving the cache-friendly representation.
+
 /// Index into ExprArena::nodes — never a pointer.
 pub type NodeId = u32;
 /// Index into Interner::strings — never a &str in AST nodes.

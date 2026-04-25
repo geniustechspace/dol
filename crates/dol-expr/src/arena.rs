@@ -1,3 +1,5 @@
+use alloc::{vec::Vec};
+
 use smallvec::SmallVec;
 
 use crate::expr::{DeleteNode, ExprNode, InsertNode, Order, QueryNode, UpdateNode, UpsertNode};

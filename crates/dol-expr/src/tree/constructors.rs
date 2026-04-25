@@ -1,5 +1,7 @@
 //! Free constructors and coercion traits for the expression DSL.
 
+use alloc::{boxed::Box, vec::Vec};
+
 use super::ast::Expr;
 use super::compact_name::CompactName;
 use super::literal::Literal;
@@ -93,7 +95,7 @@ pub fn null<'a>() -> Expr<'a> {
 }
 
 /// Create a string literal.
-pub fn string<'a>(v: impl Into<std::borrow::Cow<'a, str>>) -> Expr<'a> {
+pub fn string<'a>(v: impl Into<alloc::borrow::Cow<'a, str>>) -> Expr<'a> {
     Expr::Value(Literal::String(v.into()))
 }
 

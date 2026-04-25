@@ -1,4 +1,5 @@
 use super::super::error::TypeError;
+use alloc::format;
 use core::fmt;
 
 /// A time of day (no date, no timezone). Nanosecond precision.

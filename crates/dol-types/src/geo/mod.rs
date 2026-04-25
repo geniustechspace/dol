@@ -23,6 +23,8 @@ pub use shape::{Circle, Path, Polygon, Rect};
 
 use super::error::TypeError;
 use super::value::Value;
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 
 // ─── Factory functions ────────────────────────────────────────────────────────
 

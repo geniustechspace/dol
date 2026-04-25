@@ -33,16 +33,23 @@ pub use timestamp::{Offset, TimestampTz};
 
 use super::error::TypeError;
 use super::value::Value;
+use alloc::boxed::Box;
 
 // ─── Factory functions ────────────────────────────────────────────────────────
 
 /// Returns today's UTC date as `Value::Date`.
+///
+/// Requires the `std` Cargo feature (uses [`std::time::SystemTime`]).
+#[cfg(feature = "std")]
 pub fn today() -> Value {
     let (year, month, day) = utc_date_parts();
     Value::Date(Date::new_unchecked(year, month, day))
 }
 
 /// Returns the current UTC datetime (no timezone) as `Value::DateTime`.
+///
+/// Requires the `std` Cargo feature (uses [`std::time::SystemTime`]).
+#[cfg(feature = "std")]
 pub fn now() -> Value {
     let (year, month, day, hour, minute, second, nano) = utc_datetime_parts();
     let date = Date::new_unchecked(year, month, day);
@@ -51,6 +58,9 @@ pub fn now() -> Value {
 }
 
 /// Returns the current UTC datetime with UTC offset as `Value::TimestampTz`.
+///
+/// Requires the `std` Cargo feature (uses [`std::time::SystemTime`]).
+#[cfg(feature = "std")]
 pub fn now_tz() -> Value {
     let (year, month, day, hour, minute, second, nano) = utc_datetime_parts();
     let date = Date::new_unchecked(year, month, day);
@@ -95,6 +105,7 @@ pub fn interval_nanos(nanos: i64) -> Value {
 /// `(year, month, day)` using the proleptic Gregorian civil calendar.
 ///
 /// Algorithm by Howard Hinnant (public domain).
+#[cfg(feature = "std")]
 fn days_to_ymd(z: i64) -> (i32, u8, u8) {
     let z = z + 719_468;
     let era: i64 = if z >= 0 { z } else { z - 146_096 } / 146_097;
@@ -109,6 +120,7 @@ fn days_to_ymd(z: i64) -> (i32, u8, u8) {
     (y as i32, m as u8, d as u8)
 }
 
+#[cfg(feature = "std")]
 fn utc_date_parts() -> (i32, u8, u8) {
     let duration = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -117,6 +129,7 @@ fn utc_date_parts() -> (i32, u8, u8) {
     days_to_ymd(days)
 }
 
+#[cfg(feature = "std")]
 fn utc_datetime_parts() -> (i32, u8, u8, u8, u8, u8, u32) {
     let duration = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

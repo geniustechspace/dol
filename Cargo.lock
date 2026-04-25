@@ -123,6 +123,7 @@ name = "dol-expr"
 version = "0.1.0"
 dependencies = [
  "dol-types",
+ "hashbrown",
  "serde",
  "serde_json",
  "smallvec",

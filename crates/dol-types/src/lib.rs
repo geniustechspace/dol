@@ -27,17 +27,43 @@
 //! ```
 //!
 //! These are enforced by tests in [`value`] and must not regress.
+//!
+//! # Cargo features
+//!
+//! | feature | default | effect                                                                            |
+//! | ------- | :-----: | --------------------------------------------------------------------------------- |
+//! | `std`   |   ✓     | Enables `std::error::Error` for [`TypeError`] and the wall-clock factory helpers ([`datetime::today`], [`datetime::now`], [`datetime::now_tz`]). Disable for `no_std + alloc` targets. |
+//! | `serde` |   ✓     | `Serialize` / `Deserialize` for every public type.                                |
+//!
+//! Building with `--no-default-features` yields a `no_std + alloc` library
+//! suitable for embedded targets that cannot link `std`.
 
+#![cfg_attr(not(feature = "std"), no_std)]
 #![deny(unsafe_code)]
+#![warn(missing_docs)]
+// TODO(docs): chip away at the missing-docs allowlist below. Each entry
+// represents a module whose public API surface still needs rustdoc coverage.
+// The crate-level `#![warn(missing_docs)]` guarantees no new undocumented
+// public items will appear.
 
+extern crate alloc;
+
+#[allow(missing_docs)] // tracking: docs follow-up
 pub mod binary;
+#[allow(missing_docs)] // tracking: docs follow-up
 pub mod data_type;
+#[allow(missing_docs)] // tracking: docs follow-up
 pub mod datetime;
+#[allow(missing_docs)] // tracking: docs follow-up
 pub mod error;
+#[allow(missing_docs)] // tracking: docs follow-up
 pub mod geo;
+#[allow(missing_docs)] // tracking: docs follow-up
 pub mod network;
+#[allow(missing_docs)] // tracking: docs follow-up
 pub mod numeric;
 pub mod prelude;
+#[allow(missing_docs)] // tracking: docs follow-up
 pub mod value;
 
 /// Compatibility re-export — the old `descriptor` module has moved to [`data_type`].

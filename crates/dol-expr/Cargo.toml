@@ -7,12 +7,20 @@ description = "DOL expression AST, type system, arena, and interner (internal)"
 readme = "README.md"
 
 [dependencies]
-dol-types = { workspace = true }
+# Hand-rolled (not `workspace = true`) so we can opt out of `dol-types`'s
+# default features and stay `no_std + alloc`-clean. The version/path mirror
+# the workspace dep.
+dol-types = { path = "../dol-types", default-features = false }
+hashbrown = { workspace = true }
 smallvec = { workspace = true }
 serde    = { workspace = true, optional = true }
 
 [features]
+# `default = []` keeps the crate `no_std + alloc`-clean for embedded
+# consumers. Enable `std` to get `core::error::Error` impls (where added
+# upstream) and any future std-dependent helpers.
 default = []
+std = ["dol-types/std"]
 serde = ["dep:serde", "dol-types/serde", "smallvec/serde"]
 
 [dev-dependencies]

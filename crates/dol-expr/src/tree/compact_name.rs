@@ -1,5 +1,7 @@
 //! Shared compact name storage for well-known and custom function/operator names.
 
+use alloc::{boxed::Box, string::String};
+
 use core::fmt;
 
 /// A name that's either a static string (well-known, zero-alloc) or an owned
@@ -41,8 +43,8 @@ impl PartialEq for CompactName {
 
 impl Eq for CompactName {}
 
-impl std::hash::Hash for CompactName {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+impl core::hash::Hash for CompactName {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.as_str().hash(state);
     }
 }

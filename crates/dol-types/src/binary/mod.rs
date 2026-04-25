@@ -1,6 +1,8 @@
 //! Bit-string type.
 
 use super::error::TypeError;
+use alloc::boxed::Box;
+use alloc::vec;
 use core::fmt;
 
 /// A packed bit string with an explicit bit count.

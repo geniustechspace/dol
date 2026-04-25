@@ -5,6 +5,8 @@
 //! lifetime-parameterised `Expr<'a>`) and the arena-based IR used by
 //! `dol-ir::Statement`.
 
+use alloc::{format, string::{String, ToString}, vec::Vec};
+
 use crate::arena::{ExprArena, FieldNode, FuncNode, InListNode, ObjLitNode};
 use crate::expr::{BinOp, ExprNode, Order, UnaryOp as ArenaUnaryOp};
 use crate::ids::{NULL_NODE, NodeId};

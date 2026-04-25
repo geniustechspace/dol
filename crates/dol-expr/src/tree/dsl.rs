@@ -1,6 +1,8 @@
 //! Fluent `Expr` methods and operator overloads.
 
-use std::ops as std_ops;
+use alloc::{boxed::Box, vec::Vec};
+
+use core::ops as std_ops;
 
 use super::ast::Expr;
 use super::compact_name::CompactName;

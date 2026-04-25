@@ -23,13 +23,16 @@
 //!
 //! # No `Display`
 //!
-//! `DataType` deliberately does **not** implement [`std::fmt::Display`].
+//! `DataType` deliberately does **not** implement [`core::fmt::Display`].
 //! Backend-specific spellings (e.g. `VARCHAR(255)`, `String`, `text`) live
 //! in the corresponding backend crate. For human-readable diagnostics, use
 //! the auto-derived [`Debug`] impl or [`DataType::type_name`].
 
 use super::{TypeError, Value};
-use std::ops::Bound;
+use alloc::boxed::Box;
+use alloc::string::ToString;
+use alloc::vec::Vec;
+use core::ops::Bound;
 
 // ─── StructField ─────────────────────────────────────────────────────────────
 

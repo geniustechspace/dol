@@ -4,9 +4,12 @@
 //! expression AST. It is kept in a sibling file to keep `value/mod.rs`
 //! focused on the runtime [`Value`] enum and its `From` impls.
 
+use alloc::borrow::Cow;
+use alloc::boxed::Box;
+use alloc::string::String;
+use alloc::vec::Vec;
 use core::fmt;
-use std::borrow::Cow;
-use std::ops::Bound;
+use core::ops::Bound;
 
 use super::super::binary::BitString;
 use super::super::datetime::{Date, DateTime, Interval, Offset, Time, TimestampTz};

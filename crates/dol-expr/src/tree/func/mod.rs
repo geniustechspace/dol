@@ -5,6 +5,8 @@
 //! - [`meta`]     — function metadata: signatures, arity, kind
 //! - [`registry`] — built-in function registry
 
+use alloc::{vec, vec::Vec};
+
 pub mod def;
 pub mod meta;
 pub mod registry;
