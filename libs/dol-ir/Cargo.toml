@@ -1,0 +1,20 @@
+[package]
+name = "dol-ir"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "DOL IR — complete Statement enum and Backend trait"
+
+[dependencies]
+dol-expr   = { workspace = true }
+dol-schema = { workspace = true }
+dol-types  = { workspace = true }
+smallvec   = { workspace = true }
+serde      = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[features]
+default = []
+serde = ["dep:serde", "dol-schema/serde", "dol-types/serde"]

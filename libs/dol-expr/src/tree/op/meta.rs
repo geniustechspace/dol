@@ -1,0 +1,154 @@
+//! Operator metadata and traits for well-known DOL operators.
+
+use core::fmt;
+
+use super::super::compact_name::CompactName;
+
+/// Classification of a DOL binary operator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum OpKind {
+    /// Comparison operators: `=`, `!=`, `<`, `>`, `<=`, `>=`.
+    Comparison,
+    /// Null-safe comparison: `IS DISTINCT FROM`, `IS NOT DISTINCT FROM`.
+    NullSafe,
+    /// Arithmetic operators: `+`, `-`, `*`, `/`, `%`.
+    Arithmetic,
+    /// Logical operators: `AND`, `OR`.
+    Logical,
+    /// Pattern matching operators: `LIKE`, `ILIKE`, `SIMILAR TO`, `~`, `~*`, `GLOB`.
+    Pattern,
+    /// String operators: `||` (concatenation).
+    StringOp,
+    /// Bitwise operators: `&`, `|`, `^`, `<<`, `>>`.
+    Bitwise,
+    /// Collection containment operators: `@>`, `<@`, `&&`.
+    Collection,
+}
+
+/// A rich operator definition: name + kind.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct OpDef {
+    name: CompactName,
+    kind: OpKind,
+}
+
+impl OpDef {
+    /// Create a new operator definition (used by the `DolOp` trait).
+    pub const fn new_static(name: &'static str, kind: OpKind) -> Self {
+        Self {
+            name: CompactName::Static(name),
+            kind,
+        }
+    }
+
+    /// Create a custom operator definition.
+    pub fn custom(name: impl Into<Box<str>>, kind: OpKind) -> Self {
+        Self {
+            name: CompactName::Owned(name.into()),
+            kind,
+        }
+    }
+
+    /// Return the operator name.
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    /// Return the operator kind.
+    pub fn kind(&self) -> OpKind {
+        self.kind
+    }
+
+    // Comparison
+    pub const EQ: &str = "EQ";
+    pub const NE: &str = "NE";
+    pub const LT: &str = "LT";
+    pub const GT: &str = "GT";
+    pub const LE: &str = "LE";
+    pub const GE: &str = "GE";
+
+    // Null-safe comparison
+    pub const IS_DISTINCT_FROM: &str = "IS_DISTINCT_FROM";
+    pub const IS_NOT_DISTINCT_FROM: &str = "IS_NOT_DISTINCT_FROM";
+
+    // Arithmetic
+    pub const ADD: &str = "ADD";
+    pub const SUB: &str = "SUB";
+    pub const MUL: &str = "MUL";
+    pub const DIV: &str = "DIV";
+    pub const MOD: &str = "MOD";
+
+    // Logical
+    pub const AND: &str = "AND";
+    pub const OR: &str = "OR";
+
+    // Pattern
+    pub const LIKE: &str = "LIKE";
+    pub const ILIKE: &str = "ILIKE";
+    pub const SIMILAR_TO: &str = "SIMILAR_TO";
+    pub const REGEX_MATCH: &str = "REGEX_MATCH";
+    pub const REGEX_MATCH_INSENSITIVE: &str = "REGEX_MATCH_INSENSITIVE";
+    pub const GLOB: &str = "GLOB";
+
+    // String
+    pub const CONCAT: &str = "CONCAT";
+
+    // Bitwise
+    pub const BIT_AND: &str = "BIT_AND";
+    pub const BIT_OR: &str = "BIT_OR";
+    pub const BIT_XOR: &str = "BIT_XOR";
+    pub const SHIFT_LEFT: &str = "SHIFT_LEFT";
+    pub const SHIFT_RIGHT: &str = "SHIFT_RIGHT";
+
+    // Collection containment
+    pub const CONTAINS: &str = "CONTAINS";
+    pub const CONTAINED_BY: &str = "CONTAINED_BY";
+    pub const OVERLAP: &str = "OVERLAP";
+}
+
+impl fmt::Display for OpDef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.name())
+    }
+}
+
+impl PartialEq<&str> for OpDef {
+    fn eq(&self, other: &&str) -> bool {
+        self.name() == *other
+    }
+}
+
+impl PartialEq<OpDef> for &str {
+    fn eq(&self, other: &OpDef) -> bool {
+        *self == other.name()
+    }
+}
+
+/// Trait implemented by zero-sized structs representing well-known DOL operators.
+pub trait DolOp: Sized + 'static {
+    /// The canonical DOL name for this operator.
+    const NAME: &'static str;
+    /// The operator category.
+    const KIND: OpKind;
+
+    /// Build an [`OpDef`] from the trait constants.
+    fn def() -> OpDef {
+        OpDef::new_static(Self::NAME, Self::KIND)
+    }
+}
+
+/// Declare a zero-sized struct implementing [`DolOp`].
+#[macro_export]
+macro_rules! define_op {
+    ($struct_name:ident, $name:expr, $kind:expr) => {
+        #[derive(Debug, Clone, Copy)]
+        pub struct $struct_name;
+
+        impl $crate::tree::op::meta::DolOp for $struct_name {
+            const NAME: &'static str = $name;
+            const KIND: $crate::tree::op::meta::OpKind = $kind;
+        }
+    };
+}

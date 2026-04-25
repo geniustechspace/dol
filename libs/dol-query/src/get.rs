@@ -3,8 +3,10 @@
 //! Mirrors `dol-builder::GetBuilder` but works with owned name/namespace
 //! instead of requiring a static `&Entity` reference.
 
-use dol_expr::{Direction, Expr, NullsPosition, OrderByExpr, field};
-use dol_ir::{EntityRef, JoinIR, JoinType, LockMode, OffsetLimit, QueryIR};
+use crate::JoinKind;
+#[cfg(feature = "sql")]
+use dol_expr::expr::LockHint;
+use dol_expr::tree::{Direction, Expr, NullsPosition, OrderByExpr, field_dyn};
 
 // ---------------------------------------------------------------------------
 // Private join helper
@@ -12,8 +14,9 @@ use dol_ir::{EntityRef, JoinIR, JoinType, LockMode, OffsetLimit, QueryIR};
 
 #[derive(Debug, Clone)]
 struct JoinClause {
-    join_type: JoinType,
+    join_type: JoinKind,
     target_name: String,
+    #[allow(dead_code)] // captured by the builder API for future use
     target_namespace: Option<String>,
     alias: Option<String>,
     on_conditions: Vec<(String, String)>,
@@ -33,17 +36,24 @@ pub struct GetQuery {
     namespace: Option<String>,
     field_names: Option<Vec<String>>,
     table_alias: Option<String>,
-    projections: Vec<Expr>,
+    projections: Vec<Expr<'static>>,
     joins: Vec<JoinClause>,
-    filters: Vec<Expr>,
-    group_by: Vec<Expr>,
-    having: Vec<Expr>,
-    order_by: Vec<OrderByExpr>,
+    filters: Vec<Expr<'static>>,
+    group_by: Vec<Expr<'static>>,
+    having: Vec<Expr<'static>>,
+    order_by: Vec<OrderByExpr<'static>>,
     has_offset: bool,
     has_limit: bool,
     distinct: bool,
     distinct_on: Vec<String>,
-    lock_mode: Option<LockMode>,
+    /// Row-level lock hint. SQL-only — settable via [`for_update`], [`for_share`],
+    /// or [`lock`] when the `sql` feature is enabled.
+    ///
+    /// [`for_update`]: Self::for_update
+    /// [`for_share`]:  Self::for_share
+    /// [`lock`]:       Self::lock
+    #[cfg(feature = "sql")]
+    lock_mode: Option<LockHint>,
 }
 
 impl GetQuery {
@@ -67,6 +77,7 @@ impl GetQuery {
             has_limit: false,
             distinct: false,
             distinct_on: Vec::new(),
+            #[cfg(feature = "sql")]
             lock_mode: None,
         }
     }
@@ -84,7 +95,7 @@ impl GetQuery {
     /// Add named columns to the projection list.
     pub fn fields(mut self, names: &[&str]) -> Self {
         for name in names {
-            self.projections.push(field(name));
+            self.projections.push(field_dyn(name));
         }
         self
     }
@@ -99,7 +110,7 @@ impl GetQuery {
     /// .field(func::sum(field("amount")))
     /// .field(raw_expr("COALESCE(name, email)"))
     /// ```
-    pub fn field(mut self, expr: Expr) -> Self {
+    pub fn field(mut self, expr: Expr<'static>) -> Self {
         self.projections.push(expr);
         self
     }
@@ -109,7 +120,7 @@ impl GetQuery {
     /// Add a JOIN of the specified type on another entity by name.
     pub fn join(
         mut self,
-        join_type: JoinType,
+        join_type: JoinKind,
         target: &str,
         on_conditions: &[(&str, &str)],
     ) -> Self {
@@ -130,7 +141,7 @@ impl GetQuery {
     /// Add a JOIN with an explicit alias for the target table.
     pub fn join_aliased(
         mut self,
-        join_type: JoinType,
+        join_type: JoinKind,
         target: &str,
         alias: &str,
         on_conditions: &[(&str, &str)],
@@ -151,22 +162,22 @@ impl GetQuery {
 
     /// Shorthand for `INNER JOIN`.
     pub fn inner_join(self, target: &str, on_conditions: &[(&str, &str)]) -> Self {
-        self.join(JoinType::Inner, target, on_conditions)
+        self.join(JoinKind::Inner, target, on_conditions)
     }
 
     /// Shorthand for `LEFT JOIN`.
     pub fn left_join(self, target: &str, on_conditions: &[(&str, &str)]) -> Self {
-        self.join(JoinType::Left, target, on_conditions)
+        self.join(JoinKind::Left, target, on_conditions)
     }
 
     /// Shorthand for `RIGHT JOIN`.
     pub fn right_join(self, target: &str, on_conditions: &[(&str, &str)]) -> Self {
-        self.join(JoinType::Right, target, on_conditions)
+        self.join(JoinKind::Right, target, on_conditions)
     }
 
     /// Shorthand for `FULL OUTER JOIN`.
     pub fn full_join(self, target: &str, on_conditions: &[(&str, &str)]) -> Self {
-        self.join(JoinType::Full, target, on_conditions)
+        self.join(JoinKind::Full, target, on_conditions)
     }
 
     // ── Filter methods ──────────────────────────────────────────────────
@@ -181,7 +192,7 @@ impl GetQuery {
     /// .filter(field("status").eq(raw_expr("'active'")))
     /// .filter(raw_expr("created_at > NOW() - INTERVAL '30 days'"))
     /// ```
-    pub fn filter(mut self, expr: Expr) -> Self {
+    pub fn filter(mut self, expr: Expr<'static>) -> Self {
         self.filters.push(expr);
         self
     }
@@ -190,12 +201,12 @@ impl GetQuery {
 
     /// Set the GROUP BY columns.
     pub fn group_by(mut self, columns: &[&str]) -> Self {
-        self.group_by = columns.iter().map(|c| field(c)).collect();
+        self.group_by = columns.iter().map(|c| field_dyn(c)).collect();
         self
     }
 
     /// Add a HAVING filter expression.
-    pub fn having(mut self, expr: Expr) -> Self {
+    pub fn having(mut self, expr: Expr<'static>) -> Self {
         self.having.push(expr);
         self
     }
@@ -205,7 +216,7 @@ impl GetQuery {
     /// Add `column DESC` to the ORDER BY clause.
     pub fn order_by_desc(mut self, column: &str) -> Self {
         self.order_by.push(OrderByExpr {
-            expr: field(column),
+            expr: field_dyn(column),
             direction: Direction::Desc,
             nulls: None,
         });
@@ -215,7 +226,7 @@ impl GetQuery {
     /// Add `column ASC` to the ORDER BY clause.
     pub fn order_by_asc(mut self, column: &str) -> Self {
         self.order_by.push(OrderByExpr {
-            expr: field(column),
+            expr: field_dyn(column),
             direction: Direction::Asc,
             nulls: None,
         });
@@ -230,7 +241,7 @@ impl GetQuery {
         nulls: Option<NullsPosition>,
     ) -> Self {
         self.order_by.push(OrderByExpr {
-            expr: field(column),
+            expr: field_dyn(column),
             direction,
             nulls,
         });
@@ -238,7 +249,7 @@ impl GetQuery {
     }
 
     /// Add a fully-constructed [`OrderByExpr`] to the ORDER BY clause.
-    pub fn order_by_expr(mut self, expr: OrderByExpr) -> Self {
+    pub fn order_by_expr(mut self, expr: OrderByExpr<'static>) -> Self {
         self.order_by.push(expr);
         self
     }
@@ -272,91 +283,168 @@ impl GetQuery {
         self
     }
 
-    // ── Row-level locking ───────────────────────────────────────────────
+    // ── Row-level locking (SQL-only) ────────────────────────────────────
 
-    /// Add `FOR UPDATE` locking.
+    /// Add `FOR UPDATE` locking. SQL-specific.
+    #[cfg(feature = "sql")]
     pub fn for_update(mut self) -> Self {
-        self.lock_mode = Some(LockMode::ForUpdate);
+        self.lock_mode = Some(LockHint::ForUpdate);
         self
     }
 
-    /// Add `FOR SHARE` locking.
+    /// Add `FOR SHARE` locking. SQL-specific.
+    #[cfg(feature = "sql")]
     pub fn for_share(mut self) -> Self {
-        self.lock_mode = Some(LockMode::ForShare);
+        self.lock_mode = Some(LockHint::ForShare);
         self
     }
 
-    /// Set an arbitrary [`LockMode`].
-    pub fn lock(mut self, mode: LockMode) -> Self {
+    /// Set an arbitrary [`LockHint`]. SQL-specific.
+    #[cfg(feature = "sql")]
+    pub fn lock(mut self, mode: LockHint) -> Self {
         self.lock_mode = Some(mode);
         self
     }
 
     // ── Build to IR ─────────────────────────────────────────────────────
 
-    /// Consume the builder and produce a [`QueryIR`].
+    /// Consume the builder and produce a [`dol_ir::Statement`].
+    ///
+    /// Returns `(Statement, ExprArena, Interner)` — the arena and interner
+    /// are needed by renderers to resolve expression references.
     ///
     /// When no projections have been set and Entity field metadata is
     /// available, all entity fields are selected by default.
-    pub fn build(self) -> QueryIR {
-        let source = EntityRef {
-            name: self.name,
-            namespace: self.namespace,
-            alias: self.table_alias,
-        };
+    pub fn build(self) -> dol_ir::Program {
+        use dol_expr::expr::{ExprNode, JoinNode, JoinType as ArenaJoinType, QueryNode};
+        use dol_expr::ids::NULL_NODE;
+        use dol_expr::lower::{lower_expr, lower_exprs, lower_filters, lower_order_by};
+        use smallvec::SmallVec;
 
-        let joins = self
-            .joins
-            .into_iter()
-            .map(|jc| JoinIR {
-                join_type: jc.join_type,
-                target: EntityRef {
-                    name: jc.target_name,
-                    namespace: jc.target_namespace,
-                    alias: jc.alias,
-                },
-                on_conditions: jc.on_conditions,
-            })
-            .collect();
+        let mut arena = dol_expr::ExprArena::new();
+        let mut interner = dol_expr::Interner::new();
 
-        let offset = if self.has_offset {
-            Some(OffsetLimit::Param)
-        } else {
-            None
-        };
+        let from = interner.intern(&dol_expr::lower::qualified_name(
+            &self.name,
+            &self.namespace,
+        ));
+        let alias = self.table_alias.as_deref().map(|a| interner.intern(a));
 
-        let limit = if self.has_limit {
-            Some(OffsetLimit::Param)
-        } else {
-            None
-        };
-
-        // Default: select all entity fields when no projections were specified
-        // and field metadata is available.
-        let projections = if self.projections.is_empty() {
+        // Default projections.
+        let proj_exprs: Vec<Expr<'static>> = if self.projections.is_empty() {
             if let Some(ref names) = self.field_names {
-                names.iter().map(|n| Expr::Identifier(n.clone())).collect()
+                names.iter().map(|n| field_dyn(n)).collect()
             } else {
-                self.projections
+                Vec::new()
             }
         } else {
             self.projections
         };
+        let columns: SmallVec<[u32; 8]> = lower_exprs(&proj_exprs, &mut arena, &mut interner);
 
-        QueryIR {
-            source,
-            projections,
+        // Joins.
+        let joins: SmallVec<[JoinNode; 2]> = self
+            .joins
+            .into_iter()
+            .map(|jc| {
+                let source = interner.intern(&jc.target_name);
+                let alias = jc.alias.as_deref().map(|a| interner.intern(a));
+                let join_type = match jc.join_type {
+                    JoinKind::Inner => ArenaJoinType::Inner,
+                    JoinKind::Left => ArenaJoinType::Left,
+                    JoinKind::Right => ArenaJoinType::Right,
+                    JoinKind::Full => ArenaJoinType::Full,
+                    JoinKind::Cross => ArenaJoinType::Cross,
+                };
+                // Build ON condition from pairs.
+                let on = if jc.on_conditions.is_empty() {
+                    NULL_NODE
+                } else {
+                    let mut cond_ids: Vec<u32> = Vec::new();
+                    for (l, r) in &jc.on_conditions {
+                        let lid = {
+                            let col = interner.intern(l);
+                            let fid = arena.alloc_field(dol_expr::FieldNode {
+                                namespace: None,
+                                name: col,
+                                steps: SmallVec::new(),
+                            });
+                            arena.alloc(ExprNode::Field(fid))
+                        };
+                        let rid = {
+                            let col = interner.intern(r);
+                            let fid = arena.alloc_field(dol_expr::FieldNode {
+                                namespace: None,
+                                name: col,
+                                steps: SmallVec::new(),
+                            });
+                            arena.alloc(ExprNode::Field(fid))
+                        };
+                        cond_ids.push(arena.alloc(ExprNode::BinOp {
+                            op: dol_expr::expr::BinOp::Eq,
+                            lhs: lid,
+                            rhs: rid,
+                        }));
+                    }
+                    let mut result = cond_ids[0];
+                    for id in &cond_ids[1..] {
+                        result = arena.alloc(ExprNode::BinOp {
+                            op: dol_expr::expr::BinOp::And,
+                            lhs: result,
+                            rhs: *id,
+                        });
+                    }
+                    result
+                };
+                JoinNode {
+                    source,
+                    alias,
+                    join_type,
+                    on,
+                }
+            })
+            .collect();
+
+        let filter = lower_filters(&self.filters, &mut arena, &mut interner);
+
+        let group_by: SmallVec<[u32; 4]> = self
+            .group_by
+            .iter()
+            .map(|e| lower_expr(e, &mut arena, &mut interner))
+            .collect();
+
+        let having = if self.having.is_empty() {
+            NULL_NODE
+        } else {
+            lower_filters(&self.having, &mut arena, &mut interner)
+        };
+
+        let order_by: SmallVec<[(u32, dol_expr::expr::Order); 4]> = self
+            .order_by
+            .iter()
+            .map(|ob| lower_order_by(ob, &mut arena, &mut interner))
+            .collect();
+
+        #[cfg(feature = "sql")]
+        let lock = self.lock_mode;
+        #[cfg(not(feature = "sql"))]
+        let lock: Option<dol_expr::expr::LockHint> = None;
+
+        let node = QueryNode {
+            from,
+            alias,
             joins,
-            filters: self.filters,
-            group_by: self.group_by,
-            having: self.having,
-            order_by: self.order_by,
-            offset,
-            limit,
-            distinct: self.distinct,
-            distinct_on: self.distinct_on,
-            lock_mode: self.lock_mode,
-        }
+            filter,
+            columns,
+            group_by,
+            having,
+            order_by,
+            limit: None,
+            offset: None,
+            lock,
+        };
+
+        (dol_ir::Statement::Query(node), arena, interner).into()
     }
 }
 

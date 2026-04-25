@@ -6,138 +6,61 @@ version = 4
 name = "dol"
 version = "0.1.0"
 dependencies = [
- "dol-config",
- "dol-core",
- "dol-kv",
- "dol-migration",
- "dol-objects",
- "dol-sql",
- "serde",
- "toml",
-]
-
-[[package]]
-name = "dol-builder"
-version = "0.1.0"
-dependencies = [
- "dol-entity",
- "dol-expr",
- "dol-ir",
-]
-
-[[package]]
-name = "dol-config"
-version = "0.1.0"
-dependencies = [
- "dol-sql",
- "serde",
- "serde_json",
- "serde_norway",
- "toml",
-]
-
-[[package]]
-name = "dol-core"
-version = "0.1.0"
-dependencies = [
- "dol-builder",
- "dol-entity",
  "dol-expr",
  "dol-ir",
  "dol-query",
-]
-
-[[package]]
-name = "dol-entity"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
+ "dol-schema",
+ "dol-types",
 ]
 
 [[package]]
 name = "dol-expr"
 version = "0.1.0"
 dependencies = [
+ "dol-types",
  "serde",
+ "smallvec",
 ]
 
 [[package]]
 name = "dol-ir"
 version = "0.1.0"
 dependencies = [
- "dol-entity",
  "dol-expr",
+ "dol-schema",
+ "dol-types",
  "serde",
-]
-
-[[package]]
-name = "dol-kv"
-version = "0.1.0"
-dependencies = [
- "dol-core",
-]
-
-[[package]]
-name = "dol-migration"
-version = "0.1.0"
-dependencies = [
- "dol-config",
- "dol-core",
- "dol-sql",
- "serde",
- "tokio",
- "toml",
-]
-
-[[package]]
-name = "dol-objects"
-version = "0.1.0"
-dependencies = [
- "dol-core",
+ "serde_json",
+ "smallvec",
 ]
 
 [[package]]
 name = "dol-query"
 version = "0.1.0"
 dependencies = [
- "dol-builder",
- "dol-entity",
  "dol-expr",
  "dol-ir",
-]
-
-[[package]]
-name = "dol-sql"
-version = "0.1.0"
-dependencies = [
- "dol-core",
+ "dol-schema",
+ "dol-types",
  "serde",
  "serde_json",
- "serde_norway",
- "toml",
+ "smallvec",
 ]
 
 [[package]]
-name = "equivalent"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
-
-[[package]]
-name = "hashbrown"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f467dd6dccf739c208452f8014c75c18bb8301b050ad1cfb27153803edb0f51"
-
-[[package]]
-name = "indexmap"
-version = "2.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d466e9454f08e4a911e14806c24e16fba1b4c121d1ea474396f396069cf949d9"
+name = "dol-schema"
+version = "0.1.0"
 dependencies = [
- "equivalent",
- "hashbrown",
+ "dol-types",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "dol-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -151,12 +74,6 @@ name = "memchr"
 version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
-
-[[package]]
-name = "pin-project-lite"
-version = "0.2.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "proc-macro2"
@@ -175,12 +92,6 @@ checksum = "41f2619966050689382d2b44f664f4bc593e129785a36d6ee376ddf37259b924"
 dependencies = [
  "proc-macro2",
 ]
-
-[[package]]
-name = "ryu"
-version = "1.0.23"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 
 [[package]]
 name = "serde"
@@ -226,25 +137,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_norway"
-version = "0.9.42"
+name = "smallvec"
+version = "1.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e408f29489b5fd500fab51ff1484fc859bb655f32c671f307dcd733b72e8168c"
+checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 dependencies = [
- "indexmap",
- "itoa",
- "ryu",
  "serde",
- "unsafe-libyaml-norway",
-]
-
-[[package]]
-name = "serde_spanned"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6662b5879511e06e8999a8a235d848113e942c9124f211511b16466ee2995f26"
-dependencies = [
- "serde_core",
 ]
 
 [[package]]
@@ -259,82 +157,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio"
-version = "1.52.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a91135f59b1cbf38c91e73cf3386fca9bb77915c45ce2771460c9d92f0f3d776"
-dependencies = [
- "pin-project-lite",
- "tokio-macros",
-]
-
-[[package]]
-name = "tokio-macros"
-version = "2.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "385a6cb71ab9ab790c5fe8d67f1645e6c450a7ce006a33de03daa956cf70a496"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "toml"
-version = "1.1.2+spec-1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81f3d15e84cbcd896376e6730314d59fb5a87f31e4b038454184435cd57defee"
-dependencies = [
- "indexmap",
- "serde_core",
- "serde_spanned",
- "toml_datetime",
- "toml_parser",
- "toml_writer",
- "winnow",
-]
-
-[[package]]
-name = "toml_datetime"
-version = "1.1.1+spec-1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3165f65f62e28e0115a00b2ebdd37eb6f3b641855f9d636d3cd4103767159ad7"
-dependencies = [
- "serde_core",
-]
-
-[[package]]
-name = "toml_parser"
-version = "1.1.2+spec-1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2abe9b86193656635d2411dc43050282ca48aa31c2451210f4202550afb7526"
-dependencies = [
- "winnow",
-]
-
-[[package]]
-name = "toml_writer"
-version = "1.1.1+spec-1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "756daf9b1013ebe47a8776667b466417e2d4c5679d441c26230efd9ef78692db"
-
-[[package]]
 name = "unicode-ident"
 version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
-
-[[package]]
-name = "unsafe-libyaml-norway"
-version = "0.2.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b39abd59bf32521c7f2301b52d05a6a2c975b6003521cbd0c6dc1582f0a22104"
-
-[[package]]
-name = "winnow"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09dac053f1cd375980747450bfc7250c264eaae0583872e845c0c7cd578872b5"
 
 [[package]]
 name = "zmij"

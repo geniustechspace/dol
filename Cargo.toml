@@ -3,18 +3,12 @@
 [workspace]
 resolver = "2"
 members = [
-    "libs/dol",
-    "libs/dol-core",
-    "libs/dol-core/crates/expr",
-    "libs/dol-core/crates/entity",
-    "libs/dol-core/crates/ir",
-    "libs/dol-core/crates/builder",
-    "libs/dol-query",
-    "libs/dol-sql",
-    "libs/dol-kv",
-    "libs/dol-objects",
-    "libs/dol-migration",
-    "libs/dol-config",
+    "libs/dol-types",           # Leaf: Value, Literal, DataType
+    "libs/dol-expr",            # Canonical expression layer (ExprNode ≤ 32B, arena, interner)
+    "libs/dol-schema",          # Schema: Entity, Field, constraints
+    "libs/dol-ir",              # Canonical IR: Statement (no lifetime), Backend trait
+    "libs/dol-query",           # Query entry point + builders → produce dol-ir::Statement
+    "libs/dol",                 # Umbrella facade with feature flags
 ]
 
 [workspace.package]
@@ -24,20 +18,17 @@ rust-version = "1.85"
 publish = false
 
 [workspace.dependencies]
+# Collections
+smallvec = { version = "1", features = ["union", "serde"] }
+
 # Serialisation
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
-serde_norway = "0.9"
-toml_crate = { package = "toml", version = "1" }
 
-# Async runtime (dev/test only)
-tokio = { version = "1", features = ["rt", "macros"] }
-
-# Internal crates
-dol-core = { path = "libs/dol-core" }
-dol-sql = { path = "libs/dol-sql" }
-dol-kv = { path = "libs/dol-kv" }
-dol-objects = { path = "libs/dol-objects" }
-dol-migration = { path = "libs/dol-migration" }
-dol-config = { path = "libs/dol-config" }
-dol-query = { path = "libs/dol-query" }
+# Internal crates — core language
+dol-types  = { path = "libs/dol-types" }
+dol-expr   = { path = "libs/dol-expr" }
+dol-ir     = { path = "libs/dol-ir" }
+dol-schema = { path = "libs/dol-schema" }
+dol-query  = { path = "libs/dol-query" }
+dol        = { path = "libs/dol" }

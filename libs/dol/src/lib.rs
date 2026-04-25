@@ -1,159 +1,65 @@
-//! # DOL — Data Operating Language
+//! # DOL — umbrella facade crate
 //!
-//! A universal, storage-agnostic query and schema language for Rust.
+//! Re-exports the individual `dol-*` crates behind cargo feature flags so
+//! downstream consumers can pick the slice of the stack they need without
+//! pulling in the full dependency tree.
 //!
-//! ## Overview
+//! ## Feature flags
+//!
+//! | Feature | Pulls in | Purpose |
+//! |---------|----------|---------|
+//! | *(default)* | `dol-types` only | Leaf primitives: `Value`, `Literal`, `DataType`, scalar wrappers. |
+//! | `expr`   | `dol-expr`           | Expression arena + tree DSL. |
+//! | `schema` | `dol-schema`         | `Entity`, `Field`, constraint types. |
+//! | `ir`     | `dol-ir` (+expr+schema) | `Statement` enum, `Backend` trait, DDL/DML nodes. |
+//! | `query`  | `dol-query` (+ir)    | User-facing builder API. |
+//! | `full`   | all of the above     | Convenience aggregator. |
+//! | `serde`  | (orthogonal)         | Turns on `serde` on every active sub-crate. |
+//!
+//! ## Curated surface
+//!
+//! Each layer is exposed via a re-exported sub-module rather than a flat
+//! `pub use *::*`. To reach the stable, "blessed" surface of a layer use the
+//! `prelude` of that layer:
+//!
+//! ```ignore
+//! use dol::types::prelude::*;
+//! # #[cfg(feature = "schema")]
+//! use dol::schema::prelude::*;
+//! ```
+//!
+//! For convenience this crate also exposes a top-level [`prelude`] that
+//! globs every active layer's prelude.
 
 #![deny(unsafe_code)]
-//!
-//! DOL provides a type-safe, composable way to build queries and schema definitions
-//! that can target multiple storage backends: SQL databases, key-value stores,
-//! document databases, and object storage.
-//!
-//! ## Architecture
-//!
-//! DOL uses a three-layer pipeline:
-//!
-//! ```text
-//! Layer 1: Builders (Human-friendly API)
-//!       ↓
-//! Layer 2: IR (Intermediate Representation — backend-agnostic AST)
-//!       ↓
-//! Layer 3: Backends (SQL, KV, Document, Object Storage)
-//! ```
-//!
-//! ## Crate Structure
-//!
-//! This is the umbrella crate that re-exports from focused sub-crates:
-//!
-//! - **`dol-core`** — The complete language layer (expressions, models, IR, builders)
-//! - **`dol-sql`** — SQL renderer + dialect system
-//! - **`dol-kv`** — Key-value backend
-//! - **`dol-objects`** — Object storage backend
-//! - **`dol-migration`** — Migration system (feature-gated)
-//! - **`dol-config`** — Unified configuration (feature-gated)
-//!
-//! ## Quick Start
-//!
-//! ```rust
-//! use dol::model::{Entity, Field, FieldType};
-//! use dol::backend::sql::dialect::Dialect;
-//! use dol::builder::EntityBuilderExt;
-//! use dol::expr::{field, param};
-//! use dol::Render;
-//!
-//! // Define a static model (zero-cost, const-compatible)
-//! static USERS: Entity = Entity::new("users", &[
-//!     Field::new("id", FieldType::Uuid).primary_key(),
-//!     Field::new("email", FieldType::Text).unique(),
-//!     Field::new("status", FieldType::Text).default("'active'"),
-//! ]);
-//!
-//! // Generate SQL for different dialects
-//! let pg_sql = USERS.get()
-//!     .filter(field("id").eq(param()))
-//!     .render(Some(&Dialect::postgres())).unwrap();
-//! assert!(pg_sql.contains("$1"));
-//!
-//! let sqlite_sql = USERS.get()
-//!     .filter(field("id").eq(param()))
-//!     .render(None).unwrap();  // Uses default (SQLite)
-//! assert!(sqlite_sql.contains("?"));
-//! ```
-//!
-//! ## Supported Backends
-//!
-//! - **SQL**: PostgreSQL, MySQL, MariaDB, SQLite, MSSQL, Oracle, CockroachDB
-//! - **Key-Value**: Abstract KV operations (get, put, delete, list)
-//! - **Object Storage**: S3-compatible operations (put, get, list objects)
 
-// ── Sub-crate re-exports (preserving the original module paths) ──
+pub use dol_types as types;
 
-/// The complete language layer — expressions, models, IR, builders, Backend trait.
-/// Users can also depend on `dol-core` directly for a standalone, engine-free experience.
-pub use dol_core as language;
+#[cfg(feature = "expr")]
+pub use dol_expr as expr;
 
-/// Expression engine — composable, backend-agnostic expression AST.
-pub use dol_core::expr;
+#[cfg(feature = "schema")]
+pub use dol_schema as schema;
 
-/// Schema language — Entity, Field, FieldType, and constraints.
-pub use dol_core::model;
+#[cfg(feature = "ir")]
+pub use dol_ir as ir;
 
-/// Intermediate representation — backend-agnostic AST.
-pub use dol_core::ir;
+#[cfg(feature = "query")]
+pub use dol_query as query;
 
-/// Builder API — composable method-chain builders that produce IR.
-pub use dol_core::builder;
+/// Curated re-export of the most commonly used items from every active layer.
+pub mod prelude {
+    pub use crate::types::prelude::*;
 
-/// Query entry point — backend-neutral query construction from entities or strings.
-pub use dol_core::query;
+    #[cfg(feature = "expr")]
+    pub use crate::expr::prelude::*;
 
-/// Backend implementations.
-pub mod backend {
-    /// Backend trait and shared output types (from dol-core::ir).
-    pub use dol_core::ir::{
-        Backend, BackendError, KvOp, KvOutput, RenderedOutput, SqlOutput, StorageOp, StorageOutput,
-    };
+    #[cfg(feature = "schema")]
+    pub use crate::schema::prelude::*;
 
-    /// SQL backend — dialect-aware SQL rendering.
-    pub mod sql {
-        pub use dol_sql::*;
+    #[cfg(feature = "ir")]
+    pub use crate::ir::prelude::*;
 
-        pub use dol_core::ir::SqlOutput;
-    }
-
-    /// Key-value backend.
-    pub mod kv {
-        pub use dol_kv::*;
-    }
-
-    /// Object storage backend.
-    pub mod storage {
-        pub use dol_objects::*;
-    }
+    #[cfg(feature = "query")]
+    pub use crate::query::prelude::*;
 }
-
-/// Migration system (feature-gated).
-#[cfg(feature = "migration")]
-pub use dol_migration as migration;
-
-/// Unified configuration (feature-gated).
-#[cfg(feature = "config")]
-pub use dol_config as config;
-
-// ── Top-level re-exports for ergonomic use ──
-
-pub use dol_core::ir::definition::FieldDef;
-pub use dol_core::ir::definition::OwnedEntityConstraint;
-pub use dol_core::model::constraint::{EntityConstraint, FkAction, ForeignKeyRef, GeneratedKind};
-pub use dol_core::model::{Entity, Field, FieldType};
-pub use dol_sql::dialect::Dialect;
-
-#[cfg(feature = "config")]
-pub use dol_config::DolConfig;
-#[cfg(feature = "config")]
-pub use dol_config::{BackendFilter, LockStrategy, UnifiedMigrationConfig};
-
-// Re-export builder extension traits so users can call model.get(), etc.
-pub use dol_core::builder::{EntityBuilderExt, EntityDefineExt};
-
-// Re-export commonly used builders at the top level for ergonomic access.
-pub use dol_core::builder::{DefinePolicyBuilder, DefineTypeBuilder, DropTypeBuilder};
-
-// Re-export Query for backend-neutral entry point.
-pub use dol_core::query::Query;
-
-// Re-export the Render extension trait so builders have .render() in scope.
-pub use dol_sql::ext::Render;
-
-// Re-export TransactionRender so TransactionBuilder::render() works.
-pub use dol_sql::ext::TransactionRender;
-
-// Re-export CompoundSelectBuilder (moved from dol-builder to dol-sql).
-pub use dol_sql::ext::CompoundSelectBuilder;
-
-// Re-export GetBuilderSqlExt for union/intersect/except/as_scalar on GetBuilder.
-pub use dol_sql::ext::GetBuilderSqlExt;
-
-#[cfg(test)]
-mod tests;

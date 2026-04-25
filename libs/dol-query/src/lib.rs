@@ -13,70 +13,99 @@
 //!
 //! ```rust
 //! use dol_query::Query;
-//! use dol_entity::{Entity, Field, FieldType};
-//! use dol_expr::{field, param};
+//! use dol_schema::{Entity, Field, DataType};
+//! use dol_expr::tree::{field, param};
 //!
-//! // From a static Entity — full field-aware API
-//! static USERS: Entity = Entity::new("users", &[
-//!     Field::new("id", FieldType::Uuid).primary_key(),
-//!     Field::new("email", FieldType::Text),
+//! // From an Entity — full field-aware API
+//! let users = Entity::new("users", vec![
+//!     Field::new("id", DataType::Uuid).identity(),
+//!     Field::new("email", DataType::unbounded_string()),
 //! ]);
 //!
-//! let ir = Query::from(&USERS)
+//! let dol_ir::Program { stmt, interner, .. } = Query::from(&users)
 //!     .get()
 //!     .filter(field("id").eq(param()))
 //!     .build();
-//! assert_eq!(ir.source.name, "users");
-//! assert_eq!(ir.projections.len(), 2);
+//! match stmt {
+//!     dol_ir::Statement::Query(q) => {
+//!         assert_eq!(interner.get(q.from), "users");
+//!         assert_eq!(q.columns.len(), 2);
+//!     }
+//!     _ => panic!("expected Query"),
+//! }
 //!
 //! // From a plain string — no field metadata needed
-//! let ir = Query::from("users")
+//! let dol_ir::Program { stmt, interner, .. } = Query::from("users")
 //!     .get()
 //!     .fields(&["id", "email"])
 //!     .filter(field("id").eq(param()))
 //!     .build();
-//! assert_eq!(ir.source.name, "users");
+//! match stmt {
+//!     dol_ir::Statement::Query(q) => {
+//!         assert_eq!(interner.get(q.from), "users");
+//!     }
+//!     _ => panic!("expected Query"),
+//! }
 //!
 //! // From a namespaced string
-//! let ir = Query::from("identity.users")
+//! let dol_ir::Program { stmt, interner, .. } = Query::from("identity.users")
 //!     .get()
 //!     .fields(&["id"])
 //!     .build();
-//! assert_eq!(ir.source.name, "users");
-//! assert_eq!(ir.source.namespace.as_deref(), Some("identity"));
+//! match stmt {
+//!     dol_ir::Statement::Query(q) => {
+//!         assert_eq!(interner.get(q.from), "identity.users");
+//!     }
+//!     _ => panic!("expected Query"),
+//! }
 //!
 //! // Namespace chaining — builds hierarchical paths
-//! let ir = Query::from("api")
+//! let dol_ir::Program { stmt, interner, .. } = Query::from("api")
 //!     .namespace("v1")
 //!     .namespace("users")
 //!     .get()
 //!     .fields(&["id"])
 //!     .build();
-//! assert_eq!(ir.source.namespace.as_deref(), Some("api.v1"));
-//! assert_eq!(ir.source.name, "users");
+//! match stmt {
+//!     dol_ir::Statement::Query(q) => {
+//!         assert_eq!(interner.get(q.from), "api.v1.users");
+//!     }
+//!     _ => panic!("expected Query"),
+//! }
 //! ```
 //!
 //! # Backend Neutrality
 //!
-//! `dol-query` produces backend-agnostic IR types (`QueryIR`, `InsertIR`, etc.)
+//! `dol-query` produces backend-agnostic IR types (`Statement`, `Query`, etc.)
 //! from `dol-ir`. These can be rendered by **any** backend — SQL, key-value,
 //! file system, API, or custom engines.
 
 #![deny(unsafe_code)]
 
+mod delete;
 mod get;
 mod insert;
-mod remove;
 mod update;
 mod upsert;
 
+pub mod builder;
+pub mod ddl;
+pub mod prelude;
+
+pub use ddl::{
+    AlterEntityBuilder, CreateFromMeta, DefineEntityBuilder, DefineLookupBuilder,
+    DefineTypeBuilder, DropEntityBuilder, DropLookupBuilder, DropTypeBuilder, EntityDefineExt,
+};
+
+pub use delete::DeleteQuery;
+#[allow(deprecated)]
+pub use delete::RemoveQuery;
 pub use get::GetQuery;
 pub use insert::InsertQuery;
-pub use remove::RemoveQuery;
 pub use update::UpdateQuery;
 pub use upsert::UpsertQuery;
 
-use dol_entity::Entity;
+use dol_schema::Entity;
 
 // ---------------------------------------------------------------------------
 // Query — the universal entry point
@@ -85,7 +114,7 @@ use dol_entity::Entity;
 /// Backend-neutral query entry point.
 ///
 /// Construct via `Query::from(&entity)` or `Query::from("entity_name")`.
-/// Then call `.get()`, `.insert()`, `.update()`, `.remove()`, or `.upsert()`
+/// Then call `.get()`, `.insert()`, `.update()`, `.delete()`, or `.upsert()`
 /// to begin building a specific operation.
 ///
 /// # Namespace chaining
@@ -98,23 +127,31 @@ use dol_entity::Entity;
 /// use dol_query::Query;
 ///
 /// // Single namespace
-/// let ir = Query::from("api")
+/// let dol_ir::Program { stmt, interner, .. } = Query::from("api")
 ///     .namespace("users")
 ///     .get()
 ///     .fields(&["id"])
 ///     .build();
-/// assert_eq!(ir.source.namespace.as_deref(), Some("api"));
-/// assert_eq!(ir.source.name, "users");
+/// match stmt {
+///     dol_ir::Statement::Query(q) => {
+///         assert_eq!(interner.get(q.from), "api.users");
+///     }
+///     _ => panic!("expected Query"),
+/// }
 ///
 /// // Chained namespaces — builds "api.v1.users"
-/// let ir = Query::from("api")
+/// let dol_ir::Program { stmt, interner, .. } = Query::from("api")
 ///     .namespace("v1")
 ///     .namespace("users")
 ///     .get()
 ///     .fields(&["id"])
 ///     .build();
-/// assert_eq!(ir.source.namespace.as_deref(), Some("api.v1"));
-/// assert_eq!(ir.source.name, "users");
+/// match stmt {
+///     dol_ir::Statement::Query(q) => {
+///         assert_eq!(interner.get(q.from), "api.v1.users");
+///     }
+///     _ => panic!("expected Query"),
+/// }
 /// ```
 #[derive(Debug, Clone)]
 pub struct Query {
@@ -162,12 +199,18 @@ impl Query {
         UpdateQuery::new(self.name, self.namespace)
     }
 
-    /// Start building a REMOVE (DELETE) statement.
-    pub fn remove(self) -> RemoveQuery {
-        RemoveQuery::new(self.name, self.namespace)
+    /// Start building a DELETE statement.
+    pub fn delete(self) -> DeleteQuery {
+        DeleteQuery::new(self.name, self.namespace)
     }
 
-    /// Start building an UPSERT (INSERT ... ON CONFLICT) statement.
+    /// Deprecated: use [`delete()`](Self::delete) instead.
+    #[deprecated(note = "use `delete()`")]
+    pub fn remove(self) -> DeleteQuery {
+        DeleteQuery::new(self.name, self.namespace)
+    }
+
+    /// Start building an upsert statement.
     pub fn upsert(self) -> UpsertQuery {
         UpsertQuery::new(self.name, self.namespace, self.field_names)
     }
@@ -179,7 +222,7 @@ impl From<&Entity> for Query {
     fn from(entity: &Entity) -> Self {
         Self {
             name: entity.name.to_string(),
-            namespace: entity.namespace.map(|s| s.to_string()),
+            namespace: entity.namespace.as_ref().map(|s| s.to_string()),
             field_names: Some(entity.field_names().map(|s| s.to_string()).collect()),
         }
     }
@@ -211,6 +254,20 @@ impl From<String> for Query {
     fn from(s: String) -> Self {
         Self::from(s.as_str())
     }
+}
+
+// ---------------------------------------------------------------------------
+// JoinKind — locally defined
+// ---------------------------------------------------------------------------
+
+/// The kind of JOIN to perform.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum JoinKind {
+    Inner,
+    Left,
+    Right,
+    Full,
+    Cross,
 }
 
 // ===========================================================================
