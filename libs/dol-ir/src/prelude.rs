@@ -5,7 +5,7 @@
 //! ```
 
 pub use crate::backend::{Backend, BackendError};
-pub use crate::constraint::{EntityConstraint, FkAction, ForeignKeyRef, GeneratedKind};
+pub use crate::constraint::{EntityConstraint, RefAction, RelationRef, ComputedKind};
 pub use crate::control::{DefinePolicy, Grant, PolicyAction, Privilege, Revoke};
 pub use crate::definition::{
     AlterAction, AlterEntity, DefineEntity, DefineIndex, DefineType, DropEntity, DropIndex,

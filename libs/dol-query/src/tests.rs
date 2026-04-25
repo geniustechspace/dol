@@ -6,7 +6,7 @@ fn users_entity() -> Entity {
     Entity::new(
         "users",
         vec![
-            Field::new("id", DataType::Uuid).primary_key(),
+            Field::new("id", DataType::Uuid).identity(),
             Field::new("email", DataType::unbounded_string()).unique(),
             Field::new("name", DataType::unbounded_string()),
         ],

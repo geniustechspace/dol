@@ -6,7 +6,7 @@
 
 #![cfg(feature = "serde")]
 
-use dol_schema::{DataType, Entity, EntityConstraint, Field, FkAction, ForeignKeyRef};
+use dol_schema::{DataType, Entity, EntityConstraint, Field, RefAction, RelationRef};
 
 fn round_trip<T>(value: &T) -> T
 where
@@ -19,11 +19,11 @@ where
 #[test]
 fn fk_action_round_trip() {
     for action in [
-        FkAction::NoAction,
-        FkAction::Cascade,
-        FkAction::SetNull,
-        FkAction::Restrict,
-        FkAction::SetDefault,
+        RefAction::Forbid,
+        RefAction::Cascade,
+        RefAction::Detach,
+        RefAction::Reject,
+        RefAction::UseDefault,
     ] {
         assert_eq!(action, round_trip(&action));
     }
@@ -31,9 +31,9 @@ fn fk_action_round_trip() {
 
 #[test]
 fn foreign_key_ref_round_trip() {
-    let fk = ForeignKeyRef::new("users", "id")
-        .on_delete(FkAction::Cascade)
-        .on_update(FkAction::SetNull);
+    let fk = RelationRef::new("users", "id")
+        .on_delete(RefAction::Cascade)
+        .on_update(RefAction::Detach);
     assert_eq!(fk, round_trip(&fk));
 }
 
@@ -45,37 +45,37 @@ fn entity_constraint_unique_round_trip() {
 
 #[test]
 fn entity_constraint_foreign_key_round_trip() {
-    let c = EntityConstraint::foreign_key(["user_id"], "users", ["id"], FkAction::Cascade);
+    let c = EntityConstraint::relation(["user_id"], "users", ["id"], RefAction::Cascade);
     assert_eq!(c, round_trip(&c));
 }
 
 #[test]
 fn entity_constraint_check_round_trip() {
-    let c = EntityConstraint::check("age > 0");
+    let c = EntityConstraint::invariant("age > 0");
     assert_eq!(c, round_trip(&c));
 }
 
 #[test]
 fn entity_constraint_primary_key_round_trip() {
-    let c = EntityConstraint::primary_key(["tenant_id", "user_id"]);
+    let c = EntityConstraint::identity(["tenant_id", "user_id"]);
     assert_eq!(c, round_trip(&c));
 }
 
 #[test]
 fn field_round_trip_minimal() {
-    let f = Field::new("id", DataType::Uuid).primary_key();
+    let f = Field::new("id", DataType::Uuid).identity();
     assert_eq!(f, round_trip(&f));
 }
 
 #[test]
 fn field_round_trip_full() {
     let f = Field::new("user_id", DataType::Uuid)
-        .references("users", "id", FkAction::Cascade, FkAction::NoAction)
+        .references("users", "id", RefAction::Cascade, RefAction::Forbid)
         .check("user_id IS NOT NULL")
         .comment("FK to users.id")
         .collation("C")
         .default("gen_random_uuid()")
-        .index();
+        .lookup();
     assert_eq!(f, round_trip(&f));
 }
 
@@ -90,7 +90,7 @@ fn entity_round_trip_simple() {
     let e = Entity::new(
         "users",
         vec![
-            Field::new("id", DataType::Uuid).primary_key(),
+            Field::new("id", DataType::Uuid).identity(),
             Field::new("email", DataType::unbounded_string()).unique(),
         ],
     );
@@ -103,8 +103,8 @@ fn entity_round_trip_with_namespace_and_constraints() {
         "orders",
         vec![
             Field::new("id", DataType::Int64)
-                .primary_key()
-                .auto_increment(),
+                .identity()
+                .auto_assign(),
             Field::new("user_id", DataType::Uuid),
             Field::new("product", DataType::unbounded_string()),
         ],
@@ -112,8 +112,8 @@ fn entity_round_trip_with_namespace_and_constraints() {
     .with_namespace("public")
     .with_constraints(vec![
         EntityConstraint::unique(["user_id", "product"]),
-        EntityConstraint::foreign_key(["user_id"], "users", ["id"], FkAction::Cascade),
-        EntityConstraint::check("user_id IS NOT NULL"),
+        EntityConstraint::relation(["user_id"], "users", ["id"], RefAction::Cascade),
+        EntityConstraint::invariant("user_id IS NOT NULL"),
     ]);
     assert_eq!(e, round_trip(&e));
 }

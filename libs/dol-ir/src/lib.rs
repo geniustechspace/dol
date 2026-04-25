@@ -3,7 +3,7 @@
 //! This crate is the single IR layer for all DOL backends.  Contains
 //! the canonical Statement enum, Backend trait, and DDL/DML node types.
 //!
-//! Schema constraint types (`FkAction`, `GeneratedKind`, `ForeignKeyRef`,
+//! Schema constraint types (`RefAction`, `ComputedKind`, `RelationRef`,
 //! `EntityConstraint`) live in [`dol_schema`] and are re-exported here for
 //! convenience.
 
@@ -20,11 +20,11 @@ pub mod transaction;
 
 /// Schema constraint types — re-exported from `dol-schema`, the canonical home.
 pub mod constraint {
-    pub use dol_schema::constraint::{EntityConstraint, FkAction, ForeignKeyRef, GeneratedKind};
+    pub use dol_schema::constraint::{EntityConstraint, RefAction, RelationRef, ComputedKind};
 }
 
 pub use backend::{Backend, BackendError};
-pub use constraint::{EntityConstraint, FkAction, ForeignKeyRef, GeneratedKind};
+pub use constraint::{EntityConstraint, RefAction, RelationRef, ComputedKind};
 pub use control::{DefinePolicy, Grant, PolicyAction, Privilege, Revoke};
 pub use definition::{
     AlterAction, AlterEntity, DefineEntity, DefineIndex, DefineType, DropEntity, DropIndex,

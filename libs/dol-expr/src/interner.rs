@@ -5,7 +5,7 @@ use crate::ids::StrId;
 
 /// String interner backed by `Arc<str>` so each unique string is stored in a
 /// single shared heap allocation referenced from both the lookup map and the
-/// id-indexed table.
+/// id-lookup table.
 #[derive(Debug, Clone, Default)]
 pub struct Interner {
     strings: Vec<Arc<str>>,

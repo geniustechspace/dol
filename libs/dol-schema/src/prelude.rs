@@ -5,5 +5,5 @@
 //! ```
 
 pub use crate::{
-    DataType, Entity, EntityConstraint, Field, FkAction, ForeignKeyRef, GeneratedKind,
+    DataType, Entity, EntityConstraint, Field, RefAction, RelationRef, ComputedKind,
 };

@@ -10,7 +10,7 @@ use dol_ir::definition::{
     DropType, FieldDef, IndexMethod,
 };
 use dol_ir::entity_ref::EntityRef;
-use dol_ir::{EntityConstraint, FkAction, ForeignKeyRef};
+use dol_ir::{EntityConstraint, RefAction, RelationRef};
 use dol_types::DataType;
 
 fn round_trip<T>(value: &T) -> T
@@ -34,11 +34,11 @@ fn entity_ref_round_trip() {
 #[test]
 fn field_def_round_trip() {
     let fd = FieldDef::new("id", DataType::Uuid)
-        .primary_key()
+        .identity()
         .default("gen_random_uuid()")
         .comment("primary key")
         .references(
-            ForeignKeyRef::new("users", "id").on_delete(FkAction::Cascade),
+            RelationRef::new("users", "id").on_delete(RefAction::Cascade),
         );
     assert_eq!(fd, round_trip(&fd));
 }
@@ -47,13 +47,13 @@ fn field_def_round_trip() {
 fn owned_entity_constraint_round_trip() {
     let cs = vec![
         EntityConstraint::Unique(vec!["a".into(), "b".into()]),
-        EntityConstraint::PrimaryKey(vec!["id".into()]),
-        EntityConstraint::Check("x > 0".into()),
-        EntityConstraint::ForeignKey {
-            columns: vec!["user_id".into()],
-            ref_table: "users".into(),
-            ref_columns: vec!["id".into()],
-            on_delete: FkAction::SetNull,
+        EntityConstraint::Identity(vec!["id".into()]),
+        EntityConstraint::Invariant("x > 0".into()),
+        EntityConstraint::Relation {
+            fields: vec!["user_id".into()],
+            ref_entity: "users".into(),
+            ref_fields: vec!["id".into()],
+            on_delete: RefAction::Detach,
         },
     ];
     for c in &cs {
@@ -67,7 +67,7 @@ fn define_entity_round_trip() {
         name: "users".into(),
         namespace: Some("public".into()),
         fields: vec![
-            FieldDef::new("id", DataType::Uuid).primary_key(),
+            FieldDef::new("id", DataType::Uuid).identity(),
             FieldDef::new("email", DataType::unbounded_string()).unique(),
         ],
         constraints: vec![EntityConstraint::Unique(vec![

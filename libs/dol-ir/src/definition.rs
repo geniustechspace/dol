@@ -1,10 +1,10 @@
 //! Definition operations — DDL for schema creation and modification.
 //!
 //! These owned, runtime-friendly DDL types embed the schema-layer constraint
-//! types (`dol_schema::EntityConstraint`, `dol_schema::ForeignKeyRef`)
+//! types (`dol_schema::EntityConstraint`, `dol_schema::RelationRef`)
 //! directly — there is no longer a borrowed/owned mirror split.
 
-use dol_schema::{EntityConstraint, ForeignKeyRef, GeneratedKind};
+use dol_schema::{EntityConstraint, RelationRef, ComputedKind};
 use dol_types::DataType;
 
 use crate::entity_ref::EntityRef;
@@ -26,17 +26,17 @@ pub struct DefineEntity {
 pub struct FieldDef {
     pub name: String,
     pub data_type: DataType,
-    pub primary_key: bool,
+    pub identity: bool,
     pub nullable: bool,
     pub default_expr: Option<String>,
     pub unique: bool,
-    pub references: Option<ForeignKeyRef>,
+    pub references: Option<RelationRef>,
     pub check: Option<String>,
     pub comment: Option<String>,
     pub collation: Option<String>,
-    pub generated: Option<(GeneratedKind, String)>,
-    pub indexed: bool,
-    pub auto_increment: bool,
+    pub generated: Option<(ComputedKind, String)>,
+    pub lookup: bool,
+    pub auto_assign: bool,
 }
 
 impl FieldDef {
@@ -44,7 +44,7 @@ impl FieldDef {
         Self {
             name: name.to_string(),
             data_type,
-            primary_key: false,
+            identity: false,
             nullable: false,
             default_expr: None,
             unique: false,
@@ -53,13 +53,13 @@ impl FieldDef {
             comment: None,
             collation: None,
             generated: None,
-            indexed: false,
-            auto_increment: false,
+            lookup: false,
+            auto_assign: false,
         }
     }
 
-    pub fn primary_key(mut self) -> Self {
-        self.primary_key = true;
+    pub fn identity(mut self) -> Self {
+        self.identity = true;
         self
     }
     pub fn nullable(mut self) -> Self {
@@ -76,12 +76,12 @@ impl FieldDef {
         self.unique = true;
         self
     }
-    pub fn auto_increment(mut self) -> Self {
-        self.auto_increment = true;
+    pub fn auto_assign(mut self) -> Self {
+        self.auto_assign = true;
         self
     }
-    pub fn index(mut self) -> Self {
-        self.indexed = true;
+    pub fn lookup(mut self) -> Self {
+        self.lookup = true;
         self
     }
     pub fn default(mut self, expr: &str) -> Self {
@@ -100,18 +100,18 @@ impl FieldDef {
         self.check = Some(expr.to_string());
         self
     }
-    pub fn references(mut self, fk: ForeignKeyRef) -> Self {
+    pub fn references(mut self, fk: RelationRef) -> Self {
         self.references = Some(fk);
         self
     }
 
     pub fn generated_stored(mut self, expr: &str) -> Self {
-        self.generated = Some((GeneratedKind::Stored, expr.to_string()));
+        self.generated = Some((ComputedKind::Materialized, expr.to_string()));
         self
     }
 
     pub fn generated_virtual(mut self, expr: &str) -> Self {
-        self.generated = Some((GeneratedKind::Virtual, expr.to_string()));
+        self.generated = Some((ComputedKind::OnDemand, expr.to_string()));
         self
     }
 }

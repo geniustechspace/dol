@@ -18,7 +18,7 @@
 //!
 //! // From an Entity — full field-aware API
 //! let users = Entity::new("users", vec![
-//!     Field::new("id", DataType::Uuid).primary_key(),
+//!     Field::new("id", DataType::Uuid).identity(),
 //!     Field::new("email", DataType::unbounded_string()),
 //! ]);
 //!

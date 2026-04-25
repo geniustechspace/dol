@@ -19,7 +19,7 @@ pub mod field;
 pub mod field_type;
 pub mod prelude;
 
-pub use constraint::{EntityConstraint, FkAction, ForeignKeyRef, GeneratedKind};
+pub use constraint::{EntityConstraint, RefAction, RelationRef, ComputedKind};
 pub use field::Field;
 pub use field_type::DataType;
 
@@ -32,14 +32,14 @@ use constraint::EntityConstraint as Constraint;
 /// # Example
 ///
 /// ```rust
-/// use dol_schema::{Entity, Field, DataType, FkAction, EntityConstraint};
+/// use dol_schema::{Entity, Field, DataType, RefAction, EntityConstraint};
 ///
 /// let users = Entity::new("users", vec![
-///     Field::new("id", DataType::Uuid).primary_key(),
+///     Field::new("id", DataType::Uuid).identity(),
 ///     Field::new("tenant_id", DataType::Uuid),
 ///     Field::new("email", DataType::unbounded_string()),
 ///     Field::new("status", DataType::unbounded_string()).default("'active'"),
-///     Field::new("seq", DataType::Int32).auto_increment(),
+///     Field::new("seq", DataType::Int32).auto_assign(),
 /// ]).with_constraints(vec![
 ///     EntityConstraint::unique(["tenant_id", "email"]),
 /// ]);
@@ -99,14 +99,14 @@ impl Entity {
         self.fields.iter().map(|f| &*f.name)
     }
 
-    /// Returns an iterator over primary-key fields.
-    pub fn primary_keys(&self) -> impl Iterator<Item = &Field> {
-        self.fields.iter().filter(|f| f.primary_key)
+    /// Returns an iterator over identity fields.
+    pub fn identity_fields(&self) -> impl Iterator<Item = &Field> {
+        self.fields.iter().filter(|f| f.identity)
     }
 
-    /// Returns an iterator over non-primary-key fields.
-    pub fn non_pk_fields(&self) -> impl Iterator<Item = &Field> {
-        self.fields.iter().filter(|f| !f.primary_key)
+    /// Returns an iterator over non-identity fields.
+    pub fn non_identity_fields(&self) -> impl Iterator<Item = &Field> {
+        self.fields.iter().filter(|f| !f.identity)
     }
 
     /// Comma-separated field list for SELECT or INSERT.

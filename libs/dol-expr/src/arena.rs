@@ -134,29 +134,29 @@ impl SpanTable {
 pub struct ExprArena {
     nodes: Vec<ExprNode>,
     span_table: SpanTable,
-    /// Pooled literal values — indexed by [`LiteralId`].
+    /// Pooled literal values — lookup by [`LiteralId`].
     lits: Vec<Literal<'static>>,
-    /// Pooled function-call payloads — indexed by [`FuncId`].
+    /// Pooled function-call payloads — lookup by [`FuncId`].
     funcs: Vec<FuncNode>,
-    /// Pooled object-literal payloads — indexed by [`ObjLitId`].
+    /// Pooled object-literal payloads — lookup by [`ObjLitId`].
     obj_lits: Vec<ObjLitNode>,
-    /// Pooled window-function payloads — indexed by [`WindowId`].
+    /// Pooled window-function payloads — lookup by [`WindowId`].
     windows: Vec<WindowNode>,
-    /// Pooled CASE expression payloads — indexed by [`CaseId`].
+    /// Pooled CASE expression payloads — lookup by [`CaseId`].
     cases: Vec<CaseNode>,
-    /// Pooled IN-list payloads — indexed by [`InListId`].
+    /// Pooled IN-list payloads — lookup by [`InListId`].
     in_lists: Vec<InListNode>,
-    /// Pooled SELECT/query statement payloads — indexed by [`QueryId`].
+    /// Pooled SELECT/query statement payloads — lookup by [`QueryId`].
     queries: Vec<QueryNode>,
-    /// Pooled INSERT statement payloads — indexed by [`InsertId`].
+    /// Pooled INSERT statement payloads — lookup by [`InsertId`].
     inserts: Vec<InsertNode>,
-    /// Pooled UPDATE statement payloads — indexed by [`UpdateId`].
+    /// Pooled UPDATE statement payloads — lookup by [`UpdateId`].
     updates: Vec<UpdateNode>,
-    /// Pooled DELETE statement payloads — indexed by [`DeleteId`].
+    /// Pooled DELETE statement payloads — lookup by [`DeleteId`].
     deletes: Vec<DeleteNode>,
-    /// Pooled UPSERT statement payloads — indexed by [`UpsertId`].
+    /// Pooled UPSERT statement payloads — lookup by [`UpsertId`].
     upserts: Vec<UpsertNode>,
-    /// Pooled field-reference payloads — indexed by [`FieldId`].
+    /// Pooled field-reference payloads — lookup by [`FieldId`].
     fields: Vec<FieldNode>,
 }
 

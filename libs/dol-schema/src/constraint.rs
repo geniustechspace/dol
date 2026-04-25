@@ -7,122 +7,138 @@
 //! `dol-schema` is the single owner of constraint types; `dol-ir` re-exports
 //! the names it needs to embed in DDL `Statement` variants.
 
-use std::fmt;
 use std::sync::Arc;
 
 /// Action to take when a referenced record is deleted or updated.
+///
+/// Each variant has a backend-by-backend mapping:
+///
+/// | Variant       | SQL                  | Document store          | Graph             |
+/// |---------------|----------------------|-------------------------|-------------------|
+/// | `Forbid`      | `NO ACTION`          | reject mutation         | reject deletion   |
+/// | `Cascade`     | `CASCADE`            | cascade write/delete    | cascade traversal |
+/// | `Detach`      | `SET NULL`           | clear referencing field | drop edge         |
+/// | `Reject`      | `RESTRICT`           | refuse mutation         | refuse deletion   |
+/// | `UseDefault`  | `SET DEFAULT`        | reset to schema default | reset to default  |
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum FkAction {
-    NoAction,
+pub enum RefAction {
+    /// Reject the mutation outright; the reference is treated as a hard
+    /// invariant. Equivalent to `NO ACTION` in SQL.
+    Forbid,
+    /// Propagate the mutation to all referencing records.
     Cascade,
-    SetNull,
-    Restrict,
-    SetDefault,
+    /// Clear the referencing field on the dependent record. Equivalent to
+    /// `SET NULL` in SQL.
+    Detach,
+    /// Refuse the mutation if any referencing record exists. Equivalent to
+    /// `RESTRICT` in SQL — semantically narrower than [`Forbid`](Self::Forbid)
+    /// in that it forbids the mutation immediately rather than at commit time.
+    Reject,
+    /// Reset the referencing field to its declared default. Equivalent to
+    /// `SET DEFAULT` in SQL.
+    UseDefault,
 }
 
-impl fmt::Display for FkAction {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::NoAction => write!(f, "NO ACTION"),
-            Self::Cascade => write!(f, "CASCADE"),
-            Self::SetNull => write!(f, "SET NULL"),
-            Self::Restrict => write!(f, "RESTRICT"),
-            Self::SetDefault => write!(f, "SET DEFAULT"),
-        }
-    }
-}
-
-/// How a generated (computed) column is defined.
+/// How a computed field is materialized.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum GeneratedKind {
-    /// `GENERATED ALWAYS AS (expr) STORED` — materialized on write.
-    Stored,
-    /// `GENERATED ALWAYS AS (expr) VIRTUAL` — computed on read.
-    Virtual,
+pub enum ComputedKind {
+    /// Materialized on write — the value is stored alongside the record and
+    /// recomputed only when its inputs change.
+    Materialized,
+    /// Computed on demand — the value is recomputed every read; the field
+    /// occupies no storage of its own.
+    OnDemand,
 }
 
-/// An inline foreign key reference on a single field.
+/// An inline relation reference on a single field — the dependent side of a
+/// directed link to another entity.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ForeignKeyRef {
-    pub table: Arc<str>,
-    pub column: Arc<str>,
-    pub on_delete: FkAction,
-    pub on_update: FkAction,
+pub struct RelationRef {
+    /// Target entity name.
+    pub entity: Arc<str>,
+    /// Target field within `entity`.
+    pub field: Arc<str>,
+    pub on_delete: RefAction,
+    pub on_update: RefAction,
 }
 
-impl ForeignKeyRef {
-    pub fn new(table: impl Into<Arc<str>>, column: impl Into<Arc<str>>) -> Self {
+impl RelationRef {
+    pub fn new(entity: impl Into<Arc<str>>, field: impl Into<Arc<str>>) -> Self {
         Self {
-            table: table.into(),
-            column: column.into(),
-            on_delete: FkAction::NoAction,
-            on_update: FkAction::NoAction,
+            entity: entity.into(),
+            field: field.into(),
+            on_delete: RefAction::Forbid,
+            on_update: RefAction::Forbid,
         }
     }
 
-    pub fn on_delete(mut self, action: FkAction) -> Self {
+    pub fn on_delete(mut self, action: RefAction) -> Self {
         self.on_delete = action;
         self
     }
 
-    pub fn on_update(mut self, action: FkAction) -> Self {
+    pub fn on_update(mut self, action: RefAction) -> Self {
         self.on_update = action;
         self
     }
 }
 
-/// A model-level constraint (composite UNIQUE, multi-field FK, CHECK, composite PK).
+/// An entity-level constraint (composite uniqueness, multi-field relation,
+/// invariant expression, composite identity).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum EntityConstraint {
-    /// `UNIQUE (field1, field2, ...)`
+    /// Uniqueness constraint over one or more fields.
     Unique(Vec<Arc<str>>),
-    /// `FOREIGN KEY (fields) REFERENCES ref_model (ref_fields) ON DELETE action`
-    ForeignKey {
-        columns: Vec<Arc<str>>,
-        ref_table: Arc<str>,
-        ref_columns: Vec<Arc<str>>,
-        on_delete: FkAction,
+    /// A multi-field relation to another entity.
+    Relation {
+        fields: Vec<Arc<str>>,
+        ref_entity: Arc<str>,
+        ref_fields: Vec<Arc<str>>,
+        on_delete: RefAction,
     },
-    /// `CHECK (expression)`
-    Check(Arc<str>),
-    /// `PRIMARY KEY (field1, field2, ...)` — composite primary key.
-    PrimaryKey(Vec<Arc<str>>),
+    /// A boolean invariant expressed as text — every record must satisfy it.
+    Invariant(Arc<str>),
+    /// Composite identity constraint — these fields uniquely identify an
+    /// entity instance.
+    Identity(Vec<Arc<str>>),
 }
 
 impl EntityConstraint {
-    /// Build a `UNIQUE` constraint from any iterable of string-likes.
-    pub fn unique<I, S>(cols: I) -> Self
+    /// Build a `Unique` constraint from any iterable of string-likes.
+    pub fn unique<I, S>(fields: I) -> Self
     where
         I: IntoIterator<Item = S>,
         S: Into<Arc<str>>,
     {
-        Self::Unique(cols.into_iter().map(Into::into).collect())
+        Self::Unique(fields.into_iter().map(Into::into).collect())
     }
 
-    /// Build a `PRIMARY KEY` constraint from any iterable of string-likes.
-    pub fn primary_key<I, S>(cols: I) -> Self
+    /// Build an `Identity` constraint — the fields that uniquely identify an
+    /// entity instance.
+    pub fn identity<I, S>(fields: I) -> Self
     where
         I: IntoIterator<Item = S>,
         S: Into<Arc<str>>,
     {
-        Self::PrimaryKey(cols.into_iter().map(Into::into).collect())
+        Self::Identity(fields.into_iter().map(Into::into).collect())
     }
 
-    /// Build a `CHECK` constraint.
-    pub fn check(expr: impl Into<Arc<str>>) -> Self {
-        Self::Check(expr.into())
+    /// Build an `Invariant` constraint — a boolean expression every record
+    /// must satisfy.
+    pub fn invariant(expr: impl Into<Arc<str>>) -> Self {
+        Self::Invariant(expr.into())
     }
 
-    /// Build a `FOREIGN KEY` constraint.
-    pub fn foreign_key<I, J, S, T>(
-        columns: I,
-        ref_table: impl Into<Arc<str>>,
-        ref_columns: J,
-        on_delete: FkAction,
+    /// Build a multi-field `Relation` constraint.
+    pub fn relation<I, J, S, T>(
+        fields: I,
+        ref_entity: impl Into<Arc<str>>,
+        ref_fields: J,
+        on_delete: RefAction,
     ) -> Self
     where
         I: IntoIterator<Item = S>,
@@ -130,10 +146,10 @@ impl EntityConstraint {
         S: Into<Arc<str>>,
         T: Into<Arc<str>>,
     {
-        Self::ForeignKey {
-            columns: columns.into_iter().map(Into::into).collect(),
-            ref_table: ref_table.into(),
-            ref_columns: ref_columns.into_iter().map(Into::into).collect(),
+        Self::Relation {
+            fields: fields.into_iter().map(Into::into).collect(),
+            ref_entity: ref_entity.into(),
+            ref_fields: ref_fields.into_iter().map(Into::into).collect(),
             on_delete,
         }
     }

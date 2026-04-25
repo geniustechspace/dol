@@ -22,14 +22,14 @@ use dol_schema::{DataType, Entity, EntityConstraint, Field};
 
 /// Converts a [`Field`] into an owned IR [`FieldDef`].
 ///
-/// `dol_schema::ForeignKeyRef` and `dol_schema::EntityConstraint` are reused
+/// `dol_schema::RelationRef` and `dol_schema::EntityConstraint` are reused
 /// directly in the IR, so this helper only converts the surrounding `Arc<str>`
 /// scalars to `String` to match the IR's DDL string policy.
 fn field_to_field_def(f: &Field) -> FieldDef {
     FieldDef {
         name: f.name.to_string(),
         data_type: f.data_type.clone(),
-        primary_key: f.primary_key,
+        identity: f.identity,
         nullable: f.nullable,
         default_expr: f.default_expr.as_ref().map(|s| s.to_string()),
         unique: f.unique,
@@ -38,8 +38,8 @@ fn field_to_field_def(f: &Field) -> FieldDef {
         comment: f.comment.as_ref().map(|s| s.to_string()),
         collation: f.collation.as_ref().map(|s| s.to_string()),
         generated: f.generated.as_ref().map(|(k, e)| (*k, e.to_string())),
-        auto_increment: f.auto_increment,
-        indexed: f.indexed,
+        auto_assign: f.auto_assign,
+        lookup: f.lookup,
     }
 }
 
@@ -86,7 +86,7 @@ impl<'a> CreateFromMeta<'a> {
     /// Converts static `Field`s to owned `FieldDef`s and copies model
     /// constraints. Note: primary-key constraints derived from fields
     /// are included in the model's `constraints` array when present;
-    /// otherwise renderers should extract PKs from `FieldDef::primary_key`.
+    /// otherwise renderers should extract PKs from `FieldDef::identity`.
     pub fn build(&self) -> DefineEntity {
         let fields = self.model.fields.iter().map(field_to_field_def).collect();
         DefineEntity {
