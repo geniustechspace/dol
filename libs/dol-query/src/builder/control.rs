@@ -158,8 +158,8 @@ impl<'a> DefinePolicyBuilder<'a> {
     /// Build the arena-based IR as a [`dol_ir::Program`].
     ///
     /// Consumes the builder so the already-owned `name` / `on_model`
-    /// `String`s and any borrowed `Expr<'a>` operands can be moved
-    /// into the lowering pipeline without an extra clone.
+    /// `String`s can be moved into the IR directly, while any stored
+    /// `Expr<'a>` operands are lowered by reference without an extra clone.
     pub fn build(self) -> dol_ir::Program {
         use dol_expr::lower::lower_expr;
 
