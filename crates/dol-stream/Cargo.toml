@@ -25,3 +25,6 @@ serde   = [
     "dol-ir/serde",
     "smallvec/serde",
 ]
+
+[dev-dependencies]
+serde_json = { workspace = true }

@@ -124,6 +124,7 @@ version = "0.1.0"
 dependencies = [
  "dol-types",
  "serde",
+ "serde_json",
  "smallvec",
 ]
 
@@ -200,6 +201,7 @@ dependencies = [
  "dol-schema",
  "dol-types",
  "serde",
+ "serde_json",
  "smallvec",
 ]
 
@@ -208,6 +210,7 @@ name = "dol-types"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "serde_json",
 ]
 
 [[package]]

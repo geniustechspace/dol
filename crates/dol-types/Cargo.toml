@@ -15,3 +15,6 @@ serde = { workspace = true, optional = true }
 # Embedded users can opt out with `default-features = false`.
 default = ["serde"]
 serde = ["dep:serde"]
+
+[dev-dependencies]
+serde_json = { workspace = true }

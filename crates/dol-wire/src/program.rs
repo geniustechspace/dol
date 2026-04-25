@@ -13,6 +13,7 @@
 //! Both the postcard and JSON helpers are gated behind the matching feature
 //! flag (`postcard`, `json`) and the universal `serde` plumbing.
 
+#[cfg(feature = "json")]
 use alloc::string::String;
 use alloc::vec::Vec;
 

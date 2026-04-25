@@ -14,8 +14,12 @@ The checker is split into independent passes:
 - **`lint`** — style / best-practice findings.
 
 All passes are append-only on the diagnostic list: callers may run only the
-passes they need. `check_all` runs `type_check`, `schema_check`, and `lint`
-in order.
+passes they need. Two convenience entry points cover the common cases:
+
+- `check_all(&program)` runs `type_check`, `schema_check`, and `lint` (the
+  three backend-agnostic passes).
+- `check_all_for(&program, caps)` additionally runs `capability_check`
+  against the supplied [`BackendCapabilities`].
 
 ## Features
 
@@ -28,6 +32,9 @@ in order.
 ```rust,ignore
 let diags = dol_check::check_all(&program);
 if diags.iter().any(|d| d.severity.is_error()) { /* … */ }
+
+// With a backend capability set:
+let diags = dol_check::check_all_for(&program, dol_ir::BackendCapabilities::ALL);
 ```
 
 See the rustdoc for the full API.

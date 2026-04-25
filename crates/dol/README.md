@@ -30,6 +30,14 @@ need without pulling in the full dependency tree.
 | `full`    | every layer DOL ships                         | Library / tooling consumers                     |
 | `iot-min` | `expr + schema + ir + stream + wire/postcard` | Minimal IoT-edge slice (fits `thumbv7em` budget) |
 
+The `iot-min` preset and the three `no_std` leaves (`dol-arena`, `dol-span`,
+`dol-diag`) are verified in CI:
+
+- `cargo check -p dol --no-default-features --features iot-min` runs on every
+  build (host compile-only).
+- `cargo check -p dol-arena -p dol-span -p dol-diag --no-default-features
+  --target thumbv7em-none-eabihf` runs in a dedicated cross-compile job.
+
 ## Universal `serde`
 
 Adding the `serde` feature turns on `serde` on every active sub-crate via

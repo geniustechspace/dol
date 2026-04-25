@@ -14,6 +14,13 @@
 //!
 //! All passes are append-only on the diagnostic list: callers may run only
 //! the passes they need.
+//!
+//! Two convenience entry points cover the common cases:
+//!
+//! - [`check_all`] runs the three backend-agnostic passes
+//!   ([`type_check`], [`schema_check`], [`lint`]).
+//! - [`check_all_for`] additionally runs [`capability_check`] against a
+//!   caller-supplied [`BackendCapabilities`].
 
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
@@ -21,12 +28,24 @@
 use dol_diag::Diagnostic;
 use dol_ir::{BackendCapabilities, Program, Statement};
 
-/// Run [`type_check`], [`schema_check`], and [`lint`] in order.
+/// Run the backend-agnostic passes ([`type_check`], [`schema_check`],
+/// [`lint`]) in order.
+///
+/// Use [`check_all_for`] when you also need [`capability_check`] against a
+/// concrete backend.
 pub fn check_all(program: &Program) -> alloc::vec::Vec<Diagnostic> {
     let mut out = alloc::vec::Vec::new();
     type_check(program, &mut out);
     schema_check(program, &mut out);
     lint(program, &mut out);
+    out
+}
+
+/// Run [`check_all`] *plus* [`capability_check`] against the given backend
+/// capability set.
+pub fn check_all_for(program: &Program, caps: BackendCapabilities) -> alloc::vec::Vec<Diagnostic> {
+    let mut out = check_all(program);
+    capability_check(program, caps, &mut out);
     out
 }
 
