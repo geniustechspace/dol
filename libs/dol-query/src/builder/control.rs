@@ -87,29 +87,34 @@ impl RevokeBuilder {
 
 /// Builder for `CREATE POLICY` statements (row-level security).
 ///
+/// The builder is parameterized over the lifetime of the tree expressions
+/// it stores (`Expr<'a>`), so callers can pass expressions that borrow from
+/// request-scoped buffers as well as `'static` literals.
+///
 /// ```rust
 /// use dol_query::builder::control::DefinePolicyBuilder;
 /// use dol_expr::tree::{field, param};
 /// use dol_query::builder::control::PolicyAction;
 ///
-/// let (stmt, _arena, _interner) = DefinePolicyBuilder::new("tenant_isolation")
+/// let program = DefinePolicyBuilder::new("tenant_isolation")
 ///     .on("orders")
 ///     .for_action(PolicyAction::All)
 ///     .using(field("tenant_id").eq(param()))
 ///     .check(field("tenant_id").eq(param()))
 ///     .build();
+/// let _stmt = &program.stmt;
 /// ```
 #[derive(Debug, Clone)]
 #[must_use = "builders do nothing until .build() is called"]
-pub struct DefinePolicyBuilder {
+pub struct DefinePolicyBuilder<'a> {
     name: String,
     on_model: String,
     action: PolicyAction,
-    using_expr: Option<Expr<'static>>,
-    check_expr: Option<Expr<'static>>,
+    using_expr: Option<Expr<'a>>,
+    check_expr: Option<Expr<'a>>,
 }
 
-impl DefinePolicyBuilder {
+impl<'a> DefinePolicyBuilder<'a> {
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -133,29 +138,27 @@ impl DefinePolicyBuilder {
     }
 
     /// Set the USING expression (filter for which rows are visible).
-    pub fn using(mut self, expr: impl Into<Expr<'static>>) -> Self {
+    pub fn using(mut self, expr: impl Into<Expr<'a>>) -> Self {
         self.using_expr = Some(expr.into());
         self
     }
 
     /// Set the WITH CHECK expression (filter for mutations).
-    pub fn check(mut self, expr: impl Into<Expr<'static>>) -> Self {
+    pub fn check(mut self, expr: impl Into<Expr<'a>>) -> Self {
         self.check_expr = Some(expr.into());
         self
     }
 
-    /// Build the arena-based IR as a [`dol_ir::Statement`].
-    pub fn build(&self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+    /// Build the arena-based IR as a [`dol_ir::Program`].
+    pub fn build(&self) -> dol_ir::Program {
         use dol_expr::lower::lower_expr;
 
         let mut arena = dol_expr::ExprArena::new();
         let mut interner = dol_expr::Interner::new();
 
-        let ir_action = match self.action {
-            PolicyAction::Read => dol_ir::PolicyAction::Read,
-            PolicyAction::Write => dol_ir::PolicyAction::Write,
-            PolicyAction::All => dol_ir::PolicyAction::All,
-        };
+        // `PolicyAction` is re-exported from `dol_ir::control`, so the
+        // builder field and IR type are the same; just copy it.
+        let ir_action = self.action;
 
         let using_id = self
             .using_expr
@@ -174,6 +177,6 @@ impl DefinePolicyBuilder {
             check_expr: check_id,
         };
 
-        (dol_ir::Statement::DefinePolicy(policy), arena, interner)
+        dol_ir::Program::new(dol_ir::Statement::DefinePolicy(policy), arena, interner)
     }
 }

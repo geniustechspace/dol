@@ -84,7 +84,7 @@ impl<'a> InsertBuilder<'a> {
     ///
     /// When no fields have been set (via `.fields()`), all entity fields
     /// are included by default.
-    pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+    pub fn build(self) -> dol_ir::Program {
         let mut q = crate::InsertQuery::new(
             self.model.name.to_string(),
             self.model.namespace.as_ref().map(|s| s.to_string()),
@@ -288,7 +288,7 @@ impl<'a> UpdateBuilder<'a> {
     }
 
     /// Build the arena-based IR as a [`dol_ir::Statement`].
-    pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+    pub fn build(self) -> dol_ir::Program {
         let mut q = crate::UpdateQuery::new(
             self.model.name.to_string(),
             self.model.namespace.as_ref().map(|s| s.to_string()),
@@ -372,7 +372,7 @@ impl<'a> DeleteBuilder<'a> {
     }
 
     /// Build the arena-based IR as a [`dol_ir::Statement`].
-    pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+    pub fn build(self) -> dol_ir::Program {
         let mut q = crate::DeleteQuery::new(
             self.model.name.to_string(),
             self.model.namespace.as_ref().map(|s| s.to_string()),
@@ -508,7 +508,7 @@ impl<'a> UpsertBuilder<'a> {
     ///
     /// When no fields have been set (via `.fields()`), all entity fields
     /// are included by default.
-    pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+    pub fn build(self) -> dol_ir::Program {
         let field_names: Vec<String> = self.model.field_names().map(|s| s.to_string()).collect();
         let mut q = crate::UpsertQuery::new(
             self.model.name.to_string(),

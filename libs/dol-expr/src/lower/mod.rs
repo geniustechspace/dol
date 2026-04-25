@@ -16,7 +16,7 @@ use smallvec::SmallVec;
 ///
 /// All strings are interned into `interner`.  Sub-expressions are recursively
 /// lowered in post-order.
-pub fn lower_expr(expr: &Expr<'static>, arena: &mut ExprArena, interner: &mut Interner) -> NodeId {
+pub fn lower_expr(expr: &Expr<'_>, arena: &mut ExprArena, interner: &mut Interner) -> NodeId {
     use crate::arena::FieldStep;
 
     match expr {
@@ -285,7 +285,7 @@ pub fn lower_expr(expr: &Expr<'static>, arena: &mut ExprArena, interner: &mut In
 
 /// Lower an `OrderByExpr<'static>` into the arena, returning `(NodeId, Order)`.
 pub fn lower_order_by(
-    ob: &OrderByExpr<'static>,
+    ob: &OrderByExpr<'_>,
     arena: &mut ExprArena,
     interner: &mut Interner,
 ) -> (NodeId, Order) {
@@ -299,7 +299,7 @@ pub fn lower_order_by(
 
 /// Lower multiple expressions, returning `NodeId`s.
 pub fn lower_exprs(
-    exprs: &[Expr<'static>],
+    exprs: &[Expr<'_>],
     arena: &mut ExprArena,
     interner: &mut Interner,
 ) -> SmallVec<[NodeId; 8]> {
@@ -320,7 +320,7 @@ pub fn qualified_name(name: &str, namespace: &Option<String>) -> String {
 /// Lower multiple expressions and AND-join them, returning a single filter
 /// `NodeId` (or `NULL_NODE` if the list is empty).
 pub fn lower_filters(
-    filters: &[Expr<'static>],
+    filters: &[Expr<'_>],
     arena: &mut ExprArena,
     interner: &mut Interner,
 ) -> NodeId {

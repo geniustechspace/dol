@@ -14,6 +14,7 @@ pub mod control;
 pub mod definition;
 pub mod entity_ref;
 pub mod prelude;
+pub mod program;
 pub mod statement;
 pub mod storage;
 pub mod transaction;
@@ -31,6 +32,7 @@ pub use definition::{
     DropType, FieldDef, LookupMethod,
 };
 pub use entity_ref::EntityRef;
+pub use program::Program;
 pub use statement::Statement;
 pub use storage::{GetObject, ListObjects, MoveFile, ObjectSource, PutObject, ReadFile, WriteFile};
 pub use transaction::Transaction;

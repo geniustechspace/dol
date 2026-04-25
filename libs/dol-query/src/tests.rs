@@ -87,7 +87,7 @@ fn namespace_on_already_namespaced_string() {
 
 #[test]
 fn namespace_propagates_to_get_ir() {
-    let (stmt, _arena, interner) = Query::from("api")
+    let dol_ir::Program { stmt, interner, .. } = Query::from("api")
         .namespace("v1")
         .namespace("users")
         .get()
@@ -103,7 +103,7 @@ fn namespace_propagates_to_get_ir() {
 
 #[test]
 fn namespace_propagates_to_insert_ir() {
-    let (stmt, _arena, interner) = Query::from("api")
+    let dol_ir::Program { stmt, interner, .. } = Query::from("api")
         .namespace("users")
         .insert()
         .fields(&["id", "email"])
@@ -118,7 +118,7 @@ fn namespace_propagates_to_insert_ir() {
 
 #[test]
 fn namespace_propagates_to_update_ir() {
-    let (stmt, _arena, interner) = Query::from("api")
+    let dol_ir::Program { stmt, interner, .. } = Query::from("api")
         .namespace("users")
         .update()
         .set("email")
@@ -133,7 +133,7 @@ fn namespace_propagates_to_update_ir() {
 
 #[test]
 fn namespace_propagates_to_delete_ir() {
-    let (stmt, _arena, interner) = Query::from("api")
+    let dol_ir::Program { stmt, interner, .. } = Query::from("api")
         .namespace("users")
         .delete()
         .filter(field("id").eq(param()))
@@ -148,7 +148,7 @@ fn namespace_propagates_to_delete_ir() {
 
 #[test]
 fn namespace_propagates_to_upsert_ir() {
-    let (stmt, _arena, interner) = Query::from("api")
+    let dol_ir::Program { stmt, interner, .. } = Query::from("api")
         .namespace("users")
         .upsert()
         .fields(&["id", "email"])
@@ -168,7 +168,7 @@ fn namespace_propagates_to_upsert_ir() {
 #[test]
 fn get_from_entity_defaults() {
     let users = users_entity();
-    let (stmt, _arena, interner) = Query::from(&users).get().build();
+    let dol_ir::Program { stmt, interner, .. } = Query::from(&users).get().build();
     match stmt {
         dol_ir::Statement::Query(q) => {
             assert_eq!(interner.get(q.from), "users");
@@ -182,7 +182,7 @@ fn get_from_entity_defaults() {
 #[test]
 fn get_from_entity_filter() {
     let users = users_entity();
-    let (stmt, _arena, _interner) = Query::from(&users)
+    let dol_ir::Program { stmt, .. } = Query::from(&users)
         .get()
         .filter(field("id").eq(param()))
         .build();
@@ -198,7 +198,7 @@ fn get_from_entity_filter() {
 
 #[test]
 fn get_from_string_columns() {
-    let (stmt, _arena, interner) = Query::from("users")
+    let dol_ir::Program { stmt, interner, .. } = Query::from("users")
         .get()
         .fields(&["id", "email"])
         .filter(field("id").eq(param()))
@@ -215,7 +215,8 @@ fn get_from_string_columns() {
 
 #[test]
 fn get_from_namespaced_string() {
-    let (stmt, _arena, interner) = Query::from("identity.users").get().fields(&["id"]).build();
+    let dol_ir::Program { stmt, interner, .. } =
+        Query::from("identity.users").get().fields(&["id"]).build();
     match stmt {
         dol_ir::Statement::Query(q) => {
             assert_eq!(interner.get(q.from), "identity.users");
@@ -229,7 +230,7 @@ fn get_from_namespaced_string() {
 #[test]
 fn insert_from_entity_defaults() {
     let users = users_entity();
-    let (stmt, _arena, interner) = Query::from(&users).insert().build();
+    let dol_ir::Program { stmt, interner, .. } = Query::from(&users).insert().build();
     match stmt {
         dol_ir::Statement::Insert(ins) => {
             assert_eq!(interner.get(ins.target), "users");
@@ -241,7 +242,7 @@ fn insert_from_entity_defaults() {
 
 #[test]
 fn insert_from_string_columns() {
-    let (stmt, _arena, interner) = Query::from("users")
+    let dol_ir::Program { stmt, interner, .. } = Query::from("users")
         .insert()
         .fields(&["id", "email"])
         .rows(2)
@@ -263,7 +264,7 @@ fn insert_from_string_columns() {
 
 #[test]
 fn update_from_string() {
-    let (stmt, _arena, interner) = Query::from("users")
+    let dol_ir::Program { stmt, interner, .. } = Query::from("users")
         .update()
         .set("email")
         .filter(field("id").eq(param()))
@@ -285,7 +286,7 @@ fn update_from_string() {
 
 #[test]
 fn delete_from_string() {
-    let (stmt, _arena, interner) = Query::from("users")
+    let dol_ir::Program { stmt, interner, .. } = Query::from("users")
         .delete()
         .filter(field("id").eq(param()))
         .returning_all()
@@ -304,7 +305,7 @@ fn delete_from_string() {
 
 #[test]
 fn upsert_from_string() {
-    let (stmt, _arena, interner) = Query::from("users")
+    let dol_ir::Program { stmt, interner, .. } = Query::from("users")
         .upsert()
         .fields(&["id", "email", "name"])
         .match_on(&["id"])
@@ -327,7 +328,7 @@ fn upsert_from_string() {
 
 #[test]
 fn upsert_do_nothing() {
-    let (stmt, _arena, _interner) = Query::from("users")
+    let dol_ir::Program { stmt, .. } = Query::from("users")
         .upsert()
         .fields(&["id", "email"])
         .match_on(&["id"])
@@ -350,7 +351,7 @@ fn upsert_do_nothing() {
 
 #[test]
 fn get_build_produces_query_statement() {
-    let (stmt, _arena, interner) = Query::from("users")
+    let dol_ir::Program { stmt, interner, .. } = Query::from("users")
         .get()
         .fields(&["id", "email"])
         .filter(field("id").eq(param()))
@@ -367,7 +368,8 @@ fn get_build_produces_query_statement() {
 
 #[test]
 fn get_build_with_namespace() {
-    let (stmt, _arena, interner) = Query::from("identity.users").get().fields(&["id"]).build();
+    let dol_ir::Program { stmt, interner, .. } =
+        Query::from("identity.users").get().fields(&["id"]).build();
     match stmt {
         dol_ir::Statement::Query(q) => {
             assert_eq!(interner.get(q.from), "identity.users");
@@ -379,7 +381,7 @@ fn get_build_with_namespace() {
 
 #[test]
 fn insert_build_produces_insert_statement() {
-    let (stmt, _arena, interner) = Query::from("users")
+    let dol_ir::Program { stmt, interner, .. } = Query::from("users")
         .insert()
         .fields(&["id", "email"])
         .rows(2)
@@ -397,7 +399,7 @@ fn insert_build_produces_insert_statement() {
 
 #[test]
 fn insert_build_returning() {
-    let (stmt, _arena, interner) = Query::from("users")
+    let dol_ir::Program { stmt, interner, .. } = Query::from("users")
         .insert()
         .fields(&["id"])
         .returning_all()
@@ -415,7 +417,7 @@ fn insert_build_returning() {
 
 #[test]
 fn update_build_produces_update_statement() {
-    let (stmt, _arena, interner) = Query::from("users")
+    let dol_ir::Program { stmt, interner, .. } = Query::from("users")
         .update()
         .set("email")
         .filter(field("id").eq(param()))
@@ -433,7 +435,7 @@ fn update_build_produces_update_statement() {
 
 #[test]
 fn delete_build_produces_delete_statement() {
-    let (stmt, _arena, interner) = Query::from("users")
+    let dol_ir::Program { stmt, interner, .. } = Query::from("users")
         .delete()
         .filter(field("id").eq(param()))
         .build();
@@ -448,7 +450,7 @@ fn delete_build_produces_delete_statement() {
 
 #[test]
 fn upsert_build_do_nothing() {
-    let (stmt, _arena, interner) = Query::from("users")
+    let dol_ir::Program { stmt, interner, .. } = Query::from("users")
         .upsert()
         .fields(&["id", "email"])
         .match_on(&["id"])
@@ -469,7 +471,7 @@ fn upsert_build_do_nothing() {
 
 #[test]
 fn upsert_build_do_update() {
-    let (stmt, _arena, _interner) = Query::from("users")
+    let dol_ir::Program { stmt, .. } = Query::from("users")
         .upsert()
         .fields(&["id", "email", "name"])
         .match_on(&["id"])
@@ -492,7 +494,7 @@ fn upsert_build_do_update() {
 #[test]
 fn get_build_default_entity_fields() {
     let users = users_entity();
-    let (stmt, _arena, interner) = Query::from(&users).get().build();
+    let dol_ir::Program { stmt, interner, .. } = Query::from(&users).get().build();
     match stmt {
         dol_ir::Statement::Query(q) => {
             assert_eq!(interner.get(q.from), "users");

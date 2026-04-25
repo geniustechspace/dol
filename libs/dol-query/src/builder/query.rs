@@ -365,7 +365,7 @@ impl<'a> GetBuilder<'a> {
     ///
     /// When no projections have been set (via `.fields()`, `.field()`,
     /// etc.), all entity fields are selected by default.
-    pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+    pub fn build(self) -> dol_ir::Program {
         use dol_expr::expr::{BinOp, ExprNode, JoinNode, JoinType as ArenaJoinType, QueryNode};
         use dol_expr::ids::NULL_NODE;
         use dol_expr::lower::{lower_expr, lower_filters, lower_order_by};
@@ -496,7 +496,7 @@ impl<'a> GetBuilder<'a> {
             lock,
         };
 
-        (dol_ir::Statement::Query(node), arena, interner)
+        (dol_ir::Statement::Query(node), arena, interner).into()
     }
 }
 

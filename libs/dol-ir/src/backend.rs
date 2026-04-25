@@ -1,4 +1,4 @@
-use crate::statement::Statement;
+use crate::program::Program;
 
 /// Concrete error type returned by DOL IR backends.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,16 +23,21 @@ impl std::fmt::Display for BackendError {
 
 impl std::error::Error for BackendError {}
 
-/// A compiler from DOL [`Statement`] IR into a backend-specific artifact.
+/// A compiler from DOL [`Program`] IR into a backend-specific artifact.
 ///
 /// The associated [`Backend::Output`] type lets each backend describe its
 /// natural result shape: text-oriented backends (SQL, GraphQL, ...) can use
 /// `String`, while richer backends can return structured types carrying
 /// metadata such as parameter bindings, key/value operation descriptors, or
 /// storage actions.
+///
+/// Backends receive a [`Program`] — a [`crate::Statement`] together with the
+/// [`dol_expr::ExprArena`] and [`dol_expr::Interner`] needed to resolve any
+/// arena references the statement may carry. Backends that only handle
+/// fully-owned variants can ignore the arena/interner.
 pub trait Backend {
     /// The concrete artifact produced by this backend.
     type Output;
 
-    fn compile(&self, stmt: &Statement) -> Result<Self::Output, BackendError>;
+    fn compile(&self, program: &Program) -> Result<Self::Output, BackendError>;
 }

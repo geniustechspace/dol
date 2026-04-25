@@ -22,7 +22,7 @@
 //!     Field::new("email", DataType::unbounded_string()),
 //! ]);
 //!
-//! let (stmt, _arena, interner) = Query::from(&users)
+//! let dol_ir::Program { stmt, interner, .. } = Query::from(&users)
 //!     .get()
 //!     .filter(field("id").eq(param()))
 //!     .build();
@@ -35,7 +35,7 @@
 //! }
 //!
 //! // From a plain string — no field metadata needed
-//! let (stmt, _arena, interner) = Query::from("users")
+//! let dol_ir::Program { stmt, interner, .. } = Query::from("users")
 //!     .get()
 //!     .fields(&["id", "email"])
 //!     .filter(field("id").eq(param()))
@@ -48,7 +48,7 @@
 //! }
 //!
 //! // From a namespaced string
-//! let (stmt, _arena, interner) = Query::from("identity.users")
+//! let dol_ir::Program { stmt, interner, .. } = Query::from("identity.users")
 //!     .get()
 //!     .fields(&["id"])
 //!     .build();
@@ -60,7 +60,7 @@
 //! }
 //!
 //! // Namespace chaining — builds hierarchical paths
-//! let (stmt, _arena, interner) = Query::from("api")
+//! let dol_ir::Program { stmt, interner, .. } = Query::from("api")
 //!     .namespace("v1")
 //!     .namespace("users")
 //!     .get()
@@ -127,7 +127,7 @@ use dol_schema::Entity;
 /// use dol_query::Query;
 ///
 /// // Single namespace
-/// let (stmt, _arena, interner) = Query::from("api")
+/// let dol_ir::Program { stmt, interner, .. } = Query::from("api")
 ///     .namespace("users")
 ///     .get()
 ///     .fields(&["id"])
@@ -140,7 +140,7 @@ use dol_schema::Entity;
 /// }
 ///
 /// // Chained namespaces — builds "api.v1.users"
-/// let (stmt, _arena, interner) = Query::from("api")
+/// let dol_ir::Program { stmt, interner, .. } = Query::from("api")
 ///     .namespace("v1")
 ///     .namespace("users")
 ///     .get()

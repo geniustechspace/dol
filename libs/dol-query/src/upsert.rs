@@ -110,11 +110,15 @@ impl UpsertQuery {
         }
     }
 
-    /// Build the arena-based IR as a [`dol_ir::Statement`].
+    /// Build the arena-based IR as a [`dol_ir::Program`].
     ///
-    /// Returns `(Statement, ExprArena, Interner)` — the arena and interner
-    /// are needed by renderers to resolve expression references.
-    pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
+    /// Returns a [`Program`] carrying the [`Statement`] together with the
+    /// expression arena and interner needed by renderers to resolve any
+    /// expression references it contains.
+    ///
+    /// [`Program`]: dol_ir::Program
+    /// [`Statement`]: dol_ir::Statement
+    pub fn build(self) -> dol_ir::Program {
         use dol_expr::expr::{ConflictClause, ExprNode, UpsertNode};
 
         let mut arena = dol_expr::ExprArena::new();
@@ -186,6 +190,6 @@ impl UpsertQuery {
             conflict,
         };
 
-        (dol_ir::Statement::Upsert(node), arena, interner)
+        (dol_ir::Statement::Upsert(node), arena, interner).into()
     }
 }

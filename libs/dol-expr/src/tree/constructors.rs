@@ -39,25 +39,49 @@ pub fn field_dyn(name: &str) -> Expr<'static> {
 
 /// Create a container namespace path: `users`, `schema.users`, etc.
 ///
-/// Use this when an expression *is* a container address (a table, bucket,
-/// API endpoint, KV namespace, …). To reference a leaf attribute *inside*
-/// a namespace, chain with [`Expr::field()`]:
+/// Multi-segment literals (e.g. `"schema.users"`) are split on `.` and stored
+/// as separate segments, so each becomes a [`CompactName::Static`]
+/// (zero allocation). A single-segment literal (`"users"`) is also stored
+/// `Static`. Use this when an expression *is* a container address (a table,
+/// bucket, API endpoint, KV namespace, …). To reference a leaf attribute
+/// *inside* a namespace, chain with [`Expr::field()`]:
 /// `namespace("users").field("email")`.
 pub fn namespace(path: &'static str) -> Expr<'static> {
-    Expr::Namespace(PathExpr::from_str(path))
+    let p = if path.contains('.') {
+        PathExpr::from_segments(path.split('.').map(CompactName::Static))
+    } else {
+        PathExpr::one(CompactName::Static(path))
+    };
+    Expr::Namespace(p)
 }
 
 /// Runtime variant of [`namespace`] that accepts any `&str`.
+///
+/// Multi-segment paths (e.g. `"schema.users"`) are split on `.` and stored
+/// as separate segments; each segment is heap-allocated.
 pub fn namespace_dyn(path: &str) -> Expr<'static> {
-    Expr::Namespace(PathExpr::from_str(path))
+    let p = if path.contains('.') {
+        PathExpr::from_segments(path.split('.').map(CompactName::from_str))
+    } else {
+        PathExpr::from_str(path)
+    };
+    Expr::Namespace(p)
 }
 
 /// Create a qualified leaf reference: `scope.name` (e.g. `users.email`).
 ///
+/// `scope` may itself contain `.` separators (`"schema.users"`); it is split
+/// the same way as [`namespace`] so `qualified("schema.users", "email")`
+/// produces a two-segment namespace anchor with `email` as the leaf.
 /// Equivalent to `namespace(scope).field(name)`.
 pub fn qualified(scope: &'static str, name: &'static str) -> Expr<'static> {
+    let scope_path = if scope.contains('.') {
+        PathExpr::from_segments(scope.split('.').map(CompactName::Static))
+    } else {
+        PathExpr::one(CompactName::Static(scope))
+    };
     Expr::Field {
-        base: Some(Box::new(Expr::Namespace(PathExpr::from_str(scope)))),
+        base: Some(Box::new(Expr::Namespace(scope_path))),
         name: CompactName::Static(name),
         steps: Vec::new(),
     }
@@ -117,8 +141,10 @@ pub fn arr<'a>(elements: Vec<Expr<'a>>) -> Expr<'a> {
 
 /// Convert `&str` to an unanchored [`Expr::Field`] for ergonomic builder use.
 ///
-/// String literals use [`CompactName::Static`] (zero alloc). Non-static `&str`
-/// creates an `Owned` variant.
+/// The name is stored as [`CompactName::Owned`] (one heap allocation), since
+/// `From<&str>` cannot distinguish a `&'static str` literal from a
+/// non-`'static` borrow at the type level. For zero-alloc storage of a
+/// compile-time-known name, prefer the [`field`] free function.
 impl<'a> From<&str> for Expr<'a> {
     fn from(s: &str) -> Self {
         Expr::Field {
