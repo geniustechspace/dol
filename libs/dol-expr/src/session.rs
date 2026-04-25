@@ -72,7 +72,7 @@ impl BuildSession {
         let col_id = self.interner.intern(column);
         let fid = self.arena.alloc_field(FieldNode {
             namespace: None,
-            column: col_id,
+            name: col_id,
             steps: SmallVec::new(),
         });
         self.arena.alloc(ExprNode::Field(fid))
@@ -91,7 +91,7 @@ impl BuildSession {
         let col_id = self.interner.intern(column);
         let fid = self.arena.alloc_field(FieldNode {
             namespace: Some(ns_id),
-            column: col_id,
+            name: col_id,
             steps,
         });
         self.arena.alloc(ExprNode::Field(fid))

@@ -29,8 +29,8 @@ pub mod window;
 
 pub use ast::Expr;
 pub use constructors::{
-    IntoFloatLiteral, IntoIntLiteral, arr, bool_expr, case, field, field_dyn, float, int, null,
-    obj, param, qualified, string,
+    IntoFloatLiteral, IntoIntLiteral, arr, bool_expr, case, field, field_dyn, float, int,
+    namespace, namespace_dyn, null, obj, param, qualified, string,
 };
 pub use func::def::{
     Arity, ArityError, CompactName, DolFunc, DolOp, FuncDef, FuncKind, OpDef, OpKind,

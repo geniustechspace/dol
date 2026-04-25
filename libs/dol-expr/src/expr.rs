@@ -280,7 +280,7 @@ mod field_tests {
         let col_id = interner.intern("id");
         let fid = arena.alloc_field(FieldNode {
             namespace: None,
-            column: col_id,
+            name: col_id,
             steps: smallvec![],
         });
         let nid = arena.alloc(ExprNode::Field(fid));
@@ -290,7 +290,7 @@ mod field_tests {
         };
         let node = arena.get_field(*got_fid);
         assert!(node.namespace.is_none());
-        assert_eq!(node.column, col_id);
+        assert_eq!(node.name, col_id);
         assert!(node.steps.is_empty());
     }
 
@@ -305,7 +305,7 @@ mod field_tests {
 
         let fid = arena.alloc_field(FieldNode {
             namespace: Some(ns_id),
-            column: col_id,
+            name: col_id,
             steps: smallvec![FieldStep::Key(key_id)],
         });
         let nid = arena.alloc(ExprNode::Field(fid));
@@ -315,7 +315,7 @@ mod field_tests {
         };
         let node = arena.get_field(*got_fid);
         assert_eq!(node.namespace, Some(ns_id));
-        assert_eq!(node.column, col_id);
+        assert_eq!(node.name, col_id);
         assert_eq!(node.steps.len(), 1);
         assert_eq!(node.steps[0], FieldStep::Key(key_id));
     }
@@ -331,7 +331,7 @@ mod field_tests {
 
         let fid = arena.alloc_field(FieldNode {
             namespace: None,
-            column: col_id,
+            name: col_id,
             steps: smallvec![FieldStep::Key(meta_id), FieldStep::Index(0)],
         });
         let nid = arena.alloc(ExprNode::Field(fid));
@@ -371,7 +371,7 @@ mod field_tests {
         };
         let node = sess.arena.get_field(*fid);
         assert!(node.namespace.is_none());
-        assert_eq!(sess.interner.get(node.column), "email");
+        assert_eq!(sess.interner.get(node.name), "email");
         assert!(node.steps.is_empty());
     }
 
@@ -387,7 +387,7 @@ mod field_tests {
         };
         let node = sess.arena.get_field(*fid);
         assert_eq!(sess.interner.get(node.namespace.unwrap()), "users");
-        assert_eq!(sess.interner.get(node.column), "profile_json");
+        assert_eq!(sess.interner.get(node.name), "profile_json");
         assert_eq!(node.steps.len(), 1);
         assert_eq!(node.steps[0], FieldStep::Key(key_id));
     }
@@ -426,7 +426,7 @@ mod field_tests {
         };
         let node = sess.arena.get_field(*fid);
         assert_eq!(sess.interner.get(node.namespace.unwrap()), "response");
-        assert_eq!(sess.interner.get(node.column), "data");
+        assert_eq!(sess.interner.get(node.name), "data");
         assert_eq!(node.steps.len(), 3);
         assert!(matches!(node.steps[0], FieldStep::Key(_)));
         assert_eq!(node.steps[1], FieldStep::Index(0));

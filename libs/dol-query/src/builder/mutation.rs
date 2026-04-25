@@ -401,7 +401,7 @@ pub type RemoveBuilder<'a> = DeleteBuilder<'a>;
 // UpsertBuilder
 // ===========================================================================
 
-/// Builder for `INSERT ... ON CONFLICT ... DO UPDATE/NOTHING` statements.
+/// Builder for upsert statements (`then_patch` or `then_skip` on a match).
 #[derive(Debug, Clone)]
 #[must_use = "builders do nothing until .build() is called"]
 pub struct UpsertBuilder<'a> {
@@ -479,18 +479,11 @@ impl<'a> UpsertBuilder<'a> {
         self.output_all()
     }
 
-    /// Add a filter expression that qualifies the conflict update action.
-    ///
-    /// In SQL-backed stores this maps to the WHERE clause inside `DO UPDATE SET`.
+    /// Add a filter expression that further qualifies which existing records
+    /// the patch action applies to.
     pub fn match_filter(mut self, expr: Expr<'static>) -> Self {
         self.conflict_filters.push(expr);
         self
-    }
-
-    #[deprecated(note = "use `match_filter()`")]
-    #[inline]
-    pub fn conflict_filter(self, expr: Expr<'static>) -> Self {
-        self.match_filter(expr)
     }
 
     /// Total bind-parameter count for this UPSERT.

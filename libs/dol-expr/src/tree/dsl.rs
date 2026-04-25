@@ -8,26 +8,50 @@ use super::func::def::DolOp;
 use super::op::UnaryOp;
 use super::op::meta::OpDef;
 use super::order::{Direction, OrderByExpr};
-use super::path::PathExpr;
 use super::window::WindowBuilder;
 
 impl<'a> Expr<'a> {
-    /// Access a sub-field of this expression: `self.field_name`.
+    /// Anchor a leaf field on this expression. Only meaningful when `self` is
+    /// an [`Expr::Namespace`]; for any other base, the resulting `Field` is
+    /// still well-formed but rendering is backend-specific.
     ///
-    /// Consecutive `.get()` calls extend the path rather than nesting boxes:
+    /// `namespace("users").field("email")` is the canonical way to spell a
+    /// qualified leaf attribute.
+    pub fn field(self, name: &str) -> Expr<'a> {
+        Expr::Field {
+            base: Some(Box::new(self)),
+            name: CompactName::from_str(name),
+            steps: Vec::new(),
+        }
+    }
+
+    /// Access an in-leaf sub-field (e.g. JSON key access) on this expression.
+    ///
+    /// Consecutive `.get()` calls extend the in-leaf traversal chain rather
+    /// than nesting boxes:
     /// `field("profile").get("address").get("city")` →
-    /// `Field { base: Namespace(["profile"]), path: ["address", "city"] }`.
+    /// `Field { base: None, name: "profile", steps: ["address", "city"] }`.
     pub fn get(self, name: &str) -> Expr<'a> {
         match self {
-            // Extend an existing Field node's path — avoids an extra Box.
-            Expr::Field { base, mut path } => {
-                path.segments.push(CompactName::from_str(name));
-                Expr::Field { base, path }
+            // Extend an existing Field node's traversal chain — avoids boxing.
+            Expr::Field {
+                base,
+                name: leaf,
+                mut steps,
+            } => {
+                steps.push(CompactName::from_str(name));
+                Expr::Field {
+                    base,
+                    name: leaf,
+                    steps,
+                }
             }
-            // Any other base (including Namespace) creates a new Field node.
+            // Any other base (e.g. Namespace) becomes a fresh Field with the
+            // first traversal step.
             other => Expr::Field {
-                base: Box::new(other),
-                path: PathExpr::from_str(name),
+                base: Some(Box::new(other)),
+                name: CompactName::from_str(name),
+                steps: Vec::new(),
             },
         }
     }

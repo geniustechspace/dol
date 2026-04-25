@@ -17,53 +17,47 @@ use smallvec::SmallVec;
 /// All strings are interned into `interner`.  Sub-expressions are recursively
 /// lowered in post-order.
 pub fn lower_expr(expr: &Expr<'static>, arena: &mut ExprArena, interner: &mut Interner) -> NodeId {
+    use crate::arena::FieldStep;
+
     match expr {
         Expr::Namespace(path) => {
-            let segments: Vec<&str> = path.iter().collect();
-            if segments.len() == 1 {
-                let col = interner.intern(segments[0]);
-                let fid = arena.alloc_field(FieldNode {
-                    namespace: None,
-                    column: col,
-                    steps: SmallVec::new(),
-                });
-                arena.alloc(ExprNode::Field(fid))
-            } else if segments.len() == 2 {
-                let ns = interner.intern(segments[0]);
-                let col = interner.intern(segments[1]);
-                let fid = arena.alloc_field(FieldNode {
-                    namespace: Some(ns),
-                    column: col,
-                    steps: SmallVec::new(),
-                });
-                arena.alloc(ExprNode::Field(fid))
-            } else {
-                let prefix = segments[..segments.len() - 1].join(".");
-                let ns = interner.intern(&prefix);
-                let col = interner.intern(segments[segments.len() - 1]);
-                let fid = arena.alloc_field(FieldNode {
-                    namespace: Some(ns),
-                    column: col,
-                    steps: SmallVec::new(),
-                });
-                arena.alloc(ExprNode::Field(fid))
-            }
+            // A bare container address — interned as its dotted form.
+            let dotted = path.iter().collect::<Vec<_>>().join(".");
+            let id = interner.intern(&dotted);
+            arena.alloc(ExprNode::Namespace(id))
         }
 
-        Expr::Field { base, path } => {
-            let base_id = lower_expr(base, arena, interner);
-            let segments: Vec<&str> = path.iter().collect();
-            let mut result = base_id;
-            for seg in segments {
-                let key_id = interner.intern(seg);
-                let key_node = arena.alloc(ExprNode::Namespace(key_id));
-                result = arena.alloc(ExprNode::BinOp {
-                    op: BinOp::Arrow,
-                    lhs: result,
-                    rhs: key_node,
-                });
-            }
-            result
+        Expr::Field { base, name, steps } => {
+            // Resolve the namespace anchor (if any) by interning its dotted
+            // form. A non-namespace base is currently unsupported here — the
+            // tree-level constructors only ever produce `Some(Namespace(_))`
+            // or `None` for `base`.
+            let namespace = match base.as_deref() {
+                Some(Expr::Namespace(path)) => {
+                    let dotted = path.iter().collect::<Vec<_>>().join(".");
+                    Some(interner.intern(&dotted))
+                }
+                None => None,
+                Some(_other) => {
+                    // Future shapes (e.g. parameter-anchored leaves) would
+                    // recursively lower the base; for now, fall through to an
+                    // unanchored leaf.
+                    None
+                }
+            };
+
+            let leaf_id = interner.intern(name.as_str());
+            let arena_steps: SmallVec<[FieldStep; 4]> = steps
+                .iter()
+                .map(|s| FieldStep::Key(interner.intern(s.as_str())))
+                .collect();
+
+            let fid = arena.alloc_field(FieldNode {
+                namespace,
+                name: leaf_id,
+                steps: arena_steps,
+            });
+            arena.alloc(ExprNode::Field(fid))
         }
 
         Expr::Param => arena.alloc(ExprNode::Param),
@@ -225,7 +219,7 @@ pub fn lower_expr(expr: &Expr<'static>, arena: &mut ExprArena, interner: &mut In
             let col = interner.intern("*");
             let fid = arena.alloc_field(FieldNode {
                 namespace: None,
-                column: col,
+                name: col,
                 steps: SmallVec::new(),
             });
             arena.alloc(ExprNode::Field(fid))
@@ -236,7 +230,7 @@ pub fn lower_expr(expr: &Expr<'static>, arena: &mut ExprArena, interner: &mut In
             let star_col = interner.intern("*");
             let star_fid = arena.alloc_field(FieldNode {
                 namespace: None,
-                column: star_col,
+                name: star_col,
                 steps: SmallVec::new(),
             });
             let star_node = arena.alloc(ExprNode::Field(star_fid));
@@ -371,5 +365,84 @@ fn lower_binop(op: &crate::tree::OpDef) -> BinOp {
         "SHIFT_LEFT" => BinOp::Shl,
         "SHIFT_RIGHT" => BinOp::Shr,
         _ => BinOp::Eq, // Fallback for unknown operators.
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::expr::ExprNode;
+    use crate::tree::{field, namespace};
+
+    #[test]
+    fn lowers_bare_field_to_unanchored_arena_field() {
+        let mut arena = ExprArena::new();
+        let mut interner = Interner::new();
+        let id = lower_expr(&field("email"), &mut arena, &mut interner);
+        match arena.get(id) {
+            ExprNode::Field(fid) => {
+                let node = arena.get_field(*fid);
+                assert!(node.namespace.is_none());
+                assert_eq!(interner.get(node.name), "email");
+                assert!(node.steps.is_empty());
+            }
+            other => panic!("expected ExprNode::Field, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn lowers_namespace_anchored_field() {
+        let mut arena = ExprArena::new();
+        let mut interner = Interner::new();
+        let expr = namespace("users").field("email");
+        let id = lower_expr(&expr, &mut arena, &mut interner);
+        match arena.get(id) {
+            ExprNode::Field(fid) => {
+                let node = arena.get_field(*fid);
+                let ns = node.namespace.expect("anchored on namespace");
+                assert_eq!(interner.get(ns), "users");
+                assert_eq!(interner.get(node.name), "email");
+            }
+            other => panic!("expected ExprNode::Field, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn lowers_namespace_only_path_to_namespace_node() {
+        let mut arena = ExprArena::new();
+        let mut interner = Interner::new();
+        let id = lower_expr(&namespace("schema.users"), &mut arena, &mut interner);
+        match arena.get(id) {
+            ExprNode::Namespace(sid) => {
+                assert_eq!(interner.get(*sid), "schema.users");
+            }
+            other => panic!("expected ExprNode::Namespace, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn lowers_in_leaf_traversal_steps() {
+        use crate::arena::FieldStep;
+        let mut arena = ExprArena::new();
+        let mut interner = Interner::new();
+        let expr = field("profile").get("address").get("city");
+        let id = lower_expr(&expr, &mut arena, &mut interner);
+        match arena.get(id) {
+            ExprNode::Field(fid) => {
+                let node = arena.get_field(*fid);
+                assert_eq!(interner.get(node.name), "profile");
+                assert_eq!(node.steps.len(), 2);
+                let labels: Vec<&str> = node
+                    .steps
+                    .iter()
+                    .map(|s| match s {
+                        FieldStep::Key(id) => interner.get(*id),
+                        FieldStep::Index(_) => panic!("unexpected index step"),
+                    })
+                    .collect();
+                assert_eq!(labels, ["address", "city"]);
+            }
+            other => panic!("expected ExprNode::Field, got {:?}", other),
+        }
     }
 }

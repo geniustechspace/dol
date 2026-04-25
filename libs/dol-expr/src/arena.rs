@@ -14,10 +14,10 @@ use crate::types::value::Literal;
 /// Steps allow a [`ExprNode::Field`] to express arbitrarily deep navigation
 /// through JSON/object structures or arrays, independent of the backing store:
 ///
-/// | Step | SQL (Postgres JSONB) | REST / document |
-/// |---|---|---|
-/// | `Key("name")` | `col->>'name'` | `.name` |
-/// | `Index(0)`    | `col->>0`      | `[0]`   |
+/// | Step | Postgres JSONB              | REST / document |
+/// |---|---------------------------------|-----------------|
+/// | `Key("name")` | `col->>'name'`     | `.name`         |
+/// | `Index(0)`    | `col->>0`          | `[0]`           |
 #[derive(Debug, Clone, PartialEq)]
 pub enum FieldStep {
     /// Named key access: `.key`, `->>'key'`, `["key"]`.
@@ -28,26 +28,27 @@ pub enum FieldStep {
 
 /// Payload for [`ExprNode::Field`], stored in [`ExprArena::fields`].
 ///
-/// `namespace` is an optional table/schema qualifier (e.g. the alias `u` in
-/// `u.profile_json`, or a fully-qualified `public.users`). `column` is the
-/// base column or attribute name. `steps` is the optional traversal chain
-/// that follows the column — empty means a bare column reference.
+/// A `Field` is a leaf reference: a named attribute optionally anchored on
+/// a container [`ExprNode::Namespace`] (whose dotted address is interned as
+/// `namespace`), with an optional traversal chain that follows the leaf
+/// (e.g. JSON key / index access).
 ///
-/// # Backend rendering examples
+/// # Examples
 ///
-/// | `namespace` | `column`       | `steps`          | SQL (Postgres)                    |
-/// |-------------|----------------|------------------|-----------------------------------|
-/// | `None`      | `"id"`         | `[]`             | `id`                              |
-/// | `Some("u")` | `"id"`         | `[]`             | `u.id`                            |
-/// | `None`      | `"profile_json"` | `[Key("name")]` | `profile_json->>'name'`           |
-/// | `Some("u")` | `"data"`       | `[Key("x"), Index(0)]` | `u.data->'x'->>0`         |
+/// | `namespace` | `name`           | `steps`                | Rendered (Postgres)         |
+/// |-------------|------------------|------------------------|-----------------------------|
+/// | `None`      | `"id"`           | `[]`                   | `id`                        |
+/// | `Some("u")` | `"id"`           | `[]`                   | `u.id`                      |
+/// | `None`      | `"profile_json"` | `[Key("name")]`        | `profile_json->>'name'`     |
+/// | `Some("u")` | `"data"`         | `[Key("x"), Index(0)]` | `u.data->'x'->>0`           |
 #[derive(Debug, Clone, PartialEq)]
 pub struct FieldNode {
-    /// Optional table/alias qualifier (`None` = unqualified).
+    /// Optional container address (interned dotted path); `None` means an
+    /// unanchored leaf reference at the current scope.
     pub namespace: Option<StrId>,
-    /// Base column or attribute name (first step from the container).
-    pub column: StrId,
-    /// Traversal steps that follow the column (empty = bare column reference).
+    /// Leaf attribute name.
+    pub name: StrId,
+    /// Traversal chain that follows the leaf (empty = bare leaf reference).
     pub steps: SmallVec<[FieldStep; 4]>,
 }
 

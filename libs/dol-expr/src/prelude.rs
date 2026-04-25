@@ -22,5 +22,5 @@ pub use crate::types::{DataType, Literal, Value};
 
 pub use crate::tree::{
     Expr, FuncDef, OpDef, OrderByExpr, PathExpr, UnaryOp as TreeUnaryOp, arr, bool_expr, case,
-    field, field_dyn, float, int, null, obj, param, qualified, string,
+    field, field_dyn, float, int, namespace, namespace_dyn, null, obj, param, qualified, string,
 };

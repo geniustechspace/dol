@@ -1,4 +1,10 @@
-//! UPSERT (INSERT ... ON CONFLICT) query builder for `dol-query`.
+//! Upsert query builder for `dol-query`.
+//!
+//! An upsert inserts a new record, or — when an existing record matches on
+//! a designated set of fields — patches it in place (`then_patch`) or skips
+//! the write entirely (`then_skip`). The "match" condition is store-neutral:
+//! SQL backends may render it as `ON CONFLICT`, document stores as a unique
+//! filter, KV stores as an `IF NOT EXISTS` precondition, etc.
 
 use dol_expr::tree::Expr;
 
@@ -6,7 +12,7 @@ use dol_expr::tree::Expr;
 // UpsertQuery
 // ===========================================================================
 
-/// A composable UPSERT builder that works with any entity source.
+/// A composable upsert builder that works with any entity source.
 ///
 /// Construct via [`Query::from(...).upsert()`](crate::Query::upsert).
 #[derive(Debug, Clone)]
@@ -50,39 +56,40 @@ impl UpsertQuery {
         self
     }
 
-    /// Set the conflict target columns: `ON CONFLICT (col1, col2)`.
+    /// Match an existing record by these fields.
     pub fn match_on(mut self, cols: &[&str]) -> Self {
         self.conflict_fields = cols.iter().map(|s| s.to_string()).collect();
         self
     }
 
-    /// Set the conflict target to a named constraint: `ON CONFLICT ON CONSTRAINT name`.
+    /// Match an existing record by a named constraint.
     pub fn match_on_constraint(mut self, name: &str) -> Self {
         self.conflict_constraint = Some(name.to_string());
         self
     }
 
-    /// Set the columns to update on conflict: `DO UPDATE SET col = EXCLUDED.col`.
+    /// On a match, patch the existing record's listed fields with the new
+    /// values.
     pub fn then_patch(mut self, cols: &[&str]) -> Self {
         self.update_fields = cols.iter().map(|s| s.to_string()).collect();
         self.then_skip_flag = false;
         self
     }
 
-    /// Use `DO NOTHING` on conflict.
+    /// On a match, skip the write entirely.
     pub fn then_skip(mut self) -> Self {
         self.then_skip_flag = true;
         self.update_fields.clear();
         self
     }
 
-    /// Specify columns to return.
+    /// Return the listed fields from the affected records.
     pub fn returning(mut self, cols: &[&str]) -> Self {
         self.returning = cols.iter().map(|s| s.to_string()).collect();
         self
     }
 
-    /// Add `RETURNING *`.
+    /// Return all fields from the affected records.
     pub fn returning_all(mut self) -> Self {
         self.returning = vec!["*".to_string()];
         self
@@ -136,7 +143,7 @@ impl UpsertQuery {
                 let col = interner.intern(r);
                 let fid = arena.alloc_field(dol_expr::FieldNode {
                     namespace: None,
-                    column: col,
+                    name: col,
                     steps: smallvec::SmallVec::new(),
                 });
                 arena.alloc(ExprNode::Field(fid))
@@ -156,7 +163,7 @@ impl UpsertQuery {
                     let c = interner.intern(col);
                     let fid = arena.alloc_field(dol_expr::FieldNode {
                         namespace: Some(ns),
-                        column: c,
+                        name: c,
                         steps: smallvec::SmallVec::new(),
                     });
                     let val_id = arena.alloc(ExprNode::Field(fid));

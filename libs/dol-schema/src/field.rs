@@ -2,7 +2,7 @@
 //!
 //! In DOL, a **Field** is a named property with a type, optional constraints,
 //! and an optional default expression. The DOL philosophy:
-//! - Fields are **required** (NOT NULL) by default
+//! - Fields are **required** (non-nullable) by default
 //! - Use `.optional()` or `.nullable()` to make them nullable
 //! - Use `.required()` as a no-op self-documenting marker
 
@@ -14,16 +14,16 @@ pub use dol_types::DataType;
 /// A field definition within an entity.
 ///
 /// Fields support the full range of constraints and references:
-/// - `identity()` — marks as part of the primary key
-/// - `nullable()` / `optional()` — allows NULL values (NOT NULL by default)
-/// - `unique()` — adds a UNIQUE constraint
-/// - `default(expr)` — sets a DEFAULT expression rendered in DDL
-/// - `references(entity, field, on_delete, on_update)` — inline foreign key
-/// - `check(expr)` — inline CHECK constraint
-/// - `index()` — hints that this field should be lookup
+/// - `identity()` — marks the field as identifying an entity instance
+/// - `nullable()` / `optional()` — permits the absence of a value
+/// - `unique()` — every record's value for this field must be unique
+/// - `default(expr)` — sets a default expression
+/// - `references(entity, field, on_delete, on_update)` — inline relation
+/// - `check(expr)` — inline invariant expression
+/// - `lookup()` — hints that this field should be lookup-optimised
 /// - `collation(name)` — overrides the collation for this field
 /// - `generated_stored(expr)` / `generated_virtual(expr)` — computed fields
-/// - `auto_assign()` — marks as auto-incrementing (replaces Serial/BigSerial)
+/// - `auto_assign()` — marks the field as auto-assigned by the store
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Field {
@@ -35,17 +35,17 @@ pub struct Field {
     pub default_expr: Option<Arc<str>>,
     pub unique: bool,
     pub references: Option<RelationRef>,
-    /// Inline CHECK constraint expression.
+    /// Inline invariant expression.
     pub check: Option<Arc<str>>,
     /// Human-readable description / comment.
     pub comment: Option<Arc<str>>,
     /// Collation override (e.g. `"C"`, `"en_US.UTF-8"`).
     pub collation: Option<Arc<str>>,
-    /// Generated (computed) field: `(kind, expression)`.
+    /// Computed field: `(kind, expression)`.
     pub generated: Option<(ComputedKind, Arc<str>)>,
-    /// Hint that this field should be lookup (for schema generation tooling).
+    /// Hint that this field should be lookup-optimised.
     pub lookup: bool,
-    /// Auto-incrementing field (replaces the old Serial/BigSerial types).
+    /// Auto-assigned field (replaces store-specific Serial/Identity types).
     pub auto_assign: bool,
 }
 
@@ -90,13 +90,13 @@ impl Field {
         self
     }
 
-    /// Mark field as having a server-side default (metadata only, no DDL rendering).
+    /// Mark field as having a store-managed default (metadata only).
     pub fn has_default(mut self) -> Self {
         self.has_default = true;
         self
     }
 
-    /// Set a DEFAULT expression that will be rendered in DDL.
+    /// Set a default expression for this field.
     pub fn default(mut self, expr: impl Into<Arc<str>>) -> Self {
         self.has_default = true;
         self.default_expr = Some(expr.into());
@@ -132,7 +132,7 @@ impl Field {
         self
     }
 
-    /// Add an inline CHECK constraint expression.
+    /// Add an inline invariant expression that every record must satisfy.
     pub fn check(mut self, expr: impl Into<Arc<str>>) -> Self {
         self.check = Some(expr.into());
         self
@@ -156,13 +156,13 @@ impl Field {
         self
     }
 
-    /// Mark as a stored generated (computed) field.
+    /// Mark as a materialized computed field (recomputed on write).
     pub fn generated_stored(mut self, expr: impl Into<Arc<str>>) -> Self {
         self.generated = Some((ComputedKind::Materialized, expr.into()));
         self
     }
 
-    /// Mark as a virtual generated (computed) field.
+    /// Mark as an on-demand computed field (recomputed on read).
     pub fn generated_virtual(mut self, expr: impl Into<Arc<str>>) -> Self {
         self.generated = Some((ComputedKind::OnDemand, expr.into()));
         self

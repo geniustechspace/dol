@@ -420,7 +420,7 @@ impl<'a> GetBuilder<'a> {
                             let col = interner.intern(l);
                             let fid = arena.alloc_field(dol_expr::FieldNode {
                                 namespace: None,
-                                column: col,
+                                name: col,
                                 steps: SmallVec::new(),
                             });
                             arena.alloc(ExprNode::Field(fid))
@@ -429,7 +429,7 @@ impl<'a> GetBuilder<'a> {
                             let col = interner.intern(r);
                             let fid = arena.alloc_field(dol_expr::FieldNode {
                                 namespace: None,
-                                column: col,
+                                name: col,
                                 steps: SmallVec::new(),
                             });
                             arena.alloc(ExprNode::Field(fid))
@@ -565,7 +565,10 @@ pub(crate) fn count_single_expr_params(expr: &Expr<'static>) -> usize {
 
         Expr::Alias { expr, .. } => count_single_expr_params(expr),
 
-        Expr::Field { base, .. } => count_single_expr_params(base),
+        Expr::Field { base, .. } => base
+            .as_deref()
+            .map(count_single_expr_params)
+            .unwrap_or(0),
 
         Expr::Object(fields) => fields
             .iter()

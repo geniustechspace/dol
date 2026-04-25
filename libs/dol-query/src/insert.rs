@@ -102,7 +102,7 @@ impl InsertQuery {
                 let col = interner.intern(r);
                 let fid = arena.alloc_field(dol_expr::FieldNode {
                     namespace: None,
-                    column: col,
+                    name: col,
                     steps: smallvec::SmallVec::new(),
                 });
                 arena.alloc(ExprNode::Field(fid))

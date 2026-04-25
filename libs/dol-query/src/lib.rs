@@ -210,7 +210,7 @@ impl Query {
         DeleteQuery::new(self.name, self.namespace)
     }
 
-    /// Start building an UPSERT (INSERT ... ON CONFLICT) statement.
+    /// Start building an upsert statement.
     pub fn upsert(self) -> UpsertQuery {
         UpsertQuery::new(self.name, self.namespace, self.field_names)
     }

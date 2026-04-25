@@ -363,7 +363,7 @@ impl GetQuery {
                             let col = interner.intern(l);
                             let fid = arena.alloc_field(dol_expr::FieldNode {
                                 namespace: None,
-                                column: col,
+                                name: col,
                                 steps: SmallVec::new(),
                             });
                             arena.alloc(ExprNode::Field(fid))
@@ -372,7 +372,7 @@ impl GetQuery {
                             let col = interner.intern(r);
                             let fid = arena.alloc_field(dol_expr::FieldNode {
                                 namespace: None,
-                                column: col,
+                                name: col,
                                 steps: SmallVec::new(),
                             });
                             arena.alloc(ExprNode::Field(fid))
