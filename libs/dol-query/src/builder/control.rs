@@ -35,11 +35,14 @@ impl GrantBuilder {
     }
 
     /// Build the canonical Grant.
-    pub fn build(&self) -> Grant {
+    ///
+    /// Consumes the builder so the already-owned `String` / `Privilege`
+    /// fields can be moved into the IR without cloning.
+    pub fn build(self) -> Grant {
         Grant {
-            privilege: self.privilege.clone(),
-            on_target: self.on_target.clone(),
-            to_role: self.to_role.clone(),
+            privilege: self.privilege,
+            on_target: self.on_target,
+            to_role: self.to_role,
         }
     }
 }
@@ -72,11 +75,14 @@ impl RevokeBuilder {
     }
 
     /// Build the canonical [`Revoke`] (dol-ir).
-    pub fn build(&self) -> Revoke {
+    ///
+    /// Consumes the builder so the already-owned `String` / `Privilege`
+    /// fields can be moved into the IR without cloning.
+    pub fn build(self) -> Revoke {
         Revoke {
-            privilege: self.privilege.clone(),
-            on_target: self.on_target.clone(),
-            from_role: self.from_role.clone(),
+            privilege: self.privilege,
+            on_target: self.on_target,
+            from_role: self.from_role,
         }
     }
 }

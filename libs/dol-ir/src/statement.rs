@@ -34,7 +34,7 @@ pub enum Statement {
     Upsert(UpsertNode),
 
     // ── DDL ───────────────────────────────────────────────────────────────
-    DefineEntity(Box<DefineEntity>),
+    DefineEntity(DefineEntity),
     AlterEntity(AlterEntity),
     DropEntity(DropEntity),
     DefineLookup(DefineLookup),
