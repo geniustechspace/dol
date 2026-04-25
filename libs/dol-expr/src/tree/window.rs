@@ -32,6 +32,11 @@ pub enum FrameKind {
 }
 
 /// Builder for window function specifications: `func OVER (...)`.
+///
+/// **Note:** Builder helper types (`WindowBuilder`, [`CaseBuilder`]) are
+/// transient construction state and intentionally **not** part of the
+/// `serde` surface. Persist or transmit the produced [`Expr`] (which does
+/// implement `Serialize`/`Deserialize` under the `serde` feature) instead.
 #[derive(Debug, Clone, PartialEq)]
 pub struct WindowBuilder<'a> {
     func: Expr<'a>,
@@ -94,6 +99,11 @@ impl<'a> WindowBuilder<'a> {
 }
 
 /// Builder for CASE WHEN ... THEN ... ELSE ... END expressions.
+///
+/// **Note:** Builder helper types ([`WindowBuilder`], `CaseBuilder`) are
+/// transient construction state and intentionally **not** part of the
+/// `serde` surface. Persist or transmit the produced [`Expr`] (which does
+/// implement `Serialize`/`Deserialize` under the `serde` feature) instead.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CaseBuilder<'a> {
     whens: Vec<(Expr<'a>, Expr<'a>)>,
