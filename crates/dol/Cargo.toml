@@ -1,0 +1,84 @@
+[package]
+name = "dol"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+description = "DOL — umbrella facade re-exporting the dol-* crates behind feature flags."
+
+[dependencies]
+# Always-on foundations
+dol-types  = { workspace = true }
+
+# Optional layers
+dol-arena    = { workspace = true, optional = true }
+dol-span     = { workspace = true, optional = true }
+dol-diag     = { workspace = true, optional = true }
+dol-expr     = { workspace = true, optional = true }
+dol-schema   = { workspace = true, optional = true }
+dol-ir       = { workspace = true, optional = true }
+dol-pipeline = { workspace = true, optional = true }
+dol-stream   = { workspace = true, optional = true }
+dol-wire     = { workspace = true, optional = true }
+dol-check    = { workspace = true, optional = true }
+dol-fmt      = { workspace = true, optional = true }
+dol-query    = { workspace = true, optional = true }
+
+[features]
+default = []
+
+# ── Individual layers ────────────────────────────────────────────────────────
+arena    = ["dep:dol-arena"]
+span     = ["dep:dol-span"]
+diag     = ["dep:dol-diag", "span"]
+expr     = ["dep:dol-expr"]
+schema   = ["dep:dol-schema", "expr"]
+ir       = ["dep:dol-ir", "expr", "schema"]
+pipeline = ["dep:dol-pipeline", "ir"]
+stream   = ["dep:dol-stream", "ir"]
+wire     = ["dep:dol-wire", "ir"]
+check    = ["dep:dol-check", "ir", "diag"]
+fmt      = ["dep:dol-fmt", "ir"]
+query    = ["dep:dol-query", "ir"]
+
+# ── Curated presets ──────────────────────────────────────────────────────────
+
+# Just the core language: types + expr + schema + IR + builders. No streaming,
+# no codecs, no diagnostics renderer. Smallest sensible "full programs" build.
+core     = ["expr", "schema", "ir", "query"]
+
+# Everything DOL ships today.
+full     = [
+    "arena", "span", "diag",
+    "expr", "schema", "ir",
+    "pipeline", "stream",
+    "wire", "check", "fmt",
+    "query",
+]
+
+# Minimal IoT-edge slice: types, IR, streaming verbs, postcard wire. No
+# diagnostics renderer, no JSON codec, no pretty-printer. Designed to fit
+# inside a `thumbv7em` binary budget.
+iot-min  = [
+    "expr", "schema", "ir",
+    "stream",
+    "wire",
+    "dol-wire/postcard",
+    "dol-wire/serde",
+]
+
+# Universal serde — turns on `serde` everywhere it's available.
+serde    = [
+    "dol-types/serde",
+    "dol-arena?/serde",
+    "dol-span?/serde",
+    "dol-diag?/serde",
+    "dol-expr?/serde",
+    "dol-schema?/serde",
+    "dol-ir?/serde",
+    "dol-pipeline?/serde",
+    "dol-stream?/serde",
+    "dol-wire?/serde",
+    "dol-check?/serde",
+    "dol-query?/serde",
+]

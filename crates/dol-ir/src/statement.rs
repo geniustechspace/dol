@@ -60,4 +60,24 @@ pub enum Statement {
 
     // ── Escape hatch ──────────────────────────────────────────────────────
     Raw(String),
+
+    // ── Extension seam (open) ─────────────────────────────────────────────
+    /// Open extension carrying a registered identifier and an opaque payload.
+    ///
+    /// Higher-level crates (notably `dol-stream` and `dol-pipeline`) attach
+    /// new verbs to the IR through this variant rather than extending the
+    /// closed enum, so streaming/IoT vocabulary can evolve independently of
+    /// the core. The `id` is a stable `&'static str` registered by the
+    /// emitting crate; the `payload` is its postcard-encoded body.
+    Extension(StatementExtension),
+}
+
+/// Open extension payload attached via [`Statement::Extension`].
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct StatementExtension {
+    /// Stable extension identifier (e.g. `"dol-stream/window"`).
+    pub id: String,
+    /// Opaque, codec-encoded payload understood by the registering crate.
+    pub payload: Vec<u8>,
 }

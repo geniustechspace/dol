@@ -1,0 +1,15 @@
+[package]
+name = "dol-span"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+description = "DOL — compact source spans and file ids for diagnostics."
+
+[dependencies]
+serde = { workspace = true, optional = true }
+
+[features]
+default = []
+serde   = ["dep:serde"]
+std     = []

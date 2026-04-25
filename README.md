@@ -52,18 +52,36 @@ intent of every operation without being tied to any specific storage engine.
 
 ## Workspace Structure
 
-| Crate                                   | Description                                              |
-| --------------------------------------- | -------------------------------------------------------- |
-| [`dol-types`](libs/dol-types)           | Leaf: `Value`, `Literal`, `DataType`                     |
-| [`dol-expr`](libs/dol-expr)             | Composable expression AST (ExprNode ≤ 32B, arena, interner) |
-| [`dol-ir`](libs/dol-ir)                 | Canonical IR: `Statement` enum and `Backend` trait       |
-| [`dol-schema`](libs/dol-schema)         | Schema: `Entity`, `Field`, constraints, definition builders |
-| [`dol-query`](libs/dol-query)           | Query entry point + builders → produce `dol-ir::Statement` |
+DOL is a flat workspace with a strict, acyclic dependency DAG. Each crate has a
+single, narrow purpose.
+
+| Crate                                       | Description                                                                 |
+| ------------------------------------------- | --------------------------------------------------------------------------- |
+| [`dol-arena`](crates/dol-arena)             | Generic typed arena, string interner, `Id<T>` newtypes (no DOL semantics)   |
+| [`dol-span`](crates/dol-span)               | Compact 8-byte source spans for diagnostics                                 |
+| [`dol-diag`](crates/dol-diag)               | Diagnostic model: severity, code catalogue, labels, fix-its                 |
+| [`dol-types`](crates/dol-types)             | Leaf: `Value`, `Literal`, `DataType`                                        |
+| [`dol-expr`](crates/dol-expr)               | Composable expression AST (`ExprNode` ≤ 32 B, arena, interner)              |
+| [`dol-schema`](crates/dol-schema)           | Schema: entities, fields, constraints, relations, lookups, policies         |
+| [`dol-ir`](crates/dol-ir)                   | Canonical IR: `Statement`, `Program`, `Backend` trait, `BackendCapabilities` |
+| [`dol-pipeline`](crates/dol-pipeline)       | Source → Transform → Sink dataflow IR                                       |
+| [`dol-stream`](crates/dol-stream)           | Streaming windows, watermarks, time-series, IoT/telemetry vocabulary        |
+| [`dol-wire`](crates/dol-wire)               | Canonical wire envelope, postcard / JSON codec helpers, BLAKE3 content hash |
+| [`dol-check`](crates/dol-check)             | Static validator (type / schema / capability / lint passes)                 |
+| [`dol-fmt`](crates/dol-fmt)                 | Canonical pretty-printer for IR programs                                    |
+| [`dol-query`](crates/dol-query)             | Fluent builder DSL → produces `dol-ir::Statement`                           |
+| [`dol`](crates/dol)                         | Umbrella facade with `core`, `full`, `iot-min` presets                      |
+| [`xtask`](xtask)                            | Workspace task runner (size report, `no_std` check, doc build)              |
 
 ```
-dol-types  →  dol-expr  →  dol-ir
-                              ↑
-                          dol-schema  →  dol-query
+dol-arena ─┐
+dol-span  ─┼─► dol-types ─► dol-expr ─► dol-schema ─► dol-ir ─► dol-pipeline ─► dol-query
+dol-diag  ─┘                                            │           │
+                                                        ├──► dol-stream
+                                                        ├──► dol-wire
+                                                        ├──► dol-check
+                                                        └──► dol-fmt
+                                                        dol  (umbrella)
 ```
 
 ## Building

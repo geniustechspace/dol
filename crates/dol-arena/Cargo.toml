@@ -1,0 +1,17 @@
+[package]
+name = "dol-arena"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+description = "DOL — generic typed arena, string interner, and Id newtypes. No DOL semantics."
+
+[dependencies]
+hashbrown = { workspace = true }
+smallvec  = { workspace = true }
+serde     = { workspace = true, optional = true }
+
+[features]
+default = []
+serde   = ["dep:serde", "smallvec/serde"]
+std     = []

@@ -40,6 +40,18 @@ deny:
 doc:
     cargo doc --workspace --all-features --no-deps --open
 
+# Print the in-memory size of every size-budgeted public IR type.
+size:
+    cargo run -q -p xtask -- size
+
+# Verify the leaf no_std crates compile without `std`.
+nostd:
+    cargo run -q -p xtask -- nostd
+
+# Build workspace docs without opening them.
+docs:
+    cargo run -q -p xtask -- doc
+
 # Clean build artifacts
 clean:
     cargo clean

@@ -10,6 +10,7 @@
 #![deny(unsafe_code)]
 
 pub mod backend;
+pub mod capabilities;
 pub mod control;
 pub mod definition;
 pub mod entity_ref;
@@ -25,6 +26,7 @@ pub mod constraint {
 }
 
 pub use backend::{Backend, BackendError};
+pub use capabilities::BackendCapabilities;
 pub use constraint::{ComputedKind, EntityConstraint, RefAction, RelationRef};
 pub use control::{DefinePolicy, Grant, PolicyAction, Privilege, Revoke};
 pub use definition::{
@@ -33,6 +35,6 @@ pub use definition::{
 };
 pub use entity_ref::EntityRef;
 pub use program::Program;
-pub use statement::Statement;
+pub use statement::{Statement, StatementExtension};
 pub use storage::{GetObject, ListObjects, MoveFile, ObjectSource, PutObject, ReadFile, WriteFile};
 pub use transaction::Transaction;
