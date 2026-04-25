@@ -2,9 +2,18 @@
 name = "dol-expr"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 publish = false
 description = "DOL expression AST, type system, arena, and interner (internal)"
 readme = "README.md"
+license = "BSD-3-Clause"
+repository = "https://github.com/geniustechspace/dol"
+keywords = ["dol", "database", "ast", "query", "no-std"]
+categories = ["database", "data-structures", "no-std"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 # Hand-rolled (not `workspace = true`) so we can opt out of `dol-types`'s
@@ -25,3 +34,10 @@ serde = ["dep:serde", "dol-types/serde", "smallvec/serde"]
 
 [dev-dependencies]
 serde_json = { workspace = true }
+proptest = "1"
+criterion = { version = "0.5", default-features = false, features = ["html_reports"] }
+
+[[bench]]
+name = "expr"
+harness = false
+required-features = ["serde"]

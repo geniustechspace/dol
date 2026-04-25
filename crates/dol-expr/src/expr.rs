@@ -7,6 +7,7 @@ use crate::ids::{
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub enum BinOp {
     Eq,
     Ne,
@@ -36,6 +37,7 @@ pub enum BinOp {
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub enum UnaryOp {
     Neg,
     Not,
@@ -47,6 +49,7 @@ pub enum UnaryOp {
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub enum Order {
     Asc,
     Desc,
@@ -54,6 +57,7 @@ pub enum Order {
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub enum LockHint {
     ForUpdate,
     ForShare,
@@ -63,6 +67,7 @@ pub enum LockHint {
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub enum ConflictClause {
     DoNothing,
     DoUpdate {
@@ -81,6 +86,7 @@ pub struct JoinNode {
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub enum JoinType {
     Inner,
     Left,
@@ -145,6 +151,7 @@ pub struct UpsertNode {
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub enum ExprNode {
     /// Static container address, up to (but not including) the leaf column.
     ///

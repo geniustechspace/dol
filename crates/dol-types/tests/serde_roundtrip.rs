@@ -62,19 +62,15 @@ fn data_type_composite_round_trip() {
         DataType::Set(Box::new(DataType::Uuid)),
         DataType::Tuple(vec![DataType::Int32, DataType::Bool]),
         DataType::Struct(vec![
-            StructField {
-                name: "id".into(),
-                data_type: DataType::Uuid,
-                nullable: false,
-            },
-            StructField {
-                name: "label".into(),
-                data_type: DataType::String {
+            StructField::new("id", DataType::Uuid, false),
+            StructField::new(
+                "label",
+                DataType::String {
                     max_len: Some(64),
                     fixed: false,
                 },
-                nullable: true,
-            },
+                true,
+            ),
         ]),
         DataType::Enum(vec!["active".into(), "inactive".into()]),
         DataType::TypeRef("user_status".into()),

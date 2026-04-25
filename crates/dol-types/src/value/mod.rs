@@ -147,6 +147,7 @@ impl fmt::Display for ValueRange {
 /// finite-only values at the literal layer.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub enum Value {
     // ── Primitive ──
     Null,

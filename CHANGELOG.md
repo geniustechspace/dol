@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `no_std + alloc` support for the language layer: `dol-types` and `dol-expr`
+  now compile with `--no-default-features` and on `thumbv7em-none-eabihf`.
+  CI's `cross-compile` job and `xtask nostd` enforce both
+- New `std` feature on `dol-types` (default-on) gating
+  `datetime::today / now / now_tz`; `core::error::Error` impl on `TypeError`
+  is unconditional
+- New `std` feature on `dol-expr` (default-off) that simply forwards to
+  `dol-types/std`
+- `#[non_exhaustive]` applied to the public, growable enums in the language
+  layer (`Value`, `Literal`, `DataType`, `BinOp`, `UnaryOp`, `Order`,
+  `LockHint`, `ConflictClause`, `JoinType`, `ExprNode`, `tree::Expr`,
+  `tree::op::UnaryOp`, `OpKind`, `FuncKind`, `FieldStep`, plus `StructField`)
+- `#![warn(missing_docs)]` enabled on `dol-types` and `dol-expr` (with a
+  module-level allowlist tracking the pending doc backlog)
+- Property-based tests for `dol-types` and `dol-expr` invariants (interner
+  determinism + canonical JSON form, validated-constructor exhaustiveness,
+  `DataType::accepts` consistency, primitive serde round-trip)
+- Tree → arena lowering invariant tests for `dol-expr`
+- Criterion benches for the interner (hot/unique/serde)
+- Publish metadata (`license`, `repository`, `keywords`, `categories`,
+  `[package.metadata.docs.rs]`) on `dol-types` and `dol-expr`
+- `docs/expr.md` (architecture of the language layer) and
+  `docs/STABILITY.md` (semver and wire-format policy)
 - Comprehensive unit tests for `dol-expr`, `dol-ir`, and `dol-query`
 - `dol-query` crate for backend-neutral query entry points
 - `dol-schema` crate for Entity/Field/constraints and DDL builders

@@ -9,6 +9,7 @@ use super::super::compact_name::CompactName;
 /// Classification of a DOL binary operator.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub enum OpKind {
     /// Comparison operators: `=`, `!=`, `<`, `>`, `<=`, `>=`.
     Comparison,

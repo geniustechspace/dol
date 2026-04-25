@@ -46,6 +46,7 @@ use super::window::WindowFrame;
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub enum Expr<'a> {
     // ── References ──────────────────────────────────────────────────────────
     /// A container path (no leaf): `users`, `schema.users`, `api/v1/users`.

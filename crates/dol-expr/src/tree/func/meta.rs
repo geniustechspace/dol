@@ -53,6 +53,7 @@ impl fmt::Display for ArityError {
 /// Classification of a DOL function.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub enum FuncKind {
     /// A scalar function (e.g. `LOWER`, `ABS`, `ROUND`).
     Scalar,

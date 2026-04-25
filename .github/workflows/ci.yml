@@ -239,6 +239,8 @@ jobs:
         run: |
           cargo check -p dol-arena -p dol-span -p dol-diag \
             --no-default-features --target thumbv7em-none-eabihf
+          cargo check -p dol-types -p dol-expr \
+            --no-default-features --target thumbv7em-none-eabihf
 
   deny:
     name: Cargo Deny (Security Audit)

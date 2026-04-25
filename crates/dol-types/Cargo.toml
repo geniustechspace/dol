@@ -2,9 +2,18 @@
 name = "dol-types"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 publish = false
 description = "DOL type system — DataType, Value, Literal, and all primitive types."
 readme = "README.md"
+license = "BSD-3-Clause"
+repository = "https://github.com/geniustechspace/dol"
+keywords = ["dol", "database", "schema", "types", "no-std"]
+categories = ["database", "data-structures", "no-std"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 serde = { workspace = true, optional = true }
@@ -23,3 +32,4 @@ std = []
 
 [dev-dependencies]
 serde_json = { workspace = true }
+proptest = "1"

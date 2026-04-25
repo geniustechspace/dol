@@ -22,6 +22,7 @@ use crate::types::value::Literal;
 /// | `Index(0)`    | `col->>0`          | `[0]`           |
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub enum FieldStep {
     /// Named key access: `.key`, `->>'key'`, `["key"]`.
     Key(StrId),

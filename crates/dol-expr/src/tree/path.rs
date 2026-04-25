@@ -124,6 +124,7 @@ impl PathExpr {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec::Vec;
 
     #[test]
     fn single_segment_zero_alloc() {

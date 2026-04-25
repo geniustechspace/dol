@@ -1,3 +1,5 @@
+#[cfg(feature = "serde")]
+use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use hashbrown::HashMap;

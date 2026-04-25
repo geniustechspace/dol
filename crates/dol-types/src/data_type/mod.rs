@@ -39,6 +39,7 @@ use core::ops::Bound;
 /// A named, typed field inside a [`DataType::Struct`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct StructField {
     pub name: Box<str>,
     pub data_type: DataType,
@@ -71,6 +72,7 @@ impl StructField {
 /// message). Resolution happens at the schema layer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub enum DataType {
     // ── Primitive ──
     Null,
