@@ -39,9 +39,16 @@ pub fn lower_expr(expr: &Expr<'static>, arena: &mut ExprArena, interner: &mut In
                 }
                 None => None,
                 Some(_other) => {
-                    // Future shapes (e.g. parameter-anchored leaves) would
-                    // recursively lower the base; for now, fall through to an
-                    // unanchored leaf.
+                    // The tree-level constructors never produce a non-Namespace
+                    // base for `Expr::Field`. If a future shape introduces one
+                    // (e.g. parameter-anchored leaves), lowering must be
+                    // extended explicitly; until then, surface the violation
+                    // loudly in debug builds and fall back to an unanchored
+                    // leaf in release builds.
+                    debug_assert!(
+                        false,
+                        "Expr::Field base must be Some(Expr::Namespace(_)) or None"
+                    );
                     None
                 }
             };
