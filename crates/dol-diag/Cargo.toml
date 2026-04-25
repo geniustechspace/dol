@@ -1,0 +1,19 @@
+[package]
+name = "dol-diag"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+description = "DOL — diagnostic model: severity, code catalog, labels, fix-its."
+readme = "README.md"
+
+[dependencies]
+dol-span = { workspace = true }
+smallvec = { workspace = true }
+serde    = { workspace = true, optional = true }
+
+[features]
+default = []
+serde   = ["dep:serde", "dol-span/serde", "smallvec/serde"]
+std     = ["dol-span/std"]
+render  = ["std"]

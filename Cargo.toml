@@ -1,14 +1,58 @@
 # ── Workspace ──────────────────────────────────────────────────────────────────
+#
+# DOL is structured as a flat workspace with a strict, acyclic dependency DAG.
+# Each crate has a single, narrow purpose; see `docs/` (when populated) and the
+# top-level README for the full layering rationale.
+#
+#   dol-arena ─┐
+#   dol-span  ─┼─► dol-types ─► dol-expr ─► dol-schema ─► dol-ir ─► dol-pipeline ─► dol-query
+#   dol-diag  ─┘                                            │           │
+#                                                           ├──► dol-stream
+#                                                           ├──► dol-wire
+#                                                           ├──► dol-check
+#                                                           └──► dol-fmt
+#                                                           dol  (umbrella; depends on all, optional)
+#
+# `dol` (umbrella) is the only crate allowed to depend on `dol-query`, and no
+# crate may depend on `dol`. Cycles are intended to be enforced by `cargo deny`.
 
 [workspace]
 resolver = "2"
 members = [
-    "libs/dol-types",           # Leaf: Value, Literal, DataType
-    "libs/dol-expr",            # Canonical expression layer (ExprNode ≤ 32B, arena, interner)
-    "libs/dol-schema",          # Schema: Entity, Field, constraints
-    "libs/dol-ir",              # Canonical IR: Statement (no lifetime), Backend trait
-    "libs/dol-query",           # Query entry point + builders → produce dol-ir::Statement
-    "libs/dol",                 # Umbrella facade with feature flags
+    # Foundations — pure infrastructure, no DOL semantics
+    "crates/dol-arena",
+    "crates/dol-span",
+    "crates/dol-diag",
+
+    # Type system & values
+    "crates/dol-types",
+
+    # Expression algebra
+    "crates/dol-expr",
+
+    # Schema language
+    "crates/dol-schema",
+
+    # Statement IR + Backend trait + capabilities
+    "crates/dol-ir",
+
+    # Dataflow & streaming IR
+    "crates/dol-pipeline",
+    "crates/dol-stream",
+
+    # Codecs / static checks / pretty printing
+    "crates/dol-wire",
+    "crates/dol-check",
+    "crates/dol-fmt",
+
+    # Builder DSL
+    "crates/dol-query",
+
+    # Umbrella facade
+    "crates/dol",
+
+    # Dev tooling
+    "xtask",
 ]
 
 [workspace.package]
@@ -18,17 +62,31 @@ rust-version = "1.85"
 publish = false
 
 [workspace.dependencies]
-# Collections
-smallvec = { version = "1", features = ["union", "serde"] }
+# ── Collections / utility ────────────────────────────────────────────────────
+smallvec   = { version = "1", features = ["union", "serde"] }
+hashbrown  = { version = "0.15", default-features = false, features = ["default-hasher", "inline-more"] }
+bytemuck   = { version = "1", features = ["derive"] }
 
-# Serialisation
-serde = { version = "1", features = ["derive", "rc"] }
-serde_json = "1"
+# ── Serialisation ────────────────────────────────────────────────────────────
+serde        = { version = "1", features = ["derive", "rc"] }
+serde_json   = "1"
+postcard     = { version = "1", default-features = false, features = ["alloc"] }
 
-# Internal crates — core language
-dol-types  = { path = "libs/dol-types" }
-dol-expr   = { path = "libs/dol-expr" }
-dol-ir     = { path = "libs/dol-ir" }
-dol-schema = { path = "libs/dol-schema" }
-dol-query  = { path = "libs/dol-query" }
-dol        = { path = "libs/dol" }
+# ── Hashing ──────────────────────────────────────────────────────────────────
+blake3       = { version = "1", default-features = false }
+
+# ── Internal crates ──────────────────────────────────────────────────────────
+dol-arena    = { path = "crates/dol-arena" }
+dol-span     = { path = "crates/dol-span" }
+dol-diag     = { path = "crates/dol-diag" }
+dol-types    = { path = "crates/dol-types" }
+dol-expr     = { path = "crates/dol-expr" }
+dol-schema   = { path = "crates/dol-schema" }
+dol-ir       = { path = "crates/dol-ir" }
+dol-pipeline = { path = "crates/dol-pipeline" }
+dol-stream   = { path = "crates/dol-stream" }
+dol-wire     = { path = "crates/dol-wire" }
+dol-check    = { path = "crates/dol-check" }
+dol-fmt      = { path = "crates/dol-fmt" }
+dol-query    = { path = "crates/dol-query" }
+dol          = { path = "crates/dol" }

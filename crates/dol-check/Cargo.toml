@@ -1,0 +1,29 @@
+[package]
+name = "dol-check"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+description = "DOL — static validator: type, schema, capability, and lint checks."
+readme = "README.md"
+
+[dependencies]
+dol-types  = { workspace = true }
+dol-expr   = { workspace = true }
+dol-schema = { workspace = true }
+dol-ir     = { workspace = true }
+dol-diag   = { workspace = true }
+dol-span   = { workspace = true }
+serde      = { workspace = true, optional = true }
+
+[features]
+default = []
+serde   = [
+    "dep:serde",
+    "dol-types/serde",
+    "dol-expr/serde",
+    "dol-schema/serde",
+    "dol-ir/serde",
+    "dol-diag/serde",
+    "dol-span/serde",
+]
