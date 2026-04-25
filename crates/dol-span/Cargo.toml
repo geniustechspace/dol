@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 publish = false
 description = "DOL — compact source spans and file ids for diagnostics."
+readme = "README.md"
 
 [dependencies]
 serde = { workspace = true, optional = true }

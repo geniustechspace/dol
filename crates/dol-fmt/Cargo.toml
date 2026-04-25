@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 publish = false
 description = "DOL — canonical pretty-printer for IR programs."
+readme = "README.md"
 
 [dependencies]
 dol-ir     = { workspace = true }

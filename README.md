@@ -57,21 +57,21 @@ single, narrow purpose.
 
 | Crate                                       | Description                                                                 |
 | ------------------------------------------- | --------------------------------------------------------------------------- |
-| [`dol-arena`](crates/dol-arena)             | Generic typed arena, string interner, `Id<T>` newtypes (no DOL semantics)   |
-| [`dol-span`](crates/dol-span)               | Compact 8-byte source spans for diagnostics                                 |
-| [`dol-diag`](crates/dol-diag)               | Diagnostic model: severity, code catalogue, labels, fix-its                 |
-| [`dol-types`](crates/dol-types)             | Leaf: `Value`, `Literal`, `DataType`                                        |
-| [`dol-expr`](crates/dol-expr)               | Composable expression AST (`ExprNode` ≤ 32 B, arena, interner)              |
-| [`dol-schema`](crates/dol-schema)           | Schema: entities, fields, constraints, relations, lookups, policies         |
-| [`dol-ir`](crates/dol-ir)                   | Canonical IR: `Statement`, `Program`, `Backend` trait, `BackendCapabilities` |
-| [`dol-pipeline`](crates/dol-pipeline)       | Source → Transform → Sink dataflow IR                                       |
-| [`dol-stream`](crates/dol-stream)           | Streaming windows, watermarks, time-series, IoT/telemetry vocabulary        |
-| [`dol-wire`](crates/dol-wire)               | Canonical wire envelope, postcard / JSON codec helpers, BLAKE3 content hash |
-| [`dol-check`](crates/dol-check)             | Static validator (type / schema / capability / lint passes)                 |
-| [`dol-fmt`](crates/dol-fmt)                 | Canonical pretty-printer for IR programs                                    |
-| [`dol-query`](crates/dol-query)             | Fluent builder DSL → produces `dol-ir::Statement`                           |
-| [`dol`](crates/dol)                         | Umbrella facade with `core`, `full`, `iot-min` presets                      |
-| [`xtask`](xtask)                            | Workspace task runner (size report, `no_std` check, doc build)              |
+| [`dol-arena`](crates/dol-arena/README.md)   | Generic typed arena, string interner, `Id<T>` newtypes (no DOL semantics)   |
+| [`dol-span`](crates/dol-span/README.md)     | Compact 8-byte source spans for diagnostics                                 |
+| [`dol-diag`](crates/dol-diag/README.md)     | Diagnostic model: severity, code catalogue, labels, fix-its                 |
+| [`dol-types`](crates/dol-types/README.md)   | Leaf: `Value`, `Literal`, `DataType`                                        |
+| [`dol-expr`](crates/dol-expr/README.md)     | Composable expression AST (`ExprNode` ≤ 32 B, arena, interner)              |
+| [`dol-schema`](crates/dol-schema/README.md) | Schema: entities, fields, constraints, relations, lookups, policies         |
+| [`dol-ir`](crates/dol-ir/README.md)         | Canonical IR: `Statement`, `Program`, `Backend` trait, `BackendCapabilities` |
+| [`dol-pipeline`](crates/dol-pipeline/README.md) | Source → Transform → Sink dataflow IR                                   |
+| [`dol-stream`](crates/dol-stream/README.md) | Streaming windows, watermarks, time-series, IoT/telemetry vocabulary        |
+| [`dol-wire`](crates/dol-wire/README.md)     | Canonical wire envelope, postcard / JSON codec helpers, BLAKE3 content hash |
+| [`dol-check`](crates/dol-check/README.md)   | Static validator (type / schema / capability / lint passes)                 |
+| [`dol-fmt`](crates/dol-fmt/README.md)       | Canonical pretty-printer for IR programs                                    |
+| [`dol-query`](crates/dol-query/README.md)   | Fluent builder DSL → produces `dol-ir::Statement`                           |
+| [`dol`](crates/dol/README.md)               | Umbrella facade with `core`, `full`, `iot-min` presets                      |
+| [`xtask`](xtask/README.md)                  | Workspace task runner (size report, `no_std` check, doc build, README check) |
 
 ```
 dol-arena ─┐
@@ -104,6 +104,16 @@ cargo clippy --workspace --all-features
 ```
 
 **Requirements:** Rust 1.85+ (edition 2024)
+
+## Per-crate documentation
+
+Every crate ships its own `README.md` next to its `Cargo.toml` (linked in the
+table above). The `xtask readme` subcommand verifies that each workspace
+member has a non-empty README and declares it in `Cargo.toml`:
+
+```bash
+cargo run -p xtask -- readme
+```
 
 ## License
 

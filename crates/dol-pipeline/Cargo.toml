@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 publish = false
 description = "DOL — declarative dataflow IR (Source → Transform → Sink) layered over Statement."
+readme = "README.md"
 
 [dependencies]
 dol-types  = { workspace = true }

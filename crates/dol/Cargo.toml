@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 publish = false
 description = "DOL — umbrella facade re-exporting the dol-* crates behind feature flags."
+readme = "README.md"
 
 [dependencies]
 # Always-on foundations

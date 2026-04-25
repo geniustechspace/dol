@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 publish = false
 description = "DOL type system — DataType, Value, Literal, and all primitive types."
+readme = "README.md"
 
 [dependencies]
 serde = { workspace = true, optional = true }

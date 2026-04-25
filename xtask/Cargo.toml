@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 publish = false
 description = "DOL — workspace task runner (size, nostd, doc, audit)."
+readme = "README.md"
 
 [dependencies]
 dol-types = { workspace = true }

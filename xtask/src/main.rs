@@ -13,6 +13,7 @@
 //! | `size`   | print `size_of` for the public size-budgeted IR types.   |
 //! | `nostd`  | run `cargo check --no-default-features` on `no_std` crates. |
 //! | `doc`    | build workspace docs with all features.                  |
+//! | `readme` | verify every workspace member has a non-empty README.md. |
 //! | `help`   | print this list.                                         |
 //!
 //! See `justfile` for higher-level recipes that wrap these.
@@ -31,6 +32,7 @@ fn main() -> ExitCode {
             &["doc", "--workspace", "--all-features", "--no-deps"],
             &rest,
         ),
+        "readme" => readme_check(),
         "help" | "-h" | "--help" => {
             print_help();
             true
@@ -57,6 +59,7 @@ fn print_help() {
            size    print size_of for size-budgeted public IR types\n  \
            nostd   verify the no_std layer compiles without `std`\n  \
            doc     build workspace documentation\n  \
+           readme  verify every workspace member has a non-empty README.md\n  \
            help    show this message\n"
     );
 }
@@ -129,4 +132,83 @@ fn nostd_check() -> bool {
         }
     }
     true
+}
+
+/// Verify every workspace member has a non-empty `README.md` and that its
+/// `Cargo.toml` declares it via `readme = "README.md"`. Keeps per-crate docs
+/// from silently rotting away.
+fn readme_check() -> bool {
+    use std::fs;
+    use std::path::PathBuf;
+
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    // `xtask` lives at `<workspace>/xtask`, so the workspace root is the parent.
+    let workspace_root = manifest_dir
+        .parent()
+        .expect("xtask manifest dir has a parent")
+        .to_path_buf();
+
+    // Discover every workspace member by scanning `crates/*` plus the `xtask`
+    // crate itself. Keeps this self-contained (no `cargo metadata` parsing).
+    let mut members: Vec<PathBuf> = Vec::new();
+    let crates_dir = workspace_root.join("crates");
+    match fs::read_dir(&crates_dir) {
+        Ok(entries) => {
+            for e in entries.flatten() {
+                let p = e.path();
+                if p.is_dir() && p.join("Cargo.toml").is_file() {
+                    members.push(p);
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("xtask: cannot read {}: {e}", crates_dir.display());
+            return false;
+        }
+    }
+    members.push(workspace_root.join("xtask"));
+    members.sort();
+
+    let mut ok = true;
+    for member in &members {
+        let name = member.file_name().and_then(|s| s.to_str()).unwrap_or("?");
+        let readme = member.join("README.md");
+        let manifest = member.join("Cargo.toml");
+
+        match fs::metadata(&readme) {
+            Ok(m) if m.len() == 0 => {
+                eprintln!("xtask: README.md is empty in `{name}`");
+                ok = false;
+            }
+            Ok(_) => {}
+            Err(_) => {
+                eprintln!("xtask: missing README.md in `{name}`");
+                ok = false;
+            }
+        }
+
+        match fs::read_to_string(&manifest) {
+            Ok(s) => {
+                if !s.lines().any(|l| {
+                    let t = l.trim();
+                    t == "readme = \"README.md\""
+                }) {
+                    eprintln!("xtask: `{name}/Cargo.toml` is missing `readme = \"README.md\"`");
+                    ok = false;
+                }
+            }
+            Err(e) => {
+                eprintln!("xtask: cannot read {}: {e}", manifest.display());
+                ok = false;
+            }
+        }
+    }
+
+    if ok {
+        println!(
+            "xtask: README.md present and declared in all {} members",
+            members.len()
+        );
+    }
+    ok
 }

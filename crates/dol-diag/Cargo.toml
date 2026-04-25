@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 publish = false
 description = "DOL — diagnostic model: severity, code catalog, labels, fix-its."
+readme = "README.md"
 
 [dependencies]
 dol-span = { workspace = true }

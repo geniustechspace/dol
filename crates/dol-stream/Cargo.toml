@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 publish = false
 description = "DOL — streaming, time-series, and IoT/telemetry IR extensions."
+readme = "README.md"
 
 [dependencies]
 dol-types  = { workspace = true }

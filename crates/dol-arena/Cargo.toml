@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 publish = false
 description = "DOL — generic typed arena, string interner, and Id newtypes. No DOL semantics."
+readme = "README.md"
 
 [dependencies]
 hashbrown = { workspace = true }

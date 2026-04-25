@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 publish = false
 description = "DOL — static validator: type, schema, capability, and lint checks."
+readme = "README.md"
 
 [dependencies]
 dol-types  = { workspace = true }

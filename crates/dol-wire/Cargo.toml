@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 publish = false
 description = "DOL — canonical binary + JSON codecs, schema versioning, content hashing."
+readme = "README.md"
 
 [dependencies]
 dol-ir     = { workspace = true }
