@@ -1,13 +1,55 @@
 use core::fmt;
 use core::str::FromStr;
 
-/// Parse error for [`MacAddr`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ParseMacAddrError;
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum MacAddrErrorKind {
+    /// The input did not parse as a MAC address.
+    Invalid,
+    /// The value was a valid `MacAddr`, but not the EUI-48 width requested
+    /// by a [`TryFrom`] conversion.
+    ExpectedEui48,
+    /// The value was a valid `MacAddr`, but not the EUI-64 width requested
+    /// by a [`TryFrom`] conversion.
+    ExpectedEui64,
+}
+
+/// An error which can be returned when parsing a [`MacAddr`] or converting
+/// one to a fixed-width byte array.
+///
+/// This error is used as the error type for the [`FromStr`] implementation
+/// for [`MacAddr`] and for the [`TryFrom<MacAddr>`] conversions to
+/// `[u8; 6]` and `[u8; 8]`.
+///
+/// # Potential causes
+///
+/// `ParseMacAddrError` may be returned because the provided string does not
+/// parse as a MAC address, or because a valid `MacAddr` was the wrong width
+/// for the requested conversion (e.g. converting an EUI-64 to `[u8; 6]`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseMacAddrError(MacAddrErrorKind);
+
+impl ParseMacAddrError {
+    const fn invalid() -> Self {
+        Self(MacAddrErrorKind::Invalid)
+    }
+
+    const fn expected_eui48() -> Self {
+        Self(MacAddrErrorKind::ExpectedEui48)
+    }
+
+    const fn expected_eui64() -> Self {
+        Self(MacAddrErrorKind::ExpectedEui64)
+    }
+}
 
 impl fmt::Display for ParseMacAddrError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("invalid mac address")
+        let msg = match self.0 {
+            MacAddrErrorKind::Invalid => "invalid mac address",
+            MacAddrErrorKind::ExpectedEui48 => "mac address is not EUI-48",
+            MacAddrErrorKind::ExpectedEui64 => "mac address is not EUI-64",
+        };
+        f.write_str(msg)
     }
 }
 
@@ -95,7 +137,7 @@ impl TryFrom<MacAddr> for [u8; 6] {
     type Error = ParseMacAddrError;
 
     fn try_from(value: MacAddr) -> Result<Self, Self::Error> {
-        value.octets_48().ok_or(ParseMacAddrError)
+        value.octets_48().ok_or_else(ParseMacAddrError::expected_eui48)
     }
 }
 
@@ -103,7 +145,7 @@ impl TryFrom<MacAddr> for [u8; 8] {
     type Error = ParseMacAddrError;
 
     fn try_from(value: MacAddr) -> Result<Self, Self::Error> {
-        value.octets_64().ok_or(ParseMacAddrError)
+        value.octets_64().ok_or_else(ParseMacAddrError::expected_eui64)
     }
 }
 
@@ -127,7 +169,7 @@ impl FromStr for MacAddr {
         } else if s.contains('-') {
             '-'
         } else {
-            return Err(ParseMacAddrError);
+            return Err(ParseMacAddrError::invalid());
         };
 
         let mut bytes = [0u8; 8];
@@ -135,9 +177,9 @@ impl FromStr for MacAddr {
 
         for part in s.split(separator) {
             if count == bytes.len() {
-                return Err(ParseMacAddrError);
+                return Err(ParseMacAddrError::invalid());
             }
-            bytes[count] = parse_hex_byte(part).ok_or(ParseMacAddrError)?;
+            bytes[count] = parse_hex_byte(part).ok_or_else(ParseMacAddrError::invalid)?;
             count += 1;
         }
 
@@ -146,7 +188,7 @@ impl FromStr for MacAddr {
                 bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5],
             ])),
             8 => Ok(Self::Eui64(bytes)),
-            _ => Err(ParseMacAddrError),
+            _ => Err(ParseMacAddrError::invalid()),
         }
     }
 }
@@ -177,7 +219,7 @@ impl TryFrom<alloc::boxed::Box<str>> for MacAddr {
 
 #[cfg(test)]
 mod tests {
-    use super::MacAddr;
+    use super::{MacAddr, ParseMacAddrError};
 
     #[test]
     fn display_eui48() {
@@ -207,5 +249,23 @@ mod tests {
     fn parse_rejects_invalid() {
         assert!("00:11:22:33:44".parse::<MacAddr>().is_err());
         assert!("zz:11:22:33:44:55".parse::<MacAddr>().is_err());
+    }
+
+    #[test]
+    fn try_from_distinguishes_width_mismatch_from_parse_error() {
+        let e64 = MacAddr::eui64([0u8; 8]);
+        let e48 = MacAddr::eui48([0u8; 6]);
+
+        let bad_parse = "not-a-mac".parse::<MacAddr>().unwrap_err();
+        let bad_48: ParseMacAddrError = <[u8; 6]>::try_from(e64).unwrap_err();
+        let bad_64: ParseMacAddrError = <[u8; 8]>::try_from(e48).unwrap_err();
+
+        assert_ne!(bad_parse, bad_48);
+        assert_ne!(bad_parse, bad_64);
+        assert_ne!(bad_48, bad_64);
+
+        assert_eq!(bad_parse.to_string(), "invalid mac address");
+        assert_eq!(bad_48.to_string(), "mac address is not EUI-48");
+        assert_eq!(bad_64.to_string(), "mac address is not EUI-64");
     }
 }

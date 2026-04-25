@@ -91,6 +91,7 @@ fn primitive_value_strategy() -> impl Strategy<Value = Value> {
         any::<u128>().prop_map(|n| Value::Uuid(n.to_be_bytes())),
         ip_strategy().prop_map(Value::Inet),
         any::<[u8; 6]>().prop_map(|b| Value::MacAddr(MacAddr::eui48(b))),
+        any::<[u8; 8]>().prop_map(|b| Value::MacAddr(MacAddr::eui64(b))),
     ]
 }
 
