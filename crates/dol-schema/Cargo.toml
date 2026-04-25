@@ -13,5 +13,8 @@ serde = { workspace = true, optional = true }
 serde_json = { workspace = true }
 
 [features]
-default = []
+# `serde` is on by default: schema definitions are almost always serialized
+# (config files, wire envelopes, golden tests). Embedded users can opt out
+# with `default-features = false`.
+default = ["serde"]
 serde = ["dep:serde", "dol-types/serde"]

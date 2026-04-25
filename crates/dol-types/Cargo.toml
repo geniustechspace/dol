@@ -9,5 +9,8 @@ description = "DOL type system — DataType, Value, Literal, and all primitive t
 serde = { workspace = true, optional = true }
 
 [features]
-default = []
+# `serde` is on by default: this is a leaf primitive crate, the cost is
+# negligible, and downstream consumers almost always want round-tripping.
+# Embedded users can opt out with `default-features = false`.
+default = ["serde"]
 serde = ["dep:serde"]
