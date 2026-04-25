@@ -8,7 +8,10 @@
 use dol_expr::tree::{Direction, Expr, NullsPosition, OrderByExpr, field_dyn};
 use dol_schema::Entity;
 
-use crate::{JoinKind, LockMode};
+#[cfg(feature = "sql")]
+use dol_expr::expr::LockHint;
+
+use crate::JoinKind;
 
 // ---------------------------------------------------------------------------
 // Private join helper
@@ -45,7 +48,9 @@ pub struct GetBuilder<'a> {
     has_limit: bool,
     distinct: bool,
     distinct_on: Vec<String>,
-    lock_mode: Option<LockMode>,
+    /// Row-level lock hint. SQL-only.
+    #[cfg(feature = "sql")]
+    lock_mode: Option<LockHint>,
 }
 
 impl<'a> GetBuilder<'a> {
@@ -64,6 +69,7 @@ impl<'a> GetBuilder<'a> {
             has_limit: false,
             distinct: false,
             distinct_on: Vec::new(),
+            #[cfg(feature = "sql")]
             lock_mode: None,
         }
     }
@@ -305,38 +311,25 @@ impl<'a> GetBuilder<'a> {
         self.deduplicate_on(columns)
     }
 
-    // ── Row-level locking ───────────────────────────────────────────────
+    // ── Row-level locking (SQL-only) ────────────────────────────────────
 
-    /// Acquire an exclusive row-level lock on matched rows.
-    ///
-    /// In SQL-backed stores this maps to FOR UPDATE.
+    /// Acquire an exclusive row-level lock on matched rows. SQL-specific.
+    #[cfg(feature = "sql")]
     pub fn lock_exclusive(mut self) -> Self {
-        self.lock_mode = Some(LockMode::ForUpdate);
+        self.lock_mode = Some(LockHint::ForUpdate);
         self
     }
 
-    #[deprecated(note = "use `lock_exclusive()`")]
-    #[inline]
-    pub fn for_update(self) -> Self {
-        self.lock_exclusive()
-    }
-
-    /// Acquire a shared row-level lock on matched rows.
-    ///
-    /// In SQL-backed stores this maps to FOR SHARE.
+    /// Acquire a shared row-level lock on matched rows. SQL-specific.
+    #[cfg(feature = "sql")]
     pub fn lock_shared(mut self) -> Self {
-        self.lock_mode = Some(LockMode::ForShare);
+        self.lock_mode = Some(LockHint::ForShare);
         self
     }
 
-    #[deprecated(note = "use `lock_shared()`")]
-    #[inline]
-    pub fn for_share(self) -> Self {
-        self.lock_shared()
-    }
-
-    /// Set an arbitrary [`LockMode`].
-    pub fn lock(mut self, mode: LockMode) -> Self {
+    /// Set an arbitrary [`LockHint`]. SQL-specific.
+    #[cfg(feature = "sql")]
+    pub fn lock(mut self, mode: LockHint) -> Self {
         self.lock_mode = Some(mode);
         self
     }
@@ -375,7 +368,7 @@ impl<'a> GetBuilder<'a> {
     pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
         use dol_expr::lower::{lower_expr, lower_filters, lower_order_by};
         use dol_expr::expr::{
-            BinOp, ExprNode, JoinNode, JoinType as ArenaJoinType, LockHint, QueryNode,
+            BinOp, ExprNode, JoinNode, JoinType as ArenaJoinType, QueryNode,
         };
         use dol_expr::ids::NULL_NODE;
         use smallvec::SmallVec;
@@ -486,15 +479,10 @@ impl<'a> GetBuilder<'a> {
             .map(|ob| lower_order_by(ob, &mut arena, &mut interner))
             .collect();
 
-        // Note: LockHint has fewer variants than LockMode — ForShare+NoWait
-        // and ForShare+SkipLocked are approximated as NoWait/SkipLocked
-        // (losing the ForShare distinction). This is a dol-expr limitation.
-        let lock = self.lock_mode.map(|m| match m {
-            LockMode::ForUpdate => LockHint::ForUpdate,
-            LockMode::ForShare => LockHint::ForShare,
-            LockMode::ForUpdateNoWait | LockMode::ForShareNoWait => LockHint::NoWait,
-            LockMode::ForUpdateSkipLocked | LockMode::ForShareSkipLocked => LockHint::SkipLocked,
-        });
+        #[cfg(feature = "sql")]
+        let lock = self.lock_mode;
+        #[cfg(not(feature = "sql"))]
+        let lock: Option<dol_expr::expr::LockHint> = None;
 
         let node = QueryNode {
             from,

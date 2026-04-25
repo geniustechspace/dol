@@ -6,8 +6,8 @@
 #![cfg(feature = "serde")]
 
 use dol_ir::definition::{
-    AlterAction, AlterEntity, DefineEntity, DefineIndex, DefineType, DropEntity, DropIndex,
-    DropType, FieldDef, IndexMethod,
+    AlterAction, AlterEntity, DefineEntity, DefineLookup, DefineType, DropEntity, DropLookup,
+    DropType, FieldDef, LookupMethod,
 };
 use dol_ir::entity_ref::EntityRef;
 use dol_ir::{EntityConstraint, RefAction, RelationRef};
@@ -128,7 +128,7 @@ fn drop_entity_round_trip() {
 
 #[test]
 fn define_index_round_trip() {
-    let i = DefineIndex {
+    let i = DefineLookup {
         name: "idx_email".into(),
         target: EntityRef {
             name: "users".into(),
@@ -139,7 +139,7 @@ fn define_index_round_trip() {
         unique: true,
         if_not_exists: true,
         concurrently: false,
-        method: Some(IndexMethod::BTree),
+        method: Some(LookupMethod::Ordered),
         where_clause: Some("email IS NOT NULL".into()),
     };
     assert_eq!(i, round_trip(&i));
@@ -147,7 +147,7 @@ fn define_index_round_trip() {
 
 #[test]
 fn drop_index_round_trip() {
-    let d = DropIndex {
+    let d = DropLookup {
         name: "idx_email".into(),
         if_exists: true,
         concurrently: false,
@@ -159,11 +159,11 @@ fn drop_index_round_trip() {
 #[test]
 fn index_method_round_trip() {
     for m in [
-        IndexMethod::BTree,
-        IndexMethod::Hash,
-        IndexMethod::FullText,
-        IndexMethod::Spatial,
-        IndexMethod::Custom("gin".into()),
+        LookupMethod::Ordered,
+        LookupMethod::Equality,
+        LookupMethod::FullText,
+        LookupMethod::Spatial,
+        LookupMethod::Custom("gin".into()),
     ] {
         assert_eq!(m, round_trip(&m));
     }

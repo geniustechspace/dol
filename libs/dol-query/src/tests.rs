@@ -152,8 +152,8 @@ fn namespace_propagates_to_upsert_ir() {
         .namespace("users")
         .upsert()
         .fields(&["id", "email"])
-        .on_conflict(&["id"])
-        .do_nothing()
+        .match_on(&["id"])
+        .then_skip()
         .build();
     match stmt {
         dol_ir::Statement::Upsert(ups) => {
@@ -307,8 +307,8 @@ fn upsert_from_string() {
     let (stmt, _arena, interner) = Query::from("users")
         .upsert()
         .fields(&["id", "email", "name"])
-        .on_conflict(&["id"])
-        .do_update(&["email", "name"])
+        .match_on(&["id"])
+        .then_patch(&["email", "name"])
         .build();
     match stmt {
         dol_ir::Statement::Upsert(ups) => {
@@ -330,8 +330,8 @@ fn upsert_do_nothing() {
     let (stmt, _arena, _interner) = Query::from("users")
         .upsert()
         .fields(&["id", "email"])
-        .on_conflict(&["id"])
-        .do_nothing()
+        .match_on(&["id"])
+        .then_skip()
         .build();
     match stmt {
         dol_ir::Statement::Upsert(ups) => {
@@ -451,8 +451,8 @@ fn upsert_build_do_nothing() {
     let (stmt, _arena, interner) = Query::from("users")
         .upsert()
         .fields(&["id", "email"])
-        .on_conflict(&["id"])
-        .do_nothing()
+        .match_on(&["id"])
+        .then_skip()
         .build();
     match stmt {
         dol_ir::Statement::Upsert(ups) => {
@@ -472,8 +472,8 @@ fn upsert_build_do_update() {
     let (stmt, _arena, _interner) = Query::from("users")
         .upsert()
         .fields(&["id", "email", "name"])
-        .on_conflict(&["id"])
-        .do_update(&["email", "name"])
+        .match_on(&["id"])
+        .then_patch(&["email", "name"])
         .build();
     match stmt {
         dol_ir::Statement::Upsert(ups) => {

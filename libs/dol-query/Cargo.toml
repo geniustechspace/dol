@@ -18,6 +18,7 @@ serde_json = { workspace = true }
 
 [features]
 default = []
+sql = []
 serde = [
     "dep:serde",
     "dol-schema/serde",

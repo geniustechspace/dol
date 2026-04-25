@@ -153,32 +153,38 @@ pub struct DropEntity {
 /// Define (create) an index.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct DefineIndex {
+pub struct DefineLookup {
     pub name: String,
     pub target: EntityRef,
     pub columns: Vec<String>,
     pub unique: bool,
     pub if_not_exists: bool,
     pub concurrently: bool,
-    pub method: Option<IndexMethod>,
+    pub method: Option<LookupMethod>,
     pub where_clause: Option<String>,
 }
 
-/// Index access method — backend-agnostic.
+/// Lookup access method — backend-agnostic. Variants describe the *kind*
+/// of lookup the structure is optimised for, not a specific data structure.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum IndexMethod {
-    BTree,
-    Hash,
+pub enum LookupMethod {
+    /// Range / ordered lookups (typically a B-tree-like structure).
+    Ordered,
+    /// Exact-match / hash lookups.
+    Equality,
+    /// Full-text search lookups.
     FullText,
+    /// Spatial / geometric lookups.
     Spatial,
+    /// Backend-specific method named at runtime.
     Custom(String),
 }
 
-/// Drop an index.
+/// Drop a lookup.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct DropIndex {
+pub struct DropLookup {
     pub name: String,
     pub if_exists: bool,
     pub concurrently: bool,

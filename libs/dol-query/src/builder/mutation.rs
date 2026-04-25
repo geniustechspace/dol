@@ -410,7 +410,7 @@ pub struct UpsertBuilder<'a> {
     conflict_fields: Vec<String>,
     conflict_constraint: Option<String>,
     update_fields: Vec<String>,
-    do_nothing_flag: bool,
+    then_skip_flag: bool,
     conflict_filters: Vec<Expr<'static>>,
     returning: Vec<String>,
 }
@@ -423,7 +423,7 @@ impl<'a> UpsertBuilder<'a> {
             conflict_fields: Vec::new(),
             conflict_constraint: None,
             update_fields: Vec::new(),
-            do_nothing_flag: false,
+            then_skip_flag: false,
             conflict_filters: Vec::new(),
             returning: Vec::new(),
         }
@@ -435,77 +435,39 @@ impl<'a> UpsertBuilder<'a> {
         self
     }
 
-    /// Set the conflict target columns.
-    ///
-    /// In SQL-backed stores this maps to `ON CONFLICT (col1, col2)`.
+    /// Set the match-target fields for the upsert.
     pub fn match_on(mut self, cols: &[&str]) -> Self {
         self.conflict_fields = cols.iter().map(|s| s.to_string()).collect();
         self
     }
 
-    #[deprecated(note = "use `match_on()`")]
-    #[inline]
-    pub fn on_conflict(self, cols: &[&str]) -> Self {
-        self.match_on(cols)
-    }
-
-    /// Set the conflict target to a named constraint.
-    ///
-    /// In SQL-backed stores this maps to `ON CONFLICT ON CONSTRAINT name`.
-    pub fn match_constraint(mut self, name: &str) -> Self {
+    /// Set the match target to a named constraint.
+    pub fn match_on_constraint(mut self, name: &str) -> Self {
         self.conflict_constraint = Some(name.to_string());
         self
     }
 
-    #[deprecated(note = "use `match_constraint()`")]
-    #[inline]
-    pub fn on_conflict_constraint(self, name: &str) -> Self {
-        self.match_constraint(name)
-    }
-
-    /// Set the columns to update on conflict.
-    ///
-    /// In SQL-backed stores this maps to `DO UPDATE SET col = EXCLUDED.col`.
-    pub fn patch(mut self, cols: &[&str]) -> Self {
+    /// Specify the fields to patch when an existing record matches.
+    pub fn then_patch(mut self, cols: &[&str]) -> Self {
         self.update_fields = cols.iter().map(|s| s.to_string()).collect();
-        self.do_nothing_flag = false;
+        self.then_skip_flag = false;
         self
     }
 
-    #[deprecated(note = "use `patch()`")]
-    #[inline]
-    pub fn do_update(self, cols: &[&str]) -> Self {
-        self.patch(cols)
-    }
-
-    /// Ignore the row silently on conflict.
-    ///
-    /// In SQL-backed stores this maps to `DO NOTHING`.
-    pub fn skip_on_match(mut self) -> Self {
-        self.do_nothing_flag = true;
+    /// Skip silently when an existing record matches.
+    pub fn then_skip(mut self) -> Self {
+        self.then_skip_flag = true;
         self.update_fields.clear();
         self
     }
 
-    #[deprecated(note = "use `skip_on_match()`")]
-    #[inline]
-    pub fn do_nothing(self) -> Self {
-        self.skip_on_match()
-    }
-
-    /// Return specific columns from the affected rows.
+    /// Return specific fields from the affected records.
     pub fn output(mut self, cols: &[&str]) -> Self {
         self.returning = cols.iter().map(|s| s.to_string()).collect();
         self
     }
 
-    #[deprecated(note = "use `output()`")]
-    #[inline]
-    pub fn returning(self, cols: &[&str]) -> Self {
-        self.output(cols)
-    }
-
-    /// Return all columns from the affected rows.
+    /// Return all fields from the affected records.
     pub fn output_all(mut self) -> Self {
         self.returning = vec!["*".to_string()];
         self
@@ -564,7 +526,7 @@ impl<'a> UpsertBuilder<'a> {
             q = q.fields(&self.fields.iter().map(|s| s.as_str()).collect::<Vec<_>>());
         }
         if !self.conflict_fields.is_empty() {
-            q = q.on_conflict(
+            q = q.match_on(
                 &self
                     .conflict_fields
                     .iter()
@@ -573,10 +535,10 @@ impl<'a> UpsertBuilder<'a> {
             );
         }
         if let Some(ref constraint) = self.conflict_constraint {
-            q = q.on_conflict_constraint(constraint);
+            q = q.match_on_constraint(constraint);
         }
         if !self.update_fields.is_empty() {
-            q = q.do_update(
+            q = q.then_patch(
                 &self
                     .update_fields
                     .iter()
@@ -584,8 +546,8 @@ impl<'a> UpsertBuilder<'a> {
                     .collect::<Vec<_>>(),
             );
         }
-        if self.do_nothing_flag {
-            q = q.do_nothing();
+        if self.then_skip_flag {
+            q = q.then_skip();
         }
         for f in self.conflict_filters {
             q = q.conflict_filter(f);

@@ -4,14 +4,14 @@
 //! - [`DefineEntityBuilder`]: builds a CREATE TABLE from owned [`FieldDef`]s (runtime-defined).
 //! - [`AlterEntityBuilder`]: builds ALTER TABLE statements from an [`Entity`] reference.
 //! - [`DropEntityBuilder`]: builds DROP TABLE from an [`Entity`] reference.
-//! - [`DefineIndexBuilder`]: builds CREATE INDEX.
-//! - [`DropIndexBuilder`]: builds DROP INDEX.
+//! - [`DefineLookupBuilder`]: builds CREATE INDEX.
+//! - [`DropLookupBuilder`]: builds DROP INDEX.
 //! - [`DefineTypeBuilder`]: builds CREATE TYPE (enum types).
 //! - [`DropTypeBuilder`]: builds DROP TYPE.
 
 use dol_ir::definition::{
-    AlterAction, AlterEntity, DefineEntity, DefineIndex, DefineType, DropEntity, DropIndex,
-    DropType, FieldDef, IndexMethod,
+    AlterAction, AlterEntity, DefineEntity, DefineLookup, DefineType, DropEntity, DropLookup,
+    DropType, FieldDef, LookupMethod,
 };
 use dol_ir::entity_ref::EntityRef;
 use dol_schema::{DataType, Entity, EntityConstraint, Field};
@@ -337,13 +337,13 @@ impl<'a> DropEntityBuilder<'a> {
 }
 
 // ===========================================================================
-// DefineIndexBuilder
+// DefineLookupBuilder
 // ===========================================================================
 
 /// Builds a `CREATE INDEX` statement.
 #[derive(Debug, Clone)]
 #[must_use = "builders do nothing until .build() is called"]
-pub struct DefineIndexBuilder {
+pub struct DefineLookupBuilder {
     name: String,
     target_name: String,
     target_namespace: Option<String>,
@@ -351,11 +351,11 @@ pub struct DefineIndexBuilder {
     unique: bool,
     if_not_exists: bool,
     concurrently: bool,
-    method: Option<IndexMethod>,
+    method: Option<LookupMethod>,
     where_clause: Option<String>,
 }
 
-impl DefineIndexBuilder {
+impl DefineLookupBuilder {
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -409,7 +409,7 @@ impl DefineIndexBuilder {
         self
     }
 
-    pub fn method(mut self, method: IndexMethod) -> Self {
+    pub fn method(mut self, method: LookupMethod) -> Self {
         self.method = Some(method);
         self
     }
@@ -420,9 +420,9 @@ impl DefineIndexBuilder {
         self
     }
 
-    /// Build the canonical [`DefineIndex`].
-    pub fn build(&self) -> DefineIndex {
-        DefineIndex {
+    /// Build the canonical [`DefineLookup`].
+    pub fn build(&self) -> DefineLookup {
+        DefineLookup {
             name: self.name.clone(),
             target: EntityRef {
                 name: self.target_name.clone(),
@@ -440,20 +440,20 @@ impl DefineIndexBuilder {
 }
 
 // ===========================================================================
-// DropIndexBuilder
+// DropLookupBuilder
 // ===========================================================================
 
 /// Builds a `DROP INDEX` statement.
 #[derive(Debug, Clone)]
 #[must_use = "builders do nothing until .build() is called"]
-pub struct DropIndexBuilder {
+pub struct DropLookupBuilder {
     name: String,
     if_exists: bool,
     concurrently: bool,
     cascade: bool,
 }
 
-impl DropIndexBuilder {
+impl DropLookupBuilder {
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -478,9 +478,9 @@ impl DropIndexBuilder {
         self
     }
 
-    /// Build the canonical [`DropIndex`].
-    pub fn build(&self) -> DropIndex {
-        DropIndex {
+    /// Build the canonical [`DropLookup`].
+    pub fn build(&self) -> DropLookup {
+        DropLookup {
             name: self.name.clone(),
             if_exists: self.if_exists,
             concurrently: self.concurrently,

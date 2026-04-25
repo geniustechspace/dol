@@ -2,7 +2,7 @@ use dol_expr::expr::{DeleteNode, InsertNode, QueryNode, UpdateNode, UpsertNode};
 
 use crate::control::{DefinePolicy, Grant, Revoke};
 use crate::definition::{
-    AlterEntity, DefineEntity, DefineIndex, DefineType, DropEntity, DropIndex, DropType,
+    AlterEntity, DefineEntity, DefineLookup, DefineType, DropEntity, DropLookup, DropType,
 };
 use crate::storage::{GetObject, ListObjects, MoveFile, PutObject, ReadFile, WriteFile};
 use crate::transaction::Transaction;
@@ -35,8 +35,8 @@ pub enum Statement {
     DefineEntity(Box<DefineEntity>),
     AlterEntity(AlterEntity),
     DropEntity(DropEntity),
-    DefineIndex(DefineIndex),
-    DropIndex(DropIndex),
+    DefineLookup(DefineLookup),
+    DropLookup(DropLookup),
     DefineType(DefineType),
     DropType(DropType),
 

@@ -8,8 +8,8 @@ pub use crate::backend::{Backend, BackendError};
 pub use crate::constraint::{EntityConstraint, RefAction, RelationRef, ComputedKind};
 pub use crate::control::{DefinePolicy, Grant, PolicyAction, Privilege, Revoke};
 pub use crate::definition::{
-    AlterAction, AlterEntity, DefineEntity, DefineIndex, DefineType, DropEntity, DropIndex,
-    DropType, FieldDef, IndexMethod,
+    AlterAction, AlterEntity, DefineEntity, DefineLookup, DefineType, DropEntity, DropLookup,
+    DropType, FieldDef, LookupMethod,
 };
 pub use crate::entity_ref::EntityRef;
 pub use crate::statement::Statement;

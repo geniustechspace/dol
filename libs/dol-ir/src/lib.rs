@@ -27,8 +27,8 @@ pub use backend::{Backend, BackendError};
 pub use constraint::{EntityConstraint, RefAction, RelationRef, ComputedKind};
 pub use control::{DefinePolicy, Grant, PolicyAction, Privilege, Revoke};
 pub use definition::{
-    AlterAction, AlterEntity, DefineEntity, DefineIndex, DefineType, DropEntity, DropIndex,
-    DropType, FieldDef, IndexMethod,
+    AlterAction, AlterEntity, DefineEntity, DefineLookup, DefineType, DropEntity, DropLookup,
+    DropType, FieldDef, LookupMethod,
 };
 pub use entity_ref::EntityRef;
 pub use statement::Statement;

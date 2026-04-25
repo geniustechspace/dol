@@ -19,7 +19,7 @@ pub struct UpsertQuery {
     conflict_fields: Vec<String>,
     conflict_constraint: Option<String>,
     update_fields: Vec<String>,
-    do_nothing_flag: bool,
+    then_skip_flag: bool,
     conflict_filters: Vec<Expr<'static>>,
     returning: Vec<String>,
 }
@@ -38,7 +38,7 @@ impl UpsertQuery {
             conflict_fields: Vec::new(),
             conflict_constraint: None,
             update_fields: Vec::new(),
-            do_nothing_flag: false,
+            then_skip_flag: false,
             conflict_filters: Vec::new(),
             returning: Vec::new(),
         }
@@ -51,27 +51,27 @@ impl UpsertQuery {
     }
 
     /// Set the conflict target columns: `ON CONFLICT (col1, col2)`.
-    pub fn on_conflict(mut self, cols: &[&str]) -> Self {
+    pub fn match_on(mut self, cols: &[&str]) -> Self {
         self.conflict_fields = cols.iter().map(|s| s.to_string()).collect();
         self
     }
 
     /// Set the conflict target to a named constraint: `ON CONFLICT ON CONSTRAINT name`.
-    pub fn on_conflict_constraint(mut self, name: &str) -> Self {
+    pub fn match_on_constraint(mut self, name: &str) -> Self {
         self.conflict_constraint = Some(name.to_string());
         self
     }
 
     /// Set the columns to update on conflict: `DO UPDATE SET col = EXCLUDED.col`.
-    pub fn do_update(mut self, cols: &[&str]) -> Self {
+    pub fn then_patch(mut self, cols: &[&str]) -> Self {
         self.update_fields = cols.iter().map(|s| s.to_string()).collect();
-        self.do_nothing_flag = false;
+        self.then_skip_flag = false;
         self
     }
 
     /// Use `DO NOTHING` on conflict.
-    pub fn do_nothing(mut self) -> Self {
-        self.do_nothing_flag = true;
+    pub fn then_skip(mut self) -> Self {
+        self.then_skip_flag = true;
         self.update_fields.clear();
         self
     }
@@ -143,7 +143,7 @@ impl UpsertQuery {
             })
             .collect();
 
-        let conflict = if self.do_nothing_flag {
+        let conflict = if self.then_skip_flag {
             Some(ConflictClause::DoNothing)
         } else if !self.update_fields.is_empty() {
             let assignments: smallvec::SmallVec<[(u32, u32); 4]> = self

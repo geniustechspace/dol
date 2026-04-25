@@ -93,8 +93,8 @@ pub mod ddl;
 pub mod prelude;
 
 pub use ddl::{
-    AlterEntityBuilder, CreateFromMeta, DefineEntityBuilder, DefineIndexBuilder, DefineTypeBuilder,
-    DropEntityBuilder, DropIndexBuilder, DropTypeBuilder, EntityDefineExt,
+    AlterEntityBuilder, CreateFromMeta, DefineEntityBuilder, DefineLookupBuilder, DefineTypeBuilder,
+    DropEntityBuilder, DropLookupBuilder, DropTypeBuilder, EntityDefineExt,
 };
 
 pub use delete::DeleteQuery;
@@ -257,7 +257,7 @@ impl From<String> for Query {
 }
 
 // ---------------------------------------------------------------------------
-// JoinKind / LockMode — locally defined
+// JoinKind — locally defined
 // ---------------------------------------------------------------------------
 
 /// The kind of JOIN to perform.
@@ -268,17 +268,6 @@ pub enum JoinKind {
     Right,
     Full,
     Cross,
-}
-
-/// Row-level locking mode.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LockMode {
-    ForUpdate,
-    ForShare,
-    ForUpdateNoWait,
-    ForShareNoWait,
-    ForUpdateSkipLocked,
-    ForShareSkipLocked,
 }
 
 // ===========================================================================

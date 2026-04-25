@@ -3,7 +3,9 @@
 //! Mirrors `dol-builder::GetBuilder` but works with owned name/namespace
 //! instead of requiring a static `&Entity` reference.
 
-use crate::{JoinKind, LockMode};
+use crate::JoinKind;
+#[cfg(feature = "sql")]
+use dol_expr::expr::LockHint;
 use dol_expr::tree::{Direction, Expr, NullsPosition, OrderByExpr, field_dyn};
 
 // ---------------------------------------------------------------------------
@@ -44,7 +46,14 @@ pub struct GetQuery {
     has_limit: bool,
     distinct: bool,
     distinct_on: Vec<String>,
-    lock_mode: Option<LockMode>,
+    /// Row-level lock hint. SQL-only — settable via [`for_update`], [`for_share`],
+    /// or [`lock`] when the `sql` feature is enabled.
+    ///
+    /// [`for_update`]: Self::for_update
+    /// [`for_share`]:  Self::for_share
+    /// [`lock`]:       Self::lock
+    #[cfg(feature = "sql")]
+    lock_mode: Option<LockHint>,
 }
 
 impl GetQuery {
@@ -68,6 +77,7 @@ impl GetQuery {
             has_limit: false,
             distinct: false,
             distinct_on: Vec::new(),
+            #[cfg(feature = "sql")]
             lock_mode: None,
         }
     }
@@ -273,22 +283,25 @@ impl GetQuery {
         self
     }
 
-    // ── Row-level locking ───────────────────────────────────────────────
+    // ── Row-level locking (SQL-only) ────────────────────────────────────
 
-    /// Add `FOR UPDATE` locking.
+    /// Add `FOR UPDATE` locking. SQL-specific.
+    #[cfg(feature = "sql")]
     pub fn for_update(mut self) -> Self {
-        self.lock_mode = Some(LockMode::ForUpdate);
+        self.lock_mode = Some(LockHint::ForUpdate);
         self
     }
 
-    /// Add `FOR SHARE` locking.
+    /// Add `FOR SHARE` locking. SQL-specific.
+    #[cfg(feature = "sql")]
     pub fn for_share(mut self) -> Self {
-        self.lock_mode = Some(LockMode::ForShare);
+        self.lock_mode = Some(LockHint::ForShare);
         self
     }
 
-    /// Set an arbitrary [`LockMode`].
-    pub fn lock(mut self, mode: LockMode) -> Self {
+    /// Set an arbitrary [`LockHint`]. SQL-specific.
+    #[cfg(feature = "sql")]
+    pub fn lock(mut self, mode: LockHint) -> Self {
         self.lock_mode = Some(mode);
         self
     }
@@ -304,7 +317,7 @@ impl GetQuery {
     /// available, all entity fields are selected by default.
     pub fn build(self) -> (dol_ir::Statement, dol_expr::ExprArena, dol_expr::Interner) {
         use dol_expr::lower::{lower_expr, lower_exprs, lower_filters, lower_order_by};
-        use dol_expr::expr::{ExprNode, JoinNode, JoinType as ArenaJoinType, LockHint, QueryNode};
+        use dol_expr::expr::{ExprNode, JoinNode, JoinType as ArenaJoinType, QueryNode};
         use dol_expr::ids::NULL_NODE;
         use smallvec::SmallVec;
 
@@ -409,12 +422,10 @@ impl GetQuery {
             .map(|ob| lower_order_by(ob, &mut arena, &mut interner))
             .collect();
 
-        let lock = self.lock_mode.map(|m| match m {
-            LockMode::ForUpdate => LockHint::ForUpdate,
-            LockMode::ForShare => LockHint::ForShare,
-            LockMode::ForUpdateNoWait | LockMode::ForShareNoWait => LockHint::NoWait,
-            LockMode::ForUpdateSkipLocked | LockMode::ForShareSkipLocked => LockHint::SkipLocked,
-        });
+        #[cfg(feature = "sql")]
+        let lock = self.lock_mode;
+        #[cfg(not(feature = "sql"))]
+        let lock: Option<dol_expr::expr::LockHint> = None;
 
         let node = QueryNode {
             from,
