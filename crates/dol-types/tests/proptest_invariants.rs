@@ -12,7 +12,7 @@
 #![cfg(feature = "serde")]
 
 use dol_types::{
-    Date, DataType, Decimal, IpAddr, Literal, MacAddr, Time, TypeError, Value,
+    DataType, Date, Decimal, IpAddr, Literal, MacAddr, Time, TypeError, Value,
     datetime::{from_hms_nano, from_ymd},
 };
 use proptest::prelude::*;

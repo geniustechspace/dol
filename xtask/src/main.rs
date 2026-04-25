@@ -123,13 +123,7 @@ fn size_report() -> bool {
 
 /// Verify the leaf no_std crates still build without `std`.
 fn nostd_check() -> bool {
-    let crates = [
-        "dol-arena",
-        "dol-span",
-        "dol-diag",
-        "dol-types",
-        "dol-expr",
-    ];
+    let crates = ["dol-arena", "dol-span", "dol-diag", "dol-types", "dol-expr"];
     for c in crates {
         let ok = run_cargo(&["check", "-p", c, "--no-default-features"], &[]);
         if !ok {

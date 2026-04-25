@@ -27,6 +27,9 @@ allow = [
   "BSD-3-Clause",
   "ISC",
   "CC0-1.0",
+  # `foldhash` (transitive via `hashbrown`, used by the `dol-expr` interner)
+  # ships under Zlib, an OSI-approved permissive license.
+  "Zlib",
 ]
 # The confidence threshold for detecting a license from license text.
 # [possible values: any floating point number from 0 to 1]

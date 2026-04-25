@@ -1,4 +1,4 @@
-use alloc::{vec::Vec};
+use alloc::vec::Vec;
 
 use smallvec::SmallVec;
 
