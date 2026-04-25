@@ -128,6 +128,6 @@ impl UpdateQuery {
             returning,
         };
 
-        (dol_ir::Statement::Update(node), arena, interner).into()
+        (dol_ir::Statement::Update(Box::new(node)), arena, interner).into()
     }
 }

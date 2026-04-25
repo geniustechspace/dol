@@ -17,4 +17,4 @@ serde_json = { workspace = true }
 
 [features]
 default = []
-serde = ["dep:serde", "dol-schema/serde", "dol-types/serde"]
+serde = ["dep:serde", "dol-expr/serde", "dol-schema/serde", "dol-types/serde", "smallvec/serde"]

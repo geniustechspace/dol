@@ -40,3 +40,5 @@ full        = ["postcard", "json", "hash"]
 
 [dev-dependencies]
 serde_json = { workspace = true }
+dol-expr   = { workspace = true, features = ["serde"] }
+smallvec   = { workspace = true }

@@ -18,45 +18,50 @@ use crate::transaction::Transaction;
 ///   require an [`ExprArena`] + [`Interner`] for rendering.
 /// - **Raw**: an escape hatch for pre-built SQL / KV / other backend strings.
 ///
+/// ## Size budget
+///
+/// `Statement` keeps `size_of::<Statement>() ≤ 64` (verified at build time by
+/// `xtask size`). Every "heavy" payload — anything whose owned representation
+/// would push the variant over that budget — is held behind a `Box`. The
+/// pattern-matching ergonomics are unaffected: `Statement::Query(q)` still
+/// produces a `q: &Box<QueryNode>` that derefs to `&QueryNode`.
+///
 /// [`ExprArena`]: dol_expr::arena::ExprArena
 /// [`Interner`]:  dol_expr::interner::Interner
-///
-/// Note: Serde support for the DML variants requires the `dol-expr/serde` feature,
-/// which will be added in a future release when the arena types gain `Serialize` /
-/// `Deserialize` implementations.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Statement {
     // ── DML (arena-based) ──────────────────────────────────────────────────
-    Query(QueryNode),
-    Insert(InsertNode),
-    Update(UpdateNode),
-    Delete(DeleteNode),
-    Upsert(UpsertNode),
+    Query(Box<QueryNode>),
+    Insert(Box<InsertNode>),
+    Update(Box<UpdateNode>),
+    Delete(Box<DeleteNode>),
+    Upsert(Box<UpsertNode>),
 
     // ── DDL ───────────────────────────────────────────────────────────────
-    DefineEntity(DefineEntity),
-    AlterEntity(AlterEntity),
-    DropEntity(DropEntity),
-    DefineLookup(DefineLookup),
-    DropLookup(DropLookup),
-    DefineType(DefineType),
-    DropType(DropType),
+    DefineEntity(Box<DefineEntity>),
+    AlterEntity(Box<AlterEntity>),
+    DropEntity(Box<DropEntity>),
+    DefineLookup(Box<DefineLookup>),
+    DropLookup(Box<DropLookup>),
+    DefineType(Box<DefineType>),
+    DropType(Box<DropType>),
 
     // ── Access control ────────────────────────────────────────────────────
-    Grant(Grant),
-    Revoke(Revoke),
-    DefinePolicy(DefinePolicy),
+    Grant(Box<Grant>),
+    Revoke(Box<Revoke>),
+    DefinePolicy(Box<DefinePolicy>),
 
     // ── Transaction ───────────────────────────────────────────────────────
-    Transaction(Transaction),
+    Transaction(Box<Transaction>),
 
     // ── Storage ───────────────────────────────────────────────────────────
-    PutObject(PutObject),
-    GetObject(GetObject),
-    ListObjects(ListObjects),
-    ReadFile(ReadFile),
-    WriteFile(WriteFile),
-    MoveFile(MoveFile),
+    PutObject(Box<PutObject>),
+    GetObject(Box<GetObject>),
+    ListObjects(Box<ListObjects>),
+    ReadFile(Box<ReadFile>),
+    WriteFile(Box<WriteFile>),
+    MoveFile(Box<MoveFile>),
 
     // ── Escape hatch ──────────────────────────────────────────────────────
     Raw(String),
@@ -69,7 +74,53 @@ pub enum Statement {
     /// closed enum, so streaming/IoT vocabulary can evolve independently of
     /// the core. The `id` is a stable `&'static str` registered by the
     /// emitting crate; the `payload` is its postcard-encoded body.
-    Extension(StatementExtension),
+    Extension(Box<StatementExtension>),
+}
+
+// ── Ergonomic constructors ────────────────────────────────────────────────
+//
+// These `From` impls let callers write `Statement::from(qnode)` instead of
+// `Statement::Query(Box::new(qnode))` and are the recommended way to build a
+// `Statement` from an owned payload. The matching `Statement::Query(...)`
+// constructors are unchanged and still take a `Box<QueryNode>` directly.
+
+macro_rules! impl_stmt_from {
+    ($( $variant:ident($payload:ty) ; )+) => {
+        $(
+            impl From<$payload> for Statement {
+                #[inline]
+                fn from(value: $payload) -> Self {
+                    Statement::$variant(Box::new(value))
+                }
+            }
+        )+
+    };
+}
+
+impl_stmt_from! {
+    Query(QueryNode);
+    Insert(InsertNode);
+    Update(UpdateNode);
+    Delete(DeleteNode);
+    Upsert(UpsertNode);
+    DefineEntity(DefineEntity);
+    AlterEntity(AlterEntity);
+    DropEntity(DropEntity);
+    DefineLookup(DefineLookup);
+    DropLookup(DropLookup);
+    DefineType(DefineType);
+    DropType(DropType);
+    Grant(Grant);
+    Revoke(Revoke);
+    DefinePolicy(DefinePolicy);
+    Transaction(Transaction);
+    PutObject(PutObject);
+    GetObject(GetObject);
+    ListObjects(ListObjects);
+    ReadFile(ReadFile);
+    WriteFile(WriteFile);
+    MoveFile(MoveFile);
+    Extension(StatementExtension);
 }
 
 /// Open extension payload attached via [`Statement::Extension`].

@@ -183,3 +183,49 @@ fn drop_type_round_trip() {
     };
     assert_eq!(d, round_trip(&d));
 }
+
+#[test]
+fn program_with_arena_round_trips_through_json() {
+    use dol_expr::expr::QueryNode;
+    use dol_expr::{ExprArena, Interner};
+    use dol_ir::{Program, Statement};
+
+    // Build a small Program that exercises the arena + interner.
+    let mut interner = Interner::new();
+    let mut arena = ExprArena::new();
+
+    let from = interner.intern("users");
+    let star = interner.intern("*");
+    let star_node = arena.alloc(dol_expr::ExprNode::Namespace(star));
+
+    let qnode = QueryNode {
+        from,
+        alias: None,
+        joins: Default::default(),
+        filter: 0,
+        columns: smallvec::smallvec![star_node],
+        group_by: Default::default(),
+        having: 0,
+        order_by: Default::default(),
+        limit: Some(10),
+        offset: None,
+        lock: None,
+    };
+
+    let prog = Program::new(Statement::Query(Box::new(qnode)), arena, interner);
+
+    let bytes = serde_json::to_vec(&prog).expect("encode program as JSON");
+    let decoded: Program = serde_json::from_slice(&bytes).expect("decode program from JSON");
+
+    // Statement equality is enough to confirm structural round-trip; the arena
+    // is private but its serde representation is the source of truth.
+    assert_eq!(prog.stmt, decoded.stmt);
+    assert_eq!(prog.interner.len(), decoded.interner.len());
+}
+
+#[test]
+fn statement_is_send_sync_static() {
+    fn assert_bounds<T: Send + Sync + 'static>() {}
+    assert_bounds::<dol_ir::Statement>();
+    assert_bounds::<dol_ir::Program>();
+}

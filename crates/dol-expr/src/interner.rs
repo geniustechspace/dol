@@ -47,3 +47,34 @@ impl Interner {
         self.map.clear();
     }
 }
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for Interner {
+    fn serialize<S: serde::Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+        // The `map` field is a derived index over `strings` — serialise the
+        // canonical Vec of strings so the wire form stays minimal and
+        // independent of HashMap iteration order.
+        use serde::ser::SerializeSeq;
+        let mut seq = ser.serialize_seq(Some(self.strings.len()))?;
+        for s in &self.strings {
+            seq.serialize_element(s.as_ref())?;
+        }
+        seq.end()
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Interner {
+    fn deserialize<D: serde::Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
+        let strings: Vec<String> = serde::Deserialize::deserialize(de)?;
+        let mut interner = Interner::default();
+        interner.strings.reserve(strings.len());
+        interner.map.reserve(strings.len());
+        for (i, s) in strings.into_iter().enumerate() {
+            let arc: Arc<str> = Arc::from(s.as_str());
+            interner.strings.push(Arc::clone(&arc));
+            interner.map.insert(arc, i as StrId);
+        }
+        Ok(interner)
+    }
+}

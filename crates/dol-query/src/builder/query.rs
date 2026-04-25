@@ -496,7 +496,7 @@ impl<'a> GetBuilder<'a> {
             lock,
         };
 
-        (dol_ir::Statement::Query(node), arena, interner).into()
+        (dol_ir::Statement::Query(Box::new(node)), arena, interner).into()
     }
 }
 

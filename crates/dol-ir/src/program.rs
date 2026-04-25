@@ -13,7 +13,8 @@ use crate::statement::Statement;
 ///
 /// The fields are public so callers can pattern-match or move out
 /// individual parts. Use [`Program::into_parts`] when a tuple is needed.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Program {
     pub stmt: Statement,
     pub arena: dol_expr::ExprArena,

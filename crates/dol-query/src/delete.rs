@@ -89,7 +89,7 @@ impl DeleteQuery {
             returning,
         };
 
-        (dol_ir::Statement::Delete(node), arena, interner).into()
+        (dol_ir::Statement::Delete(Box::new(node)), arena, interner).into()
     }
 }
 

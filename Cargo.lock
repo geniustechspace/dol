@@ -222,6 +222,7 @@ dependencies = [
  "postcard",
  "serde",
  "serde_json",
+ "smallvec",
 ]
 
 [[package]]

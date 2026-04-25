@@ -112,16 +112,9 @@ fn size_report() -> bool {
     budget!(dol_types::Value, 24);
     budget!(dol_types::Literal<'static>, 32);
     budget!(dol_expr::ExprNode, 32);
-    // Statement currently inlines its DML variants (QueryNode, InsertNode, ...)
-    // which puts it well above the 64-byte target. Boxing every DML variant
-    // is a tracked follow-up; until then this is reported as a soft note.
-    let s = std::mem::size_of::<dol_ir::Statement>();
-    if s > 64 {
-        eprintln!(
-            "NOTE (follow-up): dol_ir::Statement = {s} bytes; \
-             plan target is ≤ 64 (boxes around DML variants pending)."
-        );
-    }
+    // Boxing the heavy DML / DDL / storage variants brings `Statement`
+    // comfortably under the 64-byte budget set by the implementation plan.
+    budget!(dol_ir::Statement, 64);
     ok
 }
 

@@ -13,13 +13,19 @@
 //! payload a stable identifier reusable as a migration key, plan-cache key,
 //! or IoT idempotency token.
 //!
-//! ## Status
+//! ## Typed `Program` codecs
 //!
-//! The full `Program` codec (postcard + JSON over [`dol_ir::Program`])
-//! requires every IR variant in `dol-ir` and `dol-expr` to derive
-//! `serde::{Serialize, Deserialize}`. That work is tracked separately; in
-//! the meantime this crate exposes the payload-agnostic envelope and
-//! per-codec helpers operating on `&[u8]` bodies.
+//! With the `program` feature (auto-enabled by `postcard` and `json`), this
+//! crate exposes typed helpers in [`mod@program`] that target
+//! [`dol_ir::Program`] directly:
+//!
+//! - [`program::encode_postcard`] / [`program::decode_postcard`]
+//! - [`program::encode_json`] / [`program::decode_json`]
+//! - [`program::content_hash`] — canonical BLAKE3 of the postcard body.
+//!
+//! The lower-level, payload-agnostic helpers in
+//! [`mod@postcard`] and [`mod@json`] remain available for callers that
+//! want to encode their own `Serialize` payloads behind the same envelope.
 
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
@@ -33,6 +39,8 @@ pub mod hash;
 pub mod json;
 #[cfg(feature = "postcard")]
 pub mod postcard;
+#[cfg(any(feature = "postcard", feature = "json"))]
+pub mod program;
 
 /// Errors that can arise during wire encode/decode.
 #[derive(Debug)]

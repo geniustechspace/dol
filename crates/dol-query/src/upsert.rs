@@ -190,6 +190,6 @@ impl UpsertQuery {
             conflict,
         };
 
-        (dol_ir::Statement::Upsert(node), arena, interner).into()
+        (dol_ir::Statement::Upsert(Box::new(node)), arena, interner).into()
     }
 }

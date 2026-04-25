@@ -19,6 +19,7 @@ use crate::types::value::Literal;
 /// | `Key("name")` | `col->>'name'`     | `.name`         |
 /// | `Index(0)`    | `col->>0`          | `[0]`           |
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FieldStep {
     /// Named key access: `.key`, `->>'key'`, `["key"]`.
     Key(StrId),
@@ -42,6 +43,7 @@ pub enum FieldStep {
 /// | `None`      | `"profile_json"` | `[Key("name")]`        | `profile_json->>'name'`     |
 /// | `Some("u")` | `"data"`         | `[Key("x"), Index(0)]` | `u.data->'x'->>0`           |
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FieldNode {
     /// Optional container address (interned dotted path); `None` means an
     /// unanchored leaf reference at the current scope.
@@ -61,6 +63,7 @@ pub struct FieldNode {
 /// would otherwise push the variant to 32 bytes of *payload*, which
 /// combined with the discriminant word exceeds the target.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FuncNode {
     pub name: StrId,
     pub args: SmallVec<[NodeId; 4]>,
@@ -71,6 +74,7 @@ pub struct FuncNode {
 /// The inline buffer of `SmallVec<[(StrId, NodeId); 4]>` is 4 × 8 = 32 bytes
 /// on its own — already over budget before the discriminant word is counted.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ObjLitNode(pub SmallVec<[(StrId, NodeId); 4]>);
 
 /// Payload for [`ExprNode::Window`], stored in [`ExprArena::windows`].
@@ -78,6 +82,7 @@ pub struct ObjLitNode(pub SmallVec<[(StrId, NodeId); 4]>);
 /// Two `SmallVec` fields (each 24 bytes) plus `func: StrId` total 52+ bytes
 /// of payload — pooled to keep `ExprNode` ≤ 32 bytes.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WindowNode {
     pub func: StrId,
     pub partition: SmallVec<[NodeId; 4]>,
@@ -89,6 +94,7 @@ pub struct WindowNode {
 /// `SmallVec<[(NodeId, NodeId); 4]>` has a 32-byte inline buffer, making the
 /// variant payload 36+ bytes — pooled to keep `ExprNode` ≤ 32 bytes.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CaseNode {
     pub branches: SmallVec<[(NodeId, NodeId); 4]>,
     pub else_: NodeId,
@@ -99,6 +105,7 @@ pub struct CaseNode {
 /// `SmallVec<[NodeId; 8]>` has a 32-byte inline buffer, making the variant
 /// payload 36+ bytes — pooled to keep `ExprNode` ≤ 32 bytes.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InListNode {
     pub expr: NodeId,
     pub list: SmallVec<[NodeId; 8]>,
@@ -107,12 +114,14 @@ pub struct InListNode {
 // ─── SpanTable ────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Span {
     pub start: u32,
     pub end: u32,
 }
 
 #[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SpanTable {
     spans: Vec<Span>,
 }
@@ -132,6 +141,7 @@ impl SpanTable {
 // ─── ExprArena ────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExprArena {
     nodes: Vec<ExprNode>,
     span_table: SpanTable,

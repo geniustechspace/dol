@@ -52,7 +52,7 @@ impl GrantBuilder {
     /// callers can feed the result directly into a backend without manually
     /// wrapping with [`dol_ir::Program::from_stmt`].
     pub fn build_program(self) -> dol_ir::Program {
-        dol_ir::Program::from_stmt(dol_ir::Statement::Grant(self.build()))
+        dol_ir::Program::from_stmt(dol_ir::Statement::Grant(Box::new(self.build())))
     }
 }
 
@@ -101,7 +101,7 @@ impl RevokeBuilder {
     /// callers can feed the result directly into a backend without manually
     /// wrapping with [`dol_ir::Program::from_stmt`].
     pub fn build_program(self) -> dol_ir::Program {
-        dol_ir::Program::from_stmt(dol_ir::Statement::Revoke(self.build()))
+        dol_ir::Program::from_stmt(dol_ir::Statement::Revoke(Box::new(self.build())))
     }
 }
 
@@ -205,7 +205,11 @@ impl<'a> DefinePolicyBuilder<'a> {
             check_expr: check_id,
         };
 
-        dol_ir::Program::new(dol_ir::Statement::DefinePolicy(policy), arena, interner)
+        dol_ir::Program::new(
+            dol_ir::Statement::DefinePolicy(Box::new(policy)),
+            arena,
+            interner,
+        )
     }
 }
 
@@ -224,7 +228,7 @@ mod tests {
             .build();
 
         let policy = match &program.stmt {
-            dol_ir::Statement::DefinePolicy(policy) => policy,
+            dol_ir::Statement::DefinePolicy(policy) => policy.as_ref(),
             stmt => panic!("expected Statement::DefinePolicy, got {stmt:?}"),
         };
 

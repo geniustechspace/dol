@@ -124,6 +124,6 @@ impl InsertQuery {
             conflict: None,
         };
 
-        (dol_ir::Statement::Insert(node), arena, interner).into()
+        (dol_ir::Statement::Insert(Box::new(node)), arena, interner).into()
     }
 }

@@ -6,6 +6,7 @@ use crate::ids::{
 };
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum BinOp {
     Eq,
     Ne,
@@ -34,6 +35,7 @@ pub enum BinOp {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum UnaryOp {
     Neg,
     Not,
@@ -44,12 +46,14 @@ pub enum UnaryOp {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Order {
     Asc,
     Desc,
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum LockHint {
     ForUpdate,
     ForShare,
@@ -58,6 +62,7 @@ pub enum LockHint {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ConflictClause {
     DoNothing,
     DoUpdate {
@@ -66,6 +71,7 @@ pub enum ConflictClause {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct JoinNode {
     pub source: StrId,
     pub alias: Option<StrId>,
@@ -74,6 +80,7 @@ pub struct JoinNode {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum JoinType {
     Inner,
     Left,
@@ -83,6 +90,7 @@ pub enum JoinType {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct QueryNode {
     pub from: StrId,
     pub alias: Option<StrId>,
@@ -98,6 +106,7 @@ pub struct QueryNode {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InsertNode {
     pub target: StrId,
     pub columns: SmallVec<[StrId; 8]>,
@@ -107,6 +116,7 @@ pub struct InsertNode {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UpdateNode {
     pub target: StrId,
     pub columns: SmallVec<[StrId; 8]>,
@@ -116,6 +126,7 @@ pub struct UpdateNode {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DeleteNode {
     pub target: StrId,
     pub filter: NodeId,
@@ -123,6 +134,7 @@ pub struct DeleteNode {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UpsertNode {
     pub target: StrId,
     pub columns: SmallVec<[StrId; 8]>,
@@ -132,6 +144,7 @@ pub struct UpsertNode {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ExprNode {
     /// Static container address, up to (but not including) the leaf column.
     ///
