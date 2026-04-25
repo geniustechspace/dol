@@ -91,7 +91,7 @@ fn entity_round_trip_simple() {
         "users",
         vec![
             Field::new("id", DataType::Uuid).primary_key(),
-            Field::new("email", DataType::Text).unique(),
+            Field::new("email", DataType::unbounded_string()).unique(),
         ],
     );
     assert_eq!(e, round_trip(&e));
@@ -106,7 +106,7 @@ fn entity_round_trip_with_namespace_and_constraints() {
                 .primary_key()
                 .auto_increment(),
             Field::new("user_id", DataType::Uuid),
-            Field::new("product", DataType::Text),
+            Field::new("product", DataType::unbounded_string()),
         ],
     )
     .with_namespace("public")

@@ -19,7 +19,7 @@
 //! // From an Entity — full field-aware API
 //! let users = Entity::new("users", vec![
 //!     Field::new("id", DataType::Uuid).primary_key(),
-//!     Field::new("email", DataType::Text),
+//!     Field::new("email", DataType::unbounded_string()),
 //! ]);
 //!
 //! let (stmt, _arena, interner) = Query::from(&users)

@@ -7,8 +7,8 @@ use super::*;
 fn basic_fields() -> Vec<Field> {
     vec![
         Field::new("id", DataType::Uuid).primary_key(),
-        Field::new("name", DataType::Text),
-        Field::new("email", DataType::Text).nullable(),
+        Field::new("name", DataType::unbounded_string()),
+        Field::new("email", DataType::unbounded_string()).nullable(),
     ]
 }
 
@@ -28,7 +28,7 @@ fn constrained_model() -> Entity {
                 .primary_key()
                 .auto_increment(),
             Field::new("user_id", DataType::Uuid),
-            Field::new("product", DataType::Text),
+            Field::new("product", DataType::unbounded_string()),
         ],
     )
     .with_constraints(vec![
@@ -182,7 +182,7 @@ fn field_new_defaults() {
 
 #[test]
 fn field_builder_chain() {
-    let f = Field::new("status", DataType::Text)
+    let f = Field::new("status", DataType::unbounded_string())
         .primary_key()
         .nullable()
         .unique()
@@ -205,7 +205,7 @@ fn field_builder_chain() {
 
 #[test]
 fn field_optional_is_nullable() {
-    let f = Field::new("bio", DataType::Text).optional();
+    let f = Field::new("bio", DataType::unbounded_string()).optional();
     assert!(f.nullable);
 }
 
@@ -213,9 +213,9 @@ fn field_optional_is_nullable() {
 
 #[test]
 fn field_required_is_noop() {
-    let f = Field::new("bio", DataType::Text).required();
+    let f = Field::new("bio", DataType::unbounded_string()).required();
     assert!(!f.nullable);
-    assert_eq!(f, Field::new("bio", DataType::Text));
+    assert_eq!(f, Field::new("bio", DataType::unbounded_string()));
 }
 
 // ── 16. Field::has_default (metadata only) ──────────────────────────
@@ -229,7 +229,7 @@ fn field_has_default_metadata() {
 
 #[test]
 fn field_default_sets_expr() {
-    let f = Field::new("ts", DataType::TimestampTz { precision: 6 }).default("NOW()");
+    let f = Field::new("ts", DataType::OffsetDateTime { precision: 6 }).default("NOW()");
     assert!(f.has_default);
     assert_eq!(f.default_expr.as_deref(), Some("NOW()"));
 }
@@ -276,7 +276,7 @@ fn field_generated_stored() {
 
 #[test]
 fn field_generated_virtual() {
-    let f = Field::new("full_name", DataType::Text).generated_virtual("first || ' ' || last");
+    let f = Field::new("full_name", DataType::unbounded_string()).generated_virtual("first || ' ' || last");
     let (kind, expr) = f.generated.as_ref().unwrap();
     assert_eq!(*kind, GeneratedKind::Virtual);
     assert_eq!(&**expr, "first || ' ' || last");
@@ -286,7 +286,7 @@ fn field_generated_virtual() {
 
 #[test]
 fn field_index_hint() {
-    let f = Field::new("email", DataType::Text).index();
+    let f = Field::new("email", DataType::unbounded_string()).index();
     assert!(f.indexed);
 }
 
@@ -436,11 +436,11 @@ fn entity_accepts_string_input() {
 #[test]
 fn data_type_reexported() {
     // Verify DataType is accessible through dol-entity
-    let _ = DataType::Text;
+    let _ = DataType::unbounded_string();
     let _ = DataType::Uuid;
     let _ = DataType::Int32;
-    let _ = DataType::Varchar(Some(255));
+    let _ = DataType::varying_string(255);
     let _ = DataType::Json;
-    let _ = DataType::TimestampTz { precision: 6 };
-    let _ = DataType::Array(Box::new(DataType::Text));
+    let _ = DataType::OffsetDateTime { precision: 6 };
+    let _ = DataType::Array(Box::new(DataType::unbounded_string()));
 }

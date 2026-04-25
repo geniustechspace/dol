@@ -7,7 +7,8 @@
 //! # Design
 //!
 //! - [`DataType`] mirrors every [`super::Value`] variant but adds constraints
-//!   (e.g., `Varchar(Option<u32>)` adds a max-length).
+//!   (e.g., `String { max_len, fixed }` adds a max-length and a fixed/variable
+//!   flag).
 //! - [`StructField`] is a named, typed field used inside `DataType::Struct`.
 //! - [`DataType::accepts`] is the conformance bridge: it validates that a
 //!   runtime [`super::Value`] satisfies the declared type.
@@ -20,10 +21,12 @@
 //! `DataType::Nullable(DataType::Nullable(...))` representable but meaningless.
 //! Nullability belongs on the field definition (e.g., `StructField::nullable`).
 //!
-//! Submodules:
-//! - [`display`] — `impl Display for DataType` (separate to keep this file focused).
-
-mod display;
+//! # No `Display`
+//!
+//! `DataType` deliberately does **not** implement [`std::fmt::Display`].
+//! Backend-specific spellings (e.g. `VARCHAR(255)`, `String`, `text`) live
+//! in the corresponding backend crate. For human-readable diagnostics, use
+//! the auto-derived [`Debug`] impl or [`DataType::type_name`].
 
 use super::{TypeError, Value};
 use std::ops::Bound;
@@ -97,31 +100,39 @@ pub enum DataType {
     },
 
     // ── Text ──
-    /// Fixed-length character string: `CHAR(n)`.
-    Char(u32),
-    /// Variable-length character string: `VARCHAR(n)` or `TEXT` if `max` is `None`.
-    Varchar(Option<u32>),
-    /// Unbounded text. Alias for `Varchar(None)` with distinct backend semantics.
-    Text,
-    /// JSON-typed text. Distinct from `Varchar`/`Text` so backends apply the
-    /// correct wire encoding.
+    /// Character string with optional bounded length and fixed-vs-variable
+    /// distinction. `max_len = None` means unbounded; `fixed = true` requires
+    /// values to match `max_len` exactly (padding/validation is a backend
+    /// concern).
+    String {
+        max_len: Option<u32>,
+        fixed: bool,
+    },
+    /// JSON-typed text. Distinct from [`String`](Self::String) so backends
+    /// apply the correct wire encoding.
     Json,
     /// XML-typed text.
     Xml,
 
     // ── Binary ──
-    /// Fixed-length byte array: `BINARY(n)`.
-    Binary(u32),
-    /// Variable-length byte array: `VARBINARY(n)` or `BLOB` if `max` is `None`.
-    Varbinary(Option<u32>),
+    /// Byte string with optional bounded length and fixed-vs-variable
+    /// distinction. `max_len = None` means unbounded; `fixed = true` requires
+    /// values to match `max_len` exactly.
+    Bytes {
+        max_len: Option<u32>,
+        fixed: bool,
+    },
     /// UUID in 16-byte canonical form.
     Uuid,
 
     // ── Bit string ──
-    /// Fixed-length bit string: `BIT(n)`.
-    Bit(u32),
-    /// Variable-length bit string: `VARBIT(n)` or unlimited if `max` is `None`.
-    Varbit(Option<u32>),
+    /// Bit string with optional bounded length and fixed-vs-variable
+    /// distinction. `max_len = None` means unbounded; `fixed = true` requires
+    /// values to match `max_len` exactly.
+    BitString {
+        max_len: Option<u32>,
+        fixed: bool,
+    },
 
     // ── Temporal ──
     Date,
@@ -134,16 +145,18 @@ pub enum DataType {
         precision: u8,
     },
     /// Datetime with timezone offset. `precision` is fractional seconds digits.
-    TimestampTz {
+    OffsetDateTime {
         precision: u8,
     },
     Interval,
 
     // ── Network ──
-    Inet,
-    /// IP network in CIDR notation. Values are `IpAddr` (the host portion);
-    /// the network mask is part of the *type*, not the value.
-    Cidr {
+    /// An IP host address (IPv4 or IPv6).
+    IpAddr,
+    /// An IP network range with an explicit prefix length. Values are
+    /// `IpAddr` (the host portion); the network mask is part of the *type*,
+    /// not the value.
+    IpNetwork {
         prefix_len: u8,
     },
     MacAddr,
@@ -220,14 +233,14 @@ impl DataType {
     pub const fn is_textual(&self) -> bool {
         matches!(
             self,
-            Self::Char(_) | Self::Varchar(_) | Self::Text | Self::Json | Self::Xml
+            Self::String { .. } | Self::Json | Self::Xml
         )
     }
 
     pub const fn is_binary(&self) -> bool {
         matches!(
             self,
-            Self::Binary(_) | Self::Varbinary(_) | Self::Uuid | Self::Bit(_) | Self::Varbit(_)
+            Self::Bytes { .. } | Self::Uuid | Self::BitString { .. }
         )
     }
 
@@ -237,7 +250,7 @@ impl DataType {
             Self::Date
                 | Self::Time { .. }
                 | Self::DateTime { .. }
-                | Self::TimestampTz { .. }
+                | Self::OffsetDateTime { .. }
                 | Self::Interval
         )
     }
@@ -258,7 +271,7 @@ impl DataType {
     pub const fn is_network(&self) -> bool {
         matches!(
             self,
-            Self::Inet | Self::Cidr { .. } | Self::MacAddr | Self::MacAddr8
+            Self::IpAddr | Self::IpNetwork { .. } | Self::MacAddr | Self::MacAddr8
         )
     }
 
@@ -345,74 +358,53 @@ impl DataType {
             }
 
             // Text types
-            Self::Char(len) => {
+            Self::String { max_len, fixed } => {
                 let V::String(s) = value else {
                     return Err(TypeError::KindMismatch {
                         expected: self.type_name(),
                         got: value.type_name(),
                     });
                 };
-                let actual = s.chars().count();
-                if actual != *len as usize {
-                    // CHAR requires exact length; backends pad, but we validate the max.
-                    if actual > *len as usize {
-                        return Err(TypeError::StringTooLong {
-                            max: *len,
-                            got: actual,
-                        });
-                    }
-                }
-                Ok(())
-            }
-            Self::Varchar(max) => {
-                let V::String(s) = value else {
-                    return Err(TypeError::KindMismatch {
-                        expected: self.type_name(),
-                        got: value.type_name(),
-                    });
-                };
-                if let Some(max_len) = max {
+                if let Some(limit) = max_len {
                     let actual = s.chars().count();
-                    if actual > *max_len as usize {
+                    if *fixed {
+                        if actual > *limit as usize {
+                            return Err(TypeError::StringTooLong {
+                                max: *limit,
+                                got: actual,
+                            });
+                        }
+                    } else if actual > *limit as usize {
                         return Err(TypeError::StringTooLong {
-                            max: *max_len,
+                            max: *limit,
                             got: actual,
                         });
                     }
                 }
                 Ok(())
             }
-            Self::Text => kind_check!(V::String(_)),
             Self::Json => kind_check!(V::Json(_)),
             Self::Xml => kind_check!(V::Xml(_)),
 
             // Binary types
-            Self::Binary(len) => {
+            Self::Bytes { max_len, fixed } => {
                 let V::Bytes(b) = value else {
                     return Err(TypeError::KindMismatch {
                         expected: self.type_name(),
                         got: value.type_name(),
                     });
                 };
-                if b.len() != *len as usize {
-                    return Err(TypeError::BytesTooLong {
-                        max: *len,
-                        got: b.len(),
-                    });
-                }
-                Ok(())
-            }
-            Self::Varbinary(max) => {
-                let V::Bytes(b) = value else {
-                    return Err(TypeError::KindMismatch {
-                        expected: self.type_name(),
-                        got: value.type_name(),
-                    });
-                };
-                if let Some(max_len) = max {
-                    if b.len() > *max_len as usize {
+                if let Some(limit) = max_len {
+                    if *fixed {
+                        if b.len() != *limit as usize {
+                            return Err(TypeError::BytesTooLong {
+                                max: *limit,
+                                got: b.len(),
+                            });
+                        }
+                    } else if b.len() > *limit as usize {
                         return Err(TypeError::BytesTooLong {
-                            max: *max_len,
+                            max: *limit,
                             got: b.len(),
                         });
                     }
@@ -422,32 +414,24 @@ impl DataType {
             Self::Uuid => kind_check!(V::Uuid(_)),
 
             // Bit strings
-            Self::Bit(len) => {
+            Self::BitString { max_len, fixed } => {
                 let V::BitString(bs) = value else {
                     return Err(TypeError::KindMismatch {
                         expected: self.type_name(),
                         got: value.type_name(),
                     });
                 };
-                if bs.len != *len {
-                    return Err(TypeError::BitsLengthMismatch {
-                        expected: *len,
-                        got: bs.len,
-                    });
-                }
-                Ok(())
-            }
-            Self::Varbit(max) => {
-                let V::BitString(bs) = value else {
-                    return Err(TypeError::KindMismatch {
-                        expected: self.type_name(),
-                        got: value.type_name(),
-                    });
-                };
-                if let Some(max_bits) = max {
-                    if bs.len > *max_bits {
+                if let Some(limit) = max_len {
+                    if *fixed {
+                        if bs.len != *limit {
+                            return Err(TypeError::BitsLengthMismatch {
+                                expected: *limit,
+                                got: bs.len,
+                            });
+                        }
+                    } else if bs.len > *limit {
                         return Err(TypeError::BitsTooLong {
-                            max: *max_bits,
+                            max: *limit,
                             got: bs.len,
                         });
                     }
@@ -459,11 +443,11 @@ impl DataType {
             Self::Date => kind_check!(V::Date(_)),
             Self::Time { .. } => kind_check!(V::Time(_)),
             Self::DateTime { .. } => kind_check!(V::DateTime(_)),
-            Self::TimestampTz { .. } => kind_check!(V::TimestampTz(_)),
+            Self::OffsetDateTime { .. } => kind_check!(V::TimestampTz(_)),
             Self::Interval => kind_check!(V::Interval(_)),
 
             // Network
-            Self::Inet | Self::Cidr { .. } => {
+            Self::IpAddr | Self::IpNetwork { .. } => {
                 if !matches!(value, V::Inet(_)) {
                     return Err(TypeError::KindMismatch {
                         expected: self.type_name(),
@@ -675,23 +659,19 @@ impl DataType {
             Self::Float32 => "float32",
             Self::Float64 => "float64",
             Self::Decimal { .. } => "decimal",
-            Self::Char(_) => "char",
-            Self::Varchar(_) => "varchar",
-            Self::Text => "text",
+            Self::String { .. } => "string",
             Self::Json => "json",
             Self::Xml => "xml",
-            Self::Binary(_) => "binary",
-            Self::Varbinary(_) => "varbinary",
+            Self::Bytes { .. } => "bytes",
             Self::Uuid => "uuid",
-            Self::Bit(_) => "bit",
-            Self::Varbit(_) => "varbit",
+            Self::BitString { .. } => "bitstring",
             Self::Date => "date",
             Self::Time { .. } => "time",
             Self::DateTime { .. } => "datetime",
-            Self::TimestampTz { .. } => "timestamptz",
+            Self::OffsetDateTime { .. } => "offsetdatetime",
             Self::Interval => "interval",
-            Self::Inet => "inet",
-            Self::Cidr { .. } => "cidr",
+            Self::IpAddr => "ipaddr",
+            Self::IpNetwork { .. } => "ipnetwork",
             Self::MacAddr => "macaddr",
             Self::MacAddr8 => "macaddr8",
             Self::Point => "point",
@@ -712,6 +692,75 @@ impl DataType {
             Self::Extension { .. } => "extension",
         }
     }
+
+    // ── Convenience constructors ──────────────────────────────────────────
+    //
+    // Store-neutral helpers that keep call sites concise without referencing
+    // any specific backend's spelling.
+
+    /// A bounded variable-length character string (`max_len` characters).
+    pub const fn varying_string(max_len: u32) -> Self {
+        Self::String {
+            max_len: Some(max_len),
+            fixed: false,
+        }
+    }
+
+    /// A fixed-length character string (`len` characters).
+    pub const fn fixed_string(len: u32) -> Self {
+        Self::String {
+            max_len: Some(len),
+            fixed: true,
+        }
+    }
+
+    /// An unbounded character string.
+    pub const fn unbounded_string() -> Self {
+        Self::String {
+            max_len: None,
+            fixed: false,
+        }
+    }
+
+    /// A bounded variable-length byte string.
+    pub const fn varying_bytes(max_len: u32) -> Self {
+        Self::Bytes {
+            max_len: Some(max_len),
+            fixed: false,
+        }
+    }
+
+    /// A fixed-length byte string.
+    pub const fn fixed_bytes(len: u32) -> Self {
+        Self::Bytes {
+            max_len: Some(len),
+            fixed: true,
+        }
+    }
+
+    /// An unbounded byte string.
+    pub const fn unbounded_bytes() -> Self {
+        Self::Bytes {
+            max_len: None,
+            fixed: false,
+        }
+    }
+
+    /// A bounded variable-length bit string.
+    pub const fn varying_bits(max_len: u32) -> Self {
+        Self::BitString {
+            max_len: Some(max_len),
+            fixed: false,
+        }
+    }
+
+    /// A fixed-length bit string.
+    pub const fn fixed_bits(len: u32) -> Self {
+        Self::BitString {
+            max_len: Some(len),
+            fixed: true,
+        }
+    }
 }
 
 
@@ -723,13 +772,13 @@ mod tests {
 
     #[test]
     fn varchar_accepts_string_within_length() {
-        let dt = DataType::Varchar(Some(10));
+        let dt = DataType::varying_string(10);
         assert!(dt.accepts(&Value::from("hello")).is_ok());
     }
 
     #[test]
     fn varchar_rejects_string_over_length() {
-        let dt = DataType::Varchar(Some(3));
+        let dt = DataType::varying_string(3);
         let err = dt.accepts(&Value::from("hello")).unwrap_err();
         assert!(matches!(err, TypeError::StringTooLong { max: 3, got: 5 }));
     }
@@ -762,7 +811,7 @@ mod tests {
     fn struct_missing_required_field() {
         let dt = DataType::Struct(vec![
             StructField::new("id", DataType::Int32, false),
-            StructField::new("name", DataType::Varchar(None), false),
+            StructField::new("name", DataType::unbounded_string(), false),
         ]);
         // Value has only "id"
         let v = Value::Struct(vec![("id".into(), Value::Int32(1))].into_boxed_slice());
@@ -810,7 +859,7 @@ mod tests {
 
     #[test]
     fn tuple_length_mismatch() {
-        let dt = DataType::Tuple(vec![DataType::Int32, DataType::Text]);
+        let dt = DataType::Tuple(vec![DataType::Int32, DataType::unbounded_string()]);
         let v = Value::Tuple(vec![Value::Int32(1)].into_boxed_slice());
         assert!(matches!(
             dt.accepts(&v).unwrap_err(),
@@ -819,23 +868,5 @@ mod tests {
                 got: 1
             }
         ));
-    }
-
-    #[test]
-    fn display_for_datatypes() {
-        assert_eq!(DataType::Varchar(Some(255)).to_string(), "VARCHAR(255)");
-        assert_eq!(DataType::Varchar(None).to_string(), "TEXT");
-        assert_eq!(
-            DataType::Array(Box::new(DataType::Int32)).to_string(),
-            "INT32[]"
-        );
-        assert_eq!(
-            DataType::Decimal {
-                precision: Some(10),
-                scale: Some(2)
-            }
-            .to_string(),
-            "NUMERIC(10,2)"
-        );
     }
 }

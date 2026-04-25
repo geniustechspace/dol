@@ -37,8 +37,8 @@ use constraint::EntityConstraint as Constraint;
 /// let users = Entity::new("users", vec![
 ///     Field::new("id", DataType::Uuid).primary_key(),
 ///     Field::new("tenant_id", DataType::Uuid),
-///     Field::new("email", DataType::Text),
-///     Field::new("status", DataType::Text).default("'active'"),
+///     Field::new("email", DataType::unbounded_string()),
+///     Field::new("status", DataType::unbounded_string()).default("'active'"),
 ///     Field::new("seq", DataType::Int32).auto_increment(),
 /// ]).with_constraints(vec![
 ///     EntityConstraint::unique(["tenant_id", "email"]),

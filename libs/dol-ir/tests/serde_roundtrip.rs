@@ -68,7 +68,7 @@ fn define_entity_round_trip() {
         namespace: Some("public".into()),
         fields: vec![
             FieldDef::new("id", DataType::Uuid).primary_key(),
-            FieldDef::new("email", DataType::Text).unique(),
+            FieldDef::new("email", DataType::unbounded_string()).unique(),
         ],
         constraints: vec![EntityConstraint::Unique(vec![
             "email".into(),
