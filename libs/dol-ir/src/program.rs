@@ -41,11 +41,7 @@ impl Program {
     /// [`ExprArena`]: dol_expr::arena::ExprArena
     /// [`Interner`]:  dol_expr::interner::Interner
     pub fn from_stmt(stmt: Statement) -> Self {
-        Self::new(
-            stmt,
-            dol_expr::ExprArena::default(),
-            dol_expr::Interner::default(),
-        )
+        Self::new(stmt, dol_expr::ExprArena::new(), dol_expr::Interner::new())
     }
 
     /// Decompose into `(stmt, arena, interner)`.

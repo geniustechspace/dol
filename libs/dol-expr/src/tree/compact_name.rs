@@ -81,7 +81,7 @@ impl serde::Serialize for CompactName {
 #[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for CompactName {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = String::deserialize(deserializer)?;
+        let s = <String as serde::Deserialize>::deserialize(deserializer)?;
         Ok(Self::Owned(s.into_boxed_str()))
     }
 }

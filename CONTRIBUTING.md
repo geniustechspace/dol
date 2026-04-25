@@ -76,13 +76,13 @@ dol-types  →  dol-expr  →  dol-ir
                           dol-schema  →  dol-query
 ```
 
-| Crate        | Role                                                        |
-| ------------ | ----------------------------------------------------------- |
-| `dol-types`  | Leaf: `Value`, `Literal`, `DataType`                        |
-| `dol-expr`   | Composable expression AST — operators, functions, windows   |
+| Crate        | Role                                                            |
+| ------------ | --------------------------------------------------------------- |
+| `dol-types`  | Leaf: `Value`, `Literal`, `DataType`                            |
+| `dol-expr`   | Composable expression AST — operators, functions, windows       |
 | `dol-ir`     | Intermediate representation — `Statement` enum, `Backend` trait |
-| `dol-schema` | Schema language — `Entity`, `Field`, constraints, DDL       |
-| `dol-query`  | Query entry point + builders → produce IR                   |
+| `dol-schema` | Schema language — `Entity`, `Field`, constraints, DDL           |
+| `dol-query`  | Query entry point + builders → produce IR                       |
 
 When adding a new feature, place it in the lowest appropriate crate to minimize
 coupling.
