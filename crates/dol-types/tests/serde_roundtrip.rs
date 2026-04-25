@@ -9,8 +9,8 @@
 use std::borrow::Cow;
 
 use dol_types::{
-    BitString, DataType, Date, DateTime, Decimal, Interval, IpAddr, Literal, MacAddr, MacAddr8,
-    Offset, Point, StructField, Time, TimestampTz, Value,
+    BitString, DataType, Date, DateTime, Decimal, Interval, IpAddr, Literal, MacAddr, Offset,
+    Point, StructField, Time, TimestampTz, Value,
 };
 
 fn round_trip<T>(value: &T) -> T
@@ -123,8 +123,8 @@ fn value_round_trip_temporal_and_network() {
         Value::Interval(Box::new(interval)),
         Value::Decimal(Box::new(dec)),
         Value::Inet(IpAddr::v4(127, 0, 0, 1)),
-        Value::MacAddr(MacAddr([0u8; 6])),
-        Value::MacAddr8(MacAddr8([0u8; 8])),
+        Value::MacAddr(MacAddr::eui48([0u8; 6])),
+        Value::MacAddr(MacAddr::eui64([0u8; 8])),
         Value::Point(Point::new_unchecked(1.0, 2.0)),
         Value::BitString(Box::new(bs)),
     ];

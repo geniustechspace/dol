@@ -10,12 +10,12 @@ layer, so there is exactly one definition of every type in the workspace.
 
 ## Layers
 
-| Layer        | Types                              | Purpose                                                |
-| ------------ | ---------------------------------- | ------------------------------------------------------ |
-| Values       | `Value`, `Literal`                 | Carry actual data at runtime / in ASTs                 |
-| Descriptors  | `DataType`, `StructField`          | Describe the expected shape of a position              |
-| Primitives   | `Decimal`, `Date`, `geo::Point`, … | Structural sub-types with validated constructors       |
-| Errors       | `TypeError`                        | All validation and conformance errors                  |
+| Layer       | Types                              | Purpose                                          |
+| ----------- | ---------------------------------- | ------------------------------------------------ |
+| Values      | `Value`, `Literal`                 | Carry actual data at runtime / in ASTs           |
+| Descriptors | `DataType`, `StructField`          | Describe the expected shape of a position        |
+| Primitives  | `Decimal`, `Date`, `geo::Point`, … | Structural sub-types with validated constructors |
+| Errors      | `TypeError`                        | All validation and conformance errors            |
 
 The bridge between them is `DataType::accepts(&Value) -> Result<(), TypeError>`.
 
@@ -30,7 +30,7 @@ size_of::<Literal<'static>>() == 32
 
 | feature | default | effect                              |
 | ------- | :-----: | ----------------------------------- |
-| `serde` |   ✔     | `Serialize` / `Deserialize` derives |
+| `serde` |    ✔    | `Serialize` / `Deserialize` derives |
 
 `serde` is on by default because this is a leaf primitive crate and the cost
 is negligible. Embedded users can opt out with `default-features = false`.

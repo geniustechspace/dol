@@ -47,7 +47,7 @@ impl<T, Tag: ?Sized> Arena<T, Tag> {
 
     /// Allocate a value, returning its [`Id`]. O(1) amortised.
     #[inline]
-    pub fn alloc(&mut self, item: T) -> Id<T, Tag> {
+    pub fn allocate(&mut self, item: T) -> Id<T, Tag> {
         let raw = self.items.len() as u32;
         debug_assert!(raw != crate::id::NULL_ID, "arena overflow");
         self.items.push(item);
@@ -64,7 +64,7 @@ impl<T, Tag: ?Sized> Arena<T, Tag> {
     /// Mutably borrow the value referenced by `id`.
     #[inline]
     #[allow(clippy::needless_pass_by_value)]
-    pub fn get_mut(&mut self, id: Id<T, Tag>) -> &mut T {
+    pub fn get_mutable(&mut self, id: Id<T, Tag>) -> &mut T {
         &mut self.items[id.to_raw() as usize]
     }
 
@@ -120,10 +120,10 @@ mod tests {
     }
 
     #[test]
-    fn alloc_get_roundtrip() {
+    fn allocate_get_roundtrip() {
         let mut a: Arena<u32> = Arena::new();
-        let i0 = a.alloc(10);
-        let i1 = a.alloc(20);
+        let i0 = a.allocate(10);
+        let i1 = a.allocate(20);
         assert_eq!(*a.get(i0), 10);
         assert_eq!(*a.get(i1), 20);
         assert_eq!(a.len(), 2);
