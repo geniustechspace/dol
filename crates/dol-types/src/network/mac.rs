@@ -20,6 +20,7 @@ impl std::error::Error for ParseMacAddrError {}
 /// [`super::IpAddr`], which models multiple wire widths as one enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 pub enum MacAddr {
     Eui48([u8; 6]),
     Eui64([u8; 8]),
@@ -32,11 +33,6 @@ impl MacAddr {
 
     pub const fn eui64(b: [u8; 8]) -> Self {
         Self::Eui64(b)
-    }
-
-    /// Backward-compatible alias for constructing a 6-byte MAC.
-    pub const fn new(b: [u8; 6]) -> Self {
-        Self::eui48(b)
     }
 
     pub const fn is_eui48(&self) -> bool {

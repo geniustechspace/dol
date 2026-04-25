@@ -164,6 +164,9 @@ pub enum DataType {
     IpNetwork {
         prefix_len: u8,
     },
+    /// An Ethernet MAC address. Matches both EUI-48 and EUI-64
+    /// [`Value::MacAddr`] payloads; [`Self::name`] returns `"macaddr"` for
+    /// either width.
     MacAddr,
 
     // ── Geometric ──
