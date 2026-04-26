@@ -16,8 +16,10 @@ pub mod definition;
 pub mod entity_ref;
 pub mod prelude;
 pub mod program;
+pub mod schema_ref;
 pub mod statement;
 pub mod storage;
+pub mod target;
 pub mod transaction;
 
 /// Schema constraint types — re-exported from `dol-schema`, the canonical home.
@@ -35,6 +37,8 @@ pub use definition::{
 };
 pub use entity_ref::EntityRef;
 pub use program::Program;
+pub use schema_ref::{CatalogId, SchemaId, SchemaRef};
 pub use statement::{Statement, StatementExtension};
 pub use storage::{GetObject, ListObjects, MoveFile, ObjectSource, PutObject, ReadFile, WriteFile};
+pub use target::{Locator, SchemaBinding, Symbol, Target, TargetKind};
 pub use transaction::Transaction;
