@@ -6,7 +6,8 @@
 //! - Use `.optional()` or `.nullable()` to make them nullable
 //! - Use `.required()` as a no-op self-documenting marker
 
-use std::sync::Arc;
+extern crate alloc;
+use alloc::sync::Arc;
 
 use super::constraint::{ComputedKind, RefAction, RelationRef};
 pub use dol_core::DataType;

@@ -139,7 +139,7 @@ fn nostd_check() -> bool {
             return false;
         }
     }
-    let check_crates = ["dol-ir"];
+    let check_crates = ["dol-ir", "dol-schema"];
     for c in check_crates {
         let ok = run_cargo(&["check", "-p", c, "--no-default-features"], &[]);
         if !ok {

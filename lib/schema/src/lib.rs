@@ -11,8 +11,18 @@
 //! A **Field** is a named property within an Entity.
 //!
 //! A **DataType** is the backend-agnostic logical type descriptor.
+//!
+//! # Cargo features
+//!
+//! | feature | default | effect                                                                  |
+//! | ------- | :-----: | ----------------------------------------------------------------------- |
+//! | `std`   |         | Forwards `std` to `dol-core`. Disable for `no_std + alloc` (default).  |
+//! | `serde` |    ✓    | `Serialize` / `Deserialize` for every schema type.                      |
 
+#![cfg_attr(not(feature = "std"), no_std)]
 #![deny(unsafe_code)]
+
+extern crate alloc;
 
 pub mod constraint;
 pub mod field;
@@ -23,7 +33,10 @@ pub use constraint::{ComputedKind, EntityConstraint, RefAction, RelationRef};
 pub use field::Field;
 pub use field_type::DataType;
 
-use std::sync::Arc;
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use constraint::EntityConstraint as Constraint;
 

@@ -214,7 +214,177 @@ fn opaque_schema_binding_emits_opaque_schema_tag() {
     );
 }
 
-// ── Static invariants ─────────────────────────────────────────────────────
+// ── ACL / governance smoke tests ──────────────────────────────────────────
+
+#[test]
+fn acl_grant_select_on_relation() {
+    use dol_ir::operation::Grant;
+    use dol_ir::privilege::Privilege;
+    use smallvec::smallvec;
+
+    let op: Operation = Grant {
+        privileges: smallvec![Privilege::Select],
+        target: t(TargetKind::Relation),
+        roles: smallvec![Symbol::new(0)],
+        with_grant_option: false,
+    }
+    .into();
+    assert_basic(&op, OpKind::Grant, Category::ACL);
+}
+
+#[test]
+fn acl_revoke_custom_privilege_uses_symbol() {
+    use dol_ir::operation::Revoke;
+    use dol_ir::privilege::Privilege;
+    use smallvec::smallvec;
+
+    let op: Operation = Revoke {
+        privileges: smallvec![Privilege::Custom(Symbol::new(7))],
+        target: t(TargetKind::Relation),
+        roles: smallvec![Symbol::new(0)],
+        cascade: false,
+    }
+    .into();
+    assert_basic(&op, OpKind::Revoke, Category::ACL);
+}
+
+#[test]
+fn acl_policy_create_emits_policy_kind() {
+    use dol_ir::operation::{PolicyOp, PolicyScope, StructuralVerb};
+
+    let op: Operation = PolicyOp {
+        verb: StructuralVerb::Create,
+        target: t(TargetKind::Relation),
+        name: Symbol::new(1),
+        scope: PolicyScope::Read,
+        using_expr: None,
+        check_expr: None,
+    }
+    .into();
+    assert_basic(&op, OpKind::Policy, Category::ACL);
+}
+
+#[test]
+fn acl_mask_create_emits_mask_kind() {
+    use dol_ir::operation::{MaskOp, StructuralVerb};
+    use smallvec::smallvec;
+
+    let op: Operation = MaskOp {
+        verb: StructuralVerb::Create,
+        target: t(TargetKind::Relation),
+        name: Symbol::new(1),
+        fields: smallvec![Symbol::new(2)],
+        mask_expr: None,
+    }
+    .into();
+    assert_basic(&op, OpKind::Mask, Category::ACL);
+}
+
+#[test]
+fn acl_quota_create_emits_quota_kind() {
+    use dol_ir::operation::{QuotaKind, QuotaOp, StructuralVerb};
+
+    let op: Operation = QuotaOp {
+        verb: StructuralVerb::Create,
+        target: t(TargetKind::Relation),
+        name: Symbol::new(1),
+        kind: QuotaKind::Rate,
+        limit: 1_000,
+        role: None,
+    }
+    .into();
+    assert_basic(&op, OpKind::Quota, Category::ACL);
+}
+
+#[test]
+fn acl_audit_create_emits_audit_kind() {
+    use dol_ir::operation::{AuditEvent, AuditOp, AuditSink, StructuralVerb};
+
+    let op: Operation = AuditOp {
+        verb: StructuralVerb::Create,
+        target: t(TargetKind::Relation),
+        name: Symbol::new(1),
+        event: AuditEvent::Write,
+        sink: AuditSink::Default,
+    }
+    .into();
+    assert_basic(&op, OpKind::Audit, Category::ACL);
+}
+
+#[cfg(feature = "serde")]
+#[test]
+fn serde_round_trip_for_acl_and_governance() {
+    use dol_ir::operation::{
+        AuditEvent, AuditOp, AuditSink, Grant, MaskOp, PolicyOp, PolicyScope, QuotaKind,
+        QuotaOp, Revoke, StructuralVerb,
+    };
+    use dol_ir::privilege::Privilege;
+    use serde_json::{from_str, to_string};
+    use smallvec::smallvec;
+
+    let ops: Vec<Operation> = vec![
+        Grant {
+            privileges: smallvec![Privilege::Select, Privilege::Insert],
+            target: t(TargetKind::Relation),
+            roles: smallvec![Symbol::new(0)],
+            with_grant_option: false,
+        }
+        .into(),
+        Revoke {
+            privileges: smallvec![Privilege::Custom(Symbol::new(7))],
+            target: t(TargetKind::Relation),
+            roles: smallvec![Symbol::new(0)],
+            cascade: false,
+        }
+        .into(),
+        PolicyOp {
+            verb: StructuralVerb::Create,
+            target: t(TargetKind::Relation),
+            name: Symbol::new(1),
+            scope: PolicyScope::Read,
+            using_expr: None,
+            check_expr: None,
+        }
+        .into(),
+        MaskOp {
+            verb: StructuralVerb::Create,
+            target: t(TargetKind::Relation),
+            name: Symbol::new(1),
+            fields: smallvec![Symbol::new(2)],
+            mask_expr: None,
+        }
+        .into(),
+        QuotaOp {
+            verb: StructuralVerb::Create,
+            target: t(TargetKind::Relation),
+            name: Symbol::new(1),
+            kind: QuotaKind::Rate,
+            limit: 100,
+            role: None,
+        }
+        .into(),
+        AuditOp {
+            verb: StructuralVerb::Create,
+            target: t(TargetKind::Relation),
+            name: Symbol::new(1),
+            event: AuditEvent::Write,
+            sink: AuditSink::Default,
+        }
+        .into(),
+        Append {
+            target: t(TargetKind::StreamTopic),
+            source: InsertSource::Bindings,
+            partition_key: None,
+        }
+        .into(),
+    ];
+    for op in &ops {
+        let s = to_string(op).expect("encode");
+        let back: Operation = from_str(&s).expect("decode");
+        assert_eq!(op.kind(), back.kind(), "kind mismatch round-tripping {op:?}");
+        assert_eq!(op, &back, "value mismatch round-tripping {op:?}");
+    }
+}
 
 #[test]
 fn operation_size_within_budget() {

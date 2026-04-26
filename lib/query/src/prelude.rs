@@ -1,4 +1,9 @@
 //! Curated re-exports for `dol-query`.
+//!
+//! This prelude includes the IR types accepted by `dol-query` public
+//! functions (`Privilege`, `IsolationLevel`, `PolicyScope`, `SchemaBinding`),
+//! so `use dol_query::prelude::*;` is sufficient for the documented examples
+//! without having to also import from `dol_ir`.
 
 pub use crate::{
     DeleteQuery, GetQuery, InsertQuery, JoinKind, Query, UpdateQuery, UpsertQuery,
@@ -12,3 +17,10 @@ pub use crate::storage::{
     write_file_from_path,
 };
 pub use crate::control::{define_policy, grant, revoke, tx_atomic, tx_begin, tx_commit, tx_rollback};
+
+// IR types referenced by the public `dol-query` surface.
+pub use dol_ir::{
+    operation::{IsolationLevel, PolicyScope},
+    privilege::Privilege,
+    target::SchemaBinding,
+};

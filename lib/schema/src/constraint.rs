@@ -7,7 +7,9 @@
 //! `dol-schema` is the single owner of constraint types; `dol-ir` re-exports
 //! the names it needs to embed in DDL `Statement` variants.
 
-use std::sync::Arc;
+extern crate alloc;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 /// Action to take when a referenced record is deleted or updated.
 ///
