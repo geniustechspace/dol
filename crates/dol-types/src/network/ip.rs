@@ -6,8 +6,23 @@ use core::str::FromStr;
 ///
 /// Stored as a self-contained enum (not `core::net::IpAddr`) for consistent
 /// size, alignment, and serde behaviour. `From` impls cover the stdlib types.
+///
+/// # Serde representation
+///
+/// With the `serde` feature, `IpAddr` serialises **untagged** as the bare
+/// octet array of its variant: a 4-byte array for [`IpAddr::V4`] and a
+/// 16-byte array for [`IpAddr::V6`]. The two widths are unambiguous on the
+/// wire, so no enum tag is emitted.
+///
+/// ```json
+/// // V4
+/// [192, 168, 0, 1]
+/// // V6
+/// [32, 1, 13, 184, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 pub enum IpAddr {
     V4([u8; 4]),
     V6([u8; 16]),

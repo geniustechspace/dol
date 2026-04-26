@@ -60,6 +60,20 @@ impl std::error::Error for ParseMacAddrError {}
 ///
 /// This stores either EUI-48 (6 bytes) or EUI-64 (8 bytes) for parity with
 /// [`super::IpAddr`], which models multiple wire widths as one enum.
+///
+/// # Serde representation
+///
+/// With the `serde` feature, `MacAddr` serialises **untagged** as the bare
+/// octet array of its variant: a 6-byte array for [`MacAddr::Eui48`] and an
+/// 8-byte array for [`MacAddr::Eui64`]. The two widths are unambiguous on
+/// the wire, so no enum tag is emitted.
+///
+/// ```json
+/// // EUI-48
+/// [0, 26, 43, 60, 77, 94]
+/// // EUI-64
+/// [0, 26, 43, 60, 77, 94, 111, 128]
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
