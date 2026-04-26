@@ -1,7 +1,7 @@
 //! `Replace` — full overwrite (HTTP PUT, S3 object overwrite, Mongo
 //! `replaceOne`, file-tree write).
 //!
-//! Paired with [`Update`](crate::operation::update::Update).
+//! Paired with [`Update`](crate::operation::Update).
 
 use dol_expr::ids::NodeId;
 

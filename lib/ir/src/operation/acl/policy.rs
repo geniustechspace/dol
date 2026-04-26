@@ -2,7 +2,7 @@
 
 use dol_expr::ids::NodeId;
 
-use crate::operation::schema::StructuralVerb;
+use crate::operation::shared::StructuralVerb;
 use crate::target::{Symbol, Target};
 
 /// What DML/DQL kinds the policy applies to.

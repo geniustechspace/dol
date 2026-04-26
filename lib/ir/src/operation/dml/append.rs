@@ -6,7 +6,7 @@
 
 use dol_expr::ids::NodeId;
 
-use crate::operation::insert::InsertSource;
+use crate::operation::dml::insert::InsertSource;
 use crate::target::Target;
 
 /// `Append` operation.

@@ -1,7 +1,7 @@
 //! `Update` — partial mutation (SQL `UPDATE ... SET`, Mongo `updateOne`,
 //! KV partial overwrite, file-tree rename).
 //!
-//! Paired with [`Replace`](crate::operation::replace::Replace). `Update` is
+//! Paired with [`Replace`](crate::operation::Replace). `Update` is
 //! *partial*; `Replace` is *full*.
 
 use dol_expr::ids::NodeId;

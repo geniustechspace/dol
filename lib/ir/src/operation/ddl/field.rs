@@ -8,7 +8,7 @@ use dol_core::DataType;
 use dol_expr::ids::NodeId;
 use dol_schema::{ComputedKind, RelationRef};
 
-use crate::operation::schema::StructuralVerb;
+use crate::operation::shared::StructuralVerb;
 use crate::target::{Symbol, Target};
 
 /// Field-level structural operation: add, drop, alter, or rename a single

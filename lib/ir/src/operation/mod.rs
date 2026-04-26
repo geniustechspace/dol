@@ -15,53 +15,31 @@
 //! within the 64-byte budget enforced by `xtask size` and a const assertion
 //! at the bottom of this file.
 
-pub mod append;
-pub mod audit;
-pub mod delete;
-pub mod describe;
-pub mod extension;
-pub mod field;
-pub mod grant;
-pub mod index;
-pub mod insert;
-pub mod lookup;
-pub mod mask;
-pub mod policy;
-pub mod probe;
-pub mod query;
-pub mod quota;
-#[cfg(feature = "raw")]
-pub mod raw;
-pub mod replace;
-pub mod revoke;
-pub mod schema;
+pub mod acl;
+pub mod ddl;
+pub mod dml;
+pub mod dql;
+pub mod kind;
+pub mod meta;
+pub mod shared;
 pub mod tx;
-pub mod update;
-pub mod upsert;
 
-pub use append::Append;
-pub use audit::{AuditEvent, AuditOp, AuditSink};
-pub use delete::Delete;
-pub use describe::{Describe, DescribeFacet};
-pub use extension::{ExtensionId, ExtensionPayload, OperationExtension};
-pub use field::{FieldDef, FieldOp};
-pub use grant::Grant;
-pub use index::{IndexDirection, IndexKey, IndexMethod, IndexOp};
-pub use insert::{Insert, InsertSource};
-pub use lookup::{LookupMethod, LookupOp};
-pub use mask::MaskOp;
-pub use policy::{PolicyOp, PolicyScope};
-pub use probe::Probe;
-pub use query::Query;
-pub use quota::{QuotaKind, QuotaOp};
+pub use acl::{
+    AuditEvent, AuditOp, AuditSink, Grant, MaskOp, PolicyOp, PolicyScope, QuotaKind, QuotaOp,
+    Revoke,
+};
+pub use ddl::{
+    FieldDef, FieldOp, IndexDirection, IndexKey, IndexMethod, IndexOp, LookupMethod, LookupOp,
+    SchemaBody, SchemaOp, TypeBody,
+};
+pub use dml::{Append, Delete, Insert, InsertSource, Replace, ReplaceBody, Update, Upsert};
+pub use dql::{Describe, DescribeFacet, Probe, Query};
+pub use kind::{Category, OpKind};
+pub use meta::{ExtensionId, ExtensionPayload, OperationExtension};
 #[cfg(feature = "raw")]
-pub use raw::RawOp;
-pub use replace::{Replace, ReplaceBody};
-pub use revoke::Revoke;
-pub use schema::{SchemaBody, SchemaOp, StructuralVerb, TypeBody};
+pub use meta::RawOp;
+pub use shared::StructuralVerb;
 pub use tx::{IsolationLevel, TxBegin, TxOp, TxOptions};
-pub use update::Update;
-pub use upsert::Upsert;
 
 /// Top-level IR operation.
 ///
@@ -104,79 +82,6 @@ pub enum Operation {
     Extension(Box<OperationExtension>),
     #[cfg(feature = "raw")]
     Raw(Box<RawOp>),
-}
-
-/// Coarse classification of an [`Operation`] by IR concern.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[allow(clippy::upper_case_acronyms)]
-pub enum Category {
-    /// Structural / management (`Schema`, `Field`, `Index`, `Lookup`).
-    DDL,
-    /// Data manipulation (`Insert`, `Update`, `Replace`, `Delete`, `Upsert`,
-    /// `Append`).
-    DML,
-    /// Read / inspection (`Query`, `Probe`, `Describe`).
-    DQL,
-    /// Access control (`Grant`, `Revoke`, `Policy`, `Mask`, `Quota`, `Audit`).
-    ACL,
-    /// Transaction control (`Tx`).
-    Tx,
-    /// Out-of-band escape hatches (`Extension`, `Raw`).
-    Other,
-}
-
-/// Concrete kind of an [`Operation`], used by capability checks and
-/// diagnostics.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum OpKind {
-    Schema,
-    Field,
-    Index,
-    Lookup,
-    Policy,
-    Mask,
-    Quota,
-    Audit,
-    Insert,
-    Update,
-    Replace,
-    Delete,
-    Upsert,
-    Append,
-    Query,
-    Probe,
-    Describe,
-    Grant,
-    Revoke,
-    Tx,
-    Extension,
-    Raw,
-}
-
-impl OpKind {
-    /// Coarse [`Category`] for this kind.
-    pub const fn category(self) -> Category {
-        match self {
-            OpKind::Schema | OpKind::Field | OpKind::Index | OpKind::Lookup => Category::DDL,
-            OpKind::Insert
-            | OpKind::Update
-            | OpKind::Replace
-            | OpKind::Delete
-            | OpKind::Upsert
-            | OpKind::Append => Category::DML,
-            OpKind::Query | OpKind::Probe | OpKind::Describe => Category::DQL,
-            OpKind::Policy
-            | OpKind::Mask
-            | OpKind::Quota
-            | OpKind::Audit
-            | OpKind::Grant
-            | OpKind::Revoke => Category::ACL,
-            OpKind::Tx => Category::Tx,
-            OpKind::Extension | OpKind::Raw => Category::Other,
-        }
-    }
 }
 
 impl Operation {

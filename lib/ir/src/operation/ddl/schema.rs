@@ -9,24 +9,9 @@
 //! inline. Backends that need the full schema body resolve it through
 //! [`SchemaCatalog`](crate::schema_catalog::SchemaCatalog).
 
+use crate::operation::shared::StructuralVerb;
 use crate::schema_ref::SchemaRef;
 use crate::target::{Symbol, Target};
-
-/// The verb applied by a structural / governance operation.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum StructuralVerb {
-    /// Create the object if it does not exist.
-    Create,
-    /// Drop the object.
-    Drop,
-    /// Alter the object's body.
-    Alter,
-    /// Rename the object.
-    Rename,
-    /// Empty the object's contents (data-bearing targets only).
-    Truncate,
-}
 
 /// Body kind of a [`SchemaOp`] payload.
 ///

@@ -1,6 +1,6 @@
 //! `Quota` — per-target / per-role rate-limiting and storage caps.
 
-use crate::operation::schema::StructuralVerb;
+use crate::operation::shared::StructuralVerb;
 use crate::target::{Symbol, Target};
 
 /// What facet of usage is constrained.

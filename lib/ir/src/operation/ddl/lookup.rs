@@ -7,7 +7,7 @@
 
 use smallvec::SmallVec;
 
-use crate::operation::schema::StructuralVerb;
+use crate::operation::shared::StructuralVerb;
 use crate::target::{Symbol, Target};
 
 /// Lookup method.
