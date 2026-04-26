@@ -14,39 +14,39 @@ contracts are documented in their respective READMEs.
 
 ## Versioning
 
-DOL follows [SemVer 2.0](https://semver.org/) at the _crate_ granularity.
+DOL follows [SemVer 2.0](https://semver.org/) at the *crate* granularity.
 Breaking changes are batched into a single major release wherever
 practical.
 
 A change is **breaking** if any of the following hold:
 
-- A public type, function, or trait is renamed or removed.
-- A public function's signature changes in a non-source-compatible way.
-- A `#[non_exhaustive]` enum gains a variant that callers were already
+* A public type, function, or trait is renamed or removed.
+* A public function's signature changes in a non-source-compatible way.
+* A `#[non_exhaustive]` enum gains a variant that callers were already
   matching against using `..` (allowed) — but **not** if they used a
   wildcard (also allowed). In short: `#[non_exhaustive]` makes adding
   variants non-breaking by design.
-- The MSRV (`rust-version` in `Cargo.toml`) increases. We will increase
+* The MSRV (`rust-version` in `Cargo.toml`) increases. We will increase
   MSRV only in a minor release after at least one Rust toolchain release
   cycle.
 
 ## Public surface
 
-- All public enums and growable public structs that can plausibly grow
+* All public enums and growable public structs that can plausibly grow
   new variants/fields are marked `#[non_exhaustive]`. Adding a variant
   or field is then a non-breaking change.
-- Public structs whose field set is conceptually closed (e.g. `Date {
-year, month, day }`, `MacAddr([u8; 6])`) are _not_ `#[non_exhaustive]`.
+* Public structs whose field set is conceptually closed (e.g. `Date {
+  year, month, day }`, `MacAddr([u8; 6])`) are *not* `#[non_exhaustive]`.
   Adding fields to them is a breaking change.
-- New public items may be added in a minor release. Removing or renaming
+* New public items may be added in a minor release. Removing or renaming
   one is a breaking change.
 
 ## Wire format
 
 The serde representation produced by
 
-- `serde_json` — the canonical human-readable form, and
-- `postcard` — the canonical binary form
+* `serde_json` — the canonical human-readable form, and
+* `postcard` — the canonical binary form
 
 is part of the public stability contract.
 
@@ -64,8 +64,8 @@ binary formats (e.g. CBOR with `bytes`-mode keys) are sensitive to it.
 
 ### Non-exhaustive enums
 
-Adding a new variant to a `#[non_exhaustive]` enum is _not_ breaking at
-the source level, but it is a _forward-compatible_ change at the wire
+Adding a new variant to a `#[non_exhaustive]` enum is *not* breaking at
+the source level, but it is a *forward-compatible* change at the wire
 level: older deserializers will fail to decode messages containing the
 new variant. We treat this as a minor-release-allowed change. Producers
 that need to interoperate with old consumers must avoid emitting new
@@ -76,7 +76,7 @@ variants until the consumer base has updated.
 `dol_expr::Interner`'s serde codec writes the canonical
 `Vec<Arc<str>>` in insertion order. Two `Interner` instances populated
 with the same string sequence in the same order produce byte-identical
-output across `postcard` and `serde_json`. Map iteration order is _not_
+output across `postcard` and `serde_json`. Map iteration order is *not*
 serialized; the map is rebuilt on deserialization.
 
 ### Sizes are not part of the contract
@@ -88,12 +88,12 @@ arena/IR types as opaque-by-size.
 
 ## Feature flags
 
-- `std` and `serde` features may grow more capability in minor releases.
-- Removing a feature flag is a breaking change; renaming one is breaking
+* `std` and `serde` features may grow more capability in minor releases.
+* Removing a feature flag is a breaking change; renaming one is breaking
   unless the old name continues to work as a no-op forwarder for at
   least one minor release.
-- Enabling a feature must never change observable behaviour of code that
-  did not opt into that feature (the _additive_ feature rule).
+* Enabling a feature must never change observable behaviour of code that
+  did not opt into that feature (the *additive* feature rule).
 
 ## Deprecation
 

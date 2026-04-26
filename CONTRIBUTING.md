@@ -61,7 +61,7 @@ of every type in `dol-core`. Pick the enum representation deliberately:
   This is the safe default and is what `Value`, `Literal`, `DataType`, and
   the geo enums use.
 - **`#[serde(untagged)]`** — only when every pair of variants is
-  _unambiguous_ on the wire (distinct primitive type, distinct fixed-width
+  *unambiguous* on the wire (distinct primitive type, distinct fixed-width
   array length, or disjoint required field sets). Good fits are
   "newtype-style multiplexers" of fixed-width payloads. `IpAddr`
   (`[u8; 4]` vs `[u8; 16]`) and `MacAddr` (`[u8; 6]` vs `[u8; 8]`) qualify.
@@ -96,14 +96,14 @@ refactor: simplify dialect type resolution
 ## Crate Architecture
 
 ```markdown
-dol-core → dol-expr → dol-ir
-↑
-dol-schema → dol-query
+dol-core  →  dol-expr  →  dol-ir
+                              ↑
+                          dol-schema  →  dol-query
 ```
 
 | Crate        | Role                                                            |
 | ------------ | --------------------------------------------------------------- |
-| `dol-core`   | Leaf: `Value`, `Literal`, `DataType`                            |
+| `dol-core`  | Leaf: `Value`, `Literal`, `DataType`                            |
 | `dol-expr`   | Composable expression AST — operators, functions, windows       |
 | `dol-ir`     | Intermediate representation — `Statement` enum, `Backend` trait |
 | `dol-schema` | Schema language — `Entity`, `Field`, constraints, DDL           |

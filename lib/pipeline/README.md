@@ -18,8 +18,8 @@ the same wire envelope as any other statement.
 
 ## Features
 
-| feature | default | effect                                                                     |
-| ------- | :-----: | -------------------------------------------------------------------------- |
+| feature | default | effect                                                                   |
+| ------- | :-----: | ------------------------------------------------------------------------ |
 | `serde` |         | `Serialize` / `Deserialize` (forwards to `dol-ir`, `dol-expr`, `smallvec`) |
 
 ## Example

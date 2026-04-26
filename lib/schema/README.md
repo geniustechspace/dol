@@ -19,7 +19,7 @@ non-shape semantics.
 
 | feature | default | effect                              |
 | ------- | :-----: | ----------------------------------- |
-| `serde` |    ✔    | `Serialize` / `Deserialize` derives |
+| `serde` |   ✔     | `Serialize` / `Deserialize` derives |
 
 `serde` is on by default because schema definitions are almost always
 serialized (config files, wire envelopes, golden tests). Embedded users can

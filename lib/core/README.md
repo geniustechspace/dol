@@ -48,14 +48,14 @@ size_of::<Span>()             ==  8
 
 ## Features
 
-| feature    | default | effect                                                                                     |
-| ---------- | :-----: | ------------------------------------------------------------------------------------------ |
-| `std`      |    ✔    | Enables wall-clock factory helpers (`datetime::today`/`now`/`now_tz`); implies `datetime`. |
-| `serde`    |    ✔    | `Serialize` / `Deserialize` for every public type, including `Span` / `Diagnostic`.        |
-| `geo`      |    ✔    | The `geo` module + `Value`/`Literal`/`DataType`/`TypeError` variants for geometric types.  |
-| `network`  |    ✔    | The `network` module + `Inet`/`MacAddr` variants on `Value`/`Literal`/`DataType`.          |
-| `datetime` |    ✔    | The `datetime` module + `Date`/`Time`/`DateTime`/`TimestampTz`/`Interval` variants.        |
-| `numeric`  |    ✔    | The `numeric` module + `Decimal` variants and decimal-related `TypeError` arms.            |
+| feature    | default | effect                                                                                                |
+| ---------- | :-----: | ----------------------------------------------------------------------------------------------------- |
+| `std`      |    ✔    | Enables wall-clock factory helpers (`datetime::today`/`now`/`now_tz`); implies `datetime`.            |
+| `serde`    |    ✔    | `Serialize` / `Deserialize` for every public type, including `Span` / `Diagnostic`.                   |
+| `geo`      |    ✔    | The `geo` module + `Value`/`Literal`/`DataType`/`TypeError` variants for geometric types.             |
+| `network`  |    ✔    | The `network` module + `Inet`/`MacAddr` variants on `Value`/`Literal`/`DataType`.                     |
+| `datetime` |    ✔    | The `datetime` module + `Date`/`Time`/`DateTime`/`TimestampTz`/`Interval` variants.                   |
+| `numeric`  |    ✔    | The `numeric` module + `Decimal` variants and decimal-related `TypeError` arms.                       |
 
 `core::error::Error` is always implemented for `TypeError` and
 `network::ParseMacAddrError` (stable since Rust 1.81).

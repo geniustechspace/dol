@@ -6,25 +6,25 @@ need without pulling in the full dependency tree.
 
 ## Layered surface
 
-| Feature     | Pulls in       | Purpose                                                                            |
-| ----------- | -------------- | ---------------------------------------------------------------------------------- |
-| _(default)_ | `dol-core`     | Spans, diagnostics, and the value/type system (`Value`, `Literal`, `DataType`, …). |
-| `expr`      | `dol-expr`     | Expression arena + tree DSL.                                                       |
-| `schema`    | `dol-schema`   | Entities, fields, constraints, relations, lookups.                                 |
-| `ir`        | `dol-ir`       | `Statement`, `Program`, `Backend`, `BackendCapabilities`.                          |
-| `pipeline`  | `dol-pipeline` | Source → Transform → Sink dataflow IR.                                             |
-| `stream`    | `dol-stream`   | Windows, watermarks, time-series, IoT vocabulary.                                  |
-| `wire`      | `dol-wire`     | Canonical wire envelope + postcard / JSON codec helpers.                           |
-| `check`     | `dol-check`    | Static validator (type / schema / capability / lint).                              |
-| `fmt`       | `dol-fmt`      | Canonical pretty-printer.                                                          |
-| `query`     | `dol-query`    | Fluent builder DSL.                                                                |
+| Feature      | Pulls in       | Purpose                                                    |
+| ------------ | -------------- | ---------------------------------------------------------- |
+| *(default)*  | `dol-core`     | Spans, diagnostics, and the value/type system (`Value`, `Literal`, `DataType`, …). |
+| `expr`       | `dol-expr`     | Expression arena + tree DSL.                               |
+| `schema`     | `dol-schema`   | Entities, fields, constraints, relations, lookups.         |
+| `ir`         | `dol-ir`       | `Statement`, `Program`, `Backend`, `BackendCapabilities`.  |
+| `pipeline`   | `dol-pipeline` | Source → Transform → Sink dataflow IR.                     |
+| `stream`     | `dol-stream`   | Windows, watermarks, time-series, IoT vocabulary.          |
+| `wire`       | `dol-wire`     | Canonical wire envelope + postcard / JSON codec helpers.   |
+| `check`      | `dol-check`    | Static validator (type / schema / capability / lint).      |
+| `fmt`        | `dol-fmt`      | Canonical pretty-printer.                                  |
+| `query`      | `dol-query`    | Fluent builder DSL.                                        |
 
 ## Curated presets
 
-| Preset    | Layers                                        | Use case                                         |
-| --------- | --------------------------------------------- | ------------------------------------------------ |
-| `core`    | `expr + schema + ir + query`                  | "Full programs" build, no codecs / streaming     |
-| `full`    | every layer DOL ships                         | Library / tooling consumers                      |
+| Preset    | Layers                                        | Use case                                        |
+| --------- | --------------------------------------------- | ----------------------------------------------- |
+| `core`    | `expr + schema + ir + query`                  | "Full programs" build, no codecs / streaming    |
+| `full`    | every layer DOL ships                         | Library / tooling consumers                     |
 | `iot-min` | `expr + schema + ir + stream + wire/postcard` | Minimal IoT-edge slice (fits `thumbv7em` budget) |
 
 The `iot-min` preset and the `no_std` leaves are verified in CI:
@@ -32,7 +32,7 @@ The `iot-min` preset and the `no_std` leaves are verified in CI:
 - `cargo check -p dol --no-default-features --features iot-min` runs on every
   build (host compile-only).
 - `cargo check -p dol-core -p dol-expr --no-default-features
---target thumbv7em-none-eabihf` runs in a dedicated cross-compile job.
+  --target thumbv7em-none-eabihf` runs in a dedicated cross-compile job.
 
 ## Universal `serde`
 

@@ -23,9 +23,9 @@ passes they need. Two convenience entry points cover the common cases:
 
 ## Features
 
-| feature | default | effect                                 |
-| ------- | :-----: | -------------------------------------- |
-| `serde` |         | `Serialize` derives across diagnostics |
+| feature | default | effect                                  |
+| ------- | :-----: | --------------------------------------- |
+| `serde` |         | `Serialize` derives across diagnostics  |
 
 ## Example
 
