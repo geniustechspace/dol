@@ -342,7 +342,8 @@ impl GetQuery {
         } else {
             self.projections
         };
-        let columns: SmallVec<[u32; 8]> = lower_exprs(&proj_exprs, &mut arena, &mut interner);
+        let columns: SmallVec<[u32; 8]> = lower_exprs(&proj_exprs, &mut arena, &mut interner)
+            .expect("dol-query GetQuery: lowering of projections failed");
 
         // Joins.
         let joins: SmallVec<[JoinNode; 2]> = self
@@ -407,24 +408,32 @@ impl GetQuery {
             })
             .collect();
 
-        let filter = lower_filters(&self.filters, &mut arena, &mut interner);
+        let filter = lower_filters(&self.filters, &mut arena, &mut interner)
+            .expect("dol-query GetQuery: lowering of filters failed");
 
         let group_by: SmallVec<[u32; 4]> = self
             .group_by
             .iter()
-            .map(|e| lower_expr(e, &mut arena, &mut interner))
+            .map(|e| {
+                lower_expr(e, &mut arena, &mut interner)
+                    .expect("dol-query GetQuery: lowering of GROUP BY failed")
+            })
             .collect();
 
         let having = if self.having.is_empty() {
             NULL_NODE
         } else {
             lower_filters(&self.having, &mut arena, &mut interner)
+                .expect("dol-query GetQuery: lowering of HAVING failed")
         };
 
         let order_by: SmallVec<[(u32, dol_expr::expr::Order); 4]> = self
             .order_by
             .iter()
-            .map(|ob| lower_order_by(ob, &mut arena, &mut interner))
+            .map(|ob| {
+                lower_order_by(ob, &mut arena, &mut interner)
+                    .expect("dol-query GetQuery: lowering of ORDER BY failed")
+            })
             .collect();
 
         #[cfg(feature = "sql")]

@@ -81,7 +81,13 @@ impl Entity {
         }
     }
 
-    /// Look up a field by name. Panics if not found (design-time error).
+    /// Look up a field by name. Panics if not found.
+    ///
+    /// **Design-time error contract:** the field name is part of the schema
+    /// definition; a missing field reflects a programmer mistake, not a
+    /// runtime input. Use [`Entity::try_field`] when handling
+    /// runtime-supplied names.
+    #[track_caller]
     pub fn field(&self, name: &str) -> &Field {
         self.fields
             .iter()

@@ -15,6 +15,7 @@
 //! `EntityConstraint`) live in [`dol_schema`] and are re-exported here for
 //! convenience.
 
+#![cfg_attr(not(feature = "std"), no_std)]
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
 

@@ -24,6 +24,8 @@ pub mod meta;
 pub mod shared;
 pub mod tx;
 
+use alloc::boxed::Box;
+
 pub use acl::{
     AuditEvent, AuditOp, AuditSink, Grant, MaskOp, PolicyOp, PolicyScope, QuotaKind, QuotaOp,
     Revoke,
@@ -165,6 +167,11 @@ impl Operation {
     /// The primary [`Target`](crate::target::Target) of this operation, if
     /// any. Operations without a single primary target (`Tx`, `Extension`,
     /// `Raw`) return `None`.
+    ///
+    /// **Non-recursive:** for `Operation::Tx(TxOp::Atomic { ops, .. })`
+    /// this returns `None`. Use [`Operation::all_targets`] when you need to
+    /// walk into atomic transaction bodies (capability checks, ACL gates,
+    /// catalog resolution).
     pub fn primary_target(&self) -> Option<&crate::target::Target> {
         match self {
             Operation::Schema(p) => Some(&p.target),
@@ -189,6 +196,33 @@ impl Operation {
             Operation::Tx(_) | Operation::Extension(_) => None,
             #[cfg(feature = "raw")]
             Operation::Raw(_) => None,
+        }
+    }
+
+    /// Every [`Target`](crate::target::Target) reachable from this operation,
+    /// including those nested inside `TxOp::Atomic { ops, .. }`. The order
+    /// is depth-first, parent before children, mirroring program order.
+    ///
+    /// Use this from capability checks, ACL gates, and catalog resolution
+    /// — anywhere the bare [`primary_target`](Self::primary_target) would
+    /// silently miss the targets nested in an atomic transaction body.
+    pub fn all_targets(&self) -> alloc::vec::Vec<&crate::target::Target> {
+        let mut out: alloc::vec::Vec<&crate::target::Target> = alloc::vec::Vec::new();
+        self.collect_targets(&mut out);
+        out
+    }
+
+    fn collect_targets<'a>(&'a self, out: &mut alloc::vec::Vec<&'a crate::target::Target>) {
+        if let Some(t) = self.primary_target() {
+            out.push(t);
+            return;
+        }
+        if let Operation::Tx(tx) = self {
+            if let TxOp::Atomic { ops, .. } = tx.as_ref() {
+                for op in ops {
+                    op.collect_targets(out);
+                }
+            }
         }
     }
 }
@@ -288,5 +322,37 @@ mod tests {
             op.primary_target().map(|t| &t.kind),
             Some(TargetKind::Blob)
         ));
+    }
+
+    #[test]
+    fn all_targets_recurses_into_tx_atomic() {
+        use crate::operation::tx::{TxOp, TxOptions};
+
+        let inner_a: Operation = Insert {
+            target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(1))),
+            source: InsertSource::Bindings,
+            returning: None,
+        }
+        .into();
+        let inner_b: Operation = Insert {
+            target: Target::new(TargetKind::Blob, Locator::new(Symbol::new(2))),
+            source: InsertSource::Bindings,
+            returning: None,
+        }
+        .into();
+        let atomic: Operation = TxOp::Atomic {
+            ops: alloc::vec![inner_a, inner_b],
+            opts: TxOptions::default(),
+        }
+        .into();
+
+        // primary_target does NOT recurse.
+        assert!(atomic.primary_target().is_none());
+        // all_targets DOES.
+        let kinds: alloc::vec::Vec<&TargetKind> =
+            atomic.all_targets().iter().map(|t| &t.kind).collect();
+        assert_eq!(kinds.len(), 2);
+        assert!(matches!(kinds[0], TargetKind::Relation));
+        assert!(matches!(kinds[1], TargetKind::Blob));
     }
 }

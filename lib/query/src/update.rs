@@ -98,10 +98,14 @@ impl UpdateQuery {
         let mut values = smallvec::SmallVec::new();
         for (col, expr) in &self.assignments {
             columns.push(interner.intern(col));
-            values.push(lower_expr(expr, &mut arena, &mut interner));
+            values.push(
+                lower_expr(expr, &mut arena, &mut interner)
+                    .expect("dol-query UpdateQuery: lowering of SET expression failed"),
+            );
         }
 
-        let filter = lower_filters(&self.filters, &mut arena, &mut interner);
+        let filter = lower_filters(&self.filters, &mut arena, &mut interner)
+            .expect("dol-query UpdateQuery: lowering of WHERE failed");
 
         let returning: smallvec::SmallVec<[u32; 4]> = self
             .returning

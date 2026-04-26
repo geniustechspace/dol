@@ -127,9 +127,21 @@ fn size_report() -> bool {
 /// type-check `#[cfg(test)]` bodies; tests can silently rot when imports
 /// from `alloc` are missing under `--no-default-features`.
 fn nostd_check() -> bool {
-    let crates = ["dol-core", "dol-expr"];
-    for c in crates {
+    // dol-core and dol-expr must build *and* pass tests under
+    // `--no-default-features`. dol-ir must build under
+    // `--no-default-features` (it has no dev-deps that work without std,
+    // so we settle for `cargo check`).
+    let test_crates = ["dol-core", "dol-expr"];
+    for c in test_crates {
         let ok = run_cargo(&["test", "-p", c, "--no-default-features"], &[]);
+        if !ok {
+            eprintln!("xtask: nostd check failed for {c}");
+            return false;
+        }
+    }
+    let check_crates = ["dol-ir"];
+    for c in check_crates {
+        let ok = run_cargo(&["check", "-p", c, "--no-default-features"], &[]);
         if !ok {
             eprintln!("xtask: nostd check failed for {c}");
             return false;

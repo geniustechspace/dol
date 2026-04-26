@@ -16,7 +16,7 @@ fn lowering_a_namespace_interns_its_dotted_form() {
     let mut arena = ExprArena::default();
     let mut interner = Interner::new();
 
-    let root = lower_expr(&e, &mut arena, &mut interner);
+    let root = lower_expr(&e, &mut arena, &mut interner).unwrap();
     let id = match arena.get(root) {
         ExprNode::Namespace(id) => *id,
         other => panic!("expected Namespace, got {other:?}"),
@@ -31,7 +31,7 @@ fn lowering_a_field_uses_a_field_pool_entry() {
     let mut arena = ExprArena::default();
     let mut interner = Interner::new();
 
-    let root = lower_expr(&e, &mut arena, &mut interner);
+    let root = lower_expr(&e, &mut arena, &mut interner).unwrap();
     let fid = match arena.get(root) {
         ExprNode::Field(fid) => *fid,
         other => panic!("expected Field, got {other:?}"),
@@ -49,7 +49,7 @@ fn lowering_eq_field_to_param_yields_a_binop() {
     let mut arena = ExprArena::default();
     let mut interner = Interner::new();
 
-    let root = lower_expr(&e, &mut arena, &mut interner);
+    let root = lower_expr(&e, &mut arena, &mut interner).unwrap();
     match arena.get(root) {
         ExprNode::BinOp { op, lhs, rhs } => {
             assert!(matches!(op, dol_expr::BinOp::Eq));
@@ -69,11 +69,11 @@ fn lowering_is_deterministic() {
 
     let mut arena_a = ExprArena::default();
     let mut interner_a = Interner::new();
-    let root_a = lower_expr(&make(), &mut arena_a, &mut interner_a);
+    let root_a = lower_expr(&make(), &mut arena_a, &mut interner_a).unwrap();
 
     let mut arena_b = ExprArena::default();
     let mut interner_b = Interner::new();
-    let root_b = lower_expr(&make(), &mut arena_b, &mut interner_b);
+    let root_b = lower_expr(&make(), &mut arena_b, &mut interner_b).unwrap();
 
     assert_eq!(root_a, root_b);
     assert_eq!(arena_a.len(), arena_b.len());
@@ -86,7 +86,7 @@ fn lowering_a_string_literal_uses_the_lits_pool() {
     let mut arena = ExprArena::default();
     let mut interner = Interner::new();
 
-    let root = lower_expr(&e, &mut arena, &mut interner);
+    let root = lower_expr(&e, &mut arena, &mut interner).unwrap();
     match arena.get(root) {
         ExprNode::Lit(lid) => {
             // `get_lit` panics on an out-of-bounds id; a successful call

@@ -148,6 +148,7 @@ impl core::fmt::Display for BackendError {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for BackendError {}
 
 /// A compiler from a [`ProgramRef`] into a backend-specific artifact.

@@ -41,6 +41,10 @@ pub enum BinOp {
 pub enum UnaryOp {
     Neg,
     Not,
+    /// Bitwise NOT (one's complement) on integer-typed operands. Distinct
+    /// from `Not` (logical) so backends and lowerers cannot conflate the
+    /// two on integer expressions.
+    BitNot,
     IsNull,
     IsNotNull,
     IsTrue,

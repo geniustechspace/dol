@@ -1,5 +1,7 @@
 //! `Tx` — transaction control. Meta-operation, not DDL/DML/DQL/ACL.
 
+use alloc::vec::Vec;
+
 use crate::operation::Operation;
 use crate::target::Symbol;
 

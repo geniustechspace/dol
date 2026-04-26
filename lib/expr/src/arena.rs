@@ -82,14 +82,22 @@ pub struct ObjLitNode(pub SmallVec<[(StrId, NodeId); 4]>);
 
 /// Payload for [`ExprNode::Window`], stored in `ExprArena::windows`.
 ///
+/// Payload for [`ExprNode::Window`], stored in `ExprArena::windows`.
+///
 /// Two `SmallVec` fields (each 24 bytes) plus `func: StrId` total 52+ bytes
 /// of payload — pooled to keep `ExprNode` ≤ 32 bytes.
+///
+/// `frame` carries the optional `ROWS/RANGE BETWEEN ...` clause; lowering
+/// preserves it so backends can render frames faithfully without
+/// round-trip loss.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WindowNode {
     pub func: StrId,
     pub partition: SmallVec<[NodeId; 4]>,
     pub order: SmallVec<[(NodeId, Order); 2]>,
+    /// Optional frame specification (`ROWS/RANGE BETWEEN start [AND end]`).
+    pub frame: Option<crate::tree::WindowFrame>,
 }
 
 /// Payload for [`ExprNode::Case`], stored in `ExprArena::cases`.
@@ -187,6 +195,14 @@ impl ExprArena {
         id
     }
 
+    /// Retrieve an [`ExprNode`] by its [`NodeId`].
+    ///
+    /// **Design-time error contract:** the [`NodeId`] must originate from
+    /// this same arena. Out-of-range ids reflect a programmer mistake (a
+    /// stale id from another arena, or a freed id), not a runtime input,
+    /// and panic with a `#[track_caller]` location for fast debugging.
+    /// All sibling `get_*` accessors follow the same contract.
+    #[track_caller]
     pub fn get(&self, id: NodeId) -> &ExprNode {
         &self.nodes[id as usize]
     }
@@ -213,6 +229,7 @@ impl ExprArena {
     }
 
     /// Retrieve a [`Literal`] by its [`LiteralId`].
+    #[track_caller]
     pub fn get_lit(&self, id: LiteralId) -> &Literal<'static> {
         &self.lits[id as usize]
     }
@@ -227,6 +244,7 @@ impl ExprArena {
     }
 
     /// Retrieve a [`FuncNode`] by its [`FuncId`].
+    #[track_caller]
     pub fn get_func(&self, id: FuncId) -> &FuncNode {
         &self.funcs[id as usize]
     }
@@ -241,6 +259,7 @@ impl ExprArena {
     }
 
     /// Retrieve an [`ObjLitNode`] by its [`ObjLitId`].
+    #[track_caller]
     pub fn get_obj_lit(&self, id: ObjLitId) -> &ObjLitNode {
         &self.obj_lits[id as usize]
     }
@@ -255,6 +274,7 @@ impl ExprArena {
     }
 
     /// Retrieve a [`WindowNode`] by its [`WindowId`].
+    #[track_caller]
     pub fn get_window(&self, id: WindowId) -> &WindowNode {
         &self.windows[id as usize]
     }
@@ -269,6 +289,7 @@ impl ExprArena {
     }
 
     /// Retrieve a [`CaseNode`] by its [`CaseId`].
+    #[track_caller]
     pub fn get_case(&self, id: CaseId) -> &CaseNode {
         &self.cases[id as usize]
     }
@@ -283,6 +304,7 @@ impl ExprArena {
     }
 
     /// Retrieve an [`InListNode`] by its [`InListId`].
+    #[track_caller]
     pub fn get_in_list(&self, id: InListId) -> &InListNode {
         &self.in_lists[id as usize]
     }
@@ -297,6 +319,7 @@ impl ExprArena {
     }
 
     /// Retrieve a [`QueryNode`] by its [`QueryId`].
+    #[track_caller]
     pub fn get_query(&self, id: QueryId) -> &QueryNode {
         &self.queries[id as usize]
     }
@@ -311,6 +334,7 @@ impl ExprArena {
     }
 
     /// Retrieve an [`InsertNode`] by its [`InsertId`].
+    #[track_caller]
     pub fn get_insert(&self, id: InsertId) -> &InsertNode {
         &self.inserts[id as usize]
     }
@@ -325,6 +349,7 @@ impl ExprArena {
     }
 
     /// Retrieve an [`UpdateNode`] by its [`UpdateId`].
+    #[track_caller]
     pub fn get_update(&self, id: UpdateId) -> &UpdateNode {
         &self.updates[id as usize]
     }
@@ -339,6 +364,7 @@ impl ExprArena {
     }
 
     /// Retrieve a [`DeleteNode`] by its [`DeleteId`].
+    #[track_caller]
     pub fn get_delete(&self, id: DeleteId) -> &DeleteNode {
         &self.deletes[id as usize]
     }
@@ -353,6 +379,7 @@ impl ExprArena {
     }
 
     /// Retrieve an [`UpsertNode`] by its [`UpsertId`].
+    #[track_caller]
     pub fn get_upsert(&self, id: UpsertId) -> &UpsertNode {
         &self.upserts[id as usize]
     }
@@ -367,6 +394,7 @@ impl ExprArena {
     }
 
     /// Retrieve a [`FieldNode`] by its [`FieldId`].
+    #[track_caller]
     pub fn get_field(&self, id: FieldId) -> &FieldNode {
         &self.fields[id as usize]
     }

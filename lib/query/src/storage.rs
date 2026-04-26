@@ -6,7 +6,7 @@
 //! `Insert` / `Query` / `Replace` / `Update` payload.
 
 use dol_expr::{ExprArena, Interner};
-use dol_ir::operation::{Insert, InsertSource, Query, Replace, ReplaceBody, Update};
+use dol_ir::operation::{Insert, InsertSource, Query, Replace, ReplaceBody};
 use dol_ir::{Locator, Operation, Program, SchemaBinding, Target as IrTarget, TargetKind};
 use smallvec::smallvec;
 
@@ -140,34 +140,35 @@ pub fn write_file_from_path(dest: &str, source_path: &str) -> Program {
     Program::new(op, ExprArena::new(), interner)
 }
 
-/// Emit `Operation::Update` against a file-tree path (move/rename — partial
-/// mutation of the path attribute).
+/// Emit `Operation::Schema` with `verb = Rename` against a `TargetKind::FileTree`
+/// path — a faithful file-tree rename rather than the previous placeholder
+/// `Update` against the `"path"` column.
+///
+/// # Examples
+///
+/// ```
+/// use dol_query::storage::move_file;
+/// use dol_ir::operation::{SchemaOp, StructuralVerb};
+/// use dol_ir::{OpKind, Operation, TargetKind};
+///
+/// let prog = move_file("fs/old/name.txt", "new-name.txt");
+/// assert_eq!(prog.operations.len(), 1);
+/// assert_eq!(prog.operations[0].kind(), OpKind::Schema);
+/// match &prog.operations[0] {
+///     Operation::Schema(op) => {
+///         assert_eq!(op.verb, StructuralVerb::Rename);
+///         assert_eq!(op.target.kind, TargetKind::FileTree);
+///         assert!(op.new_name.is_some());
+///     }
+///     _ => unreachable!(),
+/// }
+/// ```
 pub fn move_file(from: &str, to: &str) -> Program {
-    use dol_expr::expr::{ExprNode, UpdateNode};
+    use dol_ir::operation::SchemaOp;
+
     let mut interner = Interner::new();
-    let mut arena = ExprArena::new();
     let target = filetree_target(&mut interner, from);
-
-    // Build an arena UpdateNode that records the destination as a
-    // single-row literal value. The interpretation is target-specific;
-    // here we encode `to` as a parameter slot for runtime binding.
-    let target_str = interner.intern(from);
-    let to_id = interner.intern(to);
-    let lit_id = arena.alloc_lit(dol_core::Literal::String(std::borrow::Cow::Owned(
-        to.to_string(),
-    )));
-    let val = arena.alloc(ExprNode::Lit(lit_id));
-    let _ = to_id;
-    let unode = UpdateNode {
-        target: target_str,
-        columns: smallvec![interner.intern("path")],
-        values: smallvec![val],
-        filter: dol_expr::ids::NULL_NODE,
-        returning: smallvec![],
-    };
-    let uid = arena.alloc_update(unode);
-    let body = arena.alloc(ExprNode::Update(uid));
-
-    let op: Operation = Update { target, node: body }.into();
-    Program::new(op, arena, interner)
+    let new_name = intern_symbol(&mut interner, to);
+    let op: Operation = SchemaOp::rename(target, new_name).into();
+    Program::new(op, ExprArena::new(), interner)
 }
