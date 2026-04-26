@@ -65,7 +65,7 @@ pub fn define_lookup(
     name: &str,
     columns: &[&str],
     unique: bool,
-    _if_not_exists: bool,
+    if_not_exists: bool,
 ) -> Program {
     use dol_ir::operation::{LookupMethod, StructuralVerb};
     use smallvec::SmallVec;
@@ -84,6 +84,7 @@ pub fn define_lookup(
         method: LookupMethod::Tree,
         fields: cols,
         unique,
+        if_not_exists,
     }
     .into();
     Program::new(op, ExprArena::new(), interner)
@@ -94,7 +95,7 @@ pub fn drop_lookup(
     table: &str,
     namespace: Option<&str>,
     name: &str,
-    _if_exists: bool,
+    if_exists: bool,
 ) -> Program {
     use dol_ir::operation::{LookupMethod, StructuralVerb};
     use smallvec::SmallVec;
@@ -109,6 +110,9 @@ pub fn drop_lookup(
         method: LookupMethod::Tree,
         fields: SmallVec::new(),
         unique: false,
+        // Reuse the same flag as `if_exists` for the Drop verb (see
+        // `LookupOp::if_not_exists`).
+        if_not_exists: if_exists,
     }
     .into();
     Program::new(op, ExprArena::new(), interner)
@@ -167,7 +171,7 @@ pub fn define_index(
     keys: smallvec::SmallVec<[dol_ir::operation::IndexKey; 2]>,
     unique: bool,
     method: dol_ir::operation::IndexMethod,
-    _if_not_exists: bool,
+    if_not_exists: bool,
 ) -> Program {
     use dol_ir::operation::StructuralVerb;
 
@@ -182,6 +186,7 @@ pub fn define_index(
         keys,
         unique,
         predicate: None,
+        if_not_exists,
     }
     .into();
     Program::new(op, ExprArena::new(), interner)

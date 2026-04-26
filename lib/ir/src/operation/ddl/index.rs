@@ -82,6 +82,7 @@ pub enum IndexMethod {
 ///     }],
 ///     unique: false,
 ///     predicate: None,
+///     if_not_exists: false,
 /// }
 /// .into();
 ///
@@ -104,4 +105,10 @@ pub struct IndexOp {
     pub unique: bool,
     /// Arena `NodeId` for a partial-index predicate.
     pub predicate: Option<NodeId>,
+    /// Idempotency hint. For `Create`, suppress the failure when the index
+    /// already exists (`CREATE INDEX IF NOT EXISTS`). For `Drop`, suppress
+    /// the failure when the index is missing (`DROP INDEX IF EXISTS`).
+    /// Backends that don't natively support the flag should treat it as a
+    /// best-effort hint and apply their own pre-check.
+    pub if_not_exists: bool,
 }

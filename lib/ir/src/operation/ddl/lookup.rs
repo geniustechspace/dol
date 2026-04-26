@@ -44,6 +44,7 @@ pub enum LookupMethod {
 ///     method: LookupMethod::Hash,
 ///     fields: smallvec::smallvec![Symbol::new(2)],
 ///     unique: true,
+///     if_not_exists: false,
 /// }
 /// .into();
 ///
@@ -64,4 +65,8 @@ pub struct LookupOp {
     pub fields: SmallVec<[Symbol; 2]>,
     /// Whether the lookup enforces uniqueness.
     pub unique: bool,
+    /// Idempotency hint. For `Create`, suppress the failure when the lookup
+    /// already exists. For `Drop`, suppress the failure when the lookup is
+    /// missing. Backends without native support should pre-check.
+    pub if_not_exists: bool,
 }
