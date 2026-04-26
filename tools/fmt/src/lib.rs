@@ -76,6 +76,10 @@ fn write_target(w: &mut String, t: &Target, interner: &Interner) -> core::fmt::R
 /// Resolve `id` against `interner`, falling back to a stable `#<id>`
 /// placeholder when the symbol came from a different interner (e.g. test
 /// fixtures that build a [`Symbol`](dol_ir::Symbol) from a literal).
+///
+/// `StrId` is a transparent `u32` ([`dol_expr::ids::StrId`]); the cast to
+/// `usize` widens losslessly on every platform Rust supports
+/// (`usize >= 32` bits) and is purely a length comparison.
 fn resolve(interner: &Interner, id: dol_expr::ids::StrId) -> alloc::borrow::Cow<'_, str> {
     if (id as usize) < interner.len() {
         alloc::borrow::Cow::Borrowed(interner.get(id))
