@@ -21,8 +21,8 @@ size_of::<ExprNode>() == 32
 
 ## Features
 
-| feature | default | effect                                                            |
-| ------- | :-----: | ----------------------------------------------------------------- |
+| feature | default | effect                                                              |
+| ------- | :-----: | ------------------------------------------------------------------- |
 | `serde` |         | `Serialize` / `Deserialize` for every AST/arena type and `Interner` |
 
 `Interner` has a hand-rolled deterministic codec that round-trips through its

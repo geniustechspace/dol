@@ -29,9 +29,9 @@ let stmt: dol_ir::Statement = my_query_node.into();
 
 ## Features
 
-| feature | default | effect                                                                    |
-| ------- | :-----: | ------------------------------------------------------------------------- |
-| `serde` |         | `Serialize` / `Deserialize` for `Statement`, `Program`, `Transaction`, …  |
+| feature | default | effect                                                                   |
+| ------- | :-----: | ------------------------------------------------------------------------ |
+| `serde` |         | `Serialize` / `Deserialize` for `Statement`, `Program`, `Transaction`, … |
 
 Enabling `serde` turns on `dol-expr/serde` and `smallvec/serde` transitively.
 

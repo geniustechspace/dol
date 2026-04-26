@@ -29,13 +29,13 @@ payloads behind the same envelope.
 
 ## Features
 
-| feature    | default | effect                                                       |
-| ---------- | :-----: | ------------------------------------------------------------ |
-| `serde`    |         | universal serde plumbing on payload types                    |
+| feature    | default | effect                                                                  |
+| ---------- | :-----: | ----------------------------------------------------------------------- |
+| `serde`    |         | universal serde plumbing on payload types                               |
 | `postcard` |         | compact binary codec (ideal for IoT / on-device); pulls `serde` + `std` |
 | `json`     |         | human-readable codec (debugging / interop); pulls `serde` + `std`       |
-| `hash`     |         | BLAKE3 content hashing                                       |
-| `std`      |         | standard library                                             |
+| `hash`     |         | BLAKE3 content hashing                                                  |
+| `std`      |         | standard library                                                        |
 
 Pick exactly one codec for production traffic; both can be enabled side-by-side
 in tests.

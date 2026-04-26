@@ -8,22 +8,22 @@ description = "DOL — canonical binary + JSON codecs, schema versioning, conten
 readme = "README.md"
 
 [dependencies]
-dol-ir     = { workspace = true }
+dol-ir = { workspace = true }
 dol-schema = { workspace = true }
-dol-core   = { workspace = true }
-dol-expr   = { workspace = true }
+dol-core = { workspace = true }
+dol-expr = { workspace = true }
 
 # Codec-specific (all optional)
-serde      = { workspace = true, optional = true }
-postcard   = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+postcard = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
-blake3     = { workspace = true, optional = true }
+blake3 = { workspace = true, optional = true }
 
 [features]
-default     = []
-std         = []
+default = []
+std = []
 # Universal serde plumbing on every payload type.
-serde       = [
+serde = [
     "dep:serde",
     "dol-ir/serde",
     "dol-schema/serde",
@@ -31,15 +31,15 @@ serde       = [
     "dol-expr/serde",
 ]
 # Compact binary codec (ideal for IoT / on-device).
-postcard    = ["serde", "std", "dep:postcard"]
+postcard = ["serde", "std", "dep:postcard"]
 # Human-readable codec (debugging / interop).
-json        = ["serde", "std", "dep:serde_json"]
+json = ["serde", "std", "dep:serde_json"]
 # Content hashing of canonical wire bytes via BLAKE3.
-hash        = ["std", "dep:blake3"]
+hash = ["std", "dep:blake3"]
 # Convenience: pull in everything.
-full        = ["postcard", "json", "hash"]
+full = ["postcard", "json", "hash"]
 
 [dev-dependencies]
 serde_json = { workspace = true }
-dol-expr   = { workspace = true, features = ["serde"] }
-smallvec   = { workspace = true }
+dol-expr = { workspace = true, features = ["serde"] }
+smallvec = { workspace = true }

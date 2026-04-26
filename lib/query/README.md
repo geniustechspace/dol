@@ -24,10 +24,10 @@ projections, joins, and limits, and terminates with `.build() -> Program`.
 
 ## Features
 
-| feature | default | effect                                                         |
-| ------- | :-----: | -------------------------------------------------------------- |
+| feature | default | effect                                                             |
+| ------- | :-----: | ------------------------------------------------------------------ |
 | `serde` |         | forwards `serde` to `dol-ir`, `dol-expr`, `dol-schema`, `dol-core` |
-| `sql`   |         | reserved for future SQL-dialect-aware helpers                  |
+| `sql`   |         | reserved for future SQL-dialect-aware helpers                      |
 
 ## Example
 

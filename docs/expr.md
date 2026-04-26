@@ -1,16 +1,16 @@
 # The DOL Expression Layer
 
 This document describes the architecture of `dol-core` and `dol-expr`, the
-two crates that together form DOL's *language layer*. Higher crates
+two crates that together form DOL's _language layer_. Higher crates
 (`dol-schema`, `dol-ir`, `dol-pipeline`, etc.) depend on these two and add
 no new vocabulary at the expression level.
 
 ## Crates
 
-| Crate         | Role                                                                                                                                |
-|---------------|-------------------------------------------------------------------------------------------------------------------------------------|
-| `dol-core`   | The single source of truth for every type and value in DOL: `DataType`, `Value`, `Literal`, and the supporting primitive types.    |
-| `dol-expr`    | The expression engine — two representations (`tree::Expr<'a>` and the arena-based `ExprNode`), the lowering bridge between them, and the canonical AST node structs. |
+| Crate      | Role                                                                                                                                                                 |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dol-core` | The single source of truth for every type and value in DOL: `DataType`, `Value`, `Literal`, and the supporting primitive types.                                      |
+| `dol-expr` | The expression engine — two representations (`tree::Expr<'a>` and the arena-based `ExprNode`), the lowering bridge between them, and the canonical AST node structs. |
 
 Both crates compile in `no_std + alloc` mode (default) and on
 `thumbv7em-none-eabihf` for embedded use.
@@ -31,10 +31,10 @@ use dol_expr::tree::{field, param};
 let e = field("user.id").eq(param());
 ```
 
-* **Lifetime-parameterized** so string literals can be borrowed at no cost.
-* **Recursive** — `Box<Expr>` for sub-expressions makes building easy but
+- **Lifetime-parameterized** so string literals can be borrowed at no cost.
+- **Recursive** — `Box<Expr>` for sub-expressions makes building easy but
   is unsuitable for backend rendering (poor cache locality, deep recursion).
-* **Ergonomic** — operator overloads (`&`, `|`, `!`), method chains
+- **Ergonomic** — operator overloads (`&`, `|`, `!`), method chains
   (`.eq()`, `.between()`, `.window()`), and dedicated builders for cases,
   windows, and order-by clauses.
 
@@ -42,15 +42,15 @@ let e = field("user.id").eq(param());
 
 `ExprNode` is a flat 32-byte sum type stored in an `ExprArena`:
 
-* **`size_of::<ExprNode>() == 32`** is asserted in `xtask size` and in a
+- **`size_of::<ExprNode>() == 32`** is asserted in `xtask size` and in a
   unit test inside `dol-expr`. Variants too large for inline storage spill
   into typed side-pools (`ExprArena::fields`, `::funcs`, `::cases`,
   `::windows`, `::queries`, `::inserts`, `::updates`, `::deletes`,
   `::upserts`, `::in_lists`, `::obj_lits`).
-* **Indices, not pointers** — every cross-reference is a typed `*Id` (a
+- **Indices, not pointers** — every cross-reference is a typed `*Id` (a
   `u32`). This eliminates allocator pressure, makes the IR trivially
   serializable, and keeps cache lines hot.
-* **Backend-friendly** — backends (SQL, REST, KV, …) traverse `ExprArena`
+- **Backend-friendly** — backends (SQL, REST, KV, …) traverse `ExprArena`
   directly, never the tree.
 
 ## Lowering: tree → arena
@@ -74,22 +74,22 @@ Invariants:
 
 Every cross-reference inside the arena is one of these typed indices:
 
-| Type        | Pool                          | Notes                                  |
-|-------------|-------------------------------|----------------------------------------|
-| `NodeId`    | `ExprArena::nodes`            | All inline expression nodes.           |
-| `StrId`     | `Interner::strings`           | Stable for the lifetime of the arena.  |
-| `LiteralId` | `ExprArena::lits`             | Boxed for size.                        |
-| `FieldId`   | `ExprArena::fields`           | Field traversal payload.               |
-| `FuncId`    | `ExprArena::funcs`            | Function call payload.                 |
-| `WindowId`  | `ExprArena::windows`          | Window-function payload.               |
-| `CaseId`    | `ExprArena::cases`            | `CASE WHEN … THEN … ELSE …` payload.   |
-| `InListId`  | `ExprArena::in_lists`         | `expr IN (…)` payload.                 |
-| `ObjLitId`  | `ExprArena::obj_lits`         | Object-literal payload.                |
-| `QueryId`   | `ExprArena::queries`          | Sub-query payload.                     |
-| `InsertId`  | `ExprArena::inserts`          | INSERT payload.                        |
-| `UpdateId`  | `ExprArena::updates`          | UPDATE payload.                        |
-| `DeleteId`  | `ExprArena::deletes`          | DELETE payload.                        |
-| `UpsertId`  | `ExprArena::upserts`          | UPSERT payload.                        |
+| Type        | Pool                  | Notes                                 |
+| ----------- | --------------------- | ------------------------------------- |
+| `NodeId`    | `ExprArena::nodes`    | All inline expression nodes.          |
+| `StrId`     | `Interner::strings`   | Stable for the lifetime of the arena. |
+| `LiteralId` | `ExprArena::lits`     | Boxed for size.                       |
+| `FieldId`   | `ExprArena::fields`   | Field traversal payload.              |
+| `FuncId`    | `ExprArena::funcs`    | Function call payload.                |
+| `WindowId`  | `ExprArena::windows`  | Window-function payload.              |
+| `CaseId`    | `ExprArena::cases`    | `CASE WHEN … THEN … ELSE …` payload.  |
+| `InListId`  | `ExprArena::in_lists` | `expr IN (…)` payload.                |
+| `ObjLitId`  | `ExprArena::obj_lits` | Object-literal payload.               |
+| `QueryId`   | `ExprArena::queries`  | Sub-query payload.                    |
+| `InsertId`  | `ExprArena::inserts`  | INSERT payload.                       |
+| `UpdateId`  | `ExprArena::updates`  | UPDATE payload.                       |
+| `DeleteId`  | `ExprArena::deletes`  | DELETE payload.                       |
+| `UpsertId`  | `ExprArena::upserts`  | UPSERT payload.                       |
 
 All `*Id` types are 32-bit. They are valid only within the arena that
 produced them; mixing IDs across arenas is a logic bug — the type system
@@ -100,10 +100,10 @@ distinctly-tagged ID type.
 
 `dol_expr::Interner` deduplicates strings to a `StrId`:
 
-* Backed by `hashbrown::HashMap<Arc<str>, StrId>` and a `Vec<Arc<str>>`.
-* Each unique string is allocated once and shared between the lookup map
+- Backed by `hashbrown::HashMap<Arc<str>, StrId>` and a `Vec<Arc<str>>`.
+- Each unique string is allocated once and shared between the lookup map
   and the id-lookup table.
-* Determinism: the canonical wire form is the **`Vec<Arc<str>>` in
+- Determinism: the canonical wire form is the **`Vec<Arc<str>>` in
   insertion order**. The hand-rolled serde codec writes only that vector;
   the map is reconstructed on deserialization. Postcard / JSON / any
   serde-compatible format yields a byte-stable representation provided
@@ -114,35 +114,35 @@ distinctly-tagged ID type.
 `DataType` describes what is **expected** at a position. `Value` is what
 **arrives** there.
 
-* `DataType::accepts(&value) -> Result<(), TypeError>` is the conformance
+- `DataType::accepts(&value) -> Result<(), TypeError>` is the conformance
   bridge.
-* Validation errors are structured (`TypeError`), never panics, never
+- Validation errors are structured (`TypeError`), never panics, never
   strings.
-* All construction is via `try_*` constructors that surface the same
+- All construction is via `try_*` constructors that surface the same
   `TypeError` variants.
 
 ## Cargo features
 
-| Crate       | Feature   | Default | Effect                                                                                                |
-|-------------|-----------|---------|-------------------------------------------------------------------------------------------------------|
-| `dol-core` | `std`     | ✓       | Enables `datetime::today() / now() / now_tz()` (need `SystemTime`).                                   |
-| `dol-core` | `serde`   | ✓       | `Serialize` / `Deserialize` for every public type.                                                    |
-| `dol-expr`  | `std`     | —       | Forwards to `dol-core/std`. The crate itself is otherwise `no_std + alloc`.                          |
-| `dol-expr`  | `serde`   | —       | `Serialize` / `Deserialize` for every AST/arena type and `Interner`.                                  |
+| Crate      | Feature | Default | Effect                                                                      |
+| ---------- | ------- | ------- | --------------------------------------------------------------------------- |
+| `dol-core` | `std`   | ✓       | Enables `datetime::today() / now() / now_tz()` (need `SystemTime`).         |
+| `dol-core` | `serde` | ✓       | `Serialize` / `Deserialize` for every public type.                          |
+| `dol-expr` | `std`   | —       | Forwards to `dol-core/std`. The crate itself is otherwise `no_std + alloc`. |
+| `dol-expr` | `serde` | —       | `Serialize` / `Deserialize` for every AST/arena type and `Interner`.        |
 
 ## Tests and gates
 
-* Serde round-trip is gated in CI for both crates
+- Serde round-trip is gated in CI for both crates
   (`{lib,tools}/*/tests/serde_roundtrip.rs`).
-* `xtask size` asserts `size_of::<ExprNode> == 32`,
+- `xtask size` asserts `size_of::<ExprNode> == 32`,
   `size_of::<Value> == 24`, and `size_of::<Literal<'static>> == 32`.
-* `xtask nostd` and the `cross-compile` CI job run
+- `xtask nostd` and the `cross-compile` CI job run
   `cargo check --no-default-features` for both crates, and additionally
   `--target thumbv7em-none-eabihf` for the cross-compile job.
 
 ## See also
 
-* [`docs/STABILITY.md`](./STABILITY.md) — public-API and wire-format
+- [`docs/STABILITY.md`](./STABILITY.md) — public-API and wire-format
   stability policy.
-* `lib/core/README.md` and `lib/expr/README.md` — quick
+- `lib/core/README.md` and `lib/expr/README.md` — quick
   reference for each crate's public surface.

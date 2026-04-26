@@ -4,8 +4,8 @@ A type-safe, composable query and schema language for Rust.
 
 DOL provides a backend-agnostic intermediate representation for queries and
 schema definitions, along with a fluent builder API for constructing them. The
-vocabulary is store-neutral: DOL talks about *entities*, *fields*, *relations*,
-*identity*, *invariants*, and *lookups* — never tables, columns, foreign keys,
+vocabulary is store-neutral: DOL talks about _entities_, _fields_, _relations_,
+_identity_, _invariants_, and _lookups_ — never tables, columns, foreign keys,
 primary keys, CHECK constraints, or indexes. Backends translate that vocabulary
 into whatever shape their store understands.
 
@@ -38,11 +38,11 @@ let memberships = Entity::new("memberships", vec![
 Builders → IR
 (human API) (neutral AST)
 ───────────────────────────────
-Query::from("users").get()    Statement::Query
+Query::from("users").get() Statement::Query
 Query::from("users").insert() Statement::Insert
 Query::from("users").upsert() Statement::Upsert
-Entity::define("users")       Statement::DefineEntity
-...                            ...
+Entity::define("users") Statement::DefineEntity
+... ...
 ```
 
 **Builders** provide a fluent, method-chain API for constructing operations.
@@ -55,39 +55,39 @@ intent of every operation without being tied to any specific storage engine.
 DOL is structured as a three-tier workspace with a strict, acyclic dependency
 DAG. Folder names drop the `dol-` prefix; **published package names keep it**.
 
-```
-lib/        ── reusable libraries (depend only on each other)
-tools/      ── developer tools that consume the libraries
-backends/   ── concrete `dol_ir::Backend` implementations
-xtask/      ── workspace task runner (not published)
+```markdown
+lib/ ── reusable libraries (depend only on each other)
+tools/ ── developer tools that consume the libraries
+backends/ ── concrete `dol_ir::Backend` implementations
+xtask/ ── workspace task runner (not published)
 ```
 
-| Folder · Crate                                   | Description                                                                  |
-| ------------------------------------------------ | ---------------------------------------------------------------------------- |
-| [`lib/core`](lib/core/README.md) · `dol-core`        | Source spans, structured diagnostics, and the value/type system (`Value`, `Literal`, `DataType`, `Decimal`, …) |
-| [`lib/expr`](lib/expr/README.md) · `dol-expr`        | Composable expression AST (`ExprNode` ≤ 32 B, arena, interner)               |
-| [`lib/schema`](lib/schema/README.md) · `dol-schema`  | Entities, fields, constraints, relations, lookups, policies                  |
-| [`lib/ir`](lib/ir/README.md) · `dol-ir`              | Canonical IR: `Statement`, `Program`, `Backend` trait, `BackendCapabilities` |
-| [`lib/pipeline`](lib/pipeline/README.md) · `dol-pipeline` | Source → Transform → Sink dataflow IR                                  |
-| [`lib/stream`](lib/stream/README.md) · `dol-stream`  | Streaming windows, watermarks, time-series, IoT/telemetry vocabulary         |
-| [`lib/wire`](lib/wire/README.md) · `dol-wire`        | Canonical wire envelope, postcard / JSON codec helpers, BLAKE3 content hash  |
-| [`lib/query`](lib/query/README.md) · `dol-query`     | Fluent builder DSL → produces `dol-ir::Statement`                            |
-| [`lib/dol`](lib/dol/README.md) · `dol`               | Umbrella facade with `core`, `full`, `iot-min` presets                       |
-| [`tools/check`](tools/check/README.md) · `dol-check` | Static validator (type / schema / capability / lint passes)                  |
-| [`tools/fmt`](tools/fmt/README.md) · `dol-fmt`       | Canonical pretty-printer for IR programs                                     |
-| [`backends/`](backends/README.md)                    | Reserved for `dol-backend-<store>` crates (currently empty)                  |
-| [`xtask`](xtask/README.md)                           | Workspace task runner (size report, `no_std` check, doc build, README check) |
+| Folder · Crate                                            | Description                                                                                                    |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| [`lib/core`](lib/core/README.md) · `dol-core`             | Source spans, structured diagnostics, and the value/type system (`Value`, `Literal`, `DataType`, `Decimal`, …) |
+| [`lib/expr`](lib/expr/README.md) · `dol-expr`             | Composable expression AST (`ExprNode` ≤ 32 B, arena, interner)                                                 |
+| [`lib/schema`](lib/schema/README.md) · `dol-schema`       | Entities, fields, constraints, relations, lookups, policies                                                    |
+| [`lib/ir`](lib/ir/README.md) · `dol-ir`                   | Canonical IR: `Statement`, `Program`, `Backend` trait, `BackendCapabilities`                                   |
+| [`lib/pipeline`](lib/pipeline/README.md) · `dol-pipeline` | Source → Transform → Sink dataflow IR                                                                          |
+| [`lib/stream`](lib/stream/README.md) · `dol-stream`       | Streaming windows, watermarks, time-series, IoT/telemetry vocabulary                                           |
+| [`lib/wire`](lib/wire/README.md) · `dol-wire`             | Canonical wire envelope, postcard / JSON codec helpers, BLAKE3 content hash                                    |
+| [`lib/query`](lib/query/README.md) · `dol-query`          | Fluent builder DSL → produces `dol-ir::Statement`                                                              |
+| [`lib/dol`](lib/dol/README.md) · `dol`                    | Umbrella facade with `core`, `full`, `iot-min` presets                                                         |
+| [`tools/check`](tools/check/README.md) · `dol-check`      | Static validator (type / schema / capability / lint passes)                                                    |
+| [`tools/fmt`](tools/fmt/README.md) · `dol-fmt`            | Canonical pretty-printer for IR programs                                                                       |
+| [`backends/`](backends/README.md)                         | Reserved for `dol-backend-<store>` crates (currently empty)                                                    |
+| [`xtask`](xtask/README.md)                                | Workspace task runner (size report, `no_std` check, doc build, README check)                                   |
 
-```
+```markdown
 lib/core ─┬─► lib/expr ────┐
-          ├─► lib/schema ──┴─► lib/ir ─┬─► lib/pipeline
-          └────────────────┘           ├─► lib/stream
-                                       ├─► lib/wire
-                                       ├─► lib/query
-                                       ├─► tools/check
-                                       ├─► tools/fmt
-                                       └─► backends/<store>
-                                              lib/dol  (umbrella)
+├─► lib/schema ──┴─► lib/ir ─┬─► lib/pipeline
+└────────────────┘ ├─► lib/stream
+├─► lib/wire
+├─► lib/query
+├─► tools/check
+├─► tools/fmt
+└─► backends/<store>
+lib/dol (umbrella)
 ```
 
 Invariants enforced by the workspace structure:

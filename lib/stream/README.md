@@ -15,8 +15,8 @@ These types are pure data; they hook into `dol_ir::Statement` via the
 
 ## Features
 
-| feature | default | effect                                                                   |
-| ------- | :-----: | ------------------------------------------------------------------------ |
+| feature | default | effect                                                                     |
+| ------- | :-----: | -------------------------------------------------------------------------- |
 | `serde` |         | `Serialize` / `Deserialize` (forwards to `dol-ir`, `dol-expr`, `smallvec`) |
 
 ## Example
