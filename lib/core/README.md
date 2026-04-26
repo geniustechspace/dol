@@ -48,12 +48,23 @@ size_of::<Span>()             ==  8
 
 ## Features
 
-| feature | default | effect                                                                            |
-| ------- | :-----: | --------------------------------------------------------------------------------- |
-| `std`   |    ✔    | Enables `std::error::Error` for `TypeError` and the wall-clock factory helpers.   |
-| `serde` |    ✔    | `Serialize` / `Deserialize` for every public type, including `Span` / `Diagnostic`. |
+| feature    | default | effect                                                                                                |
+| ---------- | :-----: | ----------------------------------------------------------------------------------------------------- |
+| `std`      |    ✔    | Enables wall-clock factory helpers (`datetime::today`/`now`/`now_tz`); implies `datetime`.            |
+| `serde`    |    ✔    | `Serialize` / `Deserialize` for every public type, including `Span` / `Diagnostic`.                   |
+| `geo`      |    ✔    | The `geo` module + `Value`/`Literal`/`DataType`/`TypeError` variants for geometric types.             |
+| `network`  |    ✔    | The `network` module + `Inet`/`MacAddr` variants on `Value`/`Literal`/`DataType`.                     |
+| `datetime` |    ✔    | The `datetime` module + `Date`/`Time`/`DateTime`/`TimestampTz`/`Interval` variants.                   |
+| `numeric`  |    ✔    | The `numeric` module + `Decimal` variants and decimal-related `TypeError` arms.                       |
 
-Embedded users can opt out with `default-features = false` for a `no_std + alloc` build.
+`core::error::Error` is always implemented for `TypeError` and
+`network::ParseMacAddrError` (stable since Rust 1.81).
+
+Embedded users can opt out with `default-features = false` for a
+`no_std + alloc` build. Granular features can be re-enabled à la carte;
+turning any one off drops the corresponding `Value` / `Literal` /
+`DataType` / `TypeError` variants and the entire owning module from the
+compiled crate.
 
 ## Example
 

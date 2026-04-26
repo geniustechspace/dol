@@ -14,7 +14,11 @@ fn enum_variant_round_trips() {
 
 #[test]
 fn all_new_variants_convert_to_value() {
-    let mut cases: Vec<Literal<'_>> = vec![Literal::xml_borrowed("<root/>"), Literal::enum_variant_borrowed("active")];
+    #[allow(unused_mut)]
+    let mut cases: Vec<Literal<'_>> = vec![
+        Literal::xml_borrowed("<root/>"),
+        Literal::enum_variant_borrowed("active"),
+    ];
     #[cfg(feature = "network")]
     {
         cases.push(Literal::macaddr_eui48([0; 6]));

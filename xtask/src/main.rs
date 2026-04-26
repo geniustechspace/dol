@@ -11,7 +11,7 @@
 //! | command  | purpose                                                  |
 //! |----------|----------------------------------------------------------|
 //! | `size`   | print `size_of` for the public size-budgeted IR types.   |
-//! | `nostd`  | run `cargo check --no-default-features` on `no_std` crates. |
+//! | `nostd`  | run `cargo test --no-default-features` on `no_std` crates. |
 //! | `doc`    | build workspace docs with all features.                  |
 //! | `readme` | verify every workspace member has a non-empty README.md. |
 //! | `help`   | print this list.                                         |
@@ -121,11 +121,15 @@ fn size_report() -> bool {
     ok
 }
 
-/// Verify the leaf no_std crates still build without `std`.
+/// Verify the leaf no_std crates still build *and pass tests* without `std`.
+///
+/// Promoted from `cargo check` to `cargo test` because `check` does not
+/// type-check `#[cfg(test)]` bodies; tests can silently rot when imports
+/// from `alloc` are missing under `--no-default-features`.
 fn nostd_check() -> bool {
     let crates = ["dol-core", "dol-expr"];
     for c in crates {
-        let ok = run_cargo(&["check", "-p", c, "--no-default-features"], &[]);
+        let ok = run_cargo(&["test", "-p", c, "--no-default-features"], &[]);
         if !ok {
             eprintln!("xtask: nostd check failed for {c}");
             return false;

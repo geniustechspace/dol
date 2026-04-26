@@ -7,8 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`dol-core` granular features** — `geo`, `network`, `datetime`, `numeric`
+  (all default-on). Disabling any one drops the corresponding `Value` /
+  `Literal` / `DataType` / `TypeError` variants and the owning module from
+  the compiled crate, suitable for embedded targets that only need a subset
+  of the type system. The umbrella `dol` crate exposes pass-through features
+  with the same names; the `iot-min` preset now actively omits `geo` and
+  `network` while keeping `datetime` and `numeric`.
+- CI matrix job `dol-core-features` exercises representative
+  `--no-default-features` combinations end-to-end.
+
 ### Changed
 
+- **`dol-core` value/type system file split** (internal refactor; no public
+  API change):
+  - `value/` is now per-concern (`enum_def` / `range` / `classify` /
+    `accessors` / `display` / `from_impls`) with tests living in
+    `value/tests/<concern>.rs` siblings.
+  - `Literal<'a>` lifted to a top-level `lib/core/src/literal/` module
+    (`enum_def` / `range` / `constructors` / `display` / `conversions`),
+    reflecting that it is an AST node, not a runtime value. Public paths
+    (`dol_core::Literal`, `dol_core::LiteralRange`, `dol_core::value::Literal`)
+    continue to resolve.
+  - `data_type/` split mirrors the same shape (`enum_def` / `struct_field`
+    / `classify` / `conformance` / `constructors` + tests).
+  - Shared `fmt_uuid` helper lifted to `crate::format`.
+- `xtask nostd` promoted from `cargo check` to `cargo test`. Test bodies
+  are now type-checked under `--no-default-features` so `alloc`-import
+  regressions can no longer hide. Existing `cargo test -p dol-core
+  --no-default-features` failures (31 errors) fixed via per-test
+  `alloc::string::ToString` / `alloc::vec` imports.
+- `network::ParseMacAddrError` now implements `core::error::Error`
+  unconditionally (was gated behind `feature = "std"`; the crate's MSRV is
+  1.85, well past the 1.81 stabilisation of `core::error::Error`).
+- `dol-core/std` now implies `dol-core/datetime`. The wall-clock helpers
+  (`datetime::today`/`now`/`now_tz`) live in the datetime module and would
+  be orphaned otherwise.
 - **Workspace restructure**: crates now live in three top-level buckets —
   `lib/` (libraries), `tools/` (developer tools), and `backends/` (concrete
   `Backend` implementations; reserved, currently empty). Folder names drop

@@ -36,6 +36,14 @@ check    = ["dep:dol-check", "ir"]
 fmt      = ["dep:dol-fmt", "ir"]
 query    = ["dep:dol-query", "ir"]
 
+# ── Granular dol-core features (default-on in dol-core itself) ───────────────
+# These pass-throughs let umbrella consumers add or omit dol-core variant
+# families when they pin `dol-core` with `default-features = false`.
+geo      = ["dol-core/geo"]
+network  = ["dol-core/network"]
+datetime = ["dol-core/datetime"]
+numeric  = ["dol-core/numeric"]
+
 # ── Curated presets ──────────────────────────────────────────────────────────
 
 # Just the language: types + expr + schema + IR + builders. No streaming,
@@ -48,17 +56,21 @@ full     = [
     "pipeline", "stream",
     "wire", "check", "fmt",
     "query",
+    "geo", "network", "datetime", "numeric",
 ]
 
 # Minimal IoT-edge slice: types, IR, streaming verbs, postcard wire. No
 # diagnostics renderer, no JSON codec, no pretty-printer. Designed to fit
-# inside a `thumbv7em` binary budget.
+# inside a `thumbv7em` binary budget. Keeps `numeric` + `datetime` (sensors
+# typically report `Decimal` readings with timestamps) but drops `geo` +
+# `network` to actively exercise the granular dol-core gates.
 iot-min  = [
     "expr", "schema", "ir",
     "stream",
     "wire",
     "dol-wire/postcard",
     "dol-wire/serde",
+    "numeric", "datetime",
 ]
 
 # Universal serde — turns on `serde` everywhere it's available.

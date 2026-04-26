@@ -12,11 +12,11 @@ pub use crate::data_type::{DataType, StructField};
 pub use crate::datetime::{Date, DateTime, Interval, Offset, Time, TimestampTz};
 #[cfg(feature = "geo")]
 pub use crate::geo::{Circle, Line, Path, Point, Polygon, Rect, Segment};
+pub use crate::literal::{Literal, LiteralRange};
 #[cfg(feature = "network")]
 pub use crate::network::{IpAddr, MacAddr};
 #[cfg(feature = "numeric")]
 pub use crate::numeric::Decimal;
-pub use crate::literal::{Literal, LiteralRange};
 pub use crate::value::{Value, ValueRange};
 
 // NOTE: `Span` / `FileId` / `Diagnostic` / `Code` / `Severity` are *not*

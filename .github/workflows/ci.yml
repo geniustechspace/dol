@@ -133,6 +133,38 @@ jobs:
       - name: Run tests (${{ matrix.features || 'default' }})
         run: cargo test --workspace ${{ matrix.features }}
 
+  dol-core-features:
+    name: dol-core Granular Features
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        features:
+          - "" # bare core: no geo/network/datetime/numeric/serde/std
+          - "--features=serde"
+          - "--features=numeric"
+          - "--features=datetime,numeric"
+          - "--features=serde,datetime,numeric"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: "1.94"
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: dol-core-features
+
+      # Exercises that gating Value/Literal/DataType/TypeError variants behind
+      # `geo`/`network`/`datetime`/`numeric` keeps the crate coherent for every
+      # representative subset.
+      - name: Test dol-core --no-default-features ${{ matrix.features }}
+        run: cargo test -p dol-core --no-default-features ${{ matrix.features }}
+
   iot-min-check:
     name: Feature Matrix (iot-min)
     runs-on: ubuntu-latest

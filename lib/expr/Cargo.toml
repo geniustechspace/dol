@@ -32,6 +32,12 @@ default = []
 std = ["dol-core/std"]
 serde = ["dep:serde", "dol-core/serde", "smallvec/serde"]
 
+# Granular dol-core feature pass-throughs.
+geo      = ["dol-core/geo"]
+network  = ["dol-core/network"]
+datetime = ["dol-core/datetime"]
+numeric  = ["dol-core/numeric"]
+
 [dev-dependencies]
 serde_json = { workspace = true }
 proptest = "1"

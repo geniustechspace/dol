@@ -7,9 +7,9 @@ use alloc::vec::Vec;
 use core::ops::Bound;
 
 use super::{Literal, LiteralRange};
-use crate::error::TypeError;
 #[cfg(feature = "datetime")]
 use crate::datetime::{Date, DateTime, Interval, Offset, Time, TimestampTz};
+use crate::error::TypeError;
 #[cfg(feature = "geo")]
 use crate::geo::Point;
 #[cfg(feature = "network")]
