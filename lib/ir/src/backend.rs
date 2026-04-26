@@ -1,13 +1,11 @@
 //! Backend trait and structured [`BackendError`].
 //!
-//! v2 reshapes both:
-//!
 //! - [`Backend::compile`] takes a borrowed
 //!   [`ProgramRef`](crate::ProgramRef) so backends do not need to clone the
 //!   arena into every invocation.
 //! - [`BackendError`] is `#[non_exhaustive]` and carries a structured
 //!   [`dol_core::diag::Diagnostic`] plus optional [`dol_core::span::Span`].
-//!   New error kinds (`Capability`, `Extension`, `AclDenied`) are added
+//!   New error kinds (`Capability`, `Extension`, `AclDenied`) can be added
 //!   without breaking match arms.
 
 use alloc::string::String;
@@ -127,7 +125,7 @@ impl core::fmt::Display for BackendError {
 
 impl std::error::Error for BackendError {}
 
-/// A compiler from a v2 [`ProgramRef`] into a backend-specific artifact.
+/// A compiler from a [`ProgramRef`] into a backend-specific artifact.
 ///
 /// The associated [`Backend::Output`] type lets each backend describe its
 /// natural result shape: text-oriented backends (SQL, GraphQL, …) can use

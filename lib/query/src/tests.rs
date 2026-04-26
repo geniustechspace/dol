@@ -1,4 +1,4 @@
-//! Integration tests for `dol-query` builders against the v2
+//! Integration tests for `dol-query` builders against the
 //! [`Operation`](dol_ir::Operation) IR.
 
 use super::*;

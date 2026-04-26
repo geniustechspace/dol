@@ -1,4 +1,4 @@
-# DOL IR (v2)
+# DOL IR
 
 The DOL IR is the universal intermediate representation that every backend
 ingests. It is a single Rust enum, [`Operation`], plus a small ecosystem of
@@ -7,7 +7,7 @@ addressing primitives ([`Target`], [`Locator`], [`SchemaRef`],
 [`CapabilitySet`], [`CapabilityCheck`]).
 
 This document captures the **rules** that govern the IR's shape. RFC
-[`docs/rfcs/0001-ir-v2.md`](rfcs/0001-ir-v2.md) tells the design story; this
+[`docs/rfcs/0001-ir.md`](rfcs/0001-ir.md) tells the design story; this
 file is the reference.
 
 ## The noun-vs-verb rule
@@ -102,12 +102,11 @@ operation Append on TargetKind::StreamTopic requires capability
 - Every payload derives `Debug, Clone, PartialEq` and is
   `Serialize/Deserialize` under the `serde` feature.
 
-## Versioning
+## Wire format
 
-[`IR_SCHEMA_VERSION`] is the integer version stamped onto serialised
-programs through the [`VersionedProgram`] envelope. v1
-(`Statement`-based) is decoded into v2 [`Operation`] via the
-`compat::statement` shim.
+Persistent serialisation lives in [`dol-wire`](../lib/wire), which carries
+its own header / framing version independently of the in-memory IR. The IR
+itself is a single, current shape with no embedded schema-version envelope.
 
 [`Operation`]: ../lib/ir/src/operation/mod.rs
 [`Target`]: ../lib/ir/src/target.rs

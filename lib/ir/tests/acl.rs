@@ -1,4 +1,4 @@
-//! ACL governance object tests for v2 IR.
+//! ACL governance object tests for IR.
 //!
 //! Exercises the four nouns (`Policy`, `Mask`, `Quota`, `Audit`) plus the
 //! ACL verbs (`Grant`, `Revoke`) and confirms they:
@@ -7,8 +7,8 @@
 //! - construct cleanly through `From<Payload> for Operation`.
 
 use dol_ir::operation::{
-    AuditEvent, AuditOp, AuditSink, GrantV2, MaskOp, PolicyOp, PolicyScope, QuotaKind, QuotaOp,
-    RevokeV2, StructuralVerb,
+    AuditEvent, AuditOp, AuditSink, Grant, MaskOp, PolicyOp, PolicyScope, QuotaKind, QuotaOp,
+    Revoke, StructuralVerb,
 };
 use dol_ir::{
     Category, CapabilityTag, Locator, OpKind, Operation, Privilege, Symbol, Target, TargetKind,
@@ -97,7 +97,7 @@ fn audit_emits_audit_tag_and_carries_event() {
 
 #[test]
 fn grant_dispatches_to_acl_verb() {
-    let op: Operation = GrantV2 {
+    let op: Operation = Grant {
         privileges: smallvec![Privilege::Select, Privilege::Update],
         target: rel(0),
         roles: smallvec![Symbol::new(1)],
@@ -110,7 +110,7 @@ fn grant_dispatches_to_acl_verb() {
 
 #[test]
 fn revoke_dispatches_to_acl_verb_with_cascade() {
-    let op: Operation = RevokeV2 {
+    let op: Operation = Revoke {
         privileges: smallvec![Privilege::All],
         target: rel(0),
         roles: smallvec![Symbol::new(1)],

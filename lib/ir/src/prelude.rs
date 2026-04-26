@@ -11,4 +11,3 @@ pub use crate::program_ref::ProgramRef;
 pub use crate::schema_catalog::{CatalogEntry, SchemaCatalog, TypeEntry};
 pub use crate::schema_ref::{CatalogId, SchemaId, SchemaRef};
 pub use crate::target::{Locator, SchemaBinding, Symbol, Target, TargetKind};
-pub use crate::version::{IR_SCHEMA_VERSION, VersionedProgram};

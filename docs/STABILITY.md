@@ -112,13 +112,11 @@ public rationale in the commit message.
 If you believe DOL has broken any of the above guarantees, open an issue
 or a PR; we treat stability regressions as bugs.
 
-## IR versioning (v2)
+## IR stability
 
-The `dol-ir` crate carries a separate schema version,
-[`IR_SCHEMA_VERSION`], surfaced through the
-[`VersionedProgram`] envelope. Wire payloads embed this version so that
-v1 (`Statement`-based) programs can be auto-decoded into v2 `Operation`
-through the `compat::statement` shim.
+The `dol-ir` crate exposes a single, current IR shape. Persistent
+serialisation lives in [`dol-wire`](../lib/wire), which carries its own
+header / framing version independent of the in-memory IR.
 
 The IR follows the noun-vs-verb rule documented in
 [`docs/IR.md`](IR.md):
@@ -134,3 +132,7 @@ The IR follows the noun-vs-verb rule documented in
 size` and a `const _: () = assert!(...);` assertion). The size budget is
 *not* part of the wire-format contract; it is an internal performance
 guarantee.
+
+While the project is at the prototype stage all surface remains subject
+to change without a deprecation cycle; a public stability cycle starts
+when `0.x` is tagged.

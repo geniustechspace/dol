@@ -1,8 +1,8 @@
-//! Schema-definition (DDL) helpers — produce v2 [`Operation::Schema`],
+//! Schema-definition (DDL) helpers — produce [`Operation::Schema`],
 //! [`Operation::Field`], [`Operation::Lookup`] programs.
 //!
 //! Higher-level builders return [`dol_ir::Program`] directly. They take
-//! ownership of name / namespace / field metadata and lower it onto the v2
+//! ownership of name / namespace / field metadata and lower it onto the
 //! [`Target`](dol_ir::Target) + [`SchemaRef`](dol_ir::SchemaRef) shape.
 
 use dol_expr::{ExprArena, Interner};
@@ -67,7 +67,7 @@ pub fn define_lookup(
     unique: bool,
     _if_not_exists: bool,
 ) -> Program {
-    use dol_ir::operation::{LookupOpMethod, StructuralVerb};
+    use dol_ir::operation::{LookupMethod, StructuralVerb};
     use smallvec::SmallVec;
 
     let mut interner = Interner::new();
@@ -81,7 +81,7 @@ pub fn define_lookup(
         verb: StructuralVerb::Create,
         target,
         name: name_sym,
-        method: LookupOpMethod::Tree,
+        method: LookupMethod::Tree,
         fields: cols,
         unique,
     }
@@ -96,7 +96,7 @@ pub fn drop_lookup(
     name: &str,
     _if_exists: bool,
 ) -> Program {
-    use dol_ir::operation::{LookupOpMethod, StructuralVerb};
+    use dol_ir::operation::{LookupMethod, StructuralVerb};
     use smallvec::SmallVec;
 
     let mut interner = Interner::new();
@@ -106,7 +106,7 @@ pub fn drop_lookup(
         verb: StructuralVerb::Drop,
         target,
         name: name_sym,
-        method: LookupOpMethod::Tree,
+        method: LookupMethod::Tree,
         fields: SmallVec::new(),
         unique: false,
     }

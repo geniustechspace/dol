@@ -1,4 +1,4 @@
-//! Small helpers shared across `dol-query` builders for building v2
+//! Small helpers shared across `dol-query` builders for building
 //! [`Target`](dol_ir::Target)s, [`Symbol`](dol_ir::Symbol)s, and
 //! [`Locator`](dol_ir::Locator)s from owned name/namespace strings.
 

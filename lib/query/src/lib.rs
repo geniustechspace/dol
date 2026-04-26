@@ -4,7 +4,7 @@
 //! for DOL. Builders accept an [`Entity`](dol_schema::Entity) reference *or*
 //! a plain entity-name string; runtime-known names are first-class.
 //!
-//! Every `.build()` returns a [`dol_ir::Program`] containing one or more v2
+//! Every `.build()` returns a [`dol_ir::Program`] containing one or more
 //! [`dol_ir::Operation`]s.
 //!
 //! # Quick Start
@@ -48,8 +48,7 @@ mod update;
 mod upsert;
 
 pub use control::{
-    define_policy, grant, revoke, tx_atomic, tx_begin, tx_commit, tx_rollback, PolicyScopeV2,
-    TxIsolationLevel,
+    define_policy, grant, revoke, tx_atomic, tx_begin, tx_commit, tx_rollback,
 };
 pub use ddl::{
     define_entity, define_entity_inferred, define_from_entity, define_index, define_lookup,

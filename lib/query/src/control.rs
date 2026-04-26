@@ -1,9 +1,9 @@
-//! Access-control + transaction helpers — emit v2 [`Operation`]s for
+//! Access-control + transaction helpers — emit [`Operation`]s for
 //! `Grant`, `Revoke`, `Policy`, `Tx`.
 
 use dol_expr::{ExprArena, Interner};
 use dol_ir::operation::{
-    GrantV2, IsolationLevel, PolicyOp, PolicyScope, RevokeV2, StructuralVerb, TxBegin, TxOp,
+    Grant, IsolationLevel, PolicyOp, PolicyScope, Revoke, StructuralVerb, TxBegin, TxOp,
     TxOptions,
 };
 use dol_ir::{Operation, Privilege, Program, Symbol, TargetKind};
@@ -27,7 +27,7 @@ pub fn grant(
         .map(|r| intern_symbol(&mut interner, r))
         .collect();
     let priv_vec: SmallVec<[Privilege; 2]> = privileges.into_iter().collect();
-    let op: Operation = GrantV2 {
+    let op: Operation = Grant {
         privileges: priv_vec,
         target,
         roles: role_syms,
@@ -52,7 +52,7 @@ pub fn revoke(
         .map(|r| intern_symbol(&mut interner, r))
         .collect();
     let priv_vec: SmallVec<[Privilege; 2]> = privileges.into_iter().collect();
-    let op: Operation = RevokeV2 {
+    let op: Operation = Revoke {
         privileges: priv_vec,
         target,
         roles: role_syms,
@@ -125,5 +125,5 @@ pub fn tx_atomic(ops: Vec<Operation>) -> Program {
     Program::from_operation(op)
 }
 
-// Public re-exports for callers building transactional blocks.
-pub use dol_ir::operation::{IsolationLevel as TxIsolationLevel, PolicyScope as PolicyScopeV2};
+// (No re-exports: `dol_ir::operation::{IsolationLevel, PolicyScope}` are the
+// canonical names — import them directly when needed.)

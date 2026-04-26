@@ -1,6 +1,6 @@
 //! Schema catalog handles.
 //!
-//! In v2, schemas are data, not embedded Rust type walls. A
+//! Schemas are data, not embedded Rust type walls. A
 //! [`Program`](crate::Program) carries an optional `SchemaCatalog`, and
 //! operations reference catalog entries by [`SchemaRef`] handle.
 //!
@@ -8,9 +8,6 @@
 //! `SchemaRef` is two integers — cheap to copy, cheap to compare, and
 //! trivially serialisable.
 //!
-//! The catalog itself is added in PR #6. PR #2 only introduces the handle
-//! types so [`Target`](crate::target::Target) can carry a `Declared`
-//! schema binding without a forward dependency.
 
 /// Catalog identifier.
 ///

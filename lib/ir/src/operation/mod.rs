@@ -1,7 +1,7 @@
 //! Operation kinds, categories, and the outer [`Operation`] enum.
 //!
-//! `Operation` is the v2 IR's universal dispatch enum. Variants follow the
-//! noun/verb hybrid rule from `docs/rfcs/0001-ir-v2.md`:
+//! `Operation` is the IR's universal dispatch enum. Variants follow a
+//! noun/verb hybrid rule:
 //!
 //! - **Structural / governance** variants are nouns: `Schema`, `Field`,
 //!   `Index`, `Lookup`, `Policy`, `Mask`, `Quota`, `Audit`. Their payloads
@@ -44,11 +44,11 @@ pub use audit::{AuditEvent, AuditOp, AuditSink};
 pub use delete::Delete;
 pub use describe::{Describe, DescribeFacet};
 pub use extension::{ExtensionId, ExtensionPayload, OperationExtension};
-pub use field::{FieldDefV2, FieldOp};
-pub use grant::GrantV2;
+pub use field::{FieldDef, FieldOp};
+pub use grant::Grant;
 pub use index::{IndexDirection, IndexKey, IndexMethod, IndexOp};
 pub use insert::{Insert, InsertSource};
-pub use lookup::{LookupMethod as LookupOpMethod, LookupOp};
+pub use lookup::{LookupMethod, LookupOp};
 pub use mask::MaskOp;
 pub use policy::{PolicyOp, PolicyScope};
 pub use probe::Probe;
@@ -57,13 +57,13 @@ pub use quota::{QuotaKind, QuotaOp};
 #[cfg(feature = "raw")]
 pub use raw::RawOp;
 pub use replace::{Replace, ReplaceBody};
-pub use revoke::RevokeV2;
+pub use revoke::Revoke;
 pub use schema::{SchemaBody, SchemaOp, StructuralVerb, TypeBody};
 pub use tx::{IsolationLevel, TxBegin, TxOp, TxOptions};
 pub use update::Update;
 pub use upsert::Upsert;
 
-/// Top-level v2 IR operation.
+/// Top-level IR operation.
 ///
 /// See the module docs for the noun-vs-verb variant rule and `docs/IR.md` for
 /// the design overview.
@@ -96,8 +96,8 @@ pub enum Operation {
     Describe(Box<Describe>),
 
     // ── ACL actions — verb variants ───────────────────────────────────────
-    Grant(Box<GrantV2>),
-    Revoke(Box<RevokeV2>),
+    Grant(Box<Grant>),
+    Revoke(Box<Revoke>),
 
     // ── meta ──────────────────────────────────────────────────────────────
     Tx(Box<TxOp>),
@@ -279,8 +279,8 @@ impl_op_from! {
     Query(Query);
     Probe(Probe);
     Describe(Describe);
-    Grant(GrantV2);
-    Revoke(RevokeV2);
+    Grant(Grant);
+    Revoke(Revoke);
     Tx(TxOp);
     Extension(OperationExtension);
 }

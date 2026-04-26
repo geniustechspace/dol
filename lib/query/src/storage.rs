@@ -1,4 +1,4 @@
-//! Storage / file-system helpers — emit v2 [`Operation`]s targeting
+//! Storage / file-system helpers — emit [`Operation`]s targeting
 //! [`TargetKind::Blob`] or [`TargetKind::FileTree`].
 //!
 //! Storage operations are *just* DML against a non-tabular target, so this

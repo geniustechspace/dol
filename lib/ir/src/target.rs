@@ -1,17 +1,11 @@
-//! Universal addressing primitives for the v2 IR.
+//! Universal addressing primitives for the IR.
 //!
 //! Every [`Operation`](crate::operation::Operation) applies to a [`Target`].
 //! A `Target` describes *what* is being addressed (`TargetKind`), *where* it
 //! lives (`Locator`), an optional alias used by the surrounding query, and
 //! how its schema is bound (`SchemaBinding`).
 //!
-//! These types are introduced in PR #2 of the `dol-ir` v2 rethink. They are
-//! purely additive: the existing [`Statement`](crate::Statement) surface and
-//! its `EntityRef` continue to work unchanged. The compat layer (PR #8) maps
-//! old `EntityRef`-based payloads onto `Target` when synthesising
-//! `Operation`s.
-//!
-//! See `docs/rfcs/0001-ir-v2.md` for the full design.
+//! See `docs/rfcs/0001-ir.md` for the full design.
 
 use smallvec::SmallVec;
 

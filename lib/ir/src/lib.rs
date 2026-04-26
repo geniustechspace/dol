@@ -8,7 +8,7 @@
 //! `Grant`, `Revoke`). Meta variants (`Tx`, `Extension`, feature-gated
 //! `Raw`) round it out.
 //!
-//! See `docs/IR.md` for the design overview and `docs/rfcs/0001-ir-v2.md`
+//! See `docs/IR.md` for the design overview and `docs/rfcs/0001-ir.md`
 //! for the rationale.
 //!
 //! Schema constraint types (`RefAction`, `ComputedKind`, `RelationRef`,
@@ -29,7 +29,6 @@ pub mod program_ref;
 pub mod schema_catalog;
 pub mod schema_ref;
 pub mod target;
-pub mod version;
 
 /// Schema constraint types — re-exported from `dol-schema`, the canonical home.
 pub mod constraint {
@@ -46,4 +45,3 @@ pub use program_ref::ProgramRef;
 pub use schema_catalog::{CatalogEntry, SchemaCatalog, TypeEntry};
 pub use schema_ref::{CatalogId, SchemaId, SchemaRef};
 pub use target::{Locator, SchemaBinding, Symbol, Target, TargetKind};
-pub use version::{IR_SCHEMA_VERSION, VersionedProgram};

@@ -164,7 +164,7 @@ mod tests {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-// v2: open `CapabilityTag` / `CapabilitySet` vocabulary + `CapabilityCheck`
+// Open `CapabilityTag` / `CapabilitySet` vocabulary + `CapabilityCheck`
 // ──────────────────────────────────────────────────────────────────────────
 //
 // The `u64` `BackendCapabilities` bitset above stays for the hot path.

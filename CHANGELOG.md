@@ -7,102 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Removed (v2 finalization — breaking)
+### IR redesign — breaking
 
-- **`dol_ir::Statement` deleted.** The v1 statement enum and every payload
-  module that backed it (`statement`, `definition`, `control`,
-  `transaction`, `storage`, `entity_ref`) are gone. The `compat::statement`
-  shim, the `Program::stmt` field, and `Program::from_stmt` /
-  `Program::into_parts` are deleted alongside it. `dol_ir::Program` now
-  carries `operations: Vec<Operation>` only.
-- **DDL/control builders deleted.** The `dol_query::builder` submodule
-  tree, the `EntityBuilderExt` trait, `CreateFromMeta`,
-  `DefineEntityBuilder`, `AlterEntityBuilder`, `DropEntityBuilder`,
-  `DefineLookupBuilder`, `DropLookupBuilder`, `DefineTypeBuilder`,
-  `DropTypeBuilder`, `GrantBuilder`, `RevokeBuilder`,
-  `DefinePolicyBuilder`, `TransactionBuilder`, and the
-  `PutObjectBuilder`/`GetObjectBuilder`/`ListObjectsBuilder`/`ReadFileBuilder`/
-  `WriteFileBuilder`/`MoveFileBuilder` storage builders are removed.
-- Deprecated `Query::remove` / `RemoveQuery` aliases removed.
+The IR has been redesigned around a single, universal `Operation` enum. As
+the project never shipped a stable predecessor, the changelog no longer
+narrates the redesign as a v1→v2 migration; this entry describes the
+current shape directly.
 
-### Changed (v2 finalization — breaking)
-
-- **`Operation` DML payloads now reference arena DML nodes.** `Insert`
-  carries an `InsertSource` (`Node(NodeId)` / `FromQuery(NodeId)` /
-  `Bindings` / `FromPath(Symbol)` / `FromExpr(NodeId)`); `Update`,
-  `Delete`, and `Upsert` each carry a single `node: NodeId` pointing at
-  the corresponding `ExprNode::{Update,Delete,Upsert}` body. The inline
-  `sets` / `filter` / `conflict_keys` / `on_conflict` / `returning` fields
-  are gone — those live in the arena node. `size_of::<Operation>()` drops
-  to 16 bytes.
-- **All `dol-query` builders emit `Operation` directly** (`GetQuery`,
-  `InsertQuery`, `UpdateQuery`, `DeleteQuery`, `UpsertQuery`). `.build()`
-  returns `dol_ir::Program` with one `Operation` whose body is held in
-  the program's `ExprArena`.
-- **`dol-query` ships v2-native helpers** in place of the deleted
-  builders: `ddl::{define_entity, drop_entity, define_lookup, drop_lookup,
-  drop_field, rename_field, define_index}`, `storage::{put_blob,
-  put_blob_from_path, get_blob, list_blobs, read_file, write_file,
-  write_file_from_path, move_file}`, and `control::{grant, revoke,
-  define_policy, tx_begin, tx_commit, tx_rollback, tx_atomic}`.
-- **`Privilege` lifted to `dol_ir::privilege`** and re-exported at the
-  crate root. The v1 wrapper structs (`Grant`, `Revoke`, `DefinePolicy`)
-  in `dol_ir::control` were removed; `GrantV2` / `RevokeV2` / `PolicyOp`
-  are the replacement surfaces.
-- **`xtask size`** drops the `Statement` budget assertion.
-
-### Added
-
+- **`dol_ir::Operation` is the IR.** A noun/verb hybrid: structural /
+  governance variants are nouns (`Schema`, `Field`, `Index`, `Lookup`,
+  `Policy`, `Mask`, `Quota`, `Audit`) carrying a `StructuralVerb`
+  (`Create` / `Drop` / `Alter` / `Rename` / `Truncate`); data / query /
+  authorization variants are verbs (`Insert`, `Update`, `Replace`,
+  `Delete`, `Upsert`, `Append`, `Query`, `Probe`, `Describe`, `Grant`,
+  `Revoke`); meta variants are `Tx`, `Extension`, and the feature-gated
+  `Raw`. `size_of::<Operation>() == 16` is asserted at compile time and
+  reported by `xtask size`.
+- **Universal addressing primitives** — `Symbol`, `Locator`, `Target`,
+  `TargetKind`, `SchemaBinding` — back every operation.
+- **Schema catalog** — `SchemaCatalog`, `CatalogEntry`, `TypeEntry`, plus
+  `SchemaRef` / `CatalogId` / `SchemaId` — let programs reference schemas
+  as data instead of via embedded Rust type walls.
+- **Open capability vocabulary** — `CapabilityTag`, `CapabilitySet`,
+  `CapabilityCheck` — alongside the bitset `BackendCapabilities`. Every
+  `Operation` reports `kind() -> OpKind` and
+  `required_capabilities()`.
+- **DML payloads reference arena nodes.** `Insert` carries an
+  `InsertSource` (`Node(NodeId)` / `FromQuery(NodeId)` / `Bindings` /
+  `FromPath(Symbol)` / `FromExpr(NodeId)`); `Update`, `Delete`, and
+  `Upsert` each carry a single `node: NodeId` pointing at the
+  corresponding `ExprNode::{Update,Delete,Upsert}` body.
 - **Typed `ExtensionPayload` trait** in `dol_ir::operation` plus
   `OperationExtension::{from_payload, decode_as}` for typed extension
   registration. `dol-pipeline` ships a `PipelinePayload` (wrapping
   `Graph` under `dol.pipeline/graph` v1) and `dol-stream` ships
   `WindowPayload`, `TimeSeriesPayload`, and `SamplePayload` (under
-  `dol.stream/{window,timeseries,iot.sample}` v1). All four are encoded
-  with `postcard` when the `serde` feature is enabled.
-
-## [Unreleased — earlier v2 work]
-
-### Added
-
-- **`dol-ir` v2 — universal `Operation` IR.** Adds the `Operation` enum
-  alongside the existing `Statement` surface, following the noun/verb
-  hybrid rule:
-  - **Nouns** (`Schema`, `Field`, `Index`, `Lookup`, `Policy`, `Mask`,
-    `Quota`, `Audit`) carry a `StructuralVerb` (`Create`, `Drop`, `Alter`,
-    `Rename`, `Truncate`).
-  - **Verbs** (`Insert`, `Update`, `Replace`, `Delete`, `Upsert`, `Append`,
-    `Query`, `Probe`, `Describe`, `Grant`, `Revoke`).
-  - **Meta** (`Tx`, `Extension`, feature-gated `Raw`).
-- New addressing primitives: `Symbol`, `Locator`, `Target`, `TargetKind`,
-  `SchemaBinding`.
-- Schema catalog: `SchemaCatalog`, `CatalogEntry`, `TypeEntry`, plus
-  `SchemaRef` / `CatalogId` / `SchemaId`.
-- Open capability vocabulary: `CapabilityTag`, `CapabilitySet`,
-  `CapabilityCheck`, plus `Operation::required_capabilities()` and
-  `Operation::kind() -> OpKind`.
-- Versioned `Program`: `IR_SCHEMA_VERSION = 2`, `VersionedProgram<Body>`
-  envelope, and a borrowed `ProgramRef<'a>` view for backends.
-- Structured `BackendError` (`#[non_exhaustive]`) carrying
-  `dol_core::Diagnostic` + optional `Span`. New variants: `Capability`,
-  `Extension`, `AclDenied`.
-- `compat::statement` module providing `From<Statement> for Operation`
-  and `statement_to_operation`. Storage / file-system v1 statements
-  collapse onto `Insert` / `Query` / `Replace` / `Update` against
-  `TargetKind::Blob` / `FileTree`.
-- New static invariants on `Operation`:
-  `size_of::<Operation>() ≤ 64`, `Send + Sync + 'static`. Both are
-  asserted at compile time and reported by `xtask size`.
-- `dol-check` migrated to operate on `Program::operations`, reporting
-  per-tag diagnostics keyed by a structured `CapabilityCheck`.
-- `dol-fmt` migrated to print the new `Operation` form.
-- New tests: per-`(Category, TargetKind)` fixtures
-  (`lib/ir/tests/fixtures.rs`), v1↔v2 compat decode coverage
-  (`lib/ir/tests/compat_v1_to_v2.rs`), ACL governance ops
-  (`lib/ir/tests/acl.rs`), serde round-trips, and size assertions.
-- Docs: `docs/IR.md` (noun-vs-verb rule reference), top-level
-  `MIGRATION.md` (old vs new side-by-side), expanded `docs/STABILITY.md`
-  for IR versioning, and the underpinning RFC `docs/rfcs/0001-ir-v2.md`.
+  `dol.stream/{window,timeseries,iot.sample}` v1).
+- **All `dol-query` builders emit `Operation` directly** (`GetQuery`,
+  `InsertQuery`, `UpdateQuery`, `DeleteQuery`, `UpsertQuery`). `.build()`
+  returns `dol_ir::Program` with one `Operation` whose body is held in
+  the program's `ExprArena`. Helper modules: `ddl::{define_entity,
+  drop_entity, define_lookup, drop_lookup, drop_field, rename_field,
+  define_index}`, `storage::{put_blob, put_blob_from_path, get_blob,
+  list_blobs, read_file, write_file, write_file_from_path, move_file}`,
+  `control::{grant, revoke, define_policy, tx_begin, tx_commit,
+  tx_rollback, tx_atomic}`.
+- **Structured `BackendError`** (`#[non_exhaustive]`) carrying
+  `dol_core::Diagnostic` + optional `Span`, with `Capability`,
+  `Extension`, and `AclDenied` variants.
+- **`dol-check`** operates on `Program::operations`, reporting per-tag
+  diagnostics keyed by a structured `CapabilityCheck`.
+- **`dol-fmt`** prints the `Operation` form.
+- Operation modules are grouped by category under
+  `lib/ir/src/operation/{ddl,dml,dql,acl,meta,shared,tx}`. Flat
+  re-exports remain at `dol_ir::operation::*`.
 
 - **`dol-core` granular features** — `geo`, `network`, `datetime`, `numeric`
   (all default-on). Disabling any one drops the corresponding `Value` /

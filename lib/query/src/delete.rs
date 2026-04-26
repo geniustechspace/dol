@@ -99,4 +99,4 @@ impl DeleteQuery {
     }
 }
 
-// `RemoveQuery` was the deprecated alias for `DeleteQuery`. Removed in v2.
+// `RemoveQuery` was the deprecated alias for `DeleteQuery`. Removed.
