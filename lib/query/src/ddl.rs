@@ -91,12 +91,7 @@ pub fn define_lookup(
 }
 
 /// Emit a `DROP INDEX` operation.
-pub fn drop_lookup(
-    table: &str,
-    namespace: Option<&str>,
-    name: &str,
-    if_exists: bool,
-) -> Program {
+pub fn drop_lookup(table: &str, namespace: Option<&str>, name: &str, if_exists: bool) -> Program {
     use dol_ir::operation::{LookupMethod, StructuralVerb};
     use smallvec::SmallVec;
 
@@ -139,12 +134,7 @@ pub fn drop_field(table: &str, namespace: Option<&str>, field: &str) -> Program 
 }
 
 /// Emit an `ALTER TABLE … RENAME COLUMN`.
-pub fn rename_field(
-    table: &str,
-    namespace: Option<&str>,
-    from: &str,
-    to: &str,
-) -> Program {
+pub fn rename_field(table: &str, namespace: Option<&str>, from: &str, to: &str) -> Program {
     use dol_ir::operation::StructuralVerb;
 
     let mut interner = Interner::new();

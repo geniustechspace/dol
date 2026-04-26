@@ -78,15 +78,34 @@ pub fn capability_check(
     out: &mut alloc::vec::Vec<Diagnostic>,
 ) {
     for op in &program.operations {
-        let required = op.required_capabilities();
-        for missing in required.missing_from(provided) {
-            let check = capability_check_for(op, &missing);
-            let msg = render_capability_message(&check, &missing);
-            out.push(Diagnostic::error(
-                dol_core::diag::code::MISSING_CAPABILITY,
-                dol_core::span::Span::NONE,
-                msg,
-            ));
+        check_op_recursive(op, provided, out);
+    }
+}
+
+/// Walk into [`TxOp::Atomic`] payloads so missing capabilities inside an
+/// atomic block are diagnosed alongside the outer `Tx` operation. Mirrors
+/// the recursive contract documented on
+/// [`Operation::all_targets`](dol_ir::Operation::all_targets).
+fn check_op_recursive(
+    op: &Operation,
+    provided: &CapabilitySet,
+    out: &mut alloc::vec::Vec<Diagnostic>,
+) {
+    let required = op.required_capabilities();
+    for missing in required.missing_from(provided) {
+        let check = capability_check_for(op, &missing);
+        let msg = render_capability_message(&check, &missing);
+        out.push(Diagnostic::error(
+            dol_core::diag::code::MISSING_CAPABILITY,
+            dol_core::span::Span::NONE,
+            msg,
+        ));
+    }
+    if let Operation::Tx(tx) = op
+        && let dol_ir::operation::TxOp::Atomic { ops, .. } = tx.as_ref()
+    {
+        for inner in ops {
+            check_op_recursive(inner, provided, out);
         }
     }
 }
@@ -128,7 +147,10 @@ fn capability_check_for(op: &Operation, _missing: &CapabilityTag) -> CapabilityC
 }
 
 /// Render a uniform, backend-agnostic capability diagnostic message.
-fn render_capability_message(check: &CapabilityCheck, missing: &CapabilityTag) -> alloc::string::String {
+fn render_capability_message(
+    check: &CapabilityCheck,
+    missing: &CapabilityTag,
+) -> alloc::string::String {
     use core::fmt::Write;
     let mut s = alloc::string::String::new();
     let _ = write!(s, "operation {:?}", check.op);
@@ -138,7 +160,10 @@ fn render_capability_message(check: &CapabilityCheck, missing: &CapabilityTag) -
     if let Some(v) = check.verb {
         let _ = write!(s, " ({v:?})");
     }
-    let _ = write!(s, " requires capability `{missing}` not provided by backend");
+    let _ = write!(
+        s,
+        " requires capability `{missing}` not provided by backend"
+    );
     s
 }
 

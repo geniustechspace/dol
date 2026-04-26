@@ -15,8 +15,8 @@ use dol_ir::operation::{
     ReplaceBody, SchemaOp, Update, Upsert,
 };
 use dol_ir::{
-    Category, CapabilityTag, Locator, OpKind, Operation, SchemaBinding, SchemaRef, Symbol,
-    Target, TargetKind,
+    CapabilityTag, Category, Locator, OpKind, Operation, SchemaBinding, SchemaRef, Symbol, Target,
+    TargetKind,
 };
 
 fn t(kind: TargetKind) -> Target {
@@ -315,8 +315,8 @@ fn acl_audit_create_emits_audit_kind() {
 #[test]
 fn serde_round_trip_for_acl_and_governance() {
     use dol_ir::operation::{
-        AuditEvent, AuditOp, AuditSink, Grant, MaskOp, PolicyOp, PolicyScope, QuotaKind,
-        QuotaOp, Revoke, StructuralVerb,
+        AuditEvent, AuditOp, AuditSink, Grant, MaskOp, PolicyOp, PolicyScope, QuotaKind, QuotaOp,
+        Revoke, StructuralVerb,
     };
     use dol_ir::privilege::Privilege;
     use serde_json::{from_str, to_string};
@@ -381,7 +381,11 @@ fn serde_round_trip_for_acl_and_governance() {
     for op in &ops {
         let s = to_string(op).expect("encode");
         let back: Operation = from_str(&s).expect("decode");
-        assert_eq!(op.kind(), back.kind(), "kind mismatch round-tripping {op:?}");
+        assert_eq!(
+            op.kind(),
+            back.kind(),
+            "kind mismatch round-tripping {op:?}"
+        );
         assert_eq!(op, &back, "value mismatch round-tripping {op:?}");
     }
 }

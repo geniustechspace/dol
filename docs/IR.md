@@ -58,7 +58,7 @@ Target { kind: TargetKind, locator: Locator, alias: Option<Symbol>,
 - [`Locator`] is structured data, not a string:
   `Locator { namespace, name, path }`. `path` covers nested document
   paths, S3 key segments, file-tree segments, and topic partitions.
-- [`SchemaBinding`] is one of `Catalog(SchemaRef)`, `Inferred`, or
+- [`SchemaBinding`] is one of `Declared(SchemaRef)`, `Inferred`, or
   `Opaque`. Schemas live in a catalog ([`SchemaCatalog`]); operations
   carry a `SchemaRef`, never an inline schema body.
 

@@ -11,7 +11,7 @@ use dol_ir::operation::{
     Revoke, StructuralVerb,
 };
 use dol_ir::{
-    Category, CapabilityTag, Locator, OpKind, Operation, Privilege, Symbol, Target, TargetKind,
+    CapabilityTag, Category, Locator, OpKind, Operation, Privilege, Symbol, Target, TargetKind,
 };
 use smallvec::smallvec;
 
@@ -32,7 +32,10 @@ fn policy_create_dispatches_correctly() {
     .into();
     assert_eq!(op.kind(), OpKind::Policy);
     assert_eq!(op.category(), Category::ACL);
-    assert!(op.required_capabilities().contains(&CapabilityTag::POLICIES));
+    assert!(
+        op.required_capabilities()
+            .contains(&CapabilityTag::POLICIES)
+    );
 }
 
 #[test]

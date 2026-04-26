@@ -96,13 +96,15 @@ impl BackendError {
     }
 
     /// Construct a `MissingValue` error.
+    ///
+    /// Falls back to [`dol_core::diag::code::INTERNAL_ERROR`] rather than
+    /// [`dol_core::diag::code::VALUE_OUT_OF_RANGE`]: a missing/null required
+    /// value is a contract violation, not an out-of-range numeric.
+    /// Downstream tooling that keys off [`Diagnostic::code`] should match
+    /// the variant rather than the code for this error.
     pub fn missing_value(msg: impl Into<String>) -> Self {
         BackendError::MissingValue {
-            diag: Diagnostic::error(
-                dol_core::diag::code::VALUE_OUT_OF_RANGE,
-                Span::NONE,
-                msg.into(),
-            ),
+            diag: Diagnostic::error(dol_core::diag::code::INTERNAL_ERROR, Span::NONE, msg.into()),
             span: None,
         }
     }

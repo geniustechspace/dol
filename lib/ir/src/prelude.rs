@@ -9,9 +9,7 @@
 //! [`Target`], …) is always re-exported at the top level.
 
 pub use crate::backend::{Backend, BackendError};
-pub use crate::capabilities::{
-    BackendCapabilities, CapabilityCheck, CapabilitySet, CapabilityTag,
-};
+pub use crate::capabilities::{BackendCapabilities, CapabilityCheck, CapabilitySet, CapabilityTag};
 pub use crate::operation::{Category, OpKind, Operation};
 pub use crate::privilege::Privilege;
 pub use crate::program::Program;
@@ -23,7 +21,9 @@ pub use crate::target::{Locator, SchemaBinding, Symbol, Target, TargetKind};
 /// Data-manipulation verbs (`Insert`, `Update`, `Replace`, `Delete`,
 /// `Upsert`, `Append`).
 pub mod dml {
-    pub use crate::operation::{Append, Delete, Insert, InsertSource, Replace, ReplaceBody, Update, Upsert};
+    pub use crate::operation::{
+        Append, Delete, Insert, InsertSource, Replace, ReplaceBody, Update, Upsert,
+    };
 }
 
 /// Data-definition verbs (`Schema`, `Field`, `Index`, `Lookup`).

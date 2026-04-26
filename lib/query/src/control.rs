@@ -3,8 +3,7 @@
 
 use dol_expr::{ExprArena, Interner};
 use dol_ir::operation::{
-    Grant, IsolationLevel, PolicyOp, PolicyScope, Revoke, StructuralVerb, TxBegin, TxOp,
-    TxOptions,
+    Grant, IsolationLevel, PolicyOp, PolicyScope, Revoke, StructuralVerb, TxBegin, TxOp, TxOptions,
 };
 use dol_ir::{Operation, Privilege, Program, Symbol, TargetKind};
 use smallvec::SmallVec;

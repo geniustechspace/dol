@@ -24,8 +24,8 @@ pub mod timeseries;
 pub mod window;
 
 pub use extension::{
-    register_iot_sample, register_timeseries, register_window, IOT_SAMPLE_NAME, SamplePayload,
-    TIMESERIES_NAME, TimeSeriesPayload, WINDOW_NAME, WindowPayload,
+    IOT_SAMPLE_NAME, SamplePayload, TIMESERIES_NAME, TimeSeriesPayload, WINDOW_NAME, WindowPayload,
+    register_iot_sample, register_timeseries, register_window,
 };
 pub use iot::{Actuator, PayloadCodec, QoS, RetentionPolicy, Sample, Sensor, StoreAndForward};
 pub use timeseries::{TimeSeriesOp, TimeUnit};

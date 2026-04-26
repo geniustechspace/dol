@@ -125,9 +125,9 @@ fn capability_check_no_op_on_universally_supported_operations() {
     let provided = CapabilitySet::new();
     let mut diags: Vec<Diagnostic> = Vec::new();
     capability_check(&prog, &provided, &mut diags);
-    // The compat shim leaves the schema binding `Opaque`, which surfaces an
-    // OPAQUE_SCHEMA tag — that is the documented behaviour. We only assert
-    // the call is well-formed.
+    // `Target::new` defaults to `SchemaBinding::Inferred`, so the
+    // representative DDL above does not surface an `OPAQUE_SCHEMA` tag.
+    // We only assert the call is well-formed and append-only.
     let _ = diags;
 }
 

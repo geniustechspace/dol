@@ -32,7 +32,7 @@ pub mod graph;
 pub mod node;
 pub mod schema;
 
-pub use extension::{PipelinePayload, EXTENSION_NAME, EXTENSION_VERSION};
+pub use extension::{EXTENSION_NAME, EXTENSION_VERSION, PipelinePayload};
 pub use graph::{Graph, NodeIdx};
 pub use node::{Node, Sink, Source, Transform};
 pub use schema::{ColumnSchema, RowSchema};

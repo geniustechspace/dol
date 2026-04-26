@@ -37,9 +37,9 @@ pub use ddl::{
 pub use dml::{Append, Delete, Insert, InsertSource, Replace, ReplaceBody, Update, Upsert};
 pub use dql::{Describe, DescribeFacet, Probe, Query};
 pub use kind::{Category, OpKind};
-pub use meta::{ExtensionId, ExtensionPayload, OperationExtension};
 #[cfg(feature = "raw")]
 pub use meta::RawOp;
+pub use meta::{ExtensionId, ExtensionPayload, OperationExtension};
 pub use shared::StructuralVerb;
 pub use tx::{IsolationLevel, TxBegin, TxOp, TxOptions};
 

@@ -92,7 +92,7 @@ impl Program {
     ///
     /// At least one side must be **arena/interner-empty** — i.e. its
     /// `arena.len() == 0` and `interner.len() == 0`. This covers every
-    /// helper in [`dol_query::control`] that produces a control-only
+    /// helper in `dol_query::control` that produces a control-only
     /// `Program` (`tx_begin`, `tx_commit`, plain `tx_rollback` whose
     /// interner stays empty when the catalog supplies no savepoint label).
     ///
@@ -101,7 +101,7 @@ impl Program {
     /// `Operation` variant); when the IR shape lands as a unified `WriteBody`
     /// (Stage 2 follow-up PR) we can lift that restriction. Until then,
     /// prefer [`crate::operation::TxOp::Atomic`] (composed via
-    /// [`dol_query::control::tx_atomic`]) for combining DML payloads.
+    /// `dol_query::control::tx_atomic`) for combining DML payloads.
     ///
     /// # Panics
     ///

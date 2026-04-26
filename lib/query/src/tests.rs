@@ -371,10 +371,7 @@ fn get_emits_query_operation() {
 
 #[test]
 fn insert_emits_insert_operation() {
-    let p = Query::from("users")
-        .insert()
-        .fields(&["id"])
-        .build();
+    let p = Query::from("users").insert().fields(&["id"]).build();
     assert_eq!(p.operations[0].kind(), dol_ir::OpKind::Insert);
     assert_eq!(p.operations[0].category(), dol_ir::Category::DML);
 }

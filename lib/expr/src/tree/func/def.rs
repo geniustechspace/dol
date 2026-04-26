@@ -9,5 +9,5 @@
 //! for downstream macros and consumers.
 
 pub use super::super::compact_name::CompactName;
-pub use super::super::op::meta::{DolOp, OpDef, OpCategory};
+pub use super::super::op::meta::{DolOp, OpCategory, OpDef};
 pub use super::meta::{Arity, ArityError, DolFunc, FuncDef, FuncKind};

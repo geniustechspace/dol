@@ -1,4 +1,12 @@
-use std::sync::Arc;
+// Tests run under the same `no_std + alloc`-clean build as the library.
+// Pull in `vec!`/`Vec`/`Box`/`String` from `alloc` so the suite compiles
+// with `--no-default-features`.
+extern crate alloc;
+use alloc::boxed::Box;
+use alloc::string::String;
+use alloc::sync::Arc;
+use alloc::vec;
+use alloc::vec::Vec;
 
 use super::*;
 

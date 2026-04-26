@@ -12,15 +12,16 @@ pub fn intern_symbol(interner: &mut Interner, s: &str) -> Symbol {
     Symbol::new(interner.intern(s))
 }
 
-/// Build a [`Locator`] from a name and an optional dot-separated namespace.
+/// Build a [`Locator`] from a name and an optional namespace.
 ///
-/// The namespace is split on `.` into [`Locator::path`]; the unqualified
-/// `name` is interned into [`Locator::name`].
-pub fn locator_from_parts(
-    interner: &mut Interner,
-    name: &str,
-    namespace: Option<&str>,
-) -> Locator {
+/// `name` is interned into [`Locator::name`]. When provided, `namespace`
+/// is interned as a single [`Symbol`] and stored in [`Locator::namespace`]
+/// — this preserves the dotted form (e.g. `"public.audit"`) verbatim
+/// rather than splitting it into [`Locator::path`] segments. Builders that
+/// need structured paths (S3 keys, file-tree segments, topic partitions)
+/// should populate `Locator::path` explicitly via
+/// [`Locator::with_segment`](dol_ir::Locator::with_segment).
+pub fn locator_from_parts(interner: &mut Interner, name: &str, namespace: Option<&str>) -> Locator {
     let ns_sym = namespace
         .filter(|s| !s.is_empty())
         .map(|ns| intern_symbol(interner, ns));

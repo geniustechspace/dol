@@ -82,7 +82,8 @@ macro_rules! impl_payload {
             fn decode(bytes: &[u8]) -> Result<Self, &'static str> {
                 #[cfg(feature = "serde")]
                 {
-                    postcard::from_bytes(bytes).map_err(|_| concat!(stringify!($payload), " decode failed"))
+                    postcard::from_bytes(bytes)
+                        .map_err(|_| concat!(stringify!($payload), " decode failed"))
                 }
                 #[cfg(not(feature = "serde"))]
                 {
@@ -95,9 +96,9 @@ macro_rules! impl_payload {
         impl $payload {
             /// Wrap into an [`Operation::Extension`].
             pub fn into_operation(self) -> Operation {
-                Operation::Extension(alloc::boxed::Box::new(
-                    OperationExtension::from_payload(&self),
-                ))
+                Operation::Extension(alloc::boxed::Box::new(OperationExtension::from_payload(
+                    &self,
+                )))
             }
         }
     };
