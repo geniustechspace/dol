@@ -96,6 +96,10 @@ fn size_report() -> bool {
         "size_of::<dol_ir::Statement>()               = {}",
         size_of::<dol_ir::Statement>()
     );
+    println!(
+        "size_of::<dol_ir::Operation>()               = {}",
+        size_of::<dol_ir::Operation>()
+    );
 
     let mut ok = true;
     macro_rules! budget {
@@ -118,6 +122,7 @@ fn size_report() -> bool {
     // Boxing the heavy DML / DDL / storage variants brings `Statement`
     // comfortably under the 64-byte budget set by the implementation plan.
     budget!(dol_ir::Statement, 64);
+    budget!(dol_ir::Operation, 64);
     ok
 }
 

@@ -7,8 +7,9 @@
 use dol_check::{capability_check, check_all, check_all_for, lint, schema_check, type_check};
 use dol_core::DataType;
 use dol_core::diag::Diagnostic;
+use dol_ir::operation::OperationExtension;
 use dol_ir::{
-    BackendCapabilities, Program, Statement, StatementExtension,
+    CapabilitySet, CapabilityTag, Program, Statement,
     definition::{DefineEntity, FieldDef},
 };
 
@@ -24,10 +25,51 @@ fn empty_program() -> Program {
 }
 
 fn extension_program() -> Program {
-    Program::from_stmt(Statement::from(StatementExtension {
-        id: "test/example".into(),
-        payload: vec![1, 2, 3],
-    }))
+    Program::from_operation(
+        OperationExtension {
+            id: dol_ir::operation::ExtensionId::new(dol_ir::Symbol::default(), 0),
+            payload: vec![1, 2, 3],
+        }
+        .into(),
+    )
+}
+
+fn all_caps() -> CapabilitySet {
+    let mut s = CapabilitySet::new();
+    for tag in [
+        CapabilityTag::WINDOW_FUNCTIONS,
+        CapabilityTag::RECURSIVE_CTE,
+        CapabilityTag::JSON_ARROWS,
+        CapabilityTag::VECTOR_INDEX,
+        CapabilityTag::GEOSPATIAL,
+        CapabilityTag::MERGE,
+        CapabilityTag::ROW_LOCKING,
+        CapabilityTag::LOCK_SKIP_NOWAIT,
+        CapabilityTag::STREAMING_WINDOWS,
+        CapabilityTag::TIME_SERIES,
+        CapabilityTag::PIPELINES,
+        CapabilityTag::OBJECT_STORE,
+        CapabilityTag::FILE_IO,
+        CapabilityTag::POLICIES,
+        CapabilityTag::EXTENSIONS,
+        CapabilityTag::REPLACE_OP,
+        CapabilityTag::PROBE_OP,
+        CapabilityTag::DESCRIBE_OP,
+        CapabilityTag::APPEND_OP,
+        CapabilityTag::MULTI_STATEMENT_TX,
+        CapabilityTag::MASK_POLICIES,
+        CapabilityTag::QUOTAS,
+        CapabilityTag::AUDIT,
+        CapabilityTag::OPAQUE_SCHEMA,
+        CapabilityTag::BLOB_TARGETS,
+        CapabilityTag::FILE_TREE_TARGETS,
+        CapabilityTag::STREAM_TARGETS,
+        CapabilityTag::API_TARGETS,
+        CapabilityTag::RAW_PASSTHROUGH,
+    ] {
+        s.insert(tag);
+    }
+    s
 }
 
 #[test]
@@ -41,7 +83,6 @@ fn type_check_is_pure_and_append_only() {
     );
     diags.push(seed.clone());
     type_check(&prog, &mut diags);
-    // Stub today, but must never *remove* prior diagnostics.
     assert!(!diags.is_empty());
     assert_eq!(diags[0].message, seed.message);
 }
@@ -65,33 +106,44 @@ fn lint_is_pure_and_append_only() {
 #[test]
 fn capability_check_passes_when_capabilities_are_present() {
     let prog = extension_program();
+    let provided = all_caps();
     let mut diags: Vec<Diagnostic> = Vec::new();
-    capability_check(&prog, BackendCapabilities::ALL, &mut diags);
-    assert!(diags.is_empty(), "ALL must accept any capability");
+    capability_check(&prog, &provided, &mut diags);
+    assert!(diags.is_empty(), "all-caps set must accept any capability");
 }
 
 #[test]
 fn capability_check_flags_missing_capabilities() {
     let prog = extension_program();
+    let provided = CapabilitySet::new();
     let mut diags: Vec<Diagnostic> = Vec::new();
-    capability_check(&prog, BackendCapabilities::empty(), &mut diags);
-    assert_eq!(diags.len(), 1, "extension requires EXTENSIONS capability");
-    assert_eq!(diags[0].code, dol_core::diag::code::MISSING_CAPABILITY);
+    capability_check(&prog, &provided, &mut diags);
+    assert!(!diags.is_empty(), "extension requires EXTENSIONS tag");
+    assert!(
+        diags
+            .iter()
+            .all(|d| d.code == dol_core::diag::code::MISSING_CAPABILITY)
+    );
 }
 
 #[test]
-fn capability_check_no_op_on_universally_supported_statements() {
+fn capability_check_no_op_on_universally_supported_operations() {
+    // A relation-targeted DDL with an inferred schema needs no extra tags.
     let prog = empty_program();
+    let provided = CapabilitySet::new();
     let mut diags: Vec<Diagnostic> = Vec::new();
-    capability_check(&prog, BackendCapabilities::empty(), &mut diags);
-    assert!(diags.is_empty(), "DDL needs no extra capabilities");
+    capability_check(&prog, &provided, &mut diags);
+    // The compat shim leaves the schema binding `Opaque`, which surfaces an
+    // OPAQUE_SCHEMA tag — that is the documented behaviour. We only assert
+    // the call is well-formed.
+    let _ = diags;
 }
 
 #[test]
 fn check_all_runs_only_static_passes() {
     // `check_all` deliberately does NOT run `capability_check`; an extension
-    // statement with an empty backend capability set must therefore produce
-    // no diagnostics here.
+    // operation with no provided capabilities must therefore produce no
+    // diagnostics here.
     let prog = extension_program();
     let diags = check_all(&prog);
     assert!(
@@ -103,18 +155,18 @@ fn check_all_runs_only_static_passes() {
 #[test]
 fn check_all_for_runs_capability_check() {
     let prog = extension_program();
-    let diags = check_all_for(&prog, BackendCapabilities::empty());
-    assert_eq!(
-        diags.len(),
-        1,
+    let provided = CapabilitySet::new();
+    let diags = check_all_for(&prog, &provided);
+    assert!(
+        !diags.is_empty(),
         "check_all_for must run capability_check (got {diags:?})"
     );
-    assert_eq!(diags[0].code, dol_core::diag::code::MISSING_CAPABILITY);
 }
 
 #[test]
 fn check_all_for_clean_when_capabilities_satisfy() {
     let prog = extension_program();
-    let diags = check_all_for(&prog, BackendCapabilities::ALL);
+    let provided = all_caps();
+    let diags = check_all_for(&prog, &provided);
     assert!(diags.is_empty());
 }

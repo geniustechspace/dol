@@ -1,6 +1,7 @@
 //! Round-trip tests for the typed `dol_wire::program` codecs.
 
 #![cfg(all(feature = "postcard", feature = "json", feature = "hash"))]
+#![allow(deprecated)] // exercises the `Statement`/`stmt` v1 surface intentionally
 
 use dol_expr::expr::QueryNode;
 use dol_expr::{ExprArena, ExprNode, Interner};
