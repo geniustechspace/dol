@@ -4,6 +4,7 @@
 //! [`CapabilityTag::RawPassthrough`](crate::capabilities::CapabilityTag) tag
 //! to the program's required capability set.
 
+use alloc::string::String;
 use dol_expr::ids::NodeId;
 use smallvec::SmallVec;
 

@@ -9,15 +9,14 @@
 //! | `dol.stream/timeseries`  | [`TimeSeriesPayload`]     | [`TimeSeriesOp`] |
 //! | `dol.stream/iot.sample`  | [`SamplePayload`]         | [`Sample`] |
 //!
-//! Each payload registers its [`Symbol`] through [`register_window`],
-//! [`register_timeseries`], and [`register_iot_sample`] respectively. Call
-//! the appropriate `register_*` once per process before encoding/decoding,
-//! passing the interned id of the corresponding extension name.
+//! Each payload's [`Symbol`] is a deterministic FNV-1a 32-bit hash of its
+//! extension name, so the [`ExtensionId`] is stable across processes and
+//! independent of any [`Interner`](dol_expr::Interner). This replaces the
+//! earlier process-global `AtomicU32` registration model, which was brittle
+//! when `Program`s were built or decoded with different interners.
 
 extern crate alloc;
 use alloc::vec::Vec;
-
-use core::sync::atomic::{AtomicU32, Ordering};
 
 use dol_ir::operation::{ExtensionId, ExtensionPayload, OperationExtension};
 use dol_ir::{Operation, Symbol};
@@ -33,25 +32,27 @@ pub const IOT_SAMPLE_NAME: &str = "dol.stream/iot.sample";
 /// Wire-format version shared by all stream extension payloads.
 pub const EXTENSION_VERSION: u32 = 1;
 
-static WINDOW_SYMBOL: AtomicU32 = AtomicU32::new(0);
-static TIMESERIES_SYMBOL: AtomicU32 = AtomicU32::new(0);
-static IOT_SAMPLE_SYMBOL: AtomicU32 = AtomicU32::new(0);
+/// Stable [`Symbol`] identifying [`WindowPayload`] on the wire.
+pub const WINDOW_SYMBOL: Symbol = Symbol::new(fnv1a_32(WINDOW_NAME.as_bytes()));
+/// Stable [`Symbol`] identifying [`TimeSeriesPayload`] on the wire.
+pub const TIMESERIES_SYMBOL: Symbol = Symbol::new(fnv1a_32(TIMESERIES_NAME.as_bytes()));
+/// Stable [`Symbol`] identifying [`SamplePayload`] on the wire.
+pub const IOT_SAMPLE_SYMBOL: Symbol = Symbol::new(fnv1a_32(IOT_SAMPLE_NAME.as_bytes()));
 
-/// Register the symbol that identifies the window-extension payload.
-pub fn register_window(symbol: Symbol) {
-    WINDOW_SYMBOL.store(symbol.0, Ordering::Relaxed);
-}
-/// Register the symbol that identifies the time-series-extension payload.
-pub fn register_timeseries(symbol: Symbol) {
-    TIMESERIES_SYMBOL.store(symbol.0, Ordering::Relaxed);
-}
-/// Register the symbol that identifies the IoT-sample extension payload.
-pub fn register_iot_sample(symbol: Symbol) {
-    IOT_SAMPLE_SYMBOL.store(symbol.0, Ordering::Relaxed);
+/// `const`-eval FNV-1a 32-bit hash. Stable; matches the spec basis/prime.
+const fn fnv1a_32(bytes: &[u8]) -> u32 {
+    let mut hash: u32 = 0x811c9dc5;
+    let mut i = 0;
+    while i < bytes.len() {
+        hash ^= bytes[i] as u32;
+        hash = hash.wrapping_mul(0x01000193);
+        i += 1;
+    }
+    hash
 }
 
 macro_rules! impl_payload {
-    ($payload:ident, $inner:path, $field:ident, $sym_static:ident, $doc:expr) => {
+    ($payload:ident, $inner:path, $field:ident, $sym_const:ident, $doc:expr) => {
         #[doc = $doc]
         #[derive(Clone, Debug, PartialEq)]
         #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -62,16 +63,18 @@ macro_rules! impl_payload {
 
         impl ExtensionPayload for $payload {
             fn extension_id() -> ExtensionId {
-                ExtensionId::new(
-                    Symbol::new($sym_static.load(Ordering::Relaxed)),
-                    EXTENSION_VERSION,
-                )
+                ExtensionId::new($sym_const, EXTENSION_VERSION)
             }
 
             fn encode(&self) -> Vec<u8> {
                 #[cfg(feature = "serde")]
                 {
-                    postcard::to_allocvec(self).unwrap_or_default()
+                    // Encoding failures here would indicate a structural
+                    // bug in the payload type (postcard handles all owned
+                    // trees we use). Fail loudly rather than silently
+                    // emitting an empty payload that decodes to defaults.
+                    postcard::to_allocvec(self)
+                        .expect(concat!(stringify!($payload), " encode failed"))
                 }
                 #[cfg(not(feature = "serde"))]
                 {

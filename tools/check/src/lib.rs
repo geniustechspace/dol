@@ -101,11 +101,11 @@ fn check_op_recursive(
             msg,
         ));
     }
-    if let Operation::Tx(tx) = op
-        && let dol_ir::operation::TxOp::Atomic { ops, .. } = tx.as_ref()
-    {
-        for inner in ops {
-            check_op_recursive(inner, provided, out);
+    if let Operation::Tx(tx) = op {
+        if let dol_ir::operation::TxOp::Atomic { ops, .. } = tx.as_ref() {
+            for inner in ops {
+                check_op_recursive(inner, provided, out);
+            }
         }
     }
 }

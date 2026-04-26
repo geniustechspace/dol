@@ -8,8 +8,6 @@
 extern crate alloc;
 use alloc::vec::Vec;
 
-use core::sync::atomic::{AtomicU32, Ordering};
-
 use dol_ir::operation::{ExtensionId, ExtensionPayload};
 use dol_ir::{Operation, Symbol};
 
@@ -20,17 +18,25 @@ pub const EXTENSION_NAME: &str = "dol.pipeline/graph";
 /// Wire-format version.
 pub const EXTENSION_VERSION: u32 = 1;
 
-// Symbols are produced by the `Interner` in `dol-expr`, so we cannot
-// allocate one at compile time. Instead, the registering crate resolves the
-// symbol once per program through `register` below — `decode`/`encode`
-// callers should *not* read this until the registration has happened. The
-// default value of `0` is the same as `Symbol::default()`.
-static REGISTERED_SYMBOL: AtomicU32 = AtomicU32::new(0);
+/// Stable [`Symbol`] identifying this extension on the wire.
+///
+/// Derived deterministically from [`EXTENSION_NAME`] via the FNV-1a 32-bit
+/// hash so that every process — regardless of the [`Interner`](dol_expr::Interner)
+/// used to build the surrounding `Program` — produces the same id. This
+/// eliminates the previous design's process-global `AtomicU32`, which was
+/// brittle across `Program`s built or decoded with different interners.
+pub const EXTENSION_SYMBOL: Symbol = Symbol::new(fnv1a_32(EXTENSION_NAME.as_bytes()));
 
-/// Register the symbol that will identify this extension. Call from
-/// `Program` setup, passing the interned id of [`EXTENSION_NAME`].
-pub fn register(symbol: Symbol) {
-    REGISTERED_SYMBOL.store(symbol.0, Ordering::Relaxed);
+/// `const`-eval FNV-1a 32-bit hash. Stable; matches the spec basis/prime.
+const fn fnv1a_32(bytes: &[u8]) -> u32 {
+    let mut hash: u32 = 0x811c9dc5;
+    let mut i = 0;
+    while i < bytes.len() {
+        hash ^= bytes[i] as u32;
+        hash = hash.wrapping_mul(0x01000193);
+        i += 1;
+    }
+    hash
 }
 
 /// Typed pipeline payload — a [`Graph`] embedded in an `Operation::Extension`.
@@ -43,16 +49,18 @@ pub struct PipelinePayload {
 
 impl ExtensionPayload for PipelinePayload {
     fn extension_id() -> ExtensionId {
-        ExtensionId::new(
-            Symbol::new(REGISTERED_SYMBOL.load(Ordering::Relaxed)),
-            EXTENSION_VERSION,
-        )
+        ExtensionId::new(EXTENSION_SYMBOL, EXTENSION_VERSION)
     }
 
     fn encode(&self) -> Vec<u8> {
         #[cfg(feature = "serde")]
         {
-            postcard::to_allocvec(self).unwrap_or_default()
+            // `postcard::to_allocvec` only fails for shapes postcard cannot
+            // represent (cycles, non-finite floats with custom serializers).
+            // `PipelinePayload` is a simple owned tree, so a failure here
+            // is a structural bug — fail loudly rather than silently
+            // producing an empty payload that decodes to defaults.
+            postcard::to_allocvec(self).expect("PipelinePayload encode failed")
         }
         #[cfg(not(feature = "serde"))]
         {

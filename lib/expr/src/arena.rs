@@ -82,8 +82,6 @@ pub struct ObjLitNode(pub SmallVec<[(StrId, NodeId); 4]>);
 
 /// Payload for [`ExprNode::Window`], stored in `ExprArena::windows`.
 ///
-/// Payload for [`ExprNode::Window`], stored in `ExprArena::windows`.
-///
 /// Two `SmallVec` fields (each 24 bytes) plus `func: StrId` total 52+ bytes
 /// of payload — pooled to keep `ExprNode` ≤ 32 bytes.
 ///
