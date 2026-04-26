@@ -78,6 +78,7 @@ pub enum OpKind {
     /// `Operation::Extension`.
     Extension,
     /// `Operation::Raw` (feature-gated).
+    #[cfg(feature = "raw")]
     Raw,
 }
 
@@ -111,7 +112,9 @@ impl OpKind {
             | OpKind::Grant
             | OpKind::Revoke => Category::ACL,
             OpKind::Tx => Category::Tx,
-            OpKind::Extension | OpKind::Raw => Category::Other,
+            OpKind::Extension => Category::Other,
+            #[cfg(feature = "raw")]
+            OpKind::Raw => Category::Other,
         }
     }
 }

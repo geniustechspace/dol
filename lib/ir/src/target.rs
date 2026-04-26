@@ -192,14 +192,20 @@ pub struct Target {
 }
 
 impl Target {
-    /// Build a target with `Opaque` schema binding and no alias.
+    /// Build a target with `Inferred` schema binding and no alias.
+    ///
+    /// `Inferred` is the friendlier default for builders that don't yet know
+    /// the program's catalog: backends and `dol-check` are free to derive
+    /// the schema from the data or backend metadata. Pass
+    /// [`with_schema(SchemaBinding::Opaque)`](Self::with_schema) explicitly
+    /// for sinks that intentionally ignore the schema.
     #[inline]
     pub fn new(kind: TargetKind, locator: Locator) -> Self {
         Self {
             kind,
             locator,
             alias: None,
-            schema: SchemaBinding::Opaque,
+            schema: SchemaBinding::Inferred,
         }
     }
 
@@ -235,10 +241,17 @@ mod tests {
     }
 
     #[test]
-    fn target_defaults_to_opaque() {
+    fn target_defaults_to_inferred() {
         let t = Target::new(TargetKind::Relation, Locator::new(Symbol::new(7)));
-        assert_eq!(t.schema, SchemaBinding::Opaque);
+        assert_eq!(t.schema, SchemaBinding::Inferred);
         assert!(t.alias.is_none());
+    }
+
+    #[test]
+    fn target_explicit_opaque() {
+        let t = Target::new(TargetKind::Relation, Locator::new(Symbol::new(7)))
+            .with_schema(SchemaBinding::Opaque);
+        assert_eq!(t.schema, SchemaBinding::Opaque);
     }
 
     #[test]

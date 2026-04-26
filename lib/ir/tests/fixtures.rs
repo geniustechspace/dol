@@ -201,8 +201,9 @@ fn dql_describe_relation_fields() {
 
 #[test]
 fn opaque_schema_binding_emits_opaque_schema_tag() {
+    use dol_ir::SchemaBinding;
     let op: Operation = Insert {
-        target: t(TargetKind::Relation), // default binding is Opaque
+        target: t(TargetKind::Relation).with_schema(SchemaBinding::Opaque),
         source: InsertSource::Bindings,
         returning: None,
     }

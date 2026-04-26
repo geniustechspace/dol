@@ -9,8 +9,10 @@
 //! through [`CatalogEntry::Extension`] for backend-specific shapes.
 
 use alloc::vec::Vec;
+use smallvec::SmallVec;
 
 use crate::schema_ref::{CatalogId, SchemaId};
+use crate::target::Symbol;
 
 extern crate alloc;
 
@@ -24,23 +26,29 @@ pub enum CatalogEntry {
     Type(TypeEntry),
     /// Backend-specific body, codec-encoded.
     Extension {
-        /// Kind tag identifying the extension type.
-        kind: alloc::string::String,
+        /// Interned kind tag identifying the extension type. Resolve against
+        /// the surrounding program's [`Interner`](dol_expr::Interner).
+        kind: Symbol,
         /// Opaque payload bytes.
         payload: Vec<u8>,
     },
 }
 
 /// Named-type body stored in the catalog.
+///
+/// Names and members are interned [`Symbol`]s; resolve against the
+/// surrounding program's [`Interner`](dol_expr::Interner). The four-element
+/// inline buffer for `members` keeps the common case (small enums) in-line.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TypeEntry {
-    /// Type name.
-    pub name: alloc::string::String,
+    /// Interned type name.
+    pub name: Symbol,
     /// Type classification (enum, composite, distinct).
     pub kind: crate::operation::TypeBody,
-    /// Optional list of variants (for enums) or fields (for composites).
-    pub members: Vec<alloc::string::String>,
+    /// Optional list of variants (for enums) or fields (for composites),
+    /// each interned. The four-slot inline buffer covers the common case.
+    pub members: SmallVec<[Symbol; 4]>,
 }
 
 /// Catalog of schemas referenced by a program.
@@ -107,9 +115,9 @@ mod tests {
     fn insert_and_get() {
         let mut cat = SchemaCatalog::new();
         let id = cat.insert(CatalogEntry::Type(TypeEntry {
-            name: "status".into(),
+            name: Symbol::new(0),
             kind: crate::operation::TypeBody::Enum,
-            members: vec!["ok".into(), "err".into()],
+            members: smallvec::smallvec![Symbol::new(1), Symbol::new(2)],
         }));
         assert_eq!(cat.len(), 1);
         assert!(matches!(cat.get(id), Some(CatalogEntry::Type(_))));

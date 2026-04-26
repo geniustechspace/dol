@@ -5,9 +5,9 @@
 //! [`Revoke`](crate::operation::Revoke) against a
 //! [`Target`](crate::target::Target).
 
-use alloc::string::String;
-
 extern crate alloc;
+
+use crate::target::Symbol;
 
 /// Privilege types that can be granted or revoked.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -29,6 +29,8 @@ pub enum Privilege {
     Create,
     /// Open a connection / session against the target.
     Connect,
-    /// Backend-specific privilege, identified by name.
-    Custom(String),
+    /// Backend-specific privilege identified by an interned name. Resolve
+    /// against the surrounding program's [`Interner`](dol_expr::Interner)
+    /// to recover its textual form.
+    Custom(Symbol),
 }

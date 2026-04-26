@@ -88,6 +88,10 @@ impl Entity {
     /// runtime input. Use [`Entity::try_field`] when handling
     /// runtime-supplied names.
     #[track_caller]
+    #[deprecated(
+        since = "0.1.0",
+        note = "use `try_field(name).expect(...)` or `try_field(name)?` and handle the `Option` explicitly; this panicking convenience will be removed in a future release"
+    )]
     pub fn field(&self, name: &str) -> &Field {
         self.fields
             .iter()

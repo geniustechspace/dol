@@ -16,7 +16,6 @@ use dol_expr::tree::{Direction, Expr, NullsPosition, OrderByExpr, field_dyn};
 struct JoinClause {
     join_type: JoinKind,
     target_name: String,
-    #[allow(dead_code)] // captured by the builder API for future use
     target_namespace: Option<String>,
     alias: Option<String>,
     on_conditions: Vec<(String, String)>,
@@ -350,7 +349,13 @@ impl GetQuery {
             .joins
             .into_iter()
             .map(|jc| {
-                let source = interner.intern(&jc.target_name);
+                // Honor the parsed `"namespace.name"` form by re-joining the
+                // dotted source. The interner deduplicates so this is cheap;
+                // backends parse the dotted form when they need the parts.
+                let source = match &jc.target_namespace {
+                    Some(ns) => interner.intern(&format!("{ns}.{}", jc.target_name)),
+                    None => interner.intern(&jc.target_name),
+                };
                 let alias = jc.alias.as_deref().map(|a| interner.intern(a));
                 let join_type = match jc.join_type {
                     JoinKind::Inner => ArenaJoinType::Inner,

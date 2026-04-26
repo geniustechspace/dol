@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 publish = false
-description = "DOL — declarative dataflow IR (Source → Transform → Sink) layered over Statement."
+description = "DOL — declarative dataflow IR (Source → Transform → Sink) layered over the Operation IR."
 readme = "README.md"
 
 [dependencies]
