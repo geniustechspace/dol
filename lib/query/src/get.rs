@@ -309,7 +309,7 @@ impl GetQuery {
     // ── Build to IR ─────────────────────────────────────────────────────
 
     /// Consume the builder and produce a [`dol_ir::Program`] holding a
-    /// single [`Operation::Query`] that references an arena
+    /// single [`dol_ir::Operation::Query`] that references an arena
     /// [`ExprNode::Query`](dol_expr::expr::ExprNode::Query) carrying the
     /// SELECT body.
     ///

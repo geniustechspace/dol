@@ -1,7 +1,8 @@
 //! Registry of all well-known DOL operators as zero-sized structs.
 //!
-//! Each struct implements [`DolOp`] via the [`define_op!`] macro,
-//! providing a canonical name and operator kind.
+//! Each struct implements [`DolOp`](super::meta::DolOp) via the
+//! [`define_op!`](crate::define_op) macro, providing a canonical name and
+//! operator kind.
 
 use super::meta::OpKind;
 use crate::define_op;

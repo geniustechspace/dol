@@ -31,6 +31,6 @@ use crate::target::Target;
 pub struct Delete {
     /// Target to delete from.
     pub target: Target,
-    /// Arena `NodeId` of the [`ExprNode::Delete`] body.
+    /// Arena `NodeId` of the [`ExprNode::Delete`](dol_expr::expr::ExprNode::Delete) body.
     pub node: NodeId,
 }

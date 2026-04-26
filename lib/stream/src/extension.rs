@@ -1,14 +1,13 @@
 //! Typed [`ExtensionPayload`] wrappers for `dol-stream`.
 //!
 //! `dol-stream` exposes three streaming verbs through the
-//! [`Operation::Extension`](dol_ir::Operation::Extension) seam, each as its
-//! own typed payload:
+//! `Operation::Extension` seam, each as its own typed payload:
 //!
 //! | Identifier               | Payload struct            | Carries        |
 //! |--------------------------|---------------------------|----------------|
-//! | `dol.stream/window`      | [`WindowPayload`]         | [`WindowSpec`](crate::WindowSpec) |
-//! | `dol.stream/timeseries`  | [`TimeSeriesPayload`]     | [`TimeSeriesOp`](crate::TimeSeriesOp) |
-//! | `dol.stream/iot.sample`  | [`SamplePayload`]         | [`Sample`](crate::Sample) |
+//! | `dol.stream/window`      | [`WindowPayload`]         | [`WindowSpec`] |
+//! | `dol.stream/timeseries`  | [`TimeSeriesPayload`]     | [`TimeSeriesOp`] |
+//! | `dol.stream/iot.sample`  | [`SamplePayload`]         | [`Sample`] |
 //!
 //! Each payload registers its [`Symbol`] through [`register_window`],
 //! [`register_timeseries`], and [`register_iot_sample`] respectively. Call

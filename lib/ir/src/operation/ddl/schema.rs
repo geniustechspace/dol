@@ -5,8 +5,8 @@
 //! tree, API resource, stream topic, virtual view, or a named type.
 //!
 //! Schemas are referenced through the program's catalog
-//! ([`SchemaRef`](crate::schema_ref::SchemaRef)) rather than embedded
-//! inline. Backends that need the full schema body resolve it through
+//! ([`SchemaRef`]) rather than embedded inline. Backends that need the full
+//! schema body resolve it through
 //! [`SchemaCatalog`](crate::schema_catalog::SchemaCatalog).
 
 use crate::operation::shared::StructuralVerb;

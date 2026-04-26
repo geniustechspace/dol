@@ -31,6 +31,6 @@ use crate::target::Target;
 pub struct Upsert {
     /// Target to upsert into.
     pub target: Target,
-    /// Arena `NodeId` of the [`ExprNode::Upsert`] body.
+    /// Arena `NodeId` of the [`ExprNode::Upsert`](dol_expr::expr::ExprNode::Upsert) body.
     pub node: NodeId,
 }

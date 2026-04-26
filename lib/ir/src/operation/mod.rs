@@ -5,7 +5,7 @@
 //!
 //! - **Structural / governance** variants are nouns: `Schema`, `Field`,
 //!   `Index`, `Lookup`, `Policy`, `Mask`, `Quota`, `Audit`. Their payloads
-//!   carry a [`StructuralVerb`](schema::StructuralVerb).
+//!   carry a [`StructuralVerb`].
 //! - **Data / query / authorization** variants are verbs: `Insert`, `Update`,
 //!   `Replace`, `Delete`, `Upsert`, `Append`, `Query`, `Probe`, `Describe`,
 //!   `Grant`, `Revoke`.

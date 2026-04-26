@@ -10,11 +10,11 @@
 //!
 //! # Module layout
 //!
-//! - [`enum_def`] — the [`Literal`] enum.
-//! - [`range`] — [`LiteralRange`].
-//! - [`constructors`] — `null`/`bool`/`string_borrowed`/… plus `is_*` and `as_*`.
-//! - [`display`] — `impl fmt::Display for Literal<'a>`.
-//! - [`conversions`] — `Literal → Value` (via `From`/`into_owned`),
+//! - `enum_def` — the [`Literal`] enum.
+//! - `range` — [`LiteralRange`].
+//! - `constructors` — `null`/`bool`/`string_borrowed`/… plus `is_*` and `as_*`.
+//! - `display` — `impl fmt::Display for Literal<'a>`.
+//! - `conversions` — `Literal → Value` (via `From`/`into_owned`),
 //!   `Literal::into_static`, and `From<X> for Literal<'_>`.
 //!
 //! [`Value`]: crate::Value

@@ -30,6 +30,7 @@
 //! Adding `serde` turns on the `serde` feature on every active sub-crate.
 
 #![deny(unsafe_code)]
+#![warn(missing_docs)]
 
 pub use dol_core as core;
 

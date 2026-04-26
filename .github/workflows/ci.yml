@@ -93,6 +93,13 @@ jobs:
       - name: Run tests (all features)
         run: cargo test --workspace --all-features
 
+      - name: Doctests + rustdoc lints
+        env:
+          RUSTDOCFLAGS: "-D warnings -D rustdoc::broken_intra_doc_links"
+        run: |
+          cargo test --doc --workspace --all-features
+          cargo doc --workspace --all-features --no-deps
+
       # Dedicated gate: every public IR / schema / value type must
       # serde-round-trip. Failing this gate is a regression on universal
       # serde — see the project restructuring plan.

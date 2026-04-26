@@ -30,11 +30,11 @@
 //!
 //! # Module layout
 //!
-//! - [`enum_def`] — the [`DataType`] enum itself.
-//! - [`struct_field`] — the [`StructField`] named-field record.
-//! - [`classify`] — `is_*` predicates and [`DataType::type_name`].
-//! - [`conformance`] — [`DataType::accepts`] (the largest impl).
-//! - [`constructors`] — convenience constructors (`varying_string`, …).
+//! - `enum_def` — the [`DataType`] enum itself.
+//! - `struct_field` — the [`StructField`] named-field record.
+//! - `classify` — `is_*` predicates and [`DataType::type_name`].
+//! - `conformance` — [`DataType::accepts`] (the largest impl).
+//! - `constructors` — convenience constructors (`varying_string`, …).
 
 mod classify;
 mod conformance;

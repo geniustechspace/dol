@@ -35,6 +35,6 @@ use crate::target::Target;
 pub struct Update {
     /// Target to update.
     pub target: Target,
-    /// Arena `NodeId` of the [`ExprNode::Update`] body.
+    /// Arena `NodeId` of the [`ExprNode::Update`](dol_expr::expr::ExprNode::Update) body.
     pub node: NodeId,
 }

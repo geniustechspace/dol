@@ -1,7 +1,7 @@
 //! # dol-query — Backend-Neutral Query Entry Point
 //!
 //! A standalone, publishable crate that provides a universal query entry point
-//! for DOL. Builders accept an [`Entity`](dol_schema::Entity) reference *or*
+//! for DOL. Builders accept an [`Entity`] reference *or*
 //! a plain entity-name string; runtime-known names are first-class.
 //!
 //! Every `.build()` returns a [`dol_ir::Program`] containing one or more
@@ -35,6 +35,7 @@
 //! ```
 
 #![deny(unsafe_code)]
+#![warn(missing_docs)]
 
 pub mod control;
 pub mod ddl;
@@ -159,10 +160,15 @@ impl From<String> for Query {
 /// The kind of JOIN to perform.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JoinKind {
+    /// `INNER JOIN` — keep rows where both sides match.
     Inner,
+    /// `LEFT [OUTER] JOIN` — keep all left rows; right side is `NULL` when unmatched.
     Left,
+    /// `RIGHT [OUTER] JOIN` — keep all right rows; left side is `NULL` when unmatched.
     Right,
+    /// `FULL [OUTER] JOIN` — keep rows from both sides; unmatched columns are `NULL`.
     Full,
+    /// `CROSS JOIN` — Cartesian product; no `ON` clause.
     Cross,
 }
 

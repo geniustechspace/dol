@@ -1,6 +1,6 @@
 //! Backend capability bitset.
 //!
-//! Each [`Statement`](crate::Statement) declares a set of features it
+//! Each [`Operation`](crate::Operation) declares a set of features it
 //! depends on; a backend declares a set of features it provides. `dol-check`
 //! refuses any program whose required features aren't a subset of the
 //! backend's provided features.

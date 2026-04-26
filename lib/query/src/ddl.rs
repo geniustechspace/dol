@@ -3,7 +3,7 @@
 //!
 //! Higher-level builders return [`dol_ir::Program`] directly. They take
 //! ownership of name / namespace / field metadata and lower it onto the
-//! [`Target`](dol_ir::Target) + [`SchemaRef`](dol_ir::SchemaRef) shape.
+//! [`Target`](dol_ir::Target) + [`SchemaRef`] shape.
 
 use dol_expr::{ExprArena, Interner};
 use dol_ir::operation::{FieldOp, IndexOp, LookupOp, SchemaOp};

@@ -1,9 +1,9 @@
 //! Typed [`ExtensionPayload`] wrapper for `dol-pipeline`.
 //!
-//! Wraps a [`Graph`](crate::Graph) into an [`OperationExtension`] under the
-//! stable identifier `dol.pipeline/graph` (version 1). Encoded with
-//! `postcard` when the `serde` feature is enabled; otherwise [`encode`]
-//! returns a placeholder error payload.
+//! Wraps a [`Graph`] into an [`OperationExtension`](dol_ir::operation::OperationExtension)
+//! under the stable identifier `dol.pipeline/graph` (version 1). Encoded
+//! with `postcard` when the `serde` feature is enabled; otherwise
+//! [`PipelinePayload::encode`] returns a placeholder error payload.
 
 extern crate alloc;
 use alloc::vec::Vec;

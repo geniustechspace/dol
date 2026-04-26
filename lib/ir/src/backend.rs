@@ -1,7 +1,7 @@
 //! Backend trait and structured [`BackendError`].
 //!
 //! - [`Backend::compile`] takes a borrowed
-//!   [`ProgramRef`](crate::ProgramRef) so backends do not need to clone the
+//!   [`ProgramRef`] so backends do not need to clone the
 //!   arena into every invocation.
 //! - [`BackendError`] is `#[non_exhaustive]` and carries a structured
 //!   [`dol_core::diag::Diagnostic`] plus optional [`dol_core::span::Span`].

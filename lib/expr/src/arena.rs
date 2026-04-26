@@ -30,7 +30,7 @@ pub enum FieldStep {
     Index(u32),
 }
 
-/// Payload for [`ExprNode::Field`], stored in [`ExprArena::fields`].
+/// Payload for [`ExprNode::Field`], stored in `ExprArena::fields`.
 ///
 /// A `Field` is a leaf reference: a named attribute optionally anchored on
 /// a container [`ExprNode::Namespace`] (whose dotted address is interned as
@@ -59,7 +59,7 @@ pub struct FieldNode {
 
 // ─── Pooled payload structs ───────────────────────────────────────────────────
 
-/// Payload for [`ExprNode::Func`], stored in [`ExprArena::funcs`].
+/// Payload for [`ExprNode::Func`], stored in `ExprArena::funcs`.
 ///
 /// Moved out of the enum variant to keep `ExprNode` ≤ 32 bytes: the
 /// two fields (`name: u32` + 4-byte alignment gap + 24-byte `SmallVec`)
@@ -72,7 +72,7 @@ pub struct FuncNode {
     pub args: SmallVec<[NodeId; 4]>,
 }
 
-/// Payload for [`ExprNode::ObjectLit`], stored in [`ExprArena::obj_lits`].
+/// Payload for [`ExprNode::ObjectLit`], stored in `ExprArena::obj_lits`.
 ///
 /// The inline buffer of `SmallVec<[(StrId, NodeId); 4]>` is 4 × 8 = 32 bytes
 /// on its own — already over budget before the discriminant word is counted.
@@ -80,7 +80,7 @@ pub struct FuncNode {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ObjLitNode(pub SmallVec<[(StrId, NodeId); 4]>);
 
-/// Payload for [`ExprNode::Window`], stored in [`ExprArena::windows`].
+/// Payload for [`ExprNode::Window`], stored in `ExprArena::windows`.
 ///
 /// Two `SmallVec` fields (each 24 bytes) plus `func: StrId` total 52+ bytes
 /// of payload — pooled to keep `ExprNode` ≤ 32 bytes.
@@ -92,7 +92,7 @@ pub struct WindowNode {
     pub order: SmallVec<[(NodeId, Order); 2]>,
 }
 
-/// Payload for [`ExprNode::Case`], stored in [`ExprArena::cases`].
+/// Payload for [`ExprNode::Case`], stored in `ExprArena::cases`.
 ///
 /// `SmallVec<[(NodeId, NodeId); 4]>` has a 32-byte inline buffer, making the
 /// variant payload 36+ bytes — pooled to keep `ExprNode` ≤ 32 bytes.
@@ -103,7 +103,7 @@ pub struct CaseNode {
     pub else_: NodeId,
 }
 
-/// Payload for [`ExprNode::InList`], stored in [`ExprArena::in_lists`].
+/// Payload for [`ExprNode::InList`], stored in `ExprArena::in_lists`.
 ///
 /// `SmallVec<[NodeId; 8]>` has a 32-byte inline buffer, making the variant
 /// payload 36+ bytes — pooled to keep `ExprNode` ≤ 32 bytes.

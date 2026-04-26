@@ -2,8 +2,7 @@
 //!
 //! Schemas live in a catalog rather than being embedded inline in every
 //! [`Operation`](crate::operation::Operation). Each catalog entry is keyed by
-//! [`SchemaId`](crate::schema_ref::SchemaId) and resolved through a
-//! [`SchemaRef`](crate::schema_ref::SchemaRef).
+//! [`SchemaId`] and resolved through a [`SchemaRef`](crate::SchemaRef).
 //!
 //! The catalog stores [`dol_schema::Entity`] for entity bodies and a small
 //! [`TypeEntry`] for named-type bodies; backends can extend the catalog
@@ -46,8 +45,7 @@ pub struct TypeEntry {
 
 /// Catalog of schemas referenced by a program.
 ///
-/// The catalog is a flat indexed table; lookups are `O(1)` by
-/// [`SchemaId`](crate::schema_ref::SchemaId).
+/// The catalog is a flat indexed table; lookups are `O(1)` by [`SchemaId`].
 #[derive(Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SchemaCatalog {
