@@ -9,7 +9,13 @@
 //! 3. `DataType::accepts` is consistent: a value built from a constructor
 //!    that succeeded conforms to the matching type descriptor.
 
-#![cfg(feature = "serde")]
+#![cfg(all(
+    feature = "serde",
+    feature = "datetime",
+    feature = "geo",
+    feature = "network",
+    feature = "numeric"
+))]
 
 use dol_core::{
     DataType, Date, Decimal, IpAddr, Literal, MacAddr, Time, TypeError, Value,

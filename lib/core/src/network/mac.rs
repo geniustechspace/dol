@@ -53,8 +53,7 @@ impl fmt::Display for ParseMacAddrError {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for ParseMacAddrError {}
+impl core::error::Error for ParseMacAddrError {}
 
 /// An Ethernet MAC address.
 ///

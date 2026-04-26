@@ -8,11 +8,16 @@ pub use crate::error::TypeError;
 
 pub use crate::binary::BitString;
 pub use crate::data_type::{DataType, StructField};
+#[cfg(feature = "datetime")]
 pub use crate::datetime::{Date, DateTime, Interval, Offset, Time, TimestampTz};
+#[cfg(feature = "geo")]
 pub use crate::geo::{Circle, Line, Path, Point, Polygon, Rect, Segment};
+#[cfg(feature = "network")]
 pub use crate::network::{IpAddr, MacAddr};
+#[cfg(feature = "numeric")]
 pub use crate::numeric::Decimal;
-pub use crate::value::{Literal, LiteralRange, Value, ValueRange};
+pub use crate::literal::{Literal, LiteralRange};
+pub use crate::value::{Value, ValueRange};
 
 // NOTE: `Span` / `FileId` / `Diagnostic` / `Code` / `Severity` are *not*
 // glob-exported through the prelude — `dol-expr` has its own arena-internal

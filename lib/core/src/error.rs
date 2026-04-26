@@ -19,20 +19,28 @@ use core::fmt;
 pub enum TypeError {
     // ── Value construction ────────────────────────────────────────────────
     /// Month must be `1–12`.
+    #[cfg(feature = "datetime")]
     InvalidMonth(u8),
     /// Day must be `1–31`.
+    #[cfg(feature = "datetime")]
     InvalidDay(u8),
     /// Hour must be `0–23`.
+    #[cfg(feature = "datetime")]
     InvalidHour(u8),
     /// Minute must be `0–59`.
+    #[cfg(feature = "datetime")]
     InvalidMinute(u8),
     /// Second must be `0–60` (60 is reserved for leap seconds).
+    #[cfg(feature = "datetime")]
     InvalidSecond(u8),
     /// Nanosecond must be `0–999_999_999`.
+    #[cfg(feature = "datetime")]
     InvalidNanosecond(u32),
     /// Timezone offset must be in the range `−86_399..=86_399` seconds.
+    #[cfg(feature = "datetime")]
     TimezoneOffsetOutOfRange(i32),
-    /// `Decimal` scale exceeded [`super::Decimal::MAX_SCALE`].
+    /// `Decimal` scale exceeded [`crate::Decimal::MAX_SCALE`].
+    #[cfg(feature = "numeric")]
     DecimalScaleTooLarge { scale: u32 },
     /// A `f32` or `f64` value was `NaN` or infinite.
     NonFiniteFloat,
@@ -41,6 +49,7 @@ pub enum TypeError {
     /// `ceil(declared / 8)` bytes are required.
     BitLengthMismatch { declared: u32, byte_count: usize },
     /// A geometric coordinate was non-finite.
+    #[cfg(feature = "geo")]
     NonFiniteCoordinate,
 
     // ── Type conformance ──────────────────────────────────────────────────
@@ -66,9 +75,11 @@ pub enum TypeError {
     BitsLengthMismatch { expected: u32, got: u32 },
 
     /// A `Decimal` value had more significant digits than `precision` allows.
+    #[cfg(feature = "numeric")]
     PrecisionExceeded { max: u8, got: u8 },
 
     /// A `Decimal` value had a larger scale than declared.
+    #[cfg(feature = "numeric")]
     ScaleExceeded { max: u8, got: u8 },
 
     /// A `Tuple` value had a different number of elements than the declared type.
@@ -109,21 +120,29 @@ impl fmt::Display for TypeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             // Construction
+            #[cfg(feature = "datetime")]
             Self::InvalidMonth(m) => write!(f, "invalid month {m}: must be 1–12"),
+            #[cfg(feature = "datetime")]
             Self::InvalidDay(d) => write!(f, "invalid day {d}: must be 1–31"),
+            #[cfg(feature = "datetime")]
             Self::InvalidHour(h) => write!(f, "invalid hour {h}: must be 0–23"),
+            #[cfg(feature = "datetime")]
             Self::InvalidMinute(m) => write!(f, "invalid minute {m}: must be 0–59"),
+            #[cfg(feature = "datetime")]
             Self::InvalidSecond(s) => write!(f, "invalid second {s}: must be 0–60"),
+            #[cfg(feature = "datetime")]
             Self::InvalidNanosecond(n) => {
                 write!(f, "invalid nanosecond {n}: must be 0–999_999_999")
             }
+            #[cfg(feature = "datetime")]
             Self::TimezoneOffsetOutOfRange(o) => {
                 write!(f, "timezone offset {o}s out of ±86_399 range")
             }
+            #[cfg(feature = "numeric")]
             Self::DecimalScaleTooLarge { scale } => write!(
                 f,
                 "decimal scale {scale} exceeds maximum {}",
-                super::Decimal::MAX_SCALE
+                crate::numeric::Decimal::MAX_SCALE
             ),
             Self::NonFiniteFloat => write!(f, "float value must be finite (not NaN or infinite)"),
             Self::BitLengthMismatch {
@@ -134,6 +153,7 @@ impl fmt::Display for TypeError {
                 "bit-string declared {declared} bits but buffer has {byte_count} bytes (need {})",
                 declared.div_ceil(8)
             ),
+            #[cfg(feature = "geo")]
             Self::NonFiniteCoordinate => write!(f, "geometric coordinate must be finite"),
 
             // Conformance
@@ -152,10 +172,12 @@ impl fmt::Display for TypeError {
                 f,
                 "bit-string length {got} does not match declared {expected}"
             ),
+            #[cfg(feature = "numeric")]
             Self::PrecisionExceeded { max, got } => write!(
                 f,
                 "decimal has {got} significant digits but type allows {max}"
             ),
+            #[cfg(feature = "numeric")]
             Self::ScaleExceeded { max, got } => {
                 write!(f, "decimal scale {got} exceeds declared {max}")
             }

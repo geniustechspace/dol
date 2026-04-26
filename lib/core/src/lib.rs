@@ -13,9 +13,10 @@
 //!   `geo::Point`, …) and [`TypeError`].
 //!
 //! The crate is `no_std + alloc`-clean; building with `--no-default-features`
-//! yields an embedded-friendly library that omits the `std::error::Error`
-//! impl on [`TypeError`] and the wall-clock factory helpers
-//! ([`datetime::today`], [`datetime::now`], [`datetime::now_tz`]).
+//! yields an embedded-friendly library that omits the wall-clock factory
+//! helpers ([`datetime::today`], [`datetime::now`], [`datetime::now_tz`]) and
+//! drops the `geo`, `network`, `datetime`, and `numeric` modules along with
+//! the corresponding `Value` / `Literal` / `DataType` / `TypeError` variants.
 //!
 //! # Public surface
 //!
@@ -40,10 +41,17 @@
 //!
 //! # Cargo features
 //!
-//! | feature | default | effect                                                                            |
-//! | ------- | :-----: | --------------------------------------------------------------------------------- |
-//! | `std`   |   ✓     | Enables `std::error::Error` for [`TypeError`] and the wall-clock factory helpers. |
-//! | `serde` |   ✓     | `Serialize` / `Deserialize` for every public type, including [`Span`] and [`Diagnostic`]. |
+//! | feature    | default | effect                                                                                                |
+//! | ---------- | :-----: | ----------------------------------------------------------------------------------------------------- |
+//! | `std`      |   ✓     | Enables wall-clock factory helpers (implies `datetime`).                                              |
+//! | `serde`    |   ✓     | `Serialize` / `Deserialize` for every public type, including [`Span`] and [`Diagnostic`].             |
+//! | `geo`      |   ✓     | The `geo` module + `Value`/`Literal`/`DataType`/`TypeError` variants for geometric types.             |
+//! | `network`  |   ✓     | The `network` module + `Inet`/`MacAddr` variants on `Value`/`Literal`/`DataType`.                     |
+//! | `datetime` |   ✓     | The `datetime` module + `Date`/`Time`/`DateTime`/`TimestampTz`/`Interval` variants.                   |
+//! | `numeric`  |   ✓     | The `numeric` module + `Decimal` variants and decimal-related `TypeError` arms.                       |
+//!
+//! `core::error::Error` is always available for [`TypeError`] and
+//! [`network::ParseMacAddrError`] (stable since Rust 1.81).
 //!
 //! # Size guarantees (64-bit targets)
 //!
@@ -74,14 +82,21 @@ pub mod span;
 pub mod binary;
 #[allow(missing_docs)] // tracking: docs follow-up
 pub mod data_type;
+#[cfg(feature = "datetime")]
 #[allow(missing_docs)] // tracking: docs follow-up
 pub mod datetime;
 #[allow(missing_docs)] // tracking: docs follow-up
 pub mod error;
+mod format;
+#[cfg(feature = "geo")]
 #[allow(missing_docs)] // tracking: docs follow-up
 pub mod geo;
 #[allow(missing_docs)] // tracking: docs follow-up
+pub mod literal;
+#[cfg(feature = "network")]
+#[allow(missing_docs)] // tracking: docs follow-up
 pub mod network;
+#[cfg(feature = "numeric")]
 #[allow(missing_docs)] // tracking: docs follow-up
 pub mod numeric;
 pub mod prelude;
@@ -97,14 +112,19 @@ pub use data_type as descriptor;
 pub use error::TypeError;
 
 pub use binary::BitString;
+#[cfg(feature = "datetime")]
 pub use datetime::{Date, DateTime, Interval, Offset, Time, TimestampTz};
+#[cfg(feature = "geo")]
 pub use geo::{Circle, Line, Path, Point, Polygon, Rect, Segment};
+#[cfg(feature = "network")]
 pub use network::{IpAddr, MacAddr};
+#[cfg(feature = "numeric")]
 pub use numeric::Decimal;
 
 pub use data_type::{DataType, StructField};
 
-pub use value::{Literal, LiteralRange, Value, ValueRange};
+pub use literal::{Literal, LiteralRange};
+pub use value::{Value, ValueRange};
 
 // span / diag flat re-exports — the headline boundary items.
 pub use diag::{Code, Diagnostic, Severity};

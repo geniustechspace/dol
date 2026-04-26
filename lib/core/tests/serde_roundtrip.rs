@@ -4,7 +4,13 @@
 //! a JSON encode → decode cycle structurally. These tests back the
 //! universal-`serde` claim made by the workspace.
 
-#![cfg(feature = "serde")]
+#![cfg(all(
+    feature = "serde",
+    feature = "datetime",
+    feature = "geo",
+    feature = "network",
+    feature = "numeric"
+))]
 
 use std::borrow::Cow;
 

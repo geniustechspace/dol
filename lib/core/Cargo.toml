@@ -23,13 +23,23 @@ serde    = { workspace = true, optional = true }
 # `serde` and `std` are on by default. The crate is `no_std + alloc`-clean
 # when both are disabled, suitable for embedded targets that cannot link
 # `std`. Embedded users opt out with `default-features = false`.
-default = ["std", "serde"]
+#
+# The granular feature flags `geo`, `network`, `datetime`, `numeric` are
+# default-on; turning them off (with `default-features = false`) drops the
+# corresponding `Value` / `Literal` / `DataType` / `TypeError` variants and
+# the entire owning module from the compiled crate. Useful for embedded
+# builds that only need a subset of the type system.
+default = ["std", "serde", "geo", "network", "datetime", "numeric"]
 serde   = ["dep:serde", "smallvec/serde"]
 # Enables the wall-clock factory helpers (`datetime::today`, `datetime::now`,
 # `datetime::now_tz`) that require `std::time::SystemTime`. The
 # `core::error::Error` impl on `TypeError` is always available
 # (stable since Rust 1.81).
-std = []
+std      = ["datetime"]
+geo      = []
+network  = []
+datetime = []
+numeric  = []
 
 [dev-dependencies]
 serde_json = { workspace = true }
