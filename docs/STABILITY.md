@@ -111,3 +111,26 @@ public rationale in the commit message.
 
 If you believe DOL has broken any of the above guarantees, open an issue
 or a PR; we treat stability regressions as bugs.
+
+## IR versioning (v2)
+
+The `dol-ir` crate carries a separate schema version,
+[`IR_SCHEMA_VERSION`], surfaced through the
+[`VersionedProgram`] envelope. Wire payloads embed this version so that
+v1 (`Statement`-based) programs can be auto-decoded into v2 `Operation`
+through the `compat::statement` shim.
+
+The IR follows the noun-vs-verb rule documented in
+[`docs/IR.md`](IR.md):
+
+- Structural / governance variants are nouns and carry a
+  `StructuralVerb`.
+- Data / query / authorization variants are verbs.
+- Adding a new `OpKind`, `TargetKind`, or `CapabilityTag` is a
+  forward-compatible minor-release change. Removing or renaming one is
+  major.
+
+`Operation` is held to a strict 64-byte size budget (enforced by `xtask
+size` and a `const _: () = assert!(...);` assertion). The size budget is
+*not* part of the wire-format contract; it is an internal performance
+guarantee.

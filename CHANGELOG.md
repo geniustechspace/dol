@@ -9,6 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`dol-ir` v2 — universal `Operation` IR.** Adds the `Operation` enum
+  alongside the existing `Statement` surface, following the noun/verb
+  hybrid rule:
+  - **Nouns** (`Schema`, `Field`, `Index`, `Lookup`, `Policy`, `Mask`,
+    `Quota`, `Audit`) carry a `StructuralVerb` (`Create`, `Drop`, `Alter`,
+    `Rename`, `Truncate`).
+  - **Verbs** (`Insert`, `Update`, `Replace`, `Delete`, `Upsert`, `Append`,
+    `Query`, `Probe`, `Describe`, `Grant`, `Revoke`).
+  - **Meta** (`Tx`, `Extension`, feature-gated `Raw`).
+- New addressing primitives: `Symbol`, `Locator`, `Target`, `TargetKind`,
+  `SchemaBinding`.
+- Schema catalog: `SchemaCatalog`, `CatalogEntry`, `TypeEntry`, plus
+  `SchemaRef` / `CatalogId` / `SchemaId`.
+- Open capability vocabulary: `CapabilityTag`, `CapabilitySet`,
+  `CapabilityCheck`, plus `Operation::required_capabilities()` and
+  `Operation::kind() -> OpKind`.
+- Versioned `Program`: `IR_SCHEMA_VERSION = 2`, `VersionedProgram<Body>`
+  envelope, and a borrowed `ProgramRef<'a>` view for backends.
+- Structured `BackendError` (`#[non_exhaustive]`) carrying
+  `dol_core::Diagnostic` + optional `Span`. New variants: `Capability`,
+  `Extension`, `AclDenied`.
+- `compat::statement` module providing `From<Statement> for Operation`
+  and `statement_to_operation`. Storage / file-system v1 statements
+  collapse onto `Insert` / `Query` / `Replace` / `Update` against
+  `TargetKind::Blob` / `FileTree`.
+- New static invariants on `Operation`:
+  `size_of::<Operation>() ≤ 64`, `Send + Sync + 'static`. Both are
+  asserted at compile time and reported by `xtask size`.
+- `dol-check` migrated to operate on `Program::operations`, reporting
+  per-tag diagnostics keyed by a structured `CapabilityCheck`.
+- `dol-fmt` migrated to print the new `Operation` form.
+- New tests: per-`(Category, TargetKind)` fixtures
+  (`lib/ir/tests/fixtures.rs`), v1↔v2 compat decode coverage
+  (`lib/ir/tests/compat_v1_to_v2.rs`), ACL governance ops
+  (`lib/ir/tests/acl.rs`), serde round-trips, and size assertions.
+- Docs: `docs/IR.md` (noun-vs-verb rule reference), top-level
+  `MIGRATION.md` (old vs new side-by-side), expanded `docs/STABILITY.md`
+  for IR versioning, and the underpinning RFC `docs/rfcs/0001-ir-v2.md`.
+
 - **`dol-core` granular features** — `geo`, `network`, `datetime`, `numeric`
   (all default-on). Disabling any one drops the corresponding `Value` /
   `Literal` / `DataType` / `TypeError` variants and the owning module from

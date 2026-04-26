@@ -40,28 +40,28 @@ pub mod update;
 pub mod upsert;
 
 pub use append::Append;
-pub use audit::AuditOp;
+pub use audit::{AuditEvent, AuditOp, AuditSink};
 pub use delete::Delete;
-pub use describe::Describe;
+pub use describe::{Describe, DescribeFacet};
 pub use extension::{ExtensionId, OperationExtension};
 pub use field::{FieldDefV2, FieldOp};
 pub use grant::GrantV2;
-pub use index::IndexOp;
+pub use index::{IndexDirection, IndexKey, IndexMethod, IndexOp};
 pub use insert::{Insert, InsertSource};
-pub use lookup::LookupOp;
+pub use lookup::{LookupMethod as LookupOpMethod, LookupOp};
 pub use mask::MaskOp;
 pub use policy::{PolicyOp, PolicyScope};
 pub use probe::Probe;
 pub use query::Query;
-pub use quota::QuotaOp;
+pub use quota::{QuotaKind, QuotaOp};
 #[cfg(feature = "raw")]
 pub use raw::RawOp;
-pub use replace::Replace;
+pub use replace::{Replace, ReplaceBody};
 pub use revoke::RevokeV2;
 pub use schema::{SchemaBody, SchemaOp, StructuralVerb, TypeBody};
 pub use tx::{IsolationLevel, TxBegin, TxOp, TxOptions};
-pub use update::Update;
-pub use upsert::Upsert;
+pub use update::{Update, UpdateAssignment};
+pub use upsert::{OnConflict, Upsert};
 
 /// Top-level v2 IR operation.
 ///
