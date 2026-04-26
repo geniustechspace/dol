@@ -11,7 +11,7 @@ cargo run -p xtask -- <subcommand>
 | Command  | Purpose                                                        |
 | -------- | -------------------------------------------------------------- |
 | `size`   | print `size_of` for the public size-budgeted IR types; fails CI on regression |
-| `nostd`  | run `cargo check --no-default-features` on the `no_std` leaves (`dol-core`, `dol-expr`) |
+| `nostd`  | run `cargo test --no-default-features` on the `no_std` leaves (`dol-core`, `dol-expr`) |
 | `doc`    | build workspace docs with all features                         |
 | `readme` | verify every workspace member has a non-empty `README.md`      |
 | `help`   | print this list                                                |
