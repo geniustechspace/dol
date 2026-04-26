@@ -57,8 +57,12 @@ pub struct OperationExtension {
 pub trait ExtensionPayload: Sized {
     /// The stable [`ExtensionId`] this payload registers under.
     ///
-    /// Implementers should hold a `OnceLock<ExtensionId>` (or equivalent)
-    /// so the [`Symbol`] is interned exactly once per process.
+    /// Implementers should derive the underlying [`Symbol`] deterministically
+    /// from a stable name (e.g. a `const` FNV-1a 32-bit hash of the extension
+    /// identifier), so that the same payload type produces the same
+    /// [`ExtensionId`] across processes and is independent of any particular
+    /// [`Interner`](dol_expr::Interner). See `dol_pipeline::PipelinePayload`
+    /// and `dol_stream::WindowPayload` for reference implementations.
     fn extension_id() -> ExtensionId;
 
     /// Encode `self` into the [`OperationExtension::payload`] byte buffer.

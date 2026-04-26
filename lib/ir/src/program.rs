@@ -103,10 +103,19 @@ impl Program {
     /// prefer [`crate::operation::TxOp::Atomic`] (composed via
     /// `dol_query::control::tx_atomic`) for combining DML payloads.
     ///
+    /// At most one side may carry a [`SchemaCatalog`]. Merging two populated
+    /// catalogs would require entry-level conflict resolution that is out of
+    /// scope for this composition primitive.
+    ///
+    /// [`SchemaCatalog`]: crate::SchemaCatalog
+    ///
     /// # Panics
     ///
-    /// Panics with a clear diagnostic if both sides carry arena nodes or
-    /// interned strings; this is a design-time error.
+    /// Panics with a clear diagnostic if:
+    /// - both sides carry arena nodes or interned strings, or
+    /// - both sides carry a populated `schema_catalog`.
+    ///
+    /// Both are design-time errors.
     ///
     /// # Examples
     ///
@@ -158,6 +167,14 @@ impl Program {
             // Adopt other's storage.
             self.arena = arena;
             self.interner = interner;
+        }
+        if self.schema_catalog.is_some() && schema_catalog.is_some() {
+            panic!(
+                "Program::extend: both programs carry a populated \
+                 schema_catalog; merging two catalogs would require \
+                 entry-level conflict resolution that is out of scope for \
+                 this composition primitive."
+            );
         }
         if self.schema_catalog.is_none() {
             self.schema_catalog = schema_catalog;

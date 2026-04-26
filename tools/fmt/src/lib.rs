@@ -12,7 +12,8 @@
 //! (program
 //!   (tx :begin)
 //!   (insert :target relation/users)
-//!   (tx :commit))
+//!   (tx :commit)
+//! )
 //! ```
 //!
 //! The exact shape is governed by snapshot tests; downstream tooling should

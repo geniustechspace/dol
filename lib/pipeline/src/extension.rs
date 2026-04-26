@@ -3,7 +3,8 @@
 //! Wraps a [`Graph`] into an [`OperationExtension`](dol_ir::operation::OperationExtension)
 //! under the stable identifier `dol.pipeline/graph` (version 1). Encoded
 //! with `postcard` when the `serde` feature is enabled; otherwise
-//! [`PipelinePayload::encode`] returns a placeholder error payload.
+//! [`PipelinePayload::encode`] returns an empty byte vector and
+//! [`PipelinePayload::decode`] reports a feature-gated error.
 
 extern crate alloc;
 use alloc::vec::Vec;
