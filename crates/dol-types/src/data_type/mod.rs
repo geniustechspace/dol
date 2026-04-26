@@ -273,10 +273,7 @@ impl DataType {
     }
 
     pub const fn is_network(&self) -> bool {
-        matches!(
-            self,
-            Self::IpAddr | Self::IpNetwork { .. } | Self::MacAddr
-        )
+        matches!(self, Self::IpAddr | Self::IpNetwork { .. } | Self::MacAddr)
     }
 
     pub const fn is_composite(&self) -> bool {

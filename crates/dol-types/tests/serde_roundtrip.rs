@@ -150,8 +150,7 @@ fn ip_addr_serialises_as_untagged_octet_array() {
     // Round-trip both directions: bare arrays decode back to the right variant.
     let parsed_v4: IpAddr = serde_json::from_str("[10,0,0,1]").unwrap();
     assert_eq!(parsed_v4, IpAddr::v4(10, 0, 0, 1));
-    let parsed_v6: IpAddr =
-        serde_json::from_str("[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1]").unwrap();
+    let parsed_v6: IpAddr = serde_json::from_str("[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1]").unwrap();
     let mut expected_v6 = [0u8; 16];
     expected_v6[15] = 1;
     assert_eq!(parsed_v6, IpAddr::V6(expected_v6));

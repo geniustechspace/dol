@@ -151,7 +151,9 @@ impl TryFrom<MacAddr> for [u8; 6] {
     type Error = ParseMacAddrError;
 
     fn try_from(value: MacAddr) -> Result<Self, Self::Error> {
-        value.octets_48().ok_or_else(ParseMacAddrError::expected_eui48)
+        value
+            .octets_48()
+            .ok_or_else(ParseMacAddrError::expected_eui48)
     }
 }
 
@@ -159,7 +161,9 @@ impl TryFrom<MacAddr> for [u8; 8] {
     type Error = ParseMacAddrError;
 
     fn try_from(value: MacAddr) -> Result<Self, Self::Error> {
-        value.octets_64().ok_or_else(ParseMacAddrError::expected_eui64)
+        value
+            .octets_64()
+            .ok_or_else(ParseMacAddrError::expected_eui64)
     }
 }
 
