@@ -1,6 +1,6 @@
 # The DOL Expression Layer
 
-This document describes the architecture of `dol-types` and `dol-expr`, the
+This document describes the architecture of `dol-core` and `dol-expr`, the
 two crates that together form DOL's *language layer*. Higher crates
 (`dol-schema`, `dol-ir`, `dol-pipeline`, etc.) depend on these two and add
 no new vocabulary at the expression level.
@@ -9,7 +9,7 @@ no new vocabulary at the expression level.
 
 | Crate         | Role                                                                                                                                |
 |---------------|-------------------------------------------------------------------------------------------------------------------------------------|
-| `dol-types`   | The single source of truth for every type and value in DOL: `DataType`, `Value`, `Literal`, and the supporting primitive types.    |
+| `dol-core`   | The single source of truth for every type and value in DOL: `DataType`, `Value`, `Literal`, and the supporting primitive types.    |
 | `dol-expr`    | The expression engine — two representations (`tree::Expr<'a>` and the arena-based `ExprNode`), the lowering bridge between them, and the canonical AST node structs. |
 
 Both crates compile in `no_std + alloc` mode (default) and on
@@ -125,15 +125,15 @@ distinctly-tagged ID type.
 
 | Crate       | Feature   | Default | Effect                                                                                                |
 |-------------|-----------|---------|-------------------------------------------------------------------------------------------------------|
-| `dol-types` | `std`     | ✓       | Enables `datetime::today() / now() / now_tz()` (need `SystemTime`).                                   |
-| `dol-types` | `serde`   | ✓       | `Serialize` / `Deserialize` for every public type.                                                    |
-| `dol-expr`  | `std`     | —       | Forwards to `dol-types/std`. The crate itself is otherwise `no_std + alloc`.                          |
+| `dol-core` | `std`     | ✓       | Enables `datetime::today() / now() / now_tz()` (need `SystemTime`).                                   |
+| `dol-core` | `serde`   | ✓       | `Serialize` / `Deserialize` for every public type.                                                    |
+| `dol-expr`  | `std`     | —       | Forwards to `dol-core/std`. The crate itself is otherwise `no_std + alloc`.                          |
 | `dol-expr`  | `serde`   | —       | `Serialize` / `Deserialize` for every AST/arena type and `Interner`.                                  |
 
 ## Tests and gates
 
 * Serde round-trip is gated in CI for both crates
-  (`crates/*/tests/serde_roundtrip.rs`).
+  (`{lib,tools}/*/tests/serde_roundtrip.rs`).
 * `xtask size` asserts `size_of::<ExprNode> == 32`,
   `size_of::<Value> == 24`, and `size_of::<Literal<'static>> == 32`.
 * `xtask nostd` and the `cross-compile` CI job run
@@ -144,5 +144,5 @@ distinctly-tagged ID type.
 
 * [`docs/STABILITY.md`](./STABILITY.md) — public-API and wire-format
   stability policy.
-* `crates/dol-types/README.md` and `crates/dol-expr/README.md` — quick
+* `lib/core/README.md` and `lib/expr/README.md` — quick
   reference for each crate's public surface.

@@ -98,7 +98,7 @@ jobs:
       # serde — see the project restructuring plan.
       - name: Serde round-trip gate
         run: |
-          cargo test --all-features -p dol-types    --test serde_roundtrip
+          cargo test --all-features -p dol-core     --test serde_roundtrip
           cargo test --all-features -p dol-expr     --test serde_roundtrip
           cargo test --all-features -p dol-schema   --test serde_roundtrip
           cargo test --all-features -p dol-ir       --test serde_roundtrip
@@ -237,9 +237,7 @@ jobs:
 
       - name: Cargo check no_std leaves on thumbv7em
         run: |
-          cargo check -p dol-arena -p dol-span -p dol-diag \
-            --no-default-features --target thumbv7em-none-eabihf
-          cargo check -p dol-types -p dol-expr \
+          cargo check -p dol-core -p dol-expr \
             --no-default-features --target thumbv7em-none-eabihf
 
   deny:

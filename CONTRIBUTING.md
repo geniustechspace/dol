@@ -52,7 +52,7 @@ cargo deny check
 ## Serde Representation
 
 The wire format produced by `serde::Serialize` is part of the public contract
-of every type in `dol-types`. Pick the enum representation deliberately:
+of every type in `dol-core`. Pick the enum representation deliberately:
 
 - **Default (externally tagged)** — use for any enum whose variants would be
   ambiguous on the wire: variants that share a primitive shape (e.g. several
@@ -71,7 +71,7 @@ of every type in `dol-types`. Pick the enum representation deliberately:
 
 When introducing or changing the serde representation of a public type, add
 a `# Serde representation` doc section to the type and a wire-shape test
-under `crates/dol-types/tests/serde_roundtrip.rs` so the format is asserted,
+under `lib/core/tests/serde_roundtrip.rs` so the format is asserted,
 not just inferred.
 
 ## Commit Messages
@@ -96,14 +96,14 @@ refactor: simplify dialect type resolution
 ## Crate Architecture
 
 ```markdown
-dol-types  →  dol-expr  →  dol-ir
+dol-core  →  dol-expr  →  dol-ir
                               ↑
                           dol-schema  →  dol-query
 ```
 
 | Crate        | Role                                                            |
 | ------------ | --------------------------------------------------------------- |
-| `dol-types`  | Leaf: `Value`, `Literal`, `DataType`                            |
+| `dol-core`  | Leaf: `Value`, `Literal`, `DataType`                            |
 | `dol-expr`   | Composable expression AST — operators, functions, windows       |
 | `dol-ir`     | Intermediate representation — `Statement` enum, `Backend` trait |
 | `dol-schema` | Schema language — `Entity`, `Field`, constraints, DDL           |

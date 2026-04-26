@@ -1,0 +1,29 @@
+[package]
+name = "dol-query"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "DOL Query — backend-neutral query entry point for any data source."
+readme = "README.md"
+
+[dependencies]
+dol-schema = { workspace = true }
+dol-expr   = { workspace = true }
+dol-ir     = { workspace = true }
+dol-core   = { workspace = true }
+smallvec   = { workspace = true }
+serde      = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[features]
+default = []
+sql = []
+serde = [
+    "dep:serde",
+    "dol-schema/serde",
+    "dol-ir/serde",
+    "dol-core/serde",
+    "dol-expr/serde",
+]

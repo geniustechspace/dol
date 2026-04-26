@@ -7,9 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Workspace restructure**: crates now live in three top-level buckets —
+  `lib/` (libraries), `tools/` (developer tools), and `backends/` (concrete
+  `Backend` implementations; reserved, currently empty). Folder names drop
+  the `dol-` prefix; published package names retain it. The dependency DAG
+  is unchanged in shape but enforced by the bucket invariants.
+- **Merged `dol-span` + `dol-diag` + `dol-types` into a single `dol-core`
+  crate.** `span` and `diag` remain as namespaced sub-modules; the
+  value/type system is the crate's flat root surface (`dol_core::Value`,
+  `dol_core::DataType`, …). The most-used items (`Value`, `Literal`,
+  `DataType`, `TypeError`, `Span`, `FileId`, `Diagnostic`, `Severity`,
+  `Code`) are also re-exported flat at the crate root.
+- The umbrella `dol` crate now exposes `dol::core` (was `dol::types`) and
+  drops the `arena` / `span` / `diag` features (folded into `core`).
+
+### Removed
+
+- **`dol-arena`** — unused by any internal crate. The arena/interner code
+  remains in git history if a future external consumer needs it.
+
 ### Added
 
-- `no_std + alloc` support for the language layer: `dol-types` and `dol-expr`
+- `no_std + alloc` support for the language layer: `dol-core` and `dol-expr`
   now compile with `--no-default-features` and on `thumbv7em-none-eabihf`.
   CI's `cross-compile` job and `xtask nostd` enforce both
 - New `std` feature on `dol-types` (default-on) gating

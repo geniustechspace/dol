@@ -1,57 +1,33 @@
 # ── Workspace ──────────────────────────────────────────────────────────────────
 #
-# DOL is structured as a flat workspace with a strict, acyclic dependency DAG.
-# Each crate has a single, narrow purpose; see `docs/` (when populated) and the
-# top-level README for the full layering rationale.
+# DOL is structured as a three-tier workspace with a strict, acyclic dependency
+# DAG. The folder layout intentionally drops the `dol-` prefix; published
+# package names keep it.
 #
-#   dol-arena ─┐
-#   dol-span  ─┼─► dol-types ─► dol-expr ─► dol-schema ─► dol-ir ─► dol-pipeline ─► dol-query
-#   dol-diag  ─┘                                            │           │
-#                                                           ├──► dol-stream
-#                                                           ├──► dol-wire
-#                                                           ├──► dol-check
-#                                                           └──► dol-fmt
-#                                                           dol  (umbrella; depends on all, optional)
+#   lib/core ──┬──► lib/expr ──┐
+#              ├──► lib/schema ┴──► lib/ir ──┬──► lib/pipeline
+#              └──────────────────┘          ├──► lib/stream
+#                                            ├──► lib/wire
+#                                            ├──► lib/query
+#                                            ├──► tools/check
+#                                            ├──► tools/fmt
+#                                            └──► backends/<store>
 #
-# `dol` (umbrella) is the only crate allowed to depend on `dol-query`, and no
-# crate may depend on `dol`. Cycles are intended to be enforced by `cargo deny`.
+#   lib/dol  (umbrella; depends on the layers above; no crate depends on it)
+#
+# Invariants enforced by `cargo deny` and the xtask gates:
+#   * Nothing in `lib/`  may depend on `tools/` or `backends/`.
+#   * `tools/*`  may depend on `lib/*` but not on each other or `backends/`.
+#   * `backends/*` depend only on `lib/ir` (+ optionally `lib/wire`).
+#   * No crate depends on `lib/dol`.
 
 [workspace]
 resolver = "2"
-members = [
-    # Foundations — pure infrastructure, no DOL semantics
-    "crates/dol-arena",
-    "crates/dol-span",
-    "crates/dol-diag",
-
-    # Type system & values
-    "crates/dol-types",
-
-    # Expression algebra
-    "crates/dol-expr",
-
-    # Schema language
-    "crates/dol-schema",
-
-    # Statement IR + Backend trait + capabilities
-    "crates/dol-ir",
-
-    # Dataflow & streaming IR
-    "crates/dol-pipeline",
-    "crates/dol-stream",
-
-    # Codecs / static checks / pretty printing
-    "crates/dol-wire",
-    "crates/dol-check",
-    "crates/dol-fmt",
-
-    # Builder DSL
-    "crates/dol-query",
-
-    # Umbrella facade
-    "crates/dol",
-
-    # Dev tooling
+members  = [
+    "lib/*",
+    "tools/*",
+    # "backends/*"  — re-add when the first backend lands; cargo workspace
+    # globs error out when they match zero crates.
     "xtask",
 ]
 
@@ -76,17 +52,14 @@ postcard     = { version = "1", default-features = false, features = ["alloc"] }
 blake3       = { version = "1", default-features = false }
 
 # ── Internal crates ──────────────────────────────────────────────────────────
-dol-arena    = { path = "crates/dol-arena" }
-dol-span     = { path = "crates/dol-span" }
-dol-diag     = { path = "crates/dol-diag" }
-dol-types    = { path = "crates/dol-types" }
-dol-expr     = { path = "crates/dol-expr" }
-dol-schema   = { path = "crates/dol-schema" }
-dol-ir       = { path = "crates/dol-ir" }
-dol-pipeline = { path = "crates/dol-pipeline" }
-dol-stream   = { path = "crates/dol-stream" }
-dol-wire     = { path = "crates/dol-wire" }
-dol-check    = { path = "crates/dol-check" }
-dol-fmt      = { path = "crates/dol-fmt" }
-dol-query    = { path = "crates/dol-query" }
-dol          = { path = "crates/dol" }
+dol-core     = { path = "lib/core" }
+dol-expr     = { path = "lib/expr" }
+dol-schema   = { path = "lib/schema" }
+dol-ir       = { path = "lib/ir" }
+dol-pipeline = { path = "lib/pipeline" }
+dol-stream   = { path = "lib/stream" }
+dol-wire     = { path = "lib/wire" }
+dol-query    = { path = "lib/query" }
+dol-check    = { path = "tools/check" }
+dol-fmt      = { path = "tools/fmt" }
+dol          = { path = "lib/dol" }

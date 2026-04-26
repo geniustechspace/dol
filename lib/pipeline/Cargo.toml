@@ -1,0 +1,30 @@
+[package]
+name = "dol-pipeline"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+description = "DOL — declarative dataflow IR (Source → Transform → Sink) layered over Statement."
+readme = "README.md"
+
+[dependencies]
+dol-core   = { workspace = true }
+dol-expr   = { workspace = true }
+dol-schema = { workspace = true }
+dol-ir     = { workspace = true }
+smallvec   = { workspace = true }
+serde      = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[features]
+default = []
+serde   = [
+    "dep:serde",
+    "dol-core/serde",
+    "dol-expr/serde",
+    "dol-schema/serde",
+    "dol-ir/serde",
+    "smallvec/serde",
+]

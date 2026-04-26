@@ -1,0 +1,21 @@
+[package]
+name = "dol-schema"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "DOL schema language — Entity, Field, DataType, and constraints."
+readme = "README.md"
+
+[dependencies]
+dol-core = { workspace = true }
+serde    = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[features]
+# `serde` is on by default: schema definitions are almost always serialized
+# (config files, wire envelopes, golden tests). Embedded users can opt out
+# with `default-features = false`.
+default = ["serde"]
+serde = ["dep:serde", "dol-core/serde"]

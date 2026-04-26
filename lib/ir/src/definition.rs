@@ -1,0 +1,209 @@
+//! Definition operations — DDL for schema creation and modification.
+//!
+//! These owned, runtime-friendly DDL types embed the schema-layer constraint
+//! types (`dol_schema::EntityConstraint`, `dol_schema::RelationRef`)
+//! directly — there is no longer a borrowed/owned mirror split.
+
+use dol_core::DataType;
+use dol_schema::{ComputedKind, EntityConstraint, RelationRef};
+
+use crate::entity_ref::EntityRef;
+
+/// Define (create) a new entity / table.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct DefineEntity {
+    pub name: String,
+    pub namespace: Option<String>,
+    pub fields: Vec<FieldDef>,
+    pub constraints: Vec<EntityConstraint>,
+    pub if_not_exists: bool,
+}
+
+/// An owned field definition for use in DDL operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct FieldDef {
+    pub name: String,
+    pub data_type: DataType,
+    pub identity: bool,
+    pub nullable: bool,
+    pub default_expr: Option<String>,
+    pub unique: bool,
+    pub references: Option<RelationRef>,
+    pub check: Option<String>,
+    pub comment: Option<String>,
+    pub collation: Option<String>,
+    pub generated: Option<(ComputedKind, String)>,
+    pub lookup: bool,
+    pub auto_assign: bool,
+}
+
+impl FieldDef {
+    pub fn new(name: &str, data_type: DataType) -> Self {
+        Self {
+            name: name.to_string(),
+            data_type,
+            identity: false,
+            nullable: false,
+            default_expr: None,
+            unique: false,
+            references: None,
+            check: None,
+            comment: None,
+            collation: None,
+            generated: None,
+            lookup: false,
+            auto_assign: false,
+        }
+    }
+
+    pub fn identity(mut self) -> Self {
+        self.identity = true;
+        self
+    }
+    pub fn nullable(mut self) -> Self {
+        self.nullable = true;
+        self
+    }
+    pub fn optional(self) -> Self {
+        self.nullable()
+    }
+    pub fn required(self) -> Self {
+        self
+    }
+    pub fn unique(mut self) -> Self {
+        self.unique = true;
+        self
+    }
+    pub fn auto_assign(mut self) -> Self {
+        self.auto_assign = true;
+        self
+    }
+    pub fn lookup(mut self) -> Self {
+        self.lookup = true;
+        self
+    }
+    pub fn default(mut self, expr: &str) -> Self {
+        self.default_expr = Some(expr.to_string());
+        self
+    }
+    pub fn comment(mut self, text: &str) -> Self {
+        self.comment = Some(text.to_string());
+        self
+    }
+    pub fn collation(mut self, c: &str) -> Self {
+        self.collation = Some(c.to_string());
+        self
+    }
+    pub fn check(mut self, expr: &str) -> Self {
+        self.check = Some(expr.to_string());
+        self
+    }
+    pub fn references(mut self, fk: RelationRef) -> Self {
+        self.references = Some(fk);
+        self
+    }
+
+    pub fn generated_stored(mut self, expr: &str) -> Self {
+        self.generated = Some((ComputedKind::Materialized, expr.to_string()));
+        self
+    }
+
+    pub fn generated_virtual(mut self, expr: &str) -> Self {
+        self.generated = Some((ComputedKind::OnDemand, expr.to_string()));
+        self
+    }
+}
+
+/// Alter an existing entity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct AlterEntity {
+    pub target: EntityRef,
+    pub actions: Vec<AlterAction>,
+}
+
+/// A single action within an ALTER ENTITY statement.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum AlterAction {
+    AddField(FieldDef),
+    DropField(String),
+    RenameField { from: String, to: String },
+    AlterFieldType { name: String, new_type: DataType },
+    SetFieldDefault { name: String, expr: String },
+    DropFieldDefault(String),
+    SetFieldNotNull(String),
+    DropFieldNotNull(String),
+    AddConstraint(EntityConstraint),
+    DropConstraint(String),
+    RenameEntity(String),
+}
+
+/// Drop (remove) an entity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct DropEntity {
+    pub target: EntityRef,
+    pub if_exists: bool,
+    pub cascade: bool,
+}
+
+/// Define (create) an index.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct DefineLookup {
+    pub name: String,
+    pub target: EntityRef,
+    pub columns: Vec<String>,
+    pub unique: bool,
+    pub if_not_exists: bool,
+    pub concurrently: bool,
+    pub method: Option<LookupMethod>,
+    pub where_clause: Option<String>,
+}
+
+/// Lookup access method — backend-agnostic. Variants describe the *kind*
+/// of lookup the structure is optimised for, not a specific data structure.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum LookupMethod {
+    /// Range / ordered lookups (typically a B-tree-like structure).
+    Ordered,
+    /// Exact-match / hash lookups.
+    Equality,
+    /// Full-text search lookups.
+    FullText,
+    /// Spatial / geometric lookups.
+    Spatial,
+    /// Backend-specific method named at runtime.
+    Custom(String),
+}
+
+/// Drop a lookup.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct DropLookup {
+    pub name: String,
+    pub if_exists: bool,
+    pub concurrently: bool,
+    pub cascade: bool,
+}
+
+/// Define a custom type (e.g., an enum).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct DefineType {
+    pub name: String,
+    pub namespace: Option<String>,
+    pub variants: Vec<String>,
+}
+
+/// Drop a custom type.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct DropType {
+    pub name: String,
+    pub if_exists: bool,
+}

@@ -62,7 +62,7 @@ xtask-gates: size nostd readme
 # Cross-compile the no_std leaves for `thumbv7em-none-eabihf`. Requires
 # `rustup target add thumbv7em-none-eabihf` once.
 cross-thumbv7em:
-    cargo check -p dol-arena -p dol-span -p dol-diag \
+    cargo check -p dol-core -p dol-expr \
         --no-default-features --target thumbv7em-none-eabihf
 
 # Compile-check the umbrella's `iot-min` preset.
