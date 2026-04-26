@@ -10,6 +10,11 @@ use smallvec::SmallVec;
 use crate::target::Symbol;
 
 /// Pre-built dialect-specific body.
+///
+/// Escape hatch for passing through raw SQL or other dialect-specific
+/// statements. Requires the `raw` feature and adds the
+/// [`RAW_PASSTHROUGH`](crate::capabilities::CapabilityTag::RAW_PASSTHROUGH)
+/// capability requirement.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RawOp {

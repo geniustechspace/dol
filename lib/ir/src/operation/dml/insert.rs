@@ -31,10 +31,32 @@ pub enum InsertSource {
 }
 
 /// `Insert` operation.
+///
+/// Append new tuples / documents / objects / records to a target.
+///
+/// # Examples
+///
+/// ```
+/// use dol_ir::operation::{Insert, InsertSource};
+/// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
+/// use dol_ir::Operation;
+///
+/// // INSERT INTO users (...) VALUES (...)
+/// let op: Operation = Insert {
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
+///     source: InsertSource::Bindings,
+///     returning: None,
+/// }
+/// .into();
+///
+/// assert_eq!(op.kind(), dol_ir::OpKind::Insert);
+/// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Insert {
+    /// Target to insert into.
     pub target: Target,
+    /// Where the inserted payload comes from.
     pub source: InsertSource,
     /// Optional arena `NodeId` representing a `RETURNING` projection. For
     /// `Source::Node`, the returning list inside the arena `InsertNode`

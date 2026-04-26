@@ -20,9 +20,31 @@ pub enum DescribeFacet {
 }
 
 /// `Describe` operation.
+///
+/// Returns schema metadata about a target (shape, fields, indexes, ACLs,
+/// or statistics).
+///
+/// # Examples
+///
+/// ```
+/// use dol_ir::operation::{Describe, DescribeFacet};
+/// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
+/// use dol_ir::Operation;
+///
+/// // DESCRIBE users (field metadata)
+/// let op: Operation = Describe {
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
+///     facet: DescribeFacet::Fields,
+/// }
+/// .into();
+///
+/// assert_eq!(op.kind(), dol_ir::OpKind::Describe);
+/// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Describe {
+    /// Target to describe.
     pub target: Target,
+    /// Which metadata facet to return.
     pub facet: DescribeFacet,
 }

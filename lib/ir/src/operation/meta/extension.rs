@@ -17,11 +17,14 @@ use crate::target::Symbol;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExtensionId {
+    /// Interned extension name.
     pub name: Symbol,
+    /// Wire-format version for backwards compatibility.
     pub version: u32,
 }
 
 impl ExtensionId {
+    /// Construct an extension id from name and version.
     #[inline]
     pub const fn new(name: Symbol, version: u32) -> Self {
         Self { name, version }
@@ -29,9 +32,13 @@ impl ExtensionId {
 }
 
 /// Open extension payload.
+///
+/// Higher-level crates attach custom verbs via `Extension` rather than
+/// extending the closed `Operation` enum.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OperationExtension {
+    /// Stable identifier for this extension type.
     pub id: ExtensionId,
     /// Codec-encoded body understood by the registering crate.
     pub payload: Vec<u8>,

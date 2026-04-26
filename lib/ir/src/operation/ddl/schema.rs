@@ -24,9 +24,19 @@ use crate::target::{Symbol, Target};
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SchemaBody {
     /// Entity body referenced by catalog id.
-    Entity { schema: SchemaRef, if_not_exists: bool },
+    Entity {
+        /// Catalog reference to the entity schema.
+        schema: SchemaRef,
+        /// When `true`, the operation is idempotent (`IF NOT EXISTS`).
+        if_not_exists: bool,
+    },
     /// Named type body referenced by catalog id.
-    Type { schema: SchemaRef, body: TypeBody },
+    Type {
+        /// Catalog reference to the type schema.
+        schema: SchemaRef,
+        /// Classification of the type (enum, composite, distinct).
+        body: TypeBody,
+    },
     /// No body — used for `Drop` / `Rename` / `Truncate`.
     Reference,
 }
@@ -35,22 +45,51 @@ pub enum SchemaBody {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TypeBody {
-    /// Enumerated type.
+    /// Enumerated type (e.g. PostgreSQL `CREATE TYPE ... AS ENUM`).
     Enum,
-    /// Composite / record type.
+    /// Composite / record type (e.g. PostgreSQL `CREATE TYPE ... AS (...)`.
     Composite,
-    /// Distinct (domain) type.
+    /// Distinct (domain) type with constraints.
     Distinct,
-    /// Backend-specific kind.
+    /// Backend-specific type kind.
     Other,
 }
 
 /// Schema-level structural operation.
+///
+/// Maps to SQL `CREATE TABLE` / `DROP TABLE` / `ALTER TABLE` / `TRUNCATE`,
+/// or to document-store collection lifecycle, blob bucket creation, etc.
+///
+/// # Examples
+///
+/// ```
+/// use dol_ir::operation::{SchemaBody, SchemaOp, StructuralVerb};
+/// use dol_ir::schema_ref::{CatalogId, SchemaId, SchemaRef};
+/// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
+/// use dol_ir::Operation;
+///
+/// // CREATE TABLE users (...)
+/// let op: Operation = SchemaOp {
+///     verb: StructuralVerb::Create,
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
+///     body: SchemaBody::Entity {
+///         schema: SchemaRef::local(SchemaId::new(0)),
+///         if_not_exists: false,
+///     },
+///     new_name: None,
+/// }
+/// .into();
+///
+/// assert_eq!(op.kind(), dol_ir::OpKind::Schema);
+/// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SchemaOp {
+    /// `Create` / `Drop` / `Alter` / `Rename` / `Truncate`.
     pub verb: StructuralVerb,
+    /// Target being created / dropped / altered.
     pub target: Target,
+    /// Body of the schema (entity, type, or reference-only).
     pub body: SchemaBody,
     /// Optional new name when `verb == Rename`.
     pub new_name: Option<Symbol>,

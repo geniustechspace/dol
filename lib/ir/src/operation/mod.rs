@@ -45,41 +45,83 @@ pub use tx::{IsolationLevel, TxBegin, TxOp, TxOptions};
 ///
 /// See the module docs for the noun-vs-verb variant rule and `docs/IR.md` for
 /// the design overview.
+///
+/// # Examples
+///
+/// ```
+/// use dol_ir::operation::{Insert, InsertSource, Operation};
+/// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
+/// use dol_ir::OpKind;
+///
+/// // Create an Insert operation for a SQL table
+/// let op: Operation = Insert {
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
+///     source: InsertSource::Bindings,
+///     returning: None,
+/// }
+/// .into();
+///
+/// assert_eq!(op.kind(), OpKind::Insert);
+/// ```
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Operation {
     // ── structural / management — noun variants ───────────────────────────
+    /// Entity-level structural change (create/drop/alter/rename a relation,
+    /// document collection, blob bucket, etc.).
     Schema(Box<SchemaOp>),
+    /// Field-level structural change (add/drop/alter/rename a column on a
+    /// relation or property on a document collection).
     Field(Box<FieldOp>),
+    /// Secondary index lifecycle (create/drop/alter an index on a target).
     Index(Box<IndexOp>),
+    /// Fast-membership lookup lifecycle (create/drop a lookup on a target).
     Lookup(Box<LookupOp>),
 
     // ── ACL / governance — noun variants ──────────────────────────────────
+    /// Row-level security / authorisation policy lifecycle.
     Policy(Box<PolicyOp>),
+    /// Column / field masking rule lifecycle.
     Mask(Box<MaskOp>),
+    /// Usage quota / rate-limit rule lifecycle.
     Quota(Box<QuotaOp>),
+    /// Auditing / observability rule lifecycle.
     Audit(Box<AuditOp>),
 
     // ── DML — verb variants ───────────────────────────────────────────────
+    /// Insert new tuples / documents / objects.
     Insert(Box<Insert>),
+    /// Partial mutation of existing rows / documents.
     Update(Box<Update>),
+    /// Full overwrite of rows / objects (HTTP PUT semantics).
     Replace(Box<Replace>),
+    /// Remove rows / documents / objects.
     Delete(Box<Delete>),
+    /// Insert-or-update with conflict resolution.
     Upsert(Box<Upsert>),
+    /// Append-only write (stream topics, immutable logs).
     Append(Box<Append>),
 
     // ── DQL — verb variants ───────────────────────────────────────────────
+    /// Read tuples / documents / objects / files.
     Query(Box<Query>),
+    /// Existence / metadata check (HTTP HEAD, S3 HeadObject).
     Probe(Box<Probe>),
+    /// Schema introspection (SHOW TABLES, information_schema).
     Describe(Box<Describe>),
 
     // ── ACL actions — verb variants ───────────────────────────────────────
+    /// Bestow privileges on a target to roles.
     Grant(Box<Grant>),
+    /// Withdraw privileges on a target from roles.
     Revoke(Box<Revoke>),
 
     // ── meta ──────────────────────────────────────────────────────────────
+    /// Transaction control (begin/commit/rollback/savepoint).
     Tx(Box<TxOp>),
+    /// Open extension payload for higher-level crates.
     Extension(Box<OperationExtension>),
+    /// Feature-gated escape hatch for pre-built dialect-specific statements.
     #[cfg(feature = "raw")]
     Raw(Box<RawOp>),
 }

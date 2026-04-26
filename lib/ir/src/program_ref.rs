@@ -9,11 +9,18 @@ use crate::program::Program;
 use crate::schema_catalog::SchemaCatalog;
 
 /// Borrowed view into a [`Program`].
+///
+/// Backends receive `ProgramRef` instead of owning the program, avoiding
+/// clones of the expression arena and interner on every compilation.
 #[derive(Clone, Copy, Debug)]
 pub struct ProgramRef<'a> {
+    /// Slice of operations to compile.
     pub operations: &'a [Operation],
+    /// Expression arena containing any expression trees referenced by operations.
     pub arena: &'a dol_expr::ExprArena,
+    /// String interner for resolving symbols.
     pub interner: &'a dol_expr::Interner,
+    /// Optional schema catalog for resolving schema references.
     pub schema_catalog: Option<&'a SchemaCatalog>,
 }
 

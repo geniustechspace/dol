@@ -10,7 +10,9 @@ use crate::target::{Symbol, Target};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum IndexDirection {
+    /// Sort values in ascending order (smallest first).
     Ascending,
+    /// Sort values in descending order (largest first).
     Descending,
 }
 
@@ -20,12 +22,16 @@ pub enum IndexDirection {
 pub enum IndexKey {
     /// Plain field key.
     Field {
+        /// Interned field name.
         name: Symbol,
+        /// Sort direction for this key component.
         direction: IndexDirection,
     },
     /// Arena expression key (functional index).
     Expression {
+        /// Arena `NodeId` of the index expression.
         node: NodeId,
+        /// Sort direction for this key component.
         direction: IndexDirection,
     },
 }
@@ -35,24 +41,66 @@ pub enum IndexKey {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum IndexMethod {
+    /// B-tree index (default for most SQL databases).
     BTree,
+    /// Hash index for equality-only lookups.
     Hash,
+    /// Generalized inverted index (PostgreSQL GIN).
     Gin,
+    /// Generalized search tree (PostgreSQL GiST).
     Gist,
+    /// Vector-similarity index (pgvector, Pinecone).
     Vector,
+    /// Spatial / geospatial index (PostGIS, Mongo 2dsphere).
     Spatial,
+    /// Backend-specific index method identified by interned name.
     Custom(Symbol),
 }
 
 /// Index structural operation.
+///
+/// Maps to SQL `CREATE INDEX` / `DROP INDEX` / `ALTER INDEX`, or to a
+/// document-store index definition. The [`Self::verb`] picks the lifecycle
+/// action.
+///
+/// # Examples
+///
+/// ```
+/// use dol_ir::operation::{IndexDirection, IndexKey, IndexMethod, IndexOp, StructuralVerb};
+/// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
+/// use dol_ir::Operation;
+///
+/// // CREATE INDEX idx_users_email ON users (email ASC)
+/// let op: Operation = IndexOp {
+///     verb: StructuralVerb::Create,
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
+///     name: Symbol::new(1),
+///     method: IndexMethod::BTree,
+///     keys: smallvec::smallvec![IndexKey::Field {
+///         name: Symbol::new(2),
+///         direction: IndexDirection::Ascending,
+///     }],
+///     unique: false,
+///     predicate: None,
+/// }
+/// .into();
+///
+/// assert_eq!(op.kind(), dol_ir::OpKind::Index);
+/// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IndexOp {
+    /// `Create` / `Drop` / `Alter` / `Rename`.
     pub verb: StructuralVerb,
+    /// Target the index is defined on.
     pub target: Target,
+    /// Interned index name.
     pub name: Symbol,
+    /// Index method (BTree, Hash, Vector, …).
     pub method: IndexMethod,
+    /// Ordered list of index key columns / expressions.
     pub keys: SmallVec<[IndexKey; 2]>,
+    /// Whether the index enforces uniqueness.
     pub unique: bool,
     /// Arena `NodeId` for a partial-index predicate.
     pub predicate: Option<NodeId>,

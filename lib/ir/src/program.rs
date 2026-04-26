@@ -8,12 +8,31 @@ use crate::schema_catalog::SchemaCatalog;
 
 /// A compiled DOL program: a sequence of [`Operation`]s plus the expression
 /// arena and interner needed to render any arena references they carry.
+///
+/// # Examples
+///
+/// ```
+/// use dol_ir::operation::{Insert, InsertSource};
+/// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
+/// use dol_ir::Program;
+///
+/// let insert = Insert {
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
+///     source: InsertSource::Bindings,
+///     returning: None,
+/// };
+///
+/// let program = Program::from_operation(insert.into());
+/// assert_eq!(program.operations.len(), 1);
+/// ```
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Program {
     /// Operation sequence.
     pub operations: alloc::vec::Vec<Operation>,
+    /// Expression arena containing any expression trees.
     pub arena: dol_expr::ExprArena,
+    /// String interner for resolving symbols.
     pub interner: dol_expr::Interner,
     /// Optional schema catalog. `None` means schemas are addressed solely
     /// through `SchemaBinding::Inferred` / `Opaque`.

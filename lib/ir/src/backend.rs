@@ -19,39 +19,64 @@ use crate::capabilities::CapabilityCheck;
 extern crate alloc;
 
 /// Concrete error type returned by DOL IR backends.
+///
+/// Variants are `#[non_exhaustive]` to allow future additions without
+/// breaking downstream match arms.
+///
+/// # Examples
+///
+/// ```
+/// use dol_ir::BackendError;
+///
+/// let err = BackendError::unsupported("MERGE not supported by this backend");
+/// assert!(err.diagnostic().message.contains("MERGE"));
+/// ```
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 #[allow(clippy::large_enum_variant)]
 pub enum BackendError {
     /// The operation type / target combination is not supported.
     Unsupported {
+        /// Structured diagnostic describing the unsupported scenario.
         diag: Diagnostic,
+        /// Optional source span where the operation was declared.
         span: Option<Span>,
     },
     /// A required value was missing or null.
     MissingValue {
+        /// Structured diagnostic describing what was missing.
         diag: Diagnostic,
+        /// Optional source span for the missing value.
         span: Option<Span>,
     },
     /// Generic rendering / compilation error.
     Render {
+        /// Structured diagnostic describing the render failure.
         diag: Diagnostic,
+        /// Optional source span that triggered the error.
         span: Option<Span>,
     },
     /// A capability the program requires is not provided by the backend.
     Capability {
+        /// The capability check that failed.
         check: CapabilityCheck,
+        /// Structured diagnostic describing the missing capability.
         diag: Diagnostic,
+        /// Optional source span referencing the capability-dependent code.
         span: Option<Span>,
     },
     /// The program references an extension the backend cannot resolve.
     Extension {
+        /// Structured diagnostic describing the unresolved extension.
         diag: Diagnostic,
+        /// Optional source span where the extension was referenced.
         span: Option<Span>,
     },
     /// An ACL policy denied the operation.
     AclDenied {
+        /// Structured diagnostic describing the ACL denial.
         diag: Diagnostic,
+        /// Optional source span where the denied operation was declared.
         span: Option<Span>,
     },
 }

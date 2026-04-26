@@ -159,12 +159,35 @@ pub enum SchemaBinding {
 }
 
 /// Universal target descriptor.
+///
+/// Combines a [`TargetKind`], [`Locator`], optional alias, and
+/// [`SchemaBinding`] into a single addressable entity.
+///
+/// # Examples
+///
+/// ```
+/// use dol_ir::target::{Locator, SchemaBinding, Symbol, Target, TargetKind};
+///
+/// // SQL table "public.users" with alias "u"
+/// let t = Target::new(
+///     TargetKind::Relation,
+///     Locator::new(Symbol::new(1)).with_namespace(Symbol::new(0)),
+/// )
+/// .with_alias(Symbol::new(2))
+/// .with_schema(SchemaBinding::Inferred);
+///
+/// assert_eq!(t.kind, TargetKind::Relation);
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Target {
+    /// What family of object this target refers to.
     pub kind: TargetKind,
+    /// Structured address (namespace, name, path).
     pub locator: Locator,
+    /// Optional alias used by the surrounding query (e.g. `FROM users AS u`).
     pub alias: Option<Symbol>,
+    /// How the schema of this target is known.
     pub schema: SchemaBinding,
 }
 

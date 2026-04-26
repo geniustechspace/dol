@@ -12,10 +12,16 @@ use core::fmt;
 use core::ops::{BitAnd, BitOr, BitXor, Not};
 
 /// Bitset of optional backend features.
+///
+/// Each bit represents a single capability. Combine via `|` (bitwise or).
+/// Use [`BackendCapabilities::contains`] to test for presence.
 #[repr(transparent)]
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct BackendCapabilities(pub u64);
+pub struct BackendCapabilities(
+    /// Raw 64-bit bitmask of enabled capabilities.
+    pub u64,
+);
 
 macro_rules! cap_bits {
     ($( $(#[$m:meta])* $name:ident = $bit:expr ;)+) => {
@@ -183,7 +189,10 @@ extern crate alloc;
 /// owned `String`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct CapabilityTag(alloc::borrow::Cow<'static, str>);
+pub struct CapabilityTag(
+    /// Inner string: borrowed for built-ins, owned for extensions.
+    alloc::borrow::Cow<'static, str>,
+);
 
 impl CapabilityTag {
     /// Build a tag from a `&'static str`. Used by the built-in constants.
@@ -196,34 +205,63 @@ impl CapabilityTag {
         Self(alloc::borrow::Cow::Owned(s))
     }
 
+    /// Window functions (`ROW_NUMBER`, `RANK`, `OVER (...)`).
     pub const WINDOW_FUNCTIONS: CapabilityTag = CapabilityTag::builtin("WINDOW_FUNCTIONS");
+    /// Recursive CTEs (`WITH RECURSIVE`).
     pub const RECURSIVE_CTE: CapabilityTag = CapabilityTag::builtin("RECURSIVE_CTE");
+    /// JSON path arrows (`->`, `->>`).
     pub const JSON_ARROWS: CapabilityTag = CapabilityTag::builtin("JSON_ARROWS");
+    /// Vector-similarity indexes / operators.
     pub const VECTOR_INDEX: CapabilityTag = CapabilityTag::builtin("VECTOR_INDEX");
+    /// Geospatial predicates and indexes.
     pub const GEOSPATIAL: CapabilityTag = CapabilityTag::builtin("GEOSPATIAL");
+    /// `MERGE` / `UPSERT` semantics.
     pub const MERGE: CapabilityTag = CapabilityTag::builtin("MERGE");
+    /// Row locking with `FOR UPDATE` / `FOR SHARE`.
     pub const ROW_LOCKING: CapabilityTag = CapabilityTag::builtin("ROW_LOCKING");
+    /// `SKIP LOCKED` / `NOWAIT` lock hints.
     pub const LOCK_SKIP_NOWAIT: CapabilityTag = CapabilityTag::builtin("LOCK_SKIP_NOWAIT");
+    /// Streaming windows + watermarks (from `dol-stream`).
     pub const STREAMING_WINDOWS: CapabilityTag = CapabilityTag::builtin("STREAMING_WINDOWS");
+    /// Time-series ops (`time_bucket`, `gap_fill`, `locf`, …).
     pub const TIME_SERIES: CapabilityTag = CapabilityTag::builtin("TIME_SERIES");
+    /// Pipeline / dataflow programs (from `dol-pipeline`).
     pub const PIPELINES: CapabilityTag = CapabilityTag::builtin("PIPELINES");
+    /// Object-store statements (`PutObject`, `GetObject`, …).
     pub const OBJECT_STORE: CapabilityTag = CapabilityTag::builtin("OBJECT_STORE");
+    /// Filesystem statements (`ReadFile`, `WriteFile`, …).
     pub const FILE_IO: CapabilityTag = CapabilityTag::builtin("FILE_IO");
+    /// Row-level security policies.
     pub const POLICIES: CapabilityTag = CapabilityTag::builtin("POLICIES");
+    /// Open extension variant; backend agrees to consult its registry.
     pub const EXTENSIONS: CapabilityTag = CapabilityTag::builtin("EXTENSIONS");
+    /// `Replace` (full-overwrite) verb is supported.
     pub const REPLACE_OP: CapabilityTag = CapabilityTag::builtin("REPLACE_OP");
+    /// `Probe` (existence / metadata) verb is supported.
     pub const PROBE_OP: CapabilityTag = CapabilityTag::builtin("PROBE_OP");
+    /// `Describe` (introspection) verb is supported.
     pub const DESCRIBE_OP: CapabilityTag = CapabilityTag::builtin("DESCRIBE_OP");
+    /// `Append` (append-only) verb is supported.
     pub const APPEND_OP: CapabilityTag = CapabilityTag::builtin("APPEND_OP");
+    /// Multi-statement transactions are supported.
     pub const MULTI_STATEMENT_TX: CapabilityTag = CapabilityTag::builtin("MULTI_STATEMENT_TX");
+    /// Field-level masking policies.
     pub const MASK_POLICIES: CapabilityTag = CapabilityTag::builtin("MASK_POLICIES");
+    /// Quotas / limits.
     pub const QUOTAS: CapabilityTag = CapabilityTag::builtin("QUOTAS");
+    /// Audit policies.
     pub const AUDIT: CapabilityTag = CapabilityTag::builtin("AUDIT");
+    /// Opaque (un-resolved) schemas may be addressed.
     pub const OPAQUE_SCHEMA: CapabilityTag = CapabilityTag::builtin("OPAQUE_SCHEMA");
+    /// `TargetKind::Blob` is supported.
     pub const BLOB_TARGETS: CapabilityTag = CapabilityTag::builtin("BLOB_TARGETS");
+    /// `TargetKind::FileTree` is supported.
     pub const FILE_TREE_TARGETS: CapabilityTag = CapabilityTag::builtin("FILE_TREE_TARGETS");
+    /// `TargetKind::StreamTopic` is supported.
     pub const STREAM_TARGETS: CapabilityTag = CapabilityTag::builtin("STREAM_TARGETS");
+    /// `TargetKind::ApiResource` is supported.
     pub const API_TARGETS: CapabilityTag = CapabilityTag::builtin("API_TARGETS");
+    /// Feature-gated [`Raw`](crate::operation::Operation::Raw) escape hatch.
     pub const RAW_PASSTHROUGH: CapabilityTag = CapabilityTag::builtin("RAW_PASSTHROUGH");
 
     /// Stable string label.
@@ -239,17 +277,25 @@ impl core::fmt::Display for CapabilityTag {
 }
 
 /// Open set of capability tags.
+///
+/// Unlike [`BackendCapabilities`], which is a fixed-size bitmask,
+/// `CapabilitySet` can carry an unbounded number of tags (including
+/// extension-specific tags) and is used for diagnostics and cross-crate
+/// communication.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CapabilitySet {
+    /// List of tags in insertion order; duplicates are rejected.
     tags: Vec<CapabilityTag>,
 }
 
 impl CapabilitySet {
+    /// Create an empty capability set.
     pub const fn new() -> Self {
         Self { tags: Vec::new() }
     }
 
+    /// Build a set from an iterator of tags, de-duplicating on insertion.
     pub fn build_from<I: IntoIterator<Item = CapabilityTag>>(it: I) -> Self {
         let mut s = Self::new();
         for t in it {
@@ -258,6 +304,7 @@ impl CapabilitySet {
         s
     }
 
+    /// Insert a tag. Returns `true` if the tag was newly added.
     pub fn insert(&mut self, tag: CapabilityTag) -> bool {
         if !self.tags.contains(&tag) {
             self.tags.push(tag);
@@ -267,18 +314,22 @@ impl CapabilitySet {
         }
     }
 
+    /// Check whether the set contains the given tag.
     pub fn contains(&self, tag: &CapabilityTag) -> bool {
         self.tags.iter().any(|t| t == tag)
     }
 
+    /// `true` if no tags are present.
     pub fn is_empty(&self) -> bool {
         self.tags.is_empty()
     }
 
+    /// Number of tags in the set.
     pub fn len(&self) -> usize {
         self.tags.len()
     }
 
+    /// Iterate over tags in insertion order.
     pub fn iter(&self) -> core::slice::Iter<'_, CapabilityTag> {
         self.tags.iter()
     }
@@ -306,12 +357,16 @@ impl FromIterator<CapabilityTag> for CapabilitySet {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CapabilityCheck {
+    /// The operation kind being checked.
     pub op: crate::operation::OpKind,
+    /// The target kind, if relevant to the check.
     pub target: Option<crate::target::TargetKind>,
+    /// The structural verb, if the operation is noun-shaped.
     pub verb: Option<crate::operation::StructuralVerb>,
 }
 
 impl CapabilityCheck {
+    /// Create a check for a single operation kind.
     pub const fn new(op: crate::operation::OpKind) -> Self {
         Self {
             op,
@@ -320,11 +375,13 @@ impl CapabilityCheck {
         }
     }
 
+    /// Attach a target kind to the check.
     pub fn with_target(mut self, target: crate::target::TargetKind) -> Self {
         self.target = Some(target);
         self
     }
 
+    /// Attach a structural verb to the check.
     pub fn with_verb(mut self, verb: crate::operation::StructuralVerb) -> Self {
         self.verb = Some(verb);
         self

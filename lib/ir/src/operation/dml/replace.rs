@@ -23,10 +23,33 @@ pub enum ReplaceBody {
 }
 
 /// `Replace` operation.
+///
+/// Full overwrite of a target object (HTTP PUT, S3 object overwrite,
+/// Mongo `replaceOne`, file-tree write).
+///
+/// # Examples
+///
+/// ```
+/// use dol_ir::operation::{Replace, ReplaceBody};
+/// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
+/// use dol_ir::Operation;
+///
+/// // Replace a blob at s3://artifacts/build.log
+/// let op: Operation = Replace {
+///     target: Target::new(TargetKind::Blob, Locator::new(Symbol::new(0))),
+///     body: ReplaceBody::Bindings,
+///     filter: None,
+/// }
+/// .into();
+///
+/// assert_eq!(op.kind(), dol_ir::OpKind::Replace);
+/// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Replace {
+    /// Target to replace.
     pub target: Target,
+    /// Replacement data source.
     pub body: ReplaceBody,
     /// Arena `NodeId` for an optional `WHERE` predicate.
     pub filter: Option<NodeId>,

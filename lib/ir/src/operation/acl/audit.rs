@@ -7,10 +7,15 @@ use crate::target::{Symbol, Target};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum AuditEvent {
+    /// Audit read operations (SELECT, Query).
     Read,
+    /// Audit write operations (INSERT, UPDATE, DELETE).
     Write,
+    /// Audit schema changes (CREATE, ALTER, DROP).
     SchemaChange,
+    /// Audit access control changes (GRANT, REVOKE).
     AccessControl,
+    /// Audit all event classes.
     All,
 }
 
@@ -20,17 +25,44 @@ pub enum AuditEvent {
 pub enum AuditSink {
     /// Backend's default audit log.
     Default,
-    /// A named sink registered by the backend.
+    /// A named sink registered by the backend (e.g. `kafka://audit-topic`).
     Named(Symbol),
 }
 
 /// `Audit` operation.
+///
+/// Defines an auditing rule that records events on a target to a sink.
+///
+/// # Examples
+///
+/// ```
+/// use dol_ir::operation::{AuditEvent, AuditOp, AuditSink, StructuralVerb};
+/// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
+/// use dol_ir::Operation;
+///
+/// // Audit all writes on the "users" table
+/// let op: Operation = AuditOp {
+///     verb: StructuralVerb::Create,
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
+///     name: Symbol::new(1),
+///     event: AuditEvent::Write,
+///     sink: AuditSink::Default,
+/// }
+/// .into();
+///
+/// assert_eq!(op.kind(), dol_ir::OpKind::Audit);
+/// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AuditOp {
+    /// `Create` / `Drop` / `Alter`.
     pub verb: StructuralVerb,
+    /// Target to audit.
     pub target: Target,
+    /// Interned audit rule name.
     pub name: Symbol,
+    /// Event class to capture.
     pub event: AuditEvent,
+    /// Destination for audit records.
     pub sink: AuditSink,
 }

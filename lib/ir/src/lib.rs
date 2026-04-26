@@ -16,6 +16,7 @@
 //! convenience.
 
 #![deny(unsafe_code)]
+#![warn(missing_docs)]
 
 extern crate alloc;
 

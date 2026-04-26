@@ -17,17 +17,22 @@
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct CatalogId(pub u32);
+pub struct CatalogId(
+    /// Raw catalog index.
+    pub u32,
+);
 
 impl CatalogId {
     /// The program's own embedded catalog.
     pub const SELF: CatalogId = CatalogId(0);
 
+    /// Construct a catalog id from a raw index.
     #[inline]
     pub const fn new(id: u32) -> Self {
         Self(id)
     }
 
+    /// Underlying raw catalog index.
     #[inline]
     pub const fn raw(self) -> u32 {
         self.0
@@ -45,14 +50,19 @@ impl From<u32> for CatalogId {
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SchemaId(pub u32);
+pub struct SchemaId(
+    /// Raw schema index within the catalog.
+    pub u32,
+);
 
 impl SchemaId {
+    /// Construct a schema id from a raw index.
     #[inline]
     pub const fn new(id: u32) -> Self {
         Self(id)
     }
 
+    /// Underlying raw schema index.
     #[inline]
     pub const fn raw(self) -> u32 {
         self.0
@@ -75,11 +85,14 @@ impl From<u32> for SchemaId {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SchemaRef {
+    /// Which catalog this schema belongs to.
     pub catalog: CatalogId,
+    /// Index within that catalog.
     pub schema: SchemaId,
 }
 
 impl SchemaRef {
+    /// Construct a schema reference from explicit catalog and schema ids.
     #[inline]
     pub const fn new(catalog: CatalogId, schema: SchemaId) -> Self {
         Self { catalog, schema }

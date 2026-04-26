@@ -25,7 +25,9 @@ pub enum CatalogEntry {
     Type(TypeEntry),
     /// Backend-specific body, codec-encoded.
     Extension {
+        /// Kind tag identifying the extension type.
         kind: alloc::string::String,
+        /// Opaque payload bytes.
         payload: Vec<u8>,
     },
 }
@@ -34,7 +36,9 @@ pub enum CatalogEntry {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TypeEntry {
+    /// Type name.
     pub name: alloc::string::String,
+    /// Type classification (enum, composite, distinct).
     pub kind: crate::operation::TypeBody,
     /// Optional list of variants (for enums) or fields (for composites).
     pub members: Vec<alloc::string::String>,
