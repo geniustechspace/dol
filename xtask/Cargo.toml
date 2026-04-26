@@ -8,6 +8,6 @@ description = "DOL — workspace task runner (size, nostd, doc, audit)."
 readme = "README.md"
 
 [dependencies]
-dol-types = { workspace = true }
+dol-core = { workspace = true }
 dol-expr  = { workspace = true }
 dol-ir    = { workspace = true }

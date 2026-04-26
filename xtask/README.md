@@ -11,7 +11,7 @@ cargo run -p xtask -- <subcommand>
 | Command  | Purpose                                                        |
 | -------- | -------------------------------------------------------------- |
 | `size`   | print `size_of` for the public size-budgeted IR types; fails CI on regression |
-| `nostd`  | run `cargo check --no-default-features` on the no_std crates (`dol-arena`, `dol-span`, `dol-diag`) |
+| `nostd`  | run `cargo test --no-default-features` on the `no_std` leaves (`dol-core`, `dol-expr`) |
 | `doc`    | build workspace docs with all features                         |
 | `readme` | verify every workspace member has a non-empty `README.md`      |
 | `help`   | print this list                                                |
@@ -19,10 +19,10 @@ cargo run -p xtask -- <subcommand>
 ## Size budgets enforced by `xtask size`
 
 ```text
-size_of::<dol_types::Value>()            ≤ 24
-size_of::<dol_types::Literal<'static>>() ≤ 32
-size_of::<dol_expr::ExprNode>()          ≤ 32
-size_of::<dol_ir::Statement>()           ≤ 64   (currently 24)
+size_of::<dol_core::Value>()            ≤ 24
+size_of::<dol_core::Literal<'static>>() ≤ 32
+size_of::<dol_expr::ExprNode>()         ≤ 32
+size_of::<dol_ir::Statement>()          ≤ 64   (currently 24)
 ```
 
 See [`justfile`](../justfile) for higher-level recipes that wrap these.

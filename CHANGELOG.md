@@ -9,7 +9,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `no_std + alloc` support for the language layer: `dol-types` and `dol-expr`
+- **`dol-core` granular features** — `geo`, `network`, `datetime`, `numeric`
+  (all default-on). Disabling any one drops the corresponding `Value` /
+  `Literal` / `DataType` / `TypeError` variants and the owning module from
+  the compiled crate, suitable for embedded targets that only need a subset
+  of the type system. The umbrella `dol` crate exposes pass-through features
+  with the same names; the `iot-min` preset now actively omits `geo` and
+  `network` while keeping `datetime` and `numeric`.
+- CI matrix job `dol-core-features` exercises representative
+  `--no-default-features` combinations end-to-end.
+
+### Changed
+
+- **`dol-core` value/type system file split** (internal refactor; no public
+  API change):
+  - `value/` is now per-concern (`enum_def` / `range` / `classify` /
+    `accessors` / `display` / `from_impls`) with tests living in
+    `value/tests/<concern>.rs` siblings.
+  - `Literal<'a>` lifted to a top-level `lib/core/src/literal/` module
+    (`enum_def` / `range` / `constructors` / `display` / `conversions`),
+    reflecting that it is an AST node, not a runtime value. Public paths
+    (`dol_core::Literal`, `dol_core::LiteralRange`, `dol_core::value::Literal`)
+    continue to resolve.
+  - `data_type/` split mirrors the same shape (`enum_def` / `struct_field`
+    / `classify` / `conformance` / `constructors` + tests).
+  - Shared `fmt_uuid` helper lifted to `crate::format`.
+- `xtask nostd` promoted from `cargo check` to `cargo test`. Test bodies
+  are now type-checked under `--no-default-features` so `alloc`-import
+  regressions can no longer hide. Existing `cargo test -p dol-core
+  --no-default-features` failures (31 errors) fixed via per-test
+  `alloc::string::ToString` / `alloc::vec` imports.
+- `network::ParseMacAddrError` now implements `core::error::Error`
+  unconditionally (was gated behind `feature = "std"`; the crate's MSRV is
+  1.85, well past the 1.81 stabilisation of `core::error::Error`).
+- `dol-core/std` now implies `dol-core/datetime`. The wall-clock helpers
+  (`datetime::today`/`now`/`now_tz`) live in the datetime module and would
+  be orphaned otherwise.
+- **Workspace restructure**: crates now live in three top-level buckets —
+  `lib/` (libraries), `tools/` (developer tools), and `backends/` (concrete
+  `Backend` implementations; reserved, currently empty). Folder names drop
+  the `dol-` prefix; published package names retain it. The dependency DAG
+  is unchanged in shape but enforced by the bucket invariants.
+- **Merged `dol-span` + `dol-diag` + `dol-types` into a single `dol-core`
+  crate.** `span` and `diag` remain as namespaced sub-modules; the
+  value/type system is the crate's flat root surface (`dol_core::Value`,
+  `dol_core::DataType`, …). The most-used items (`Value`, `Literal`,
+  `DataType`, `TypeError`, `Span`, `FileId`, `Diagnostic`, `Severity`,
+  `Code`) are also re-exported flat at the crate root.
+- The umbrella `dol` crate now exposes `dol::core` (was `dol::types`) and
+  drops the `arena` / `span` / `diag` features (folded into `core`).
+
+### Removed
+
+- **`dol-arena`** — unused by any internal crate. The arena/interner code
+  remains in git history if a future external consumer needs it.
+
+### Added
+
+- `no_std + alloc` support for the language layer: `dol-core` and `dol-expr`
   now compile with `--no-default-features` and on `thumbv7em-none-eabihf`.
   CI's `cross-compile` job and `xtask nostd` enforce both
 - New `std` feature on `dol-types` (default-on) gating

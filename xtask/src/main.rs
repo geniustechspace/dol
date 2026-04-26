@@ -11,7 +11,7 @@
 //! | command  | purpose                                                  |
 //! |----------|----------------------------------------------------------|
 //! | `size`   | print `size_of` for the public size-budgeted IR types.   |
-//! | `nostd`  | run `cargo check --no-default-features` on `no_std` crates. |
+//! | `nostd`  | run `cargo test --no-default-features` on `no_std` crates. |
 //! | `doc`    | build workspace docs with all features.                  |
 //! | `readme` | verify every workspace member has a non-empty README.md. |
 //! | `help`   | print this list.                                         |
@@ -81,12 +81,12 @@ fn size_report() -> bool {
     use std::mem::size_of;
     println!("--- DOL size report ---");
     println!(
-        "size_of::<dol_types::Value>()                = {}",
-        size_of::<dol_types::Value>()
+        "size_of::<dol_core::Value>()                = {}",
+        size_of::<dol_core::Value>()
     );
     println!(
-        "size_of::<dol_types::Literal<'static>>()     = {}",
-        size_of::<dol_types::Literal<'static>>()
+        "size_of::<dol_core::Literal<'static>>()     = {}",
+        size_of::<dol_core::Literal<'static>>()
     );
     println!(
         "size_of::<dol_expr::ExprNode>()              = {}",
@@ -112,8 +112,8 @@ fn size_report() -> bool {
             }
         }};
     }
-    budget!(dol_types::Value, 24);
-    budget!(dol_types::Literal<'static>, 32);
+    budget!(dol_core::Value, 24);
+    budget!(dol_core::Literal<'static>, 32);
     budget!(dol_expr::ExprNode, 32);
     // Boxing the heavy DML / DDL / storage variants brings `Statement`
     // comfortably under the 64-byte budget set by the implementation plan.
@@ -121,11 +121,15 @@ fn size_report() -> bool {
     ok
 }
 
-/// Verify the leaf no_std crates still build without `std`.
+/// Verify the leaf no_std crates still build *and pass tests* without `std`.
+///
+/// Promoted from `cargo check` to `cargo test` because `check` does not
+/// type-check `#[cfg(test)]` bodies; tests can silently rot when imports
+/// from `alloc` are missing under `--no-default-features`.
 fn nostd_check() -> bool {
-    let crates = ["dol-arena", "dol-span", "dol-diag", "dol-types", "dol-expr"];
+    let crates = ["dol-core", "dol-expr"];
     for c in crates {
-        let ok = run_cargo(&["check", "-p", c, "--no-default-features"], &[]);
+        let ok = run_cargo(&["test", "-p", c, "--no-default-features"], &[]);
         if !ok {
             eprintln!("xtask: nostd check failed for {c}");
             return false;
@@ -148,22 +152,29 @@ fn readme_check() -> bool {
         .expect("xtask manifest dir has a parent")
         .to_path_buf();
 
-    // Discover every workspace member by scanning `crates/*` plus the `xtask`
-    // crate itself. Keeps this self-contained (no `cargo metadata` parsing).
+    // Discover every workspace member by scanning the three top-level
+    // buckets (`lib/*`, `tools/*`, `backends/*`) plus the `xtask` crate
+    // itself. Keeps this self-contained (no `cargo metadata` parsing).
     let mut members: Vec<PathBuf> = Vec::new();
-    let crates_dir = workspace_root.join("crates");
-    match fs::read_dir(&crates_dir) {
-        Ok(entries) => {
-            for e in entries.flatten() {
-                let p = e.path();
-                if p.is_dir() && p.join("Cargo.toml").is_file() {
-                    members.push(p);
+    for bucket in ["lib", "tools", "backends"] {
+        let bucket_dir = workspace_root.join(bucket);
+        match fs::read_dir(&bucket_dir) {
+            Ok(entries) => {
+                for e in entries.flatten() {
+                    let p = e.path();
+                    if p.is_dir() && p.join("Cargo.toml").is_file() {
+                        members.push(p);
+                    }
                 }
             }
-        }
-        Err(e) => {
-            eprintln!("xtask: cannot read {}: {e}", crates_dir.display());
-            return false;
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                // `backends/` may legitimately be empty; skip silently.
+                continue;
+            }
+            Err(e) => {
+                eprintln!("xtask: cannot read {}: {e}", bucket_dir.display());
+                return false;
+            }
         }
     }
     members.push(workspace_root.join("xtask"));

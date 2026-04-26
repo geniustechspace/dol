@@ -224,49 +224,36 @@ checksum = "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5"
 name = "dol"
 version = "0.1.0"
 dependencies = [
- "dol-arena",
  "dol-check",
- "dol-diag",
+ "dol-core",
  "dol-expr",
  "dol-fmt",
  "dol-ir",
  "dol-pipeline",
  "dol-query",
  "dol-schema",
- "dol-span",
  "dol-stream",
- "dol-types",
  "dol-wire",
-]
-
-[[package]]
-name = "dol-arena"
-version = "0.1.0"
-dependencies = [
- "hashbrown 0.15.5",
- "serde",
- "smallvec",
 ]
 
 [[package]]
 name = "dol-check"
 version = "0.1.0"
 dependencies = [
- "dol-diag",
+ "dol-core",
  "dol-expr",
  "dol-ir",
  "dol-schema",
- "dol-span",
- "dol-types",
  "serde",
 ]
 
 [[package]]
-name = "dol-diag"
+name = "dol-core"
 version = "0.1.0"
 dependencies = [
- "dol-span",
+ "proptest",
  "serde",
+ "serde_json",
  "smallvec",
 ]
 
@@ -275,7 +262,7 @@ name = "dol-expr"
 version = "0.1.0"
 dependencies = [
  "criterion",
- "dol-types",
+ "dol-core",
  "hashbrown 0.15.5",
  "proptest",
  "serde",
@@ -287,19 +274,19 @@ dependencies = [
 name = "dol-fmt"
 version = "0.1.0"
 dependencies = [
+ "dol-core",
  "dol-expr",
  "dol-ir",
  "dol-schema",
- "dol-types",
 ]
 
 [[package]]
 name = "dol-ir"
 version = "0.1.0"
 dependencies = [
+ "dol-core",
  "dol-expr",
  "dol-schema",
- "dol-types",
  "serde",
  "serde_json",
  "smallvec",
@@ -309,10 +296,10 @@ dependencies = [
 name = "dol-pipeline"
 version = "0.1.0"
 dependencies = [
+ "dol-core",
  "dol-expr",
  "dol-ir",
  "dol-schema",
- "dol-types",
  "serde",
  "serde_json",
  "smallvec",
@@ -322,10 +309,10 @@ dependencies = [
 name = "dol-query"
 version = "0.1.0"
 dependencies = [
+ "dol-core",
  "dol-expr",
  "dol-ir",
  "dol-schema",
- "dol-types",
  "serde",
  "serde_json",
  "smallvec",
@@ -335,38 +322,22 @@ dependencies = [
 name = "dol-schema"
 version = "0.1.0"
 dependencies = [
- "dol-types",
+ "dol-core",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "dol-span"
-version = "0.1.0"
-dependencies = [
- "serde",
 ]
 
 [[package]]
 name = "dol-stream"
 version = "0.1.0"
 dependencies = [
+ "dol-core",
  "dol-expr",
  "dol-ir",
  "dol-schema",
- "dol-types",
  "serde",
  "serde_json",
  "smallvec",
-]
-
-[[package]]
-name = "dol-types"
-version = "0.1.0"
-dependencies = [
- "proptest",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -374,10 +345,10 @@ name = "dol-wire"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "dol-core",
  "dol-expr",
  "dol-ir",
  "dol-schema",
- "dol-types",
  "postcard",
  "serde",
  "serde_json",
@@ -1116,9 +1087,9 @@ dependencies = [
 name = "xtask"
 version = "0.1.0"
 dependencies = [
+ "dol-core",
  "dol-expr",
  "dol-ir",
- "dol-types",
 ]
 
 [[package]]

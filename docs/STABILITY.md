@@ -2,9 +2,9 @@
 
 This document describes the stability guarantees of the DOL public Rust API
 and the on-disk / on-the-wire serialized representation produced by the
-`serde` feature on `dol-types` and `dol-expr`.
+`serde` feature on `dol-core` and `dol-expr`.
 
-The policy applies to the language layer (`dol-types` and `dol-expr`).
+The policy applies to the language layer (`dol-core` and `dol-expr`).
 Higher-level crates inherit the same conventions, but their own stability
 contracts are documented in their respective READMEs.
 

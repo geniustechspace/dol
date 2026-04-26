@@ -1,0 +1,46 @@
+[package]
+name = "dol-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+description = "DOL — foundation crate: source spans, structured diagnostics, and the DOL value/type system."
+readme = "README.md"
+license = "BSD-3-Clause"
+repository = "https://github.com/geniustechspace/dol"
+keywords = ["dol", "database", "schema", "types", "no-std"]
+categories = ["database", "data-structures", "no-std"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+smallvec = { workspace = true }
+serde    = { workspace = true, optional = true }
+
+[features]
+# `serde` and `std` are on by default. The crate is `no_std + alloc`-clean
+# when both are disabled, suitable for embedded targets that cannot link
+# `std`. Embedded users opt out with `default-features = false`.
+#
+# The granular feature flags `geo`, `network`, `datetime`, `numeric` are
+# default-on; turning them off (with `default-features = false`) drops the
+# corresponding `Value` / `Literal` / `DataType` / `TypeError` variants and
+# the entire owning module from the compiled crate. Useful for embedded
+# builds that only need a subset of the type system.
+default = ["std", "serde", "geo", "network", "datetime", "numeric"]
+serde   = ["dep:serde", "smallvec/serde"]
+# Enables the wall-clock factory helpers (`datetime::today`, `datetime::now`,
+# `datetime::now_tz`) that require `std::time::SystemTime`. The
+# `core::error::Error` impl on `TypeError` is always available
+# (stable since Rust 1.81).
+std      = ["datetime"]
+geo      = []
+network  = []
+datetime = []
+numeric  = []
+
+[dev-dependencies]
+serde_json = { workspace = true }
+proptest = "1"
