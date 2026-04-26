@@ -49,6 +49,31 @@ cargo deny check
 - Run `cargo test --workspace --all-features` to execute the full suite.
 - Feature-gated code should be tested under the relevant feature flag.
 
+## Serde Representation
+
+The wire format produced by `serde::Serialize` is part of the public contract
+of every type in `dol-types`. Pick the enum representation deliberately:
+
+- **Default (externally tagged)** — use for any enum whose variants would be
+  ambiguous on the wire: variants that share a primitive shape (e.g. several
+  number-like or string-like variants), variants whose payloads have
+  overlapping field sets, or unit variants that need to be distinguishable.
+  This is the safe default and is what `Value`, `Literal`, `DataType`, and
+  the geo enums use.
+- **`#[serde(untagged)]`** — only when every pair of variants is
+  *unambiguous* on the wire (distinct primitive type, distinct fixed-width
+  array length, or disjoint required field sets). Good fits are
+  "newtype-style multiplexers" of fixed-width payloads. `IpAddr`
+  (`[u8; 4]` vs `[u8; 16]`) and `MacAddr` (`[u8; 6]` vs `[u8; 8]`) qualify.
+- **`#[serde(tag = "kind")]` (internally tagged)** — prefer over `untagged`
+  when you want a cleaner wire format than the default but the variants are
+  not structurally unambiguous.
+
+When introducing or changing the serde representation of a public type, add
+a `# Serde representation` doc section to the type and a wire-shape test
+under `crates/dol-types/tests/serde_roundtrip.rs` so the format is asserted,
+not just inferred.
+
 ## Commit Messages
 
 Use conventional commit messages:

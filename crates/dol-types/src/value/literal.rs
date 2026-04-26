@@ -15,9 +15,43 @@ use super::super::binary::BitString;
 use super::super::datetime::{Date, DateTime, Interval, Offset, Time, TimestampTz};
 use super::super::error::TypeError;
 use super::super::geo::{Circle, Line, Path, Point, Polygon, Rect, Segment};
-use super::super::network::{IpAddr, MacAddr, MacAddr8};
+use super::super::network::{IpAddr, MacAddr};
 use super::super::numeric::Decimal;
-use super::{LiteralRange, Value, ValueRange, fmt_uuid};
+use super::{Value, ValueRange, fmt_uuid};
+
+// ─── Range types ─────────────────────────────────────────────────────────────
+
+/// A range bound-pair for [`Literal`].
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct LiteralRange<'a> {
+    pub start: Bound<Box<Literal<'a>>>,
+    pub end: Bound<Box<Literal<'a>>>,
+}
+
+impl<'a> LiteralRange<'a> {
+    pub fn new(start: Bound<Literal<'a>>, end: Bound<Literal<'a>>) -> Self {
+        Self {
+            start: start.map(Box::new),
+            end: end.map(Box::new),
+        }
+    }
+
+    pub fn unbounded() -> Self {
+        Self {
+            start: Bound::Unbounded,
+            end: Bound::Unbounded,
+        }
+    }
+
+    /// Convert any borrowed data to owned, erasing the lifetime.
+    pub fn into_static(self) -> LiteralRange<'static> {
+        LiteralRange {
+            start: self.start.map(|b| Box::new((*b).into_static())),
+            end: self.end.map(|b| Box::new((*b).into_static())),
+        }
+    }
+}
 
 // ─── Literal<'a> ─────────────────────────────────────────────────────────────
 
@@ -72,7 +106,6 @@ pub enum Literal<'a> {
     // ── Network ──
     Inet(IpAddr),
     MacAddr(MacAddr),
-    MacAddr8(MacAddr8),
 
     // ── Temporal ──
     Date(Date),
@@ -216,11 +249,11 @@ impl<'a> Literal<'a> {
         Self::Inet(IpAddr::v6(bytes))
     }
 
-    pub const fn macaddr(b: [u8; 6]) -> Self {
-        Self::MacAddr(MacAddr::new(b))
+    pub const fn macaddr_eui48(b: [u8; 6]) -> Self {
+        Self::MacAddr(MacAddr::eui48(b))
     }
-    pub const fn macaddr8(b: [u8; 8]) -> Self {
-        Self::MacAddr8(MacAddr8::new(b))
+    pub const fn macaddr_eui64(b: [u8; 8]) -> Self {
+        Self::MacAddr(MacAddr::eui64(b))
     }
 
     // ── Geometric constructors ──
@@ -409,7 +442,6 @@ impl<'a> Literal<'a> {
             Self::Decimal(d) => Literal::Decimal(d),
             Self::Inet(v) => Literal::Inet(v),
             Self::MacAddr(v) => Literal::MacAddr(v),
-            Self::MacAddr8(v) => Literal::MacAddr8(v),
             Self::Date(v) => Literal::Date(v),
             Self::Time(v) => Literal::Time(v),
             Self::DateTime(v) => Literal::DateTime(v),
@@ -492,7 +524,6 @@ impl<'a> fmt::Display for Literal<'a> {
             Self::Decimal(v) => write!(f, "{v}"),
             Self::Inet(v) => write!(f, "{v}"),
             Self::MacAddr(v) => write!(f, "{v}"),
-            Self::MacAddr8(v) => write!(f, "{v}"),
             Self::Date(v) => write!(f, "{v}"),
             Self::Time(v) => write!(f, "{v}"),
             Self::DateTime(v) => write!(f, "{v}"),
@@ -577,7 +608,6 @@ impl<'a> From<Literal<'a>> for Value {
             Literal::Decimal(v) => Self::Decimal(v),
             Literal::Inet(v) => Self::Inet(v),
             Literal::MacAddr(v) => Self::MacAddr(v),
-            Literal::MacAddr8(v) => Self::MacAddr8(v),
             Literal::Date(v) => Self::Date(v),
             Literal::Time(v) => Self::Time(v),
             Literal::DateTime(v) => Self::DateTime(v),
@@ -771,11 +801,6 @@ impl<'a> From<IpAddr> for Literal<'a> {
 impl<'a> From<MacAddr> for Literal<'a> {
     fn from(v: MacAddr) -> Self {
         Self::MacAddr(v)
-    }
-}
-impl<'a> From<MacAddr8> for Literal<'a> {
-    fn from(v: MacAddr8) -> Self {
-        Self::MacAddr8(v)
     }
 }
 impl<'a> From<Point> for Literal<'a> {

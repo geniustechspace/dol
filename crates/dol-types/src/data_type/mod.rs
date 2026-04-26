@@ -164,8 +164,10 @@ pub enum DataType {
     IpNetwork {
         prefix_len: u8,
     },
+    /// An Ethernet MAC address. Matches both EUI-48 and EUI-64
+    /// [`Value::MacAddr`] payloads; [`Self::name`] returns `"macaddr"` for
+    /// either width.
     MacAddr,
-    MacAddr8,
 
     // ── Geometric ──
     Point,
@@ -271,10 +273,7 @@ impl DataType {
     }
 
     pub const fn is_network(&self) -> bool {
-        matches!(
-            self,
-            Self::IpAddr | Self::IpNetwork { .. } | Self::MacAddr | Self::MacAddr8
-        )
+        matches!(self, Self::IpAddr | Self::IpNetwork { .. } | Self::MacAddr)
     }
 
     pub const fn is_composite(&self) -> bool {
@@ -459,7 +458,6 @@ impl DataType {
                 Ok(())
             }
             Self::MacAddr => kind_check!(V::MacAddr(_)),
-            Self::MacAddr8 => kind_check!(V::MacAddr8(_)),
 
             // Geometric
             Self::Point => kind_check!(V::Point(_)),
@@ -675,7 +673,6 @@ impl DataType {
             Self::IpAddr => "ipaddr",
             Self::IpNetwork { .. } => "ipnetwork",
             Self::MacAddr => "macaddr",
-            Self::MacAddr8 => "macaddr8",
             Self::Point => "point",
             Self::Line => "line",
             Self::LineSegment => "lseg",

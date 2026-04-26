@@ -9,7 +9,7 @@
 //! |-------|-------|---------|
 //! | **Values** | [`Value`], [`Literal`] | Carry actual data at runtime and in ASTs |
 //! | **Descriptors** | [`DataType`], [`StructField`] | Describe the expected shape of a position |
-//! | **Primitives** | [`Decimal`], [`Date`], [`Time`], [`Interval`], [`IpAddr`], [`MacAddr`], [`MacAddr8`], [`BitString`], [`geo::Point`], etc. | Structural sub-types with validated constructors |
+//! | **Primitives** | [`Decimal`], [`Date`], [`Time`], [`Interval`], [`IpAddr`], [`MacAddr`], [`BitString`], [`geo::Point`], etc. | Structural sub-types with validated constructors |
 //! | **Errors** | [`TypeError`] | All validation and conformance errors |
 //!
 //! # The `DataType` / `Value` contract
@@ -77,7 +77,7 @@ pub use error::TypeError;
 pub use binary::BitString;
 pub use datetime::{Date, DateTime, Interval, Offset, Time, TimestampTz};
 pub use geo::{Circle, Line, Path, Point, Polygon, Rect, Segment};
-pub use network::{IpAddr, MacAddr, MacAddr8};
+pub use network::{IpAddr, MacAddr};
 pub use numeric::Decimal;
 
 pub use data_type::{DataType, StructField};

@@ -9,8 +9,8 @@
 use std::borrow::Cow;
 
 use dol_types::{
-    BitString, DataType, Date, DateTime, Decimal, Interval, IpAddr, Literal, MacAddr, MacAddr8,
-    Offset, Point, StructField, Time, TimestampTz, Value,
+    BitString, DataType, Date, DateTime, Decimal, Interval, IpAddr, Literal, MacAddr, Offset,
+    Point, StructField, Time, TimestampTz, Value,
 };
 
 fn round_trip<T>(value: &T) -> T
@@ -123,14 +123,55 @@ fn value_round_trip_temporal_and_network() {
         Value::Interval(Box::new(interval)),
         Value::Decimal(Box::new(dec)),
         Value::Inet(IpAddr::v4(127, 0, 0, 1)),
-        Value::MacAddr(MacAddr([0u8; 6])),
-        Value::MacAddr8(MacAddr8([0u8; 8])),
+        Value::MacAddr(MacAddr::eui48([0u8; 6])),
+        Value::MacAddr(MacAddr::eui64([0u8; 8])),
         Value::Point(Point::new_unchecked(1.0, 2.0)),
         Value::BitString(Box::new(bs)),
     ];
     for v in &cases {
         assert_eq!(v, &round_trip(v));
     }
+}
+
+#[test]
+fn ip_addr_serialises_as_untagged_octet_array() {
+    // V4 -> 4-byte JSON array, V6 -> 16-byte JSON array, with no enum tag.
+    let v4 = IpAddr::v4(192, 168, 0, 1);
+    assert_eq!(serde_json::to_string(&v4).unwrap(), "[192,168,0,1]");
+
+    let v6 = IpAddr::v6([
+        0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01,
+    ]);
+    assert_eq!(
+        serde_json::to_string(&v6).unwrap(),
+        "[32,1,13,184,0,0,0,0,0,0,0,0,0,0,0,1]"
+    );
+
+    // Round-trip both directions: bare arrays decode back to the right variant.
+    let parsed_v4: IpAddr = serde_json::from_str("[10,0,0,1]").unwrap();
+    assert_eq!(parsed_v4, IpAddr::v4(10, 0, 0, 1));
+    let parsed_v6: IpAddr = serde_json::from_str("[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1]").unwrap();
+    let mut expected_v6 = [0u8; 16];
+    expected_v6[15] = 1;
+    assert_eq!(parsed_v6, IpAddr::V6(expected_v6));
+}
+
+#[test]
+fn mac_addr_serialises_as_untagged_octet_array() {
+    // EUI-48 -> 6-byte JSON array, EUI-64 -> 8-byte JSON array, no enum tag.
+    let eui48 = MacAddr::eui48([0x00, 0x1a, 0x2b, 0x3c, 0x4d, 0x5e]);
+    assert_eq!(serde_json::to_string(&eui48).unwrap(), "[0,26,43,60,77,94]");
+
+    let eui64 = MacAddr::eui64([0x00, 0x1a, 0x2b, 0x3c, 0x4d, 0x5e, 0x6f, 0x80]);
+    assert_eq!(
+        serde_json::to_string(&eui64).unwrap(),
+        "[0,26,43,60,77,94,111,128]"
+    );
+
+    let parsed_48: MacAddr = serde_json::from_str("[1,2,3,4,5,6]").unwrap();
+    assert_eq!(parsed_48, MacAddr::eui48([1, 2, 3, 4, 5, 6]));
+    let parsed_64: MacAddr = serde_json::from_str("[1,2,3,4,5,6,7,8]").unwrap();
+    assert_eq!(parsed_64, MacAddr::eui64([1, 2, 3, 4, 5, 6, 7, 8]));
 }
 
 #[test]

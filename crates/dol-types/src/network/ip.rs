@@ -1,11 +1,28 @@
 use core::fmt;
+use core::net::AddrParseError;
+use core::str::FromStr;
 
 /// An IP address literal.
 ///
 /// Stored as a self-contained enum (not `core::net::IpAddr`) for consistent
 /// size, alignment, and serde behaviour. `From` impls cover the stdlib types.
+///
+/// # Serde representation
+///
+/// With the `serde` feature, `IpAddr` serialises **untagged** as the bare
+/// octet array of its variant: a 4-byte array for [`IpAddr::V4`] and a
+/// 16-byte array for [`IpAddr::V6`]. The two widths are unambiguous on the
+/// wire, so no enum tag is emitted.
+///
+/// ```json
+/// // V4
+/// [192, 168, 0, 1]
+/// // V6
+/// [32, 1, 13, 184, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 pub enum IpAddr {
     V4([u8; 4]),
     V6([u8; 16]),
@@ -75,5 +92,83 @@ impl From<core::net::IpAddr> for IpAddr {
             core::net::IpAddr::V4(v) => v.into(),
             core::net::IpAddr::V6(v) => v.into(),
         }
+    }
+}
+
+impl From<IpAddr> for core::net::IpAddr {
+    fn from(a: IpAddr) -> Self {
+        match a {
+            IpAddr::V4(octets) => core::net::IpAddr::V4(core::net::Ipv4Addr::from(octets)),
+            IpAddr::V6(octets) => core::net::IpAddr::V6(core::net::Ipv6Addr::from(octets)),
+        }
+    }
+}
+
+impl FromStr for IpAddr {
+    type Err = AddrParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse::<core::net::IpAddr>().map(Into::into)
+    }
+}
+
+impl TryFrom<&str> for IpAddr {
+    type Error = AddrParseError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        value.parse()
+    }
+}
+
+impl TryFrom<alloc::string::String> for IpAddr {
+    type Error = AddrParseError;
+
+    fn try_from(value: alloc::string::String) -> Result<Self, Self::Error> {
+        value.parse()
+    }
+}
+
+impl TryFrom<alloc::boxed::Box<str>> for IpAddr {
+    type Error = AddrParseError;
+
+    fn try_from(value: alloc::boxed::Box<str>) -> Result<Self, Self::Error> {
+        value.parse()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::IpAddr;
+
+    #[test]
+    fn parses_ipv4_from_str() {
+        let ip: IpAddr = "192.168.0.1".parse().expect("valid IPv4");
+        assert_eq!(ip, IpAddr::V4([192, 168, 0, 1]));
+    }
+
+    #[test]
+    fn parses_ipv6_from_str() {
+        let ip: IpAddr = "2001:db8::1".parse().expect("valid IPv6");
+        let expected: IpAddr = core::net::Ipv6Addr::new(0x2001, 0x0db8, 0, 0, 0, 0, 0, 1).into();
+        assert_eq!(ip, expected);
+    }
+
+    #[test]
+    fn parses_owned_string_variants() {
+        let from_string =
+            IpAddr::try_from(alloc::string::String::from("10.0.0.42")).expect("valid string ip");
+        let from_boxed =
+            IpAddr::try_from(alloc::boxed::Box::<str>::from("::1")).expect("valid boxed str ip");
+
+        assert_eq!(from_string, IpAddr::V4([10, 0, 0, 42]));
+        assert_eq!(
+            from_boxed,
+            IpAddr::V6(core::net::Ipv6Addr::LOCALHOST.octets())
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_string_ip() {
+        assert!("not-an-ip".parse::<IpAddr>().is_err());
     }
 }

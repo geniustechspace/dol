@@ -19,7 +19,7 @@ use core::ops::Bound;
 use super::binary::BitString;
 use super::datetime::{Date, DateTime, Interval, Time, TimestampTz};
 use super::geo::{Circle, Line, Path, Point, Polygon, Rect, Segment};
-use super::network::{IpAddr, MacAddr, MacAddr8};
+use super::network::{IpAddr, MacAddr};
 use super::numeric::Decimal;
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
@@ -50,14 +50,6 @@ pub(crate) fn fmt_uuid(bytes: &[u8; 16], f: &mut fmt::Formatter<'_>) -> fmt::Res
 
 // ─── Range types ─────────────────────────────────────────────────────────────
 
-/// A range bound-pair for [`Literal`].
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct LiteralRange<'a> {
-    pub start: Bound<Box<Literal<'a>>>,
-    pub end: Bound<Box<Literal<'a>>>,
-}
-
 /// A range bound-pair for [`Value`].
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -65,31 +57,6 @@ pub struct ValueRange {
     pub start: Bound<Box<Value>>,
     pub end: Bound<Box<Value>>,
 }
-
-impl<'a> LiteralRange<'a> {
-    pub fn new(start: Bound<Literal<'a>>, end: Bound<Literal<'a>>) -> Self {
-        Self {
-            start: start.map(Box::new),
-            end: end.map(Box::new),
-        }
-    }
-
-    pub fn unbounded() -> Self {
-        Self {
-            start: Bound::Unbounded,
-            end: Bound::Unbounded,
-        }
-    }
-
-    /// Convert any borrowed data to owned, erasing the lifetime.
-    pub fn into_static(self) -> LiteralRange<'static> {
-        LiteralRange {
-            start: self.start.map(|b| Box::new((*b).into_static())),
-            end: self.end.map(|b| Box::new((*b).into_static())),
-        }
-    }
-}
-
 impl ValueRange {
     pub fn new(start: Bound<Value>, end: Bound<Value>) -> Self {
         Self {
@@ -187,7 +154,6 @@ pub enum Value {
     // ── Network ──
     Inet(IpAddr),
     MacAddr(MacAddr),
-    MacAddr8(MacAddr8),
 
     // ── Temporal ──
     Date(Date),
@@ -295,7 +261,6 @@ impl Value {
             Self::Decimal(_) => "decimal",
             Self::Inet(_) => "inet",
             Self::MacAddr(_) => "macaddr",
-            Self::MacAddr8(_) => "macaddr8",
             Self::Date(_) => "date",
             Self::Time(_) => "time",
             Self::DateTime(_) => "datetime",
@@ -404,13 +369,6 @@ impl Value {
             None
         }
     }
-    pub fn as_macaddr8(&self) -> Option<MacAddr8> {
-        if let Self::MacAddr8(v) = self {
-            Some(*v)
-        } else {
-            None
-        }
-    }
     pub fn as_point(&self) -> Option<Point> {
         if let Self::Point(v) = self {
             Some(*v)
@@ -489,7 +447,6 @@ impl fmt::Display for Value {
             Self::Decimal(v) => write!(f, "{v}"),
             Self::Inet(v) => write!(f, "{v}"),
             Self::MacAddr(v) => write!(f, "{v}"),
-            Self::MacAddr8(v) => write!(f, "{v}"),
             Self::Date(v) => write!(f, "{v}"),
             Self::Time(v) => write!(f, "{v}"),
             Self::DateTime(v) => write!(f, "{v}"),
@@ -687,11 +644,6 @@ impl From<MacAddr> for Value {
         Self::MacAddr(v)
     }
 }
-impl From<MacAddr8> for Value {
-    fn from(v: MacAddr8) -> Self {
-        Self::MacAddr8(v)
-    }
-}
 impl From<Point> for Value {
     fn from(v: Point) -> Self {
         Self::Point(v)
@@ -763,13 +715,13 @@ mod tests {
 
     #[test]
     fn macaddr_display() {
-        let mac = MacAddr::new([0x00, 0x1A, 0x2B, 0x3C, 0x4D, 0x5E]);
+        let mac = MacAddr::eui48([0x00, 0x1A, 0x2B, 0x3C, 0x4D, 0x5E]);
         assert_eq!(mac.to_string(), "00:1a:2b:3c:4d:5e");
     }
 
     #[test]
-    fn macaddr8_display() {
-        let mac = MacAddr8::new([0x00, 0x1A, 0x2B, 0x3C, 0x4D, 0x5E, 0x6F, 0x70]);
+    fn macaddr_eui64_display() {
+        let mac = MacAddr::eui64([0x00, 0x1A, 0x2B, 0x3C, 0x4D, 0x5E, 0x6F, 0x70]);
         assert_eq!(mac.to_string(), "00:1a:2b:3c:4d:5e:6f:70");
     }
 
@@ -811,8 +763,8 @@ mod tests {
         let cases: Vec<Literal<'_>> = vec![
             Literal::xml_borrowed("<root/>"),
             Literal::enum_variant_borrowed("active"),
-            Literal::macaddr([0; 6]),
-            Literal::macaddr8([0; 8]),
+            Literal::macaddr_eui48([0; 6]),
+            Literal::macaddr_eui64([0; 8]),
             Literal::inet_v4(127, 0, 0, 1),
             Literal::from(Point::new_unchecked(0.0, 0.0)),
         ];
