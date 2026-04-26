@@ -43,7 +43,7 @@ pub use append::Append;
 pub use audit::{AuditEvent, AuditOp, AuditSink};
 pub use delete::Delete;
 pub use describe::{Describe, DescribeFacet};
-pub use extension::{ExtensionId, OperationExtension};
+pub use extension::{ExtensionId, ExtensionPayload, OperationExtension};
 pub use field::{FieldDefV2, FieldOp};
 pub use grant::GrantV2;
 pub use index::{IndexDirection, IndexKey, IndexMethod, IndexOp};
@@ -60,8 +60,8 @@ pub use replace::{Replace, ReplaceBody};
 pub use revoke::RevokeV2;
 pub use schema::{SchemaBody, SchemaOp, StructuralVerb, TypeBody};
 pub use tx::{IsolationLevel, TxBegin, TxOp, TxOptions};
-pub use update::{Update, UpdateAssignment};
-pub use upsert::{OnConflict, Upsert};
+pub use update::Update;
+pub use upsert::Upsert;
 
 /// Top-level v2 IR operation.
 ///

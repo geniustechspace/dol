@@ -2,9 +2,10 @@
 
 The v2 IR introduces:
 
-- [`Operation`](docs/IR.md) as the universal operation enum (replaces
-  `Statement`, which is retained as a deprecated compat alias under
-  `dol_ir::compat::statement`).
+- [`Operation`](docs/IR.md) as the **only** universal operation enum.
+  `Statement` and the v1 modules that backed it (`statement`,
+  `definition`, `control`, `transaction`, `storage`, `entity_ref`) are
+  **deleted**.
 - [`Target`](docs/IR.md) / [`Locator`](docs/IR.md) /
   [`SchemaBinding`](docs/IR.md) as the universal addressing primitive.
 - A schema catalog: operations carry a `SchemaRef`, not inline bodies.

@@ -93,10 +93,6 @@ fn size_report() -> bool {
         size_of::<dol_expr::ExprNode>()
     );
     println!(
-        "size_of::<dol_ir::Statement>()               = {}",
-        size_of::<dol_ir::Statement>()
-    );
-    println!(
         "size_of::<dol_ir::Operation>()               = {}",
         size_of::<dol_ir::Operation>()
     );
@@ -119,9 +115,8 @@ fn size_report() -> bool {
     budget!(dol_core::Value, 24);
     budget!(dol_core::Literal<'static>, 32);
     budget!(dol_expr::ExprNode, 32);
-    // Boxing the heavy DML / DDL / storage variants brings `Statement`
-    // comfortably under the 64-byte budget set by the implementation plan.
-    budget!(dol_ir::Statement, 64);
+    // Boxing every heavy payload (DDL bodies, DML arena handles, governance
+    // structs) keeps `Operation` comfortably under its 64-byte budget.
     budget!(dol_ir::Operation, 64);
     ok
 }

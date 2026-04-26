@@ -1,19 +1,14 @@
-//! Curated re-exports — the stable, recommended surface for downstream users.
-//!
-//! ```ignore
-//! use dol_ir::prelude::*;
-//! ```
+//! Prelude — the curated public surface of `dol-ir`.
 
 pub use crate::backend::{Backend, BackendError};
-pub use crate::constraint::{ComputedKind, EntityConstraint, RefAction, RelationRef};
-pub use crate::control::{DefinePolicy, Grant, PolicyAction, Privilege, Revoke};
-pub use crate::definition::{
-    AlterAction, AlterEntity, DefineEntity, DefineLookup, DefineType, DropEntity, DropLookup,
-    DropType, FieldDef, LookupMethod,
+pub use crate::capabilities::{
+    BackendCapabilities, CapabilityCheck, CapabilitySet, CapabilityTag,
 };
-pub use crate::entity_ref::EntityRef;
-pub use crate::statement::Statement;
-pub use crate::storage::{
-    GetObject, ListObjects, MoveFile, ObjectSource, PutObject, ReadFile, WriteFile,
-};
-pub use crate::transaction::Transaction;
+pub use crate::operation::{Category, OpKind, Operation};
+pub use crate::privilege::Privilege;
+pub use crate::program::Program;
+pub use crate::program_ref::ProgramRef;
+pub use crate::schema_catalog::{CatalogEntry, SchemaCatalog, TypeEntry};
+pub use crate::schema_ref::{CatalogId, SchemaId, SchemaRef};
+pub use crate::target::{Locator, SchemaBinding, Symbol, Target, TargetKind};
+pub use crate::version::{IR_SCHEMA_VERSION, VersionedProgram};

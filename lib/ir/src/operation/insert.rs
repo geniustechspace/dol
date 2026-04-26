@@ -1,31 +1,32 @@
 //! `Insert` — append new tuples / documents / objects / records.
 //!
 //! Generic over [`TargetKind`](crate::target::TargetKind): inserting into a
-//! `Relation` is a SQL `INSERT`, into a `Document` is a `insertOne` /
-//! `insertMany`, into a `Blob` is `PutObject`, into a `FileTree` is a
-//! file-create, and so on.
+//! `Relation` is a SQL `INSERT`, into a `Document` is `insertOne`, into a
+//! `Blob` is `PutObject`, into a `FileTree` is a file-create, etc.
 
 use dol_expr::ids::NodeId;
-use smallvec::SmallVec;
 
-use crate::target::Target;
+use crate::target::{Symbol, Target};
 
 /// Where the inserted payload comes from.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum InsertSource {
-    /// One or more rows of arena expressions (for relational/document inserts).
-    Rows(SmallVec<[SmallVec<[NodeId; 4]>; 1]>),
-    /// Insert from a sub-query (arena `Query` node).
+    /// Tabular insert body — `NodeId` points to an arena
+    /// [`ExprNode::Insert`](dol_expr::expr::ExprNode::Insert) carrying
+    /// columns + values + conflict clause. Used for `Relation`, `Document`,
+    /// `KeyValue` targets.
+    Node(NodeId),
+    /// Insert from a sub-query (arena `NodeId` pointing at
+    /// [`ExprNode::Query`](dol_expr::expr::ExprNode::Query)).
     FromQuery(NodeId),
-    /// Insert from runtime parameter bindings (the engine supplies the
-    /// values at execution time). Used for object-store PUT and file-tree
-    /// create when the body is a runtime byte buffer.
+    /// Insert from runtime parameter bindings (engine supplies the bytes /
+    /// document body at execution time). Used for `Blob` / `FileTree` /
+    /// `ApiResource` targets.
     Bindings,
-    /// Insert from a server-side path. Replaces v1 `ObjectSource::FromPath`.
-    FromPath(crate::target::Symbol),
-    /// Insert from an arena expression evaluated at execution time. Replaces
-    /// v1 `ObjectSource::FromExpr`.
+    /// Insert from a server-side path (file copy, blob upload-from-path).
+    FromPath(Symbol),
+    /// Insert from an arena expression evaluated at execution time.
     FromExpr(NodeId),
 }
 
@@ -35,6 +36,8 @@ pub enum InsertSource {
 pub struct Insert {
     pub target: Target,
     pub source: InsertSource,
-    /// Optional arena `NodeId` representing a `RETURNING` projection.
+    /// Optional arena `NodeId` representing a `RETURNING` projection. For
+    /// `Source::Node`, the returning list inside the arena `InsertNode`
+    /// is canonical and this field is `None`.
     pub returning: Option<NodeId>,
 }

@@ -48,22 +48,19 @@ impl DeleteQuery {
         self
     }
 
-    /// Build the arena-based IR as a [`dol_ir::Program`].
-    ///
-    /// Returns a [`Program`] carrying the [`Statement`] together with the
-    /// expression arena and interner needed by renderers to resolve any
-    /// expression references it contains.
-    ///
-    /// [`Program`]: dol_ir::Program
-    /// [`Statement`]: dol_ir::Statement
+    /// Build the arena-based IR as a [`dol_ir::Program`] containing a
+    /// single [`dol_ir::Operation::Delete`] referencing an arena
+    /// [`ExprNode::Delete`](dol_expr::expr::ExprNode::Delete).
     pub fn build(self) -> dol_ir::Program {
         use dol_expr::expr::{DeleteNode, ExprNode};
         use dol_expr::lower::lower_filters;
+        use dol_ir::TargetKind;
+        use dol_ir::operation::Delete;
 
         let mut arena = dol_expr::ExprArena::new();
         let mut interner = dol_expr::Interner::new();
 
-        let target = interner.intern(&dol_expr::lower::qualified_name(
+        let target_str = interner.intern(&dol_expr::lower::qualified_name(
             &self.name,
             &self.namespace,
         ));
@@ -83,16 +80,23 @@ impl DeleteQuery {
             })
             .collect();
 
-        let node = DeleteNode {
-            target,
+        let dnode = DeleteNode {
+            target: target_str,
             filter,
             returning,
         };
+        let did = arena.alloc_delete(dnode);
+        let body = arena.alloc(ExprNode::Delete(did));
 
-        (dol_ir::Statement::Delete(Box::new(node)), arena, interner).into()
+        let target = crate::target::target_from_parts(
+            &mut interner,
+            TargetKind::Relation,
+            &self.name,
+            self.namespace.as_deref(),
+        );
+        let op: dol_ir::Operation = Delete { target, node: body }.into();
+        dol_ir::Program::new(op, arena, interner)
     }
 }
 
-/// Deprecated alias for [`DeleteQuery`].
-#[deprecated(note = "renamed to `DeleteQuery`")]
-pub type RemoveQuery = DeleteQuery;
+// `RemoveQuery` was the deprecated alias for `DeleteQuery`. Removed in v2.

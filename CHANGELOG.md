@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed (v2 finalization — breaking)
+
+- **`dol_ir::Statement` deleted.** The v1 statement enum and every payload
+  module that backed it (`statement`, `definition`, `control`,
+  `transaction`, `storage`, `entity_ref`) are gone. The `compat::statement`
+  shim, the `Program::stmt` field, and `Program::from_stmt` /
+  `Program::into_parts` are deleted alongside it. `dol_ir::Program` now
+  carries `operations: Vec<Operation>` only.
+- **DDL/control builders deleted.** The `dol_query::builder` submodule
+  tree, the `EntityBuilderExt` trait, `CreateFromMeta`,
+  `DefineEntityBuilder`, `AlterEntityBuilder`, `DropEntityBuilder`,
+  `DefineLookupBuilder`, `DropLookupBuilder`, `DefineTypeBuilder`,
+  `DropTypeBuilder`, `GrantBuilder`, `RevokeBuilder`,
+  `DefinePolicyBuilder`, `TransactionBuilder`, and the
+  `PutObjectBuilder`/`GetObjectBuilder`/`ListObjectsBuilder`/`ReadFileBuilder`/
+  `WriteFileBuilder`/`MoveFileBuilder` storage builders are removed.
+- Deprecated `Query::remove` / `RemoveQuery` aliases removed.
+
+### Changed (v2 finalization — breaking)
+
+- **`Operation` DML payloads now reference arena DML nodes.** `Insert`
+  carries an `InsertSource` (`Node(NodeId)` / `FromQuery(NodeId)` /
+  `Bindings` / `FromPath(Symbol)` / `FromExpr(NodeId)`); `Update`,
+  `Delete`, and `Upsert` each carry a single `node: NodeId` pointing at
+  the corresponding `ExprNode::{Update,Delete,Upsert}` body. The inline
+  `sets` / `filter` / `conflict_keys` / `on_conflict` / `returning` fields
+  are gone — those live in the arena node. `size_of::<Operation>()` drops
+  to 16 bytes.
+- **All `dol-query` builders emit `Operation` directly** (`GetQuery`,
+  `InsertQuery`, `UpdateQuery`, `DeleteQuery`, `UpsertQuery`). `.build()`
+  returns `dol_ir::Program` with one `Operation` whose body is held in
+  the program's `ExprArena`.
+- **`dol-query` ships v2-native helpers** in place of the deleted
+  builders: `ddl::{define_entity, drop_entity, define_lookup, drop_lookup,
+  drop_field, rename_field, define_index}`, `storage::{put_blob,
+  put_blob_from_path, get_blob, list_blobs, read_file, write_file,
+  write_file_from_path, move_file}`, and `control::{grant, revoke,
+  define_policy, tx_begin, tx_commit, tx_rollback, tx_atomic}`.
+- **`Privilege` lifted to `dol_ir::privilege`** and re-exported at the
+  crate root. The v1 wrapper structs (`Grant`, `Revoke`, `DefinePolicy`)
+  in `dol_ir::control` were removed; `GrantV2` / `RevokeV2` / `PolicyOp`
+  are the replacement surfaces.
+- **`xtask size`** drops the `Statement` budget assertion.
+
+### Added
+
+- **Typed `ExtensionPayload` trait** in `dol_ir::operation` plus
+  `OperationExtension::{from_payload, decode_as}` for typed extension
+  registration. `dol-pipeline` ships a `PipelinePayload` (wrapping
+  `Graph` under `dol.pipeline/graph` v1) and `dol-stream` ships
+  `WindowPayload`, `TimeSeriesPayload`, and `SamplePayload` (under
+  `dol.stream/{window,timeseries,iot.sample}` v1). All four are encoded
+  with `postcard` when the `serde` feature is enabled.
+
+## [Unreleased — earlier v2 work]
+
 ### Added
 
 - **`dol-ir` v2 — universal `Operation` IR.** Adds the `Operation` enum

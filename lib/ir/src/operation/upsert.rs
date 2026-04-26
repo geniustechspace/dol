@@ -1,33 +1,18 @@
 //! `Upsert` — insert-or-update with conflict resolution.
 
 use dol_expr::ids::NodeId;
-use smallvec::SmallVec;
 
-use crate::operation::insert::InsertSource;
-use crate::operation::update::UpdateAssignment;
-use crate::target::{Symbol, Target};
-
-/// Conflict-resolution clause for an upsert.
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum OnConflict {
-    /// Do nothing on conflict.
-    DoNothing,
-    /// Update the named fields with the given assignments.
-    DoUpdate {
-        sets: SmallVec<[UpdateAssignment; 4]>,
-        filter: Option<NodeId>,
-    },
-}
+use crate::target::Target;
 
 /// `Upsert` operation.
+///
+/// Body lives in an arena [`ExprNode::Upsert`](dol_expr::expr::ExprNode::Upsert)
+/// node; the arena `UpsertNode` carries the columns, values, conflict
+/// clause, and returning list.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Upsert {
     pub target: Target,
-    pub source: InsertSource,
-    /// Conflict-detection columns / fields.
-    pub conflict_keys: SmallVec<[Symbol; 2]>,
-    pub on_conflict: OnConflict,
-    pub returning: Option<NodeId>,
+    /// Arena `NodeId` of the [`ExprNode::Upsert`] body.
+    pub node: NodeId,
 }

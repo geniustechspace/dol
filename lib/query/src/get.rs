@@ -308,10 +308,10 @@ impl GetQuery {
 
     // ── Build to IR ─────────────────────────────────────────────────────
 
-    /// Consume the builder and produce a [`dol_ir::Statement`].
-    ///
-    /// Returns `(Statement, ExprArena, Interner)` — the arena and interner
-    /// are needed by renderers to resolve expression references.
+    /// Consume the builder and produce a [`dol_ir::Program`] holding a
+    /// single [`Operation::Query`] that references an arena
+    /// [`ExprNode::Query`](dol_expr::expr::ExprNode::Query) carrying the
+    /// SELECT body.
     ///
     /// When no projections have been set and Entity field metadata is
     /// available, all entity fields are selected by default.
@@ -319,6 +319,8 @@ impl GetQuery {
         use dol_expr::expr::{ExprNode, JoinNode, JoinType as ArenaJoinType, QueryNode};
         use dol_expr::ids::NULL_NODE;
         use dol_expr::lower::{lower_expr, lower_exprs, lower_filters, lower_order_by};
+        use dol_ir::TargetKind;
+        use dol_ir::operation::Query as OpQuery;
         use smallvec::SmallVec;
 
         let mut arena = dol_expr::ExprArena::new();
@@ -430,7 +432,7 @@ impl GetQuery {
         #[cfg(not(feature = "sql"))]
         let lock: Option<dol_expr::expr::LockHint> = None;
 
-        let node = QueryNode {
+        let qnode = QueryNode {
             from,
             alias,
             joins,
@@ -444,7 +446,23 @@ impl GetQuery {
             lock,
         };
 
-        (dol_ir::Statement::Query(Box::new(node)), arena, interner).into()
+        // Lower the QueryNode into the arena and reference it from
+        // Operation::Query.
+        let qid = arena.alloc_query(qnode);
+        let body = arena.alloc(ExprNode::Query(qid));
+
+        let target = crate::target::target_from_parts(
+            &mut interner,
+            TargetKind::Relation,
+            &self.name,
+            self.namespace.as_deref(),
+        );
+        let op: dol_ir::Operation = OpQuery {
+            target,
+            node: Some(body),
+        }
+        .into();
+        dol_ir::Program::new(op, arena, interner)
     }
 }
 

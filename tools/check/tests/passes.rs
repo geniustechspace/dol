@@ -5,23 +5,15 @@
 //! the documented append-only contract on the diagnostic list.
 
 use dol_check::{capability_check, check_all, check_all_for, lint, schema_check, type_check};
-use dol_core::DataType;
 use dol_core::diag::Diagnostic;
-use dol_ir::operation::OperationExtension;
+use dol_ir::operation::{OperationExtension, SchemaOp};
 use dol_ir::{
-    CapabilitySet, CapabilityTag, Program, Statement,
-    definition::{DefineEntity, FieldDef},
+    CapabilitySet, CapabilityTag, Locator, Program, SchemaRef, Symbol, Target, TargetKind,
 };
 
 fn empty_program() -> Program {
-    let de = DefineEntity {
-        name: "users".into(),
-        namespace: None,
-        fields: vec![FieldDef::new("id", DataType::Uuid).identity()],
-        constraints: vec![],
-        if_not_exists: false,
-    };
-    Program::from_stmt(Statement::from(de))
+    let target = Target::new(TargetKind::Relation, Locator::new(Symbol::default()));
+    Program::from_operation(SchemaOp::create_entity(target, SchemaRef::default(), false).into())
 }
 
 fn extension_program() -> Program {

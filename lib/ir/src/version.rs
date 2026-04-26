@@ -2,9 +2,9 @@
 
 /// Current `dol-ir` schema version.
 ///
-/// `dol-wire` and any persistent serialisation should embed this version in
-/// the wire envelope so a v1 payload can be detected and decoded through
-/// [`crate::compat::statement`].
+/// `dol-wire` and any persistent serialisation should embed this version
+/// in the wire envelope so older payloads can be rejected with a clear
+/// diagnostic.
 pub const IR_SCHEMA_VERSION: u32 = 2;
 
 /// Versioned envelope for serialised programs.

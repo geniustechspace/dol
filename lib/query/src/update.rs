@@ -77,22 +77,19 @@ impl UpdateQuery {
         self
     }
 
-    /// Build the arena-based IR as a [`dol_ir::Program`].
-    ///
-    /// Returns a [`Program`] carrying the [`Statement`] together with the
-    /// expression arena and interner needed by renderers to resolve any
-    /// expression references it contains.
-    ///
-    /// [`Program`]: dol_ir::Program
-    /// [`Statement`]: dol_ir::Statement
+    /// Build the arena-based IR as a [`dol_ir::Program`] containing a
+    /// single [`dol_ir::Operation::Update`] referencing an arena
+    /// [`ExprNode::Update`](dol_expr::expr::ExprNode::Update).
     pub fn build(self) -> dol_ir::Program {
         use dol_expr::expr::{ExprNode, UpdateNode};
         use dol_expr::lower::{lower_expr, lower_filters};
+        use dol_ir::TargetKind;
+        use dol_ir::operation::Update;
 
         let mut arena = dol_expr::ExprArena::new();
         let mut interner = dol_expr::Interner::new();
 
-        let target = interner.intern(&dol_expr::lower::qualified_name(
+        let target_str = interner.intern(&dol_expr::lower::qualified_name(
             &self.name,
             &self.namespace,
         ));
@@ -120,14 +117,23 @@ impl UpdateQuery {
             })
             .collect();
 
-        let node = UpdateNode {
-            target,
+        let unode = UpdateNode {
+            target: target_str,
             columns,
             values,
             filter,
             returning,
         };
+        let uid = arena.alloc_update(unode);
+        let body = arena.alloc(ExprNode::Update(uid));
 
-        (dol_ir::Statement::Update(Box::new(node)), arena, interner).into()
+        let target = crate::target::target_from_parts(
+            &mut interner,
+            TargetKind::Relation,
+            &self.name,
+            self.namespace.as_deref(),
+        );
+        let op: dol_ir::Operation = Update { target, node: body }.into();
+        dol_ir::Program::new(op, arena, interner)
     }
 }

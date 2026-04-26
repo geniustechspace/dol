@@ -9,15 +9,15 @@
 //! - the operation round-trips through serde JSON when the `serde` feature
 //!   is enabled.
 
+use dol_expr::ids::NULL_NODE;
 use dol_ir::operation::{
-    Append, Delete, Describe, DescribeFacet, Insert, InsertSource, OnConflict, Probe, Query,
-    Replace, ReplaceBody, SchemaOp, Update, Upsert,
+    Append, Delete, Describe, DescribeFacet, Insert, InsertSource, Probe, Query, Replace,
+    ReplaceBody, SchemaOp, Update, Upsert,
 };
 use dol_ir::{
     Category, CapabilityTag, Locator, OpKind, Operation, SchemaBinding, SchemaRef, Symbol,
     Target, TargetKind,
 };
-use smallvec::SmallVec;
 
 fn t(kind: TargetKind) -> Target {
     Target::new(kind, Locator::new(Symbol::default()))
@@ -117,9 +117,7 @@ fn dml_replace_filetree_emits_replace_and_filetree_tags() {
 fn dml_update_filetree_for_rename() {
     let op: Operation = Update {
         target: t(TargetKind::FileTree),
-        sets: SmallVec::new(),
-        filter: None,
-        returning: None,
+        node: NULL_NODE,
     }
     .into();
     assert_basic(&op, OpKind::Update, Category::DML);
@@ -129,8 +127,7 @@ fn dml_update_filetree_for_rename() {
 fn dml_delete_kv() {
     let op: Operation = Delete {
         target: t(TargetKind::KeyValue),
-        filter: None,
-        returning: None,
+        node: NULL_NODE,
     }
     .into();
     assert_basic(&op, OpKind::Delete, Category::DML);
@@ -140,10 +137,7 @@ fn dml_delete_kv() {
 fn dml_upsert_emits_merge_tag() {
     let op: Operation = Upsert {
         target: t(TargetKind::Relation),
-        source: InsertSource::Bindings,
-        conflict_keys: SmallVec::new(),
-        on_conflict: OnConflict::DoNothing,
-        returning: None,
+        node: NULL_NODE,
     }
     .into();
     assert_basic(&op, OpKind::Upsert, Category::DML);
