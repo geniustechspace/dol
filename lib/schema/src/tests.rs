@@ -1,4 +1,12 @@
-use std::sync::Arc;
+// Tests run under the same `no_std + alloc`-clean build as the library.
+// Pull in `vec!`/`Vec`/`Box`/`String` from `alloc` so the suite compiles
+// with `--no-default-features`.
+extern crate alloc;
+use alloc::boxed::Box;
+use alloc::string::String;
+use alloc::sync::Arc;
+use alloc::vec;
+use alloc::vec::Vec;
 
 use super::*;
 
@@ -86,6 +94,7 @@ fn qualified_name_with_namespace() {
 // ── 5 & 6. Entity::field ─────────────────────────────────────────────
 
 #[test]
+#[allow(deprecated)] // exercising the deprecated panicking accessor
 fn field_lookup_success() {
     let m = basic_model();
     let f = m.field("email");
@@ -95,6 +104,7 @@ fn field_lookup_success() {
 
 #[test]
 #[should_panic(expected = "field 'missing' not found in entity 'users'")]
+#[allow(deprecated)] // exercising the deprecated panicking accessor
 fn field_lookup_panic_on_missing() {
     basic_model().field("missing");
 }

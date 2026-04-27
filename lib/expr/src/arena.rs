@@ -30,7 +30,7 @@ pub enum FieldStep {
     Index(u32),
 }
 
-/// Payload for [`ExprNode::Field`], stored in [`ExprArena::fields`].
+/// Payload for [`ExprNode::Field`], stored in `ExprArena::fields`.
 ///
 /// A `Field` is a leaf reference: a named attribute optionally anchored on
 /// a container [`ExprNode::Namespace`] (whose dotted address is interned as
@@ -59,7 +59,7 @@ pub struct FieldNode {
 
 // ─── Pooled payload structs ───────────────────────────────────────────────────
 
-/// Payload for [`ExprNode::Func`], stored in [`ExprArena::funcs`].
+/// Payload for [`ExprNode::Func`], stored in `ExprArena::funcs`.
 ///
 /// Moved out of the enum variant to keep `ExprNode` ≤ 32 bytes: the
 /// two fields (`name: u32` + 4-byte alignment gap + 24-byte `SmallVec`)
@@ -72,7 +72,7 @@ pub struct FuncNode {
     pub args: SmallVec<[NodeId; 4]>,
 }
 
-/// Payload for [`ExprNode::ObjectLit`], stored in [`ExprArena::obj_lits`].
+/// Payload for [`ExprNode::ObjectLit`], stored in `ExprArena::obj_lits`.
 ///
 /// The inline buffer of `SmallVec<[(StrId, NodeId); 4]>` is 4 × 8 = 32 bytes
 /// on its own — already over budget before the discriminant word is counted.
@@ -80,19 +80,25 @@ pub struct FuncNode {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ObjLitNode(pub SmallVec<[(StrId, NodeId); 4]>);
 
-/// Payload for [`ExprNode::Window`], stored in [`ExprArena::windows`].
+/// Payload for [`ExprNode::Window`], stored in `ExprArena::windows`.
 ///
 /// Two `SmallVec` fields (each 24 bytes) plus `func: StrId` total 52+ bytes
 /// of payload — pooled to keep `ExprNode` ≤ 32 bytes.
+///
+/// `frame` carries the optional `ROWS/RANGE BETWEEN ...` clause; lowering
+/// preserves it so backends can render frames faithfully without
+/// round-trip loss.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WindowNode {
     pub func: StrId,
     pub partition: SmallVec<[NodeId; 4]>,
     pub order: SmallVec<[(NodeId, Order); 2]>,
+    /// Optional frame specification (`ROWS/RANGE BETWEEN start [AND end]`).
+    pub frame: Option<crate::tree::WindowFrame>,
 }
 
-/// Payload for [`ExprNode::Case`], stored in [`ExprArena::cases`].
+/// Payload for [`ExprNode::Case`], stored in `ExprArena::cases`.
 ///
 /// `SmallVec<[(NodeId, NodeId); 4]>` has a 32-byte inline buffer, making the
 /// variant payload 36+ bytes — pooled to keep `ExprNode` ≤ 32 bytes.
@@ -103,7 +109,7 @@ pub struct CaseNode {
     pub else_: NodeId,
 }
 
-/// Payload for [`ExprNode::InList`], stored in [`ExprArena::in_lists`].
+/// Payload for [`ExprNode::InList`], stored in `ExprArena::in_lists`.
 ///
 /// `SmallVec<[NodeId; 8]>` has a 32-byte inline buffer, making the variant
 /// payload 36+ bytes — pooled to keep `ExprNode` ≤ 32 bytes.
@@ -187,6 +193,14 @@ impl ExprArena {
         id
     }
 
+    /// Retrieve an [`ExprNode`] by its [`NodeId`].
+    ///
+    /// **Design-time error contract:** the [`NodeId`] must originate from
+    /// this same arena. Out-of-range ids reflect a programmer mistake (a
+    /// stale id from another arena, or a freed id), not a runtime input,
+    /// and panic with a `#[track_caller]` location for fast debugging.
+    /// All sibling `get_*` accessors follow the same contract.
+    #[track_caller]
     pub fn get(&self, id: NodeId) -> &ExprNode {
         &self.nodes[id as usize]
     }
@@ -213,6 +227,7 @@ impl ExprArena {
     }
 
     /// Retrieve a [`Literal`] by its [`LiteralId`].
+    #[track_caller]
     pub fn get_lit(&self, id: LiteralId) -> &Literal<'static> {
         &self.lits[id as usize]
     }
@@ -227,6 +242,7 @@ impl ExprArena {
     }
 
     /// Retrieve a [`FuncNode`] by its [`FuncId`].
+    #[track_caller]
     pub fn get_func(&self, id: FuncId) -> &FuncNode {
         &self.funcs[id as usize]
     }
@@ -241,6 +257,7 @@ impl ExprArena {
     }
 
     /// Retrieve an [`ObjLitNode`] by its [`ObjLitId`].
+    #[track_caller]
     pub fn get_obj_lit(&self, id: ObjLitId) -> &ObjLitNode {
         &self.obj_lits[id as usize]
     }
@@ -255,6 +272,7 @@ impl ExprArena {
     }
 
     /// Retrieve a [`WindowNode`] by its [`WindowId`].
+    #[track_caller]
     pub fn get_window(&self, id: WindowId) -> &WindowNode {
         &self.windows[id as usize]
     }
@@ -269,6 +287,7 @@ impl ExprArena {
     }
 
     /// Retrieve a [`CaseNode`] by its [`CaseId`].
+    #[track_caller]
     pub fn get_case(&self, id: CaseId) -> &CaseNode {
         &self.cases[id as usize]
     }
@@ -283,6 +302,7 @@ impl ExprArena {
     }
 
     /// Retrieve an [`InListNode`] by its [`InListId`].
+    #[track_caller]
     pub fn get_in_list(&self, id: InListId) -> &InListNode {
         &self.in_lists[id as usize]
     }
@@ -297,6 +317,7 @@ impl ExprArena {
     }
 
     /// Retrieve a [`QueryNode`] by its [`QueryId`].
+    #[track_caller]
     pub fn get_query(&self, id: QueryId) -> &QueryNode {
         &self.queries[id as usize]
     }
@@ -311,6 +332,7 @@ impl ExprArena {
     }
 
     /// Retrieve an [`InsertNode`] by its [`InsertId`].
+    #[track_caller]
     pub fn get_insert(&self, id: InsertId) -> &InsertNode {
         &self.inserts[id as usize]
     }
@@ -325,6 +347,7 @@ impl ExprArena {
     }
 
     /// Retrieve an [`UpdateNode`] by its [`UpdateId`].
+    #[track_caller]
     pub fn get_update(&self, id: UpdateId) -> &UpdateNode {
         &self.updates[id as usize]
     }
@@ -339,6 +362,7 @@ impl ExprArena {
     }
 
     /// Retrieve a [`DeleteNode`] by its [`DeleteId`].
+    #[track_caller]
     pub fn get_delete(&self, id: DeleteId) -> &DeleteNode {
         &self.deletes[id as usize]
     }
@@ -353,6 +377,7 @@ impl ExprArena {
     }
 
     /// Retrieve an [`UpsertNode`] by its [`UpsertId`].
+    #[track_caller]
     pub fn get_upsert(&self, id: UpsertId) -> &UpsertNode {
         &self.upserts[id as usize]
     }
@@ -367,6 +392,7 @@ impl ExprArena {
     }
 
     /// Retrieve a [`FieldNode`] by its [`FieldId`].
+    #[track_caller]
     pub fn get_field(&self, id: FieldId) -> &FieldNode {
         &self.fields[id as usize]
     }

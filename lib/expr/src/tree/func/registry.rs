@@ -1,7 +1,8 @@
 //! Registry of all well-known DOL functions as zero-sized structs.
 //!
-//! Each struct implements [`DolFunc`] via the [`define_func!`] macro,
-//! providing a canonical name, arity constraint, and function kind.
+//! Each struct implements [`DolFunc`](super::meta::DolFunc) via the
+//! [`define_func!`](crate::define_func) macro, providing a canonical name,
+//! arity constraint, and function kind.
 //!
 //! Backends can extend any struct with additional traits:
 //!

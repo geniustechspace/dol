@@ -68,16 +68,13 @@ impl InsertQuery {
         field_count * self.row_count
     }
 
-    /// Build the arena-based IR as a [`dol_ir::Program`].
-    ///
-    /// Returns a [`Program`] carrying the [`Statement`] together with the
-    /// expression arena and interner needed by renderers to resolve any
-    /// expression references it contains.
-    ///
-    /// [`Program`]: dol_ir::Program
-    /// [`Statement`]: dol_ir::Statement
+    /// Build the arena-based IR as a [`dol_ir::Program`] containing a
+    /// single [`dol_ir::Operation::Insert`] referencing an arena
+    /// [`ExprNode::Insert`](dol_expr::expr::ExprNode::Insert).
     pub fn build(self) -> dol_ir::Program {
         use dol_expr::expr::{ExprNode, InsertNode};
+        use dol_ir::TargetKind;
+        use dol_ir::operation::{Insert, InsertSource};
 
         let mut arena = dol_expr::ExprArena::new();
         let mut interner = dol_expr::Interner::new();
@@ -88,7 +85,7 @@ impl InsertQuery {
             self.fields
         };
 
-        let target = interner.intern(&dol_expr::lower::qualified_name(
+        let target_str = interner.intern(&dol_expr::lower::qualified_name(
             &self.name,
             &self.namespace,
         ));
@@ -116,14 +113,28 @@ impl InsertQuery {
             })
             .collect();
 
-        let node = InsertNode {
-            target,
+        let inode = InsertNode {
+            target: target_str,
             columns,
             values,
             returning,
             conflict: None,
         };
+        let iid = arena.alloc_insert(inode);
+        let body = arena.alloc(ExprNode::Insert(iid));
 
-        (dol_ir::Statement::Insert(Box::new(node)), arena, interner).into()
+        let target = crate::target::target_from_parts(
+            &mut interner,
+            TargetKind::Relation,
+            &self.name,
+            self.namespace.as_deref(),
+        );
+        let op: dol_ir::Operation = Insert {
+            target,
+            source: InsertSource::Node(body),
+            returning: None,
+        }
+        .into();
+        dol_ir::Program::new(op, arena, interner)
     }
 }

@@ -33,7 +33,7 @@ pub use constructors::{
     namespace, namespace_dyn, null, obj, param, qualified, string,
 };
 pub use func::def::{
-    Arity, ArityError, CompactName, DolFunc, DolOp, FuncDef, FuncKind, OpDef, OpKind,
+    Arity, ArityError, CompactName, DolFunc, DolOp, FuncDef, FuncKind, OpCategory, OpDef,
 };
 pub use literal::{Literal, TypeError, Value};
 pub use op::UnaryOp;

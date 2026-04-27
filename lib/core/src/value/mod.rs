@@ -10,12 +10,12 @@
 //!
 //! # Module layout
 //!
-//! - [`enum_def`] — the [`Value`] enum.
-//! - [`range`] — [`ValueRange`].
-//! - [`classify`] — `is_*` predicates and [`Value::type_name`].
-//! - [`accessors`] — typed `as_*` helpers.
-//! - [`display`] — `impl fmt::Display for Value`.
-//! - [`from_impls`] — `From<…>` conversions for primitive payloads.
+//! - `enum_def` — the [`Value`] enum.
+//! - `range` — [`ValueRange`].
+//! - `classify` — `is_*` predicates and [`Value::type_name`].
+//! - `accessors` — typed `as_*` helpers.
+//! - `display` — `impl fmt::Display for Value`.
+//! - `from_impls` — `From<…>` conversions for primitive payloads.
 
 mod accessors;
 mod classify;

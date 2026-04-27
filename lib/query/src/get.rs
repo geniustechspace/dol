@@ -16,7 +16,6 @@ use dol_expr::tree::{Direction, Expr, NullsPosition, OrderByExpr, field_dyn};
 struct JoinClause {
     join_type: JoinKind,
     target_name: String,
-    #[allow(dead_code)] // captured by the builder API for future use
     target_namespace: Option<String>,
     alias: Option<String>,
     on_conditions: Vec<(String, String)>,
@@ -308,10 +307,10 @@ impl GetQuery {
 
     // ── Build to IR ─────────────────────────────────────────────────────
 
-    /// Consume the builder and produce a [`dol_ir::Statement`].
-    ///
-    /// Returns `(Statement, ExprArena, Interner)` — the arena and interner
-    /// are needed by renderers to resolve expression references.
+    /// Consume the builder and produce a [`dol_ir::Program`] holding a
+    /// single [`dol_ir::Operation::Query`] that references an arena
+    /// [`ExprNode::Query`](dol_expr::expr::ExprNode::Query) carrying the
+    /// SELECT body.
     ///
     /// When no projections have been set and Entity field metadata is
     /// available, all entity fields are selected by default.
@@ -319,6 +318,8 @@ impl GetQuery {
         use dol_expr::expr::{ExprNode, JoinNode, JoinType as ArenaJoinType, QueryNode};
         use dol_expr::ids::NULL_NODE;
         use dol_expr::lower::{lower_expr, lower_exprs, lower_filters, lower_order_by};
+        use dol_ir::TargetKind;
+        use dol_ir::operation::Query as OpQuery;
         use smallvec::SmallVec;
 
         let mut arena = dol_expr::ExprArena::new();
@@ -340,14 +341,21 @@ impl GetQuery {
         } else {
             self.projections
         };
-        let columns: SmallVec<[u32; 8]> = lower_exprs(&proj_exprs, &mut arena, &mut interner);
+        let columns: SmallVec<[u32; 8]> = lower_exprs(&proj_exprs, &mut arena, &mut interner)
+            .expect("dol-query GetQuery: lowering of projections failed");
 
         // Joins.
         let joins: SmallVec<[JoinNode; 2]> = self
             .joins
             .into_iter()
             .map(|jc| {
-                let source = interner.intern(&jc.target_name);
+                // Honor the parsed `"namespace.name"` form by re-joining the
+                // dotted source. The interner deduplicates so this is cheap;
+                // backends parse the dotted form when they need the parts.
+                let source = match &jc.target_namespace {
+                    Some(ns) => interner.intern(&format!("{ns}.{}", jc.target_name)),
+                    None => interner.intern(&jc.target_name),
+                };
                 let alias = jc.alias.as_deref().map(|a| interner.intern(a));
                 let join_type = match jc.join_type {
                     JoinKind::Inner => ArenaJoinType::Inner,
@@ -405,24 +413,32 @@ impl GetQuery {
             })
             .collect();
 
-        let filter = lower_filters(&self.filters, &mut arena, &mut interner);
+        let filter = lower_filters(&self.filters, &mut arena, &mut interner)
+            .expect("dol-query GetQuery: lowering of filters failed");
 
         let group_by: SmallVec<[u32; 4]> = self
             .group_by
             .iter()
-            .map(|e| lower_expr(e, &mut arena, &mut interner))
+            .map(|e| {
+                lower_expr(e, &mut arena, &mut interner)
+                    .expect("dol-query GetQuery: lowering of GROUP BY failed")
+            })
             .collect();
 
         let having = if self.having.is_empty() {
             NULL_NODE
         } else {
             lower_filters(&self.having, &mut arena, &mut interner)
+                .expect("dol-query GetQuery: lowering of HAVING failed")
         };
 
         let order_by: SmallVec<[(u32, dol_expr::expr::Order); 4]> = self
             .order_by
             .iter()
-            .map(|ob| lower_order_by(ob, &mut arena, &mut interner))
+            .map(|ob| {
+                lower_order_by(ob, &mut arena, &mut interner)
+                    .expect("dol-query GetQuery: lowering of ORDER BY failed")
+            })
             .collect();
 
         #[cfg(feature = "sql")]
@@ -430,7 +446,7 @@ impl GetQuery {
         #[cfg(not(feature = "sql"))]
         let lock: Option<dol_expr::expr::LockHint> = None;
 
-        let node = QueryNode {
+        let qnode = QueryNode {
             from,
             alias,
             joins,
@@ -444,7 +460,23 @@ impl GetQuery {
             lock,
         };
 
-        (dol_ir::Statement::Query(Box::new(node)), arena, interner).into()
+        // Lower the QueryNode into the arena and reference it from
+        // Operation::Query.
+        let qid = arena.alloc_query(qnode);
+        let body = arena.alloc(ExprNode::Query(qid));
+
+        let target = crate::target::target_from_parts(
+            &mut interner,
+            TargetKind::Relation,
+            &self.name,
+            self.namespace.as_deref(),
+        );
+        let op: dol_ir::Operation = OpQuery {
+            target,
+            node: Some(body),
+        }
+        .into();
+        dol_ir::Program::new(op, arena, interner)
     }
 }
 

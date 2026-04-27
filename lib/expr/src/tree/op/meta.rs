@@ -10,7 +10,7 @@ use super::super::compact_name::CompactName;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
-pub enum OpKind {
+pub enum OpCategory {
     /// Comparison operators: `=`, `!=`, `<`, `>`, `<=`, `>=`.
     Comparison,
     /// Null-safe comparison: `IS DISTINCT FROM`, `IS NOT DISTINCT FROM`.
@@ -34,12 +34,12 @@ pub enum OpKind {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OpDef {
     name: CompactName,
-    kind: OpKind,
+    kind: OpCategory,
 }
 
 impl OpDef {
     /// Create a new operator definition (used by the `DolOp` trait).
-    pub const fn new_static(name: &'static str, kind: OpKind) -> Self {
+    pub const fn new_static(name: &'static str, kind: OpCategory) -> Self {
         Self {
             name: CompactName::Static(name),
             kind,
@@ -47,7 +47,7 @@ impl OpDef {
     }
 
     /// Create a custom operator definition.
-    pub fn custom(name: impl Into<Box<str>>, kind: OpKind) -> Self {
+    pub fn custom(name: impl Into<Box<str>>, kind: OpCategory) -> Self {
         Self {
             name: CompactName::Owned(name.into()),
             kind,
@@ -60,7 +60,7 @@ impl OpDef {
     }
 
     /// Return the operator kind.
-    pub fn kind(&self) -> OpKind {
+    pub fn kind(&self) -> OpCategory {
         self.kind
     }
 
@@ -134,7 +134,7 @@ pub trait DolOp: Sized + 'static {
     /// The canonical DOL name for this operator.
     const NAME: &'static str;
     /// The operator category.
-    const KIND: OpKind;
+    const KIND: OpCategory;
 
     /// Build an [`OpDef`] from the trait constants.
     fn def() -> OpDef {
@@ -151,7 +151,7 @@ macro_rules! define_op {
 
         impl $crate::tree::op::meta::DolOp for $struct_name {
             const NAME: &'static str = $name;
-            const KIND: $crate::tree::op::meta::OpKind = $kind;
+            const KIND: $crate::tree::op::meta::OpCategory = $kind;
         }
     };
 }

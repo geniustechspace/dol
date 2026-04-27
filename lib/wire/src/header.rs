@@ -46,7 +46,7 @@ impl WireSchemaVersion {
 /// The version this build of `dol-wire` understands.
 pub const CURRENT_VERSION: WireSchemaVersion = WireSchemaVersion::new(0, 1);
 
-/// 8-byte wire header: 4-byte [`MAGIC`] + 4-byte [`WireSchemaVersion`].
+/// 8-byte wire header: 4-byte magic + 4-byte [`WireSchemaVersion`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct WireHeader {
     /// Schema version.

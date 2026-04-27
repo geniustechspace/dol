@@ -110,16 +110,13 @@ impl UpsertQuery {
         }
     }
 
-    /// Build the arena-based IR as a [`dol_ir::Program`].
-    ///
-    /// Returns a [`Program`] carrying the [`Statement`] together with the
-    /// expression arena and interner needed by renderers to resolve any
-    /// expression references it contains.
-    ///
-    /// [`Program`]: dol_ir::Program
-    /// [`Statement`]: dol_ir::Statement
+    /// Build the arena-based IR as a [`dol_ir::Program`] containing a
+    /// single [`dol_ir::Operation::Upsert`] referencing an arena
+    /// [`ExprNode::Upsert`](dol_expr::expr::ExprNode::Upsert).
     pub fn build(self) -> dol_ir::Program {
         use dol_expr::expr::{ConflictClause, ExprNode, UpsertNode};
+        use dol_ir::TargetKind;
+        use dol_ir::operation::Upsert;
 
         let mut arena = dol_expr::ExprArena::new();
         let mut interner = dol_expr::Interner::new();
@@ -130,7 +127,7 @@ impl UpsertQuery {
             self.fields
         };
 
-        let target = interner.intern(&dol_expr::lower::qualified_name(
+        let target_str = interner.intern(&dol_expr::lower::qualified_name(
             &self.name,
             &self.namespace,
         ));
@@ -182,14 +179,23 @@ impl UpsertQuery {
             None
         };
 
-        let node = UpsertNode {
-            target,
+        let unode = UpsertNode {
+            target: target_str,
             columns,
             values,
             returning,
             conflict,
         };
+        let uid = arena.alloc_upsert(unode);
+        let body = arena.alloc(ExprNode::Upsert(uid));
 
-        (dol_ir::Statement::Upsert(Box::new(node)), arena, interner).into()
+        let target = crate::target::target_from_parts(
+            &mut interner,
+            TargetKind::Relation,
+            &self.name,
+            self.namespace.as_deref(),
+        );
+        let op: dol_ir::Operation = Upsert { target, node: body }.into();
+        dol_ir::Program::new(op, arena, interner)
     }
 }

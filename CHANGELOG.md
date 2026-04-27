@@ -7,7 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+### IR redesign — breaking
+
+The IR has been redesigned around a single, universal `Operation` enum. As
+the project never shipped a stable predecessor, the changelog no longer
+narrates the redesign as a v1→v2 migration; this entry describes the
+current shape directly.
+
+- **`dol_ir::Operation` is the IR.** A noun/verb hybrid: structural /
+  governance variants are nouns (`Schema`, `Field`, `Index`, `Lookup`,
+  `Policy`, `Mask`, `Quota`, `Audit`) carrying a `StructuralVerb`
+  (`Create` / `Drop` / `Alter` / `Rename` / `Truncate`); data / query /
+  authorization variants are verbs (`Insert`, `Update`, `Replace`,
+  `Delete`, `Upsert`, `Append`, `Query`, `Probe`, `Describe`, `Grant`,
+  `Revoke`); meta variants are `Tx`, `Extension`, and the feature-gated
+  `Raw`. `size_of::<Operation>() == 16` is asserted at compile time and
+  reported by `xtask size`.
+- **Universal addressing primitives** — `Symbol`, `Locator`, `Target`,
+  `TargetKind`, `SchemaBinding` — back every operation.
+- **Schema catalog** — `SchemaCatalog`, `CatalogEntry`, `TypeEntry`, plus
+  `SchemaRef` / `CatalogId` / `SchemaId` — let programs reference schemas
+  as data instead of via embedded Rust type walls.
+- **Open capability vocabulary** — `CapabilityTag`, `CapabilitySet`,
+  `CapabilityCheck` — alongside the bitset `BackendCapabilities`. Every
+  `Operation` reports `kind() -> OpKind` and
+  `required_capabilities()`.
+- **DML payloads reference arena nodes.** `Insert` carries an
+  `InsertSource` (`Node(NodeId)` / `FromQuery(NodeId)` / `Bindings` /
+  `FromPath(Symbol)` / `FromExpr(NodeId)`); `Update`, `Delete`, and
+  `Upsert` each carry a single `node: NodeId` pointing at the
+  corresponding `ExprNode::{Update,Delete,Upsert}` body.
+- **Typed `ExtensionPayload` trait** in `dol_ir::operation` plus
+  `OperationExtension::{from_payload, decode_as}` for typed extension
+  registration. `dol-pipeline` ships a `PipelinePayload` (wrapping
+  `Graph` under `dol.pipeline/graph` v1) and `dol-stream` ships
+  `WindowPayload`, `TimeSeriesPayload`, and `SamplePayload` (under
+  `dol.stream/{window,timeseries,iot.sample}` v1).
+- **All `dol-query` builders emit `Operation` directly** (`GetQuery`,
+  `InsertQuery`, `UpdateQuery`, `DeleteQuery`, `UpsertQuery`). `.build()`
+  returns `dol_ir::Program` with one `Operation` whose body is held in
+  the program's `ExprArena`. Helper modules: `ddl::{define_entity,
+  drop_entity, define_lookup, drop_lookup, drop_field, rename_field,
+  define_index}`, `storage::{put_blob, put_blob_from_path, get_blob,
+  list_blobs, read_file, write_file, write_file_from_path, move_file}`,
+  `control::{grant, revoke, define_policy, tx_begin, tx_commit,
+  tx_rollback, tx_atomic}`.
+- **Structured `BackendError`** (`#[non_exhaustive]`) carrying
+  `dol_core::Diagnostic` + optional `Span`, with `Capability`,
+  `Extension`, and `AclDenied` variants.
+- **`dol-check`** operates on `Program::operations`, reporting per-tag
+  diagnostics keyed by a structured `CapabilityCheck`.
+- **`dol-fmt`** prints the `Operation` form.
+- Operation modules are grouped by category under
+  `lib/ir/src/operation/{ddl,dml,dql,acl,meta,shared,tx}`. Flat
+  re-exports remain at `dol_ir::operation::*`.
 
 - **`dol-core` granular features** — `geo`, `network`, `datetime`, `numeric`
   (all default-on). Disabling any one drops the corresponding `Value` /

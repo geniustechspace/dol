@@ -128,6 +128,16 @@ member has a non-empty README and declares it in `Cargo.toml`:
 cargo run -p xtask -- readme
 ```
 
+## Design references
+
+| Topic                         | Document                                          |
+| ----------------------------- | ------------------------------------------------- |
+| Stability policy              | [`docs/STABILITY.md`](docs/STABILITY.md)          |
+| `dol-ir` reference            | [`docs/IR.md`](docs/IR.md)                        |
+| `dol-ir` design RFC           | [`docs/rfcs/0001-ir.md`](docs/rfcs/0001-ir.md)    |
+| Expression / arena layer      | [`docs/expr.md`](docs/expr.md)                    |
+| Release notes                 | [`CHANGELOG.md`](CHANGELOG.md)                    |
+
 ## License
 
 BSD 3-Clause License. See [LICENSE](LICENSE) for details.

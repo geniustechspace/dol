@@ -11,9 +11,11 @@
 //! Pipelines are **descriptive only** — this crate provides type inference
 //! over their node schemas; execution is a backend concern.
 //!
-//! Pipelines compose with [`dol_ir::Statement`] via the
-//! [`dol_ir::Statement::Extension`] seam: a `Pipeline` is wrapped in a
-//! `PipelineExtension` payload and embedded into a [`dol_ir::Program`].
+//! Pipelines compose with [`dol_ir::Operation`] via the
+//! [`dol_ir::Operation::Extension`] seam: a [`Graph`] is wrapped in a
+//! [`PipelinePayload`] (a typed
+//! [`ExtensionPayload`](dol_ir::operation::ExtensionPayload)) and embedded
+//! into a [`dol_ir::Program`].
 //!
 //! ## Status
 //!
@@ -25,10 +27,12 @@
 #![warn(missing_docs)]
 #![allow(clippy::large_enum_variant)]
 
+pub mod extension;
 pub mod graph;
 pub mod node;
 pub mod schema;
 
+pub use extension::{EXTENSION_NAME, EXTENSION_SYMBOL, EXTENSION_VERSION, PipelinePayload};
 pub use graph::{Graph, NodeIdx};
 pub use node::{Node, Sink, Source, Transform};
 pub use schema::{ColumnSchema, RowSchema};

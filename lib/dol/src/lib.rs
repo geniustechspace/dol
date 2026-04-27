@@ -11,7 +11,7 @@
 //! | *(default)*  | `dol-core`                     | Spans, diagnostics, and the value/type system (`Value`, `Literal`, `DataType`, …). |
 //! | `expr`       | `dol-expr`                     | Expression arena + tree DSL.                               |
 //! | `schema`     | `dol-schema`                   | Entities, fields, constraints, relations, lookups, policies. |
-//! | `ir`         | `dol-ir`                       | `Statement`, `Program`, `Backend`, `BackendCapabilities`.  |
+//! | `ir`         | `dol-ir`                       | `Operation`, `Program`, `Backend`, `BackendCapabilities`.  |
 //! | `pipeline`   | `dol-pipeline`                 | Source → Transform → Sink dataflow IR.                     |
 //! | `stream`     | `dol-stream`                   | Windows, watermarks, time-series, IoT vocabulary.          |
 //! | `wire`       | `dol-wire`                     | Canonical wire envelope + postcard / JSON codec helpers.   |
@@ -30,6 +30,7 @@
 //! Adding `serde` turns on the `serde` feature on every active sub-crate.
 
 #![deny(unsafe_code)]
+#![warn(missing_docs)]
 
 pub use dol_core as core;
 

@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 publish = false
-description = "DOL — declarative dataflow IR (Source → Transform → Sink) layered over Statement."
+description = "DOL — declarative dataflow IR (Source → Transform → Sink) layered over the Operation IR."
 readme = "README.md"
 
 [dependencies]
@@ -14,6 +14,7 @@ dol-schema = { workspace = true }
 dol-ir     = { workspace = true }
 smallvec   = { workspace = true }
 serde      = { workspace = true, optional = true }
+postcard   = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
@@ -22,6 +23,7 @@ serde_json = { workspace = true }
 default = []
 serde   = [
     "dep:serde",
+    "dep:postcard",
     "dol-core/serde",
     "dol-expr/serde",
     "dol-schema/serde",

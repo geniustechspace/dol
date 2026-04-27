@@ -11,8 +11,18 @@
 //! A **Field** is a named property within an Entity.
 //!
 //! A **DataType** is the backend-agnostic logical type descriptor.
+//!
+//! # Cargo features
+//!
+//! | feature | default | effect                                                                  |
+//! | ------- | :-----: | ----------------------------------------------------------------------- |
+//! | `std`   |         | Forwards `std` to `dol-core`. Disable for `no_std + alloc` (default).  |
+//! | `serde` |    ✓    | `Serialize` / `Deserialize` for every schema type.                      |
 
+#![cfg_attr(not(feature = "std"), no_std)]
 #![deny(unsafe_code)]
+
+extern crate alloc;
 
 pub mod constraint;
 pub mod field;
@@ -23,7 +33,10 @@ pub use constraint::{ComputedKind, EntityConstraint, RefAction, RelationRef};
 pub use field::Field;
 pub use field_type::DataType;
 
-use std::sync::Arc;
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use constraint::EntityConstraint as Constraint;
 
@@ -81,7 +94,17 @@ impl Entity {
         }
     }
 
-    /// Look up a field by name. Panics if not found (design-time error).
+    /// Look up a field by name. Panics if not found.
+    ///
+    /// **Design-time error contract:** the field name is part of the schema
+    /// definition; a missing field reflects a programmer mistake, not a
+    /// runtime input. Use [`Entity::try_field`] when handling
+    /// runtime-supplied names.
+    #[track_caller]
+    #[deprecated(
+        since = "0.1.0",
+        note = "use `try_field(name).expect(...)` or `try_field(name)?` and handle the `Option` explicitly; this panicking convenience will be removed in a future release"
+    )]
     pub fn field(&self, name: &str) -> &Field {
         self.fields
             .iter()

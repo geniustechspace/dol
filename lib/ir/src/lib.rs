@@ -1,24 +1,36 @@
-//! DOL IR — complete Statement enum covering all DOL operation types.
+//! DOL IR — universal `Operation` enum and Backend trait.
 //!
-//! This crate is the single IR layer for all DOL backends.  Contains
-//! the canonical Statement enum, Backend trait, and DDL/DML node types.
+//! The IR is a noun/verb hybrid: structural / governance variants are nouns
+//! (`Schema`, `Field`, `Index`, `Lookup`, `Policy`, `Mask`, `Quota`,
+//! `Audit`) and carry a [`StructuralVerb`](operation::StructuralVerb).
+//! Data / query / authorization variants are verbs (`Insert`, `Update`,
+//! `Replace`, `Delete`, `Upsert`, `Append`, `Query`, `Probe`, `Describe`,
+//! `Grant`, `Revoke`). Meta variants (`Tx`, `Extension`, feature-gated
+//! `Raw`) round it out.
+//!
+//! See `docs/IR.md` for the design overview and `docs/rfcs/0001-ir.md`
+//! for the rationale.
 //!
 //! Schema constraint types (`RefAction`, `ComputedKind`, `RelationRef`,
 //! `EntityConstraint`) live in [`dol_schema`] and are re-exported here for
 //! convenience.
 
+#![cfg_attr(not(feature = "std"), no_std)]
 #![deny(unsafe_code)]
+#![warn(missing_docs)]
+
+extern crate alloc;
 
 pub mod backend;
 pub mod capabilities;
-pub mod control;
-pub mod definition;
-pub mod entity_ref;
+pub mod operation;
 pub mod prelude;
+pub mod privilege;
 pub mod program;
-pub mod statement;
-pub mod storage;
-pub mod transaction;
+pub mod program_ref;
+pub mod schema_catalog;
+pub mod schema_ref;
+pub mod target;
 
 /// Schema constraint types — re-exported from `dol-schema`, the canonical home.
 pub mod constraint {
@@ -26,15 +38,12 @@ pub mod constraint {
 }
 
 pub use backend::{Backend, BackendError};
-pub use capabilities::BackendCapabilities;
+pub use capabilities::{BackendCapabilities, CapabilityCheck, CapabilitySet, CapabilityTag};
 pub use constraint::{ComputedKind, EntityConstraint, RefAction, RelationRef};
-pub use control::{DefinePolicy, Grant, PolicyAction, Privilege, Revoke};
-pub use definition::{
-    AlterAction, AlterEntity, DefineEntity, DefineLookup, DefineType, DropEntity, DropLookup,
-    DropType, FieldDef, LookupMethod,
-};
-pub use entity_ref::EntityRef;
+pub use operation::{Category, OpKind, Operation};
+pub use privilege::Privilege;
 pub use program::Program;
-pub use statement::{Statement, StatementExtension};
-pub use storage::{GetObject, ListObjects, MoveFile, ObjectSource, PutObject, ReadFile, WriteFile};
-pub use transaction::Transaction;
+pub use program_ref::ProgramRef;
+pub use schema_catalog::{CatalogEntry, SchemaCatalog, TypeEntry};
+pub use schema_ref::{CatalogId, SchemaId, SchemaRef};
+pub use target::{Locator, SchemaBinding, Symbol, Target, TargetKind};

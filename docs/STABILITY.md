@@ -111,3 +111,28 @@ public rationale in the commit message.
 
 If you believe DOL has broken any of the above guarantees, open an issue
 or a PR; we treat stability regressions as bugs.
+
+## IR stability
+
+The `dol-ir` crate exposes a single, current IR shape. Persistent
+serialisation lives in [`dol-wire`](../lib/wire), which carries its own
+header / framing version independent of the in-memory IR.
+
+The IR follows the noun-vs-verb rule documented in
+[`docs/IR.md`](IR.md):
+
+- Structural / governance variants are nouns and carry a
+  `StructuralVerb`.
+- Data / query / authorization variants are verbs.
+- Adding a new `OpKind`, `TargetKind`, or `CapabilityTag` is a
+  forward-compatible minor-release change. Removing or renaming one is
+  major.
+
+`Operation` is held to a strict 64-byte size budget (enforced by `xtask
+size` and a `const _: () = assert!(...);` assertion). The size budget is
+*not* part of the wire-format contract; it is an internal performance
+guarantee.
+
+While the project is at the prototype stage all surface remains subject
+to change without a deprecation cycle; a public stability cycle starts
+when `0.x` is tagged.

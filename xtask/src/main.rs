@@ -93,8 +93,8 @@ fn size_report() -> bool {
         size_of::<dol_expr::ExprNode>()
     );
     println!(
-        "size_of::<dol_ir::Statement>()               = {}",
-        size_of::<dol_ir::Statement>()
+        "size_of::<dol_ir::Operation>()               = {}",
+        size_of::<dol_ir::Operation>()
     );
 
     let mut ok = true;
@@ -115,9 +115,9 @@ fn size_report() -> bool {
     budget!(dol_core::Value, 24);
     budget!(dol_core::Literal<'static>, 32);
     budget!(dol_expr::ExprNode, 32);
-    // Boxing the heavy DML / DDL / storage variants brings `Statement`
-    // comfortably under the 64-byte budget set by the implementation plan.
-    budget!(dol_ir::Statement, 64);
+    // Boxing every heavy payload (DDL bodies, DML arena handles, governance
+    // structs) keeps `Operation` comfortably under its 64-byte budget.
+    budget!(dol_ir::Operation, 64);
     ok
 }
 
@@ -127,9 +127,21 @@ fn size_report() -> bool {
 /// type-check `#[cfg(test)]` bodies; tests can silently rot when imports
 /// from `alloc` are missing under `--no-default-features`.
 fn nostd_check() -> bool {
-    let crates = ["dol-core", "dol-expr"];
-    for c in crates {
+    // dol-core and dol-expr must build *and* pass tests under
+    // `--no-default-features`. dol-ir must build under
+    // `--no-default-features` (it has no dev-deps that work without std,
+    // so we settle for `cargo check`).
+    let test_crates = ["dol-core", "dol-expr"];
+    for c in test_crates {
         let ok = run_cargo(&["test", "-p", c, "--no-default-features"], &[]);
+        if !ok {
+            eprintln!("xtask: nostd check failed for {c}");
+            return false;
+        }
+    }
+    let check_crates = ["dol-ir", "dol-schema"];
+    for c in check_crates {
+        let ok = run_cargo(&["check", "-p", c, "--no-default-features"], &[]);
         if !ok {
             eprintln!("xtask: nostd check failed for {c}");
             return false;

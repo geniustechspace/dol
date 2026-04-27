@@ -3,7 +3,11 @@
 //!
 //! This module bridges the gap between the tree-based expression AST (with
 //! lifetime-parameterised `Expr<'a>`) and the arena-based IR used by
-//! `dol-ir::Statement`.
+//! `dol-ir::Operation`.
+//!
+//! Lowering is fallible: shapes that have no faithful arena representation
+//! (e.g. `Window` over a non-`Func` head) surface as a [`LowerError`] rather
+//! than silently degrading.
 
 use alloc::{
     format,
@@ -18,11 +22,58 @@ use crate::interner::Interner;
 use crate::tree::{Direction, Expr, OrderByExpr};
 use smallvec::SmallVec;
 
+/// Errors produced by the tree → arena lowering pipeline.
+///
+/// Variants are `#[non_exhaustive]` so new lossy paths can be surfaced
+/// without breaking downstream match arms.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum LowerError {
+    /// `Expr::Window` was lowered with a head that is not `Expr::Func`.
+    /// The arena representation only models named window-function heads;
+    /// faithfully lowering anything else would require a different shape,
+    /// so we refuse rather than guess.
+    UnsupportedWindowHead {
+        /// Free-form description of what was found in the head position.
+        head: String,
+    },
+    /// A field reference's `base` was not `None` or `Expr::Namespace(_)`.
+    /// The tree-level constructors guarantee one of those two shapes; this
+    /// only triggers if a future shape introduces a new base form without
+    /// extending lowering.
+    UnsupportedFieldBase {
+        /// Free-form description of the rejected base shape.
+        base: String,
+    },
+}
+
+impl core::fmt::Display for LowerError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            LowerError::UnsupportedWindowHead { head } => {
+                write!(f, "unsupported window head: {head}")
+            }
+            LowerError::UnsupportedFieldBase { base } => {
+                write!(f, "unsupported field base: {base}")
+            }
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for LowerError {}
+
 /// Lowers an `Expr<'static>` into the arena, returning the root `NodeId`.
 ///
-/// All strings are interned into `interner`.  Sub-expressions are recursively
-/// lowered in post-order.
-pub fn lower_expr(expr: &Expr<'_>, arena: &mut ExprArena, interner: &mut Interner) -> NodeId {
+/// All strings are interned into `interner`. Sub-expressions are recursively
+/// lowered in post-order. Returns [`LowerError`] when an expression shape
+/// has no faithful arena representation; callers should propagate the
+/// diagnostic rather than swallow it.
+pub fn lower_expr(
+    expr: &Expr<'_>,
+    arena: &mut ExprArena,
+    interner: &mut Interner,
+) -> Result<NodeId, LowerError> {
     use crate::arena::FieldStep;
 
     match expr {
@@ -30,7 +81,7 @@ pub fn lower_expr(expr: &Expr<'_>, arena: &mut ExprArena, interner: &mut Interne
             // A bare container address — interned as its dotted form.
             let dotted = path.iter().collect::<Vec<_>>().join(".");
             let id = interner.intern(&dotted);
-            arena.alloc(ExprNode::Namespace(id))
+            Ok(arena.alloc(ExprNode::Namespace(id)))
         }
 
         Expr::Field { base, name, steps } => {
@@ -44,18 +95,10 @@ pub fn lower_expr(expr: &Expr<'_>, arena: &mut ExprArena, interner: &mut Interne
                     Some(interner.intern(&dotted))
                 }
                 None => None,
-                Some(_other) => {
-                    // The tree-level constructors never produce a non-Namespace
-                    // base for `Expr::Field`. If a future shape introduces one
-                    // (e.g. parameter-anchored leaves), lowering must be
-                    // extended explicitly; until then, surface the violation
-                    // loudly in debug builds and fall back to an unanchored
-                    // leaf in release builds.
-                    debug_assert!(
-                        false,
-                        "Expr::Field base must be Some(Expr::Namespace(_)) or None"
-                    );
-                    None
+                Some(other) => {
+                    return Err(LowerError::UnsupportedFieldBase {
+                        base: format!("{other:?}"),
+                    });
                 }
             };
 
@@ -70,47 +113,45 @@ pub fn lower_expr(expr: &Expr<'_>, arena: &mut ExprArena, interner: &mut Interne
                 name: leaf_id,
                 steps: arena_steps,
             });
-            arena.alloc(ExprNode::Field(fid))
+            Ok(arena.alloc(ExprNode::Field(fid)))
         }
 
-        Expr::Param => arena.alloc(ExprNode::Param),
+        Expr::Param => Ok(arena.alloc(ExprNode::Param)),
 
         Expr::Value(lit) => {
             // dol-expr::Literal — clone directly.
             let lid = arena.alloc_lit(lit.clone().into_static());
-            arena.alloc(ExprNode::Lit(lid))
+            Ok(arena.alloc(ExprNode::Lit(lid)))
         }
 
         Expr::Array(elements) => {
-            let ids: SmallVec<[NodeId; 4]> = elements
-                .iter()
-                .map(|e| lower_expr(e, arena, interner))
-                .collect();
-            arena.alloc(ExprNode::ArrayLit(ids))
+            let mut ids: SmallVec<[NodeId; 4]> = SmallVec::new();
+            for e in elements {
+                ids.push(lower_expr(e, arena, interner)?);
+            }
+            Ok(arena.alloc(ExprNode::ArrayLit(ids)))
         }
 
         Expr::Object(fields) => {
-            let pairs: SmallVec<[(u32, NodeId); 4]> = fields
-                .iter()
-                .map(|(k, v)| {
-                    let kid = interner.intern(k.as_str());
-                    let vid = lower_expr(v, arena, interner);
-                    (kid, vid)
-                })
-                .collect();
+            let mut pairs: SmallVec<[(u32, NodeId); 4]> = SmallVec::new();
+            for (k, v) in fields {
+                let kid = interner.intern(k.as_str());
+                let vid = lower_expr(v, arena, interner)?;
+                pairs.push((kid, vid));
+            }
             let oid = arena.alloc_obj_lit(ObjLitNode(pairs));
-            arena.alloc(ExprNode::ObjectLit(oid))
+            Ok(arena.alloc(ExprNode::ObjectLit(oid)))
         }
 
         Expr::BinaryOp { left, op, right } => {
-            let lhs = lower_expr(left, arena, interner);
-            let rhs = lower_expr(right, arena, interner);
+            let lhs = lower_expr(left, arena, interner)?;
+            let rhs = lower_expr(right, arena, interner)?;
             let bin_op = lower_binop(op);
-            arena.alloc(ExprNode::BinOp {
+            Ok(arena.alloc(ExprNode::BinOp {
                 op: bin_op,
                 lhs,
                 rhs,
-            })
+            }))
         }
 
         Expr::UnaryOp { op, expr: inner } => {
@@ -127,72 +168,72 @@ pub fn lower_expr(expr: &Expr<'_>, arena: &mut ExprArena, interner: &mut Interne
                         },
                         arena,
                         interner,
-                    );
-                    return arena.alloc(ExprNode::UnaryOp {
+                    )?;
+                    return Ok(arena.alloc(ExprNode::UnaryOp {
                         op: ArenaUnaryOp::Not,
                         operand: in_node,
-                    });
+                    }));
                 }
             }
 
-            let inner_id = lower_expr(inner, arena, interner);
+            let inner_id = lower_expr(inner, arena, interner)?;
             let arena_op = match op {
                 CoreUnaryOp::Not => ArenaUnaryOp::Not,
                 CoreUnaryOp::Neg => ArenaUnaryOp::Neg,
                 CoreUnaryOp::IsNull => ArenaUnaryOp::IsNull,
                 CoreUnaryOp::IsNotNull => ArenaUnaryOp::IsNotNull,
-                CoreUnaryOp::BitNot => ArenaUnaryOp::Not, // dol-expr has no BitNot; approximate as Not
+                CoreUnaryOp::BitNot => ArenaUnaryOp::BitNot,
             };
-            arena.alloc(ExprNode::UnaryOp {
+            Ok(arena.alloc(ExprNode::UnaryOp {
                 op: arena_op,
                 operand: inner_id,
-            })
+            }))
         }
 
         Expr::Func { name, args } => {
             let func_name = interner.intern(name.name());
-            let arg_ids: SmallVec<[NodeId; 4]> = args
-                .iter()
-                .map(|a| lower_expr(a, arena, interner))
-                .collect();
+            let mut arg_ids: SmallVec<[NodeId; 4]> = SmallVec::new();
+            for a in args {
+                arg_ids.push(lower_expr(a, arena, interner)?);
+            }
             let fid = arena.alloc_func(FuncNode {
                 name: func_name,
                 args: arg_ids,
             });
-            arena.alloc(ExprNode::Func(fid))
+            Ok(arena.alloc(ExprNode::Func(fid)))
         }
 
         Expr::Cast {
             expr: inner,
             as_type,
         } => {
-            let inner_id = lower_expr(inner, arena, interner);
-            let type_name = interner.intern(&format!("{:?}", as_type));
-            arena.alloc(ExprNode::Cast {
+            let inner_id = lower_expr(inner, arena, interner)?;
+            // Use the stable `DataType::type_name()` rather than a `Debug`
+            // rendering so the interned type name is wire-stable across
+            // Rust toolchain upgrades.
+            let type_name = interner.intern(as_type.type_name());
+            Ok(arena.alloc(ExprNode::Cast {
                 expr: inner_id,
                 to: type_name,
-            })
+            }))
         }
 
         Expr::Case { whens, else_expr } => {
-            let branches: SmallVec<[(NodeId, NodeId); 4]> = whens
-                .iter()
-                .map(|(c, t)| {
-                    (
-                        lower_expr(c, arena, interner),
-                        lower_expr(t, arena, interner),
-                    )
-                })
-                .collect();
-            let else_id = else_expr
-                .as_deref()
-                .map(|e| lower_expr(e, arena, interner))
-                .unwrap_or(NULL_NODE);
+            let mut branches: SmallVec<[(NodeId, NodeId); 4]> = SmallVec::new();
+            for (c, t) in whens {
+                let cid = lower_expr(c, arena, interner)?;
+                let tid = lower_expr(t, arena, interner)?;
+                branches.push((cid, tid));
+            }
+            let else_id = match else_expr.as_deref() {
+                Some(e) => lower_expr(e, arena, interner)?,
+                None => NULL_NODE,
+            };
             let cid = arena.alloc_case(crate::CaseNode {
                 branches,
                 else_: else_id,
             });
-            arena.alloc(ExprNode::Case(cid))
+            Ok(arena.alloc(ExprNode::Case(cid)))
         }
 
         Expr::Between {
@@ -200,32 +241,32 @@ pub fn lower_expr(expr: &Expr<'_>, arena: &mut ExprArena, interner: &mut Interne
             low,
             high,
         } => {
-            let eid = lower_expr(inner, arena, interner);
-            let lo = lower_expr(low, arena, interner);
-            let hi = lower_expr(high, arena, interner);
-            arena.alloc(ExprNode::Between { expr: eid, lo, hi })
+            let eid = lower_expr(inner, arena, interner)?;
+            let lo = lower_expr(low, arena, interner)?;
+            let hi = lower_expr(high, arena, interner)?;
+            Ok(arena.alloc(ExprNode::Between { expr: eid, lo, hi }))
         }
 
         Expr::InList { expr: inner, list } => {
-            let eid = lower_expr(inner, arena, interner);
-            let ids: SmallVec<[NodeId; 8]> = list
-                .iter()
-                .map(|e| lower_expr(e, arena, interner))
-                .collect();
+            let eid = lower_expr(inner, arena, interner)?;
+            let mut ids: SmallVec<[NodeId; 8]> = SmallVec::new();
+            for e in list {
+                ids.push(lower_expr(e, arena, interner)?);
+            }
             let in_id = arena.alloc_in_list(InListNode {
                 expr: eid,
                 list: ids,
             });
-            arena.alloc(ExprNode::InList(in_id))
+            Ok(arena.alloc(ExprNode::InList(in_id)))
         }
 
         Expr::Alias { expr: inner, alias } => {
-            let inner_id = lower_expr(inner, arena, interner);
+            let inner_id = lower_expr(inner, arena, interner)?;
             let aid = interner.intern(alias.as_str());
-            arena.alloc(ExprNode::Alias {
+            Ok(arena.alloc(ExprNode::Alias {
                 expr: inner_id,
                 name: aid,
-            })
+            }))
         }
 
         Expr::Star => {
@@ -235,7 +276,7 @@ pub fn lower_expr(expr: &Expr<'_>, arena: &mut ExprArena, interner: &mut Interne
                 name: col,
                 steps: SmallVec::new(),
             });
-            arena.alloc(ExprNode::Field(fid))
+            Ok(arena.alloc(ExprNode::Field(fid)))
         }
 
         Expr::CountStar => {
@@ -247,44 +288,50 @@ pub fn lower_expr(expr: &Expr<'_>, arena: &mut ExprArena, interner: &mut Interne
                 steps: SmallVec::new(),
             });
             let star_node = arena.alloc(ExprNode::Field(star_fid));
-            arena.alloc(ExprNode::Agg {
+            Ok(arena.alloc(ExprNode::Agg {
                 func: func_name,
                 expr: star_node,
                 distinct: false,
-            })
+            }))
         }
 
         Expr::Window {
             func,
             partition_by,
             order_by,
-            ..
+            frame,
         } => {
+            // The arena's `WindowNode` only models named window-function
+            // heads. A non-`Func` head has no faithful representation; we
+            // refuse explicitly rather than interning a sentinel "unknown".
             let func_name = match func.as_ref() {
                 Expr::Func { name, .. } => interner.intern(name.name()),
-                _ => interner.intern("unknown"),
+                other => {
+                    return Err(LowerError::UnsupportedWindowHead {
+                        head: format!("{other:?}"),
+                    });
+                }
             };
-            let partition: SmallVec<[NodeId; 4]> = partition_by
-                .iter()
-                .map(|e| lower_expr(e, arena, interner))
-                .collect();
-            let order: SmallVec<[(NodeId, Order); 2]> = order_by
-                .iter()
-                .map(|ob| {
-                    let eid = lower_expr(&ob.expr, arena, interner);
-                    let dir = match ob.direction {
-                        Direction::Asc => Order::Asc,
-                        Direction::Desc => Order::Desc,
-                    };
-                    (eid, dir)
-                })
-                .collect();
+            let mut partition: SmallVec<[NodeId; 4]> = SmallVec::new();
+            for e in partition_by {
+                partition.push(lower_expr(e, arena, interner)?);
+            }
+            let mut order: SmallVec<[(NodeId, Order); 2]> = SmallVec::new();
+            for ob in order_by {
+                let eid = lower_expr(&ob.expr, arena, interner)?;
+                let dir = match ob.direction {
+                    Direction::Asc => Order::Asc,
+                    Direction::Desc => Order::Desc,
+                };
+                order.push((eid, dir));
+            }
             let wid = arena.alloc_window(crate::WindowNode {
                 func: func_name,
                 partition,
                 order,
+                frame: frame.clone(),
             });
-            arena.alloc(ExprNode::Window(wid))
+            Ok(arena.alloc(ExprNode::Window(wid)))
         }
     }
 }
@@ -294,13 +341,13 @@ pub fn lower_order_by(
     ob: &OrderByExpr<'_>,
     arena: &mut ExprArena,
     interner: &mut Interner,
-) -> (NodeId, Order) {
-    let nid = lower_expr(&ob.expr, arena, interner);
+) -> Result<(NodeId, Order), LowerError> {
+    let nid = lower_expr(&ob.expr, arena, interner)?;
     let dir = match ob.direction {
         Direction::Asc => Order::Asc,
         Direction::Desc => Order::Desc,
     };
-    (nid, dir)
+    Ok((nid, dir))
 }
 
 /// Lower multiple expressions, returning `NodeId`s.
@@ -308,11 +355,12 @@ pub fn lower_exprs(
     exprs: &[Expr<'_>],
     arena: &mut ExprArena,
     interner: &mut Interner,
-) -> SmallVec<[NodeId; 8]> {
-    exprs
-        .iter()
-        .map(|e| lower_expr(e, arena, interner))
-        .collect()
+) -> Result<SmallVec<[NodeId; 8]>, LowerError> {
+    let mut out: SmallVec<[NodeId; 8]> = SmallVec::new();
+    for e in exprs {
+        out.push(lower_expr(e, arena, interner)?);
+    }
+    Ok(out)
 }
 
 /// Format a qualified entity name (e.g. "namespace.name" or just "name").
@@ -329,14 +377,14 @@ pub fn lower_filters(
     filters: &[Expr<'_>],
     arena: &mut ExprArena,
     interner: &mut Interner,
-) -> NodeId {
+) -> Result<NodeId, LowerError> {
     if filters.is_empty() {
-        return NULL_NODE;
+        return Ok(NULL_NODE);
     }
-    let mut ids: Vec<NodeId> = filters
-        .iter()
-        .map(|e| lower_expr(e, arena, interner))
-        .collect();
+    let mut ids: Vec<NodeId> = Vec::with_capacity(filters.len());
+    for f in filters {
+        ids.push(lower_expr(f, arena, interner)?);
+    }
     let mut result = ids.remove(0);
     for id in ids {
         result = arena.alloc(ExprNode::BinOp {
@@ -345,7 +393,7 @@ pub fn lower_filters(
             rhs: id,
         });
     }
-    result
+    Ok(result)
 }
 
 // ---------------------------------------------------------------------------
@@ -391,7 +439,7 @@ mod tests {
     fn lowers_bare_field_to_unanchored_arena_field() {
         let mut arena = ExprArena::new();
         let mut interner = Interner::new();
-        let id = lower_expr(&field("email"), &mut arena, &mut interner);
+        let id = lower_expr(&field("email"), &mut arena, &mut interner).unwrap();
         match arena.get(id) {
             ExprNode::Field(fid) => {
                 let node = arena.get_field(*fid);
@@ -408,7 +456,7 @@ mod tests {
         let mut arena = ExprArena::new();
         let mut interner = Interner::new();
         let expr = namespace("users").field("email");
-        let id = lower_expr(&expr, &mut arena, &mut interner);
+        let id = lower_expr(&expr, &mut arena, &mut interner).unwrap();
         match arena.get(id) {
             ExprNode::Field(fid) => {
                 let node = arena.get_field(*fid);
@@ -424,7 +472,7 @@ mod tests {
     fn lowers_namespace_only_path_to_namespace_node() {
         let mut arena = ExprArena::new();
         let mut interner = Interner::new();
-        let id = lower_expr(&namespace("schema.users"), &mut arena, &mut interner);
+        let id = lower_expr(&namespace("schema.users"), &mut arena, &mut interner).unwrap();
         match arena.get(id) {
             ExprNode::Namespace(sid) => {
                 assert_eq!(interner.get(*sid), "schema.users");
@@ -439,7 +487,7 @@ mod tests {
         let mut arena = ExprArena::new();
         let mut interner = Interner::new();
         let expr = field("profile").get("address").get("city");
-        let id = lower_expr(&expr, &mut arena, &mut interner);
+        let id = lower_expr(&expr, &mut arena, &mut interner).unwrap();
         match arena.get(id) {
             ExprNode::Field(fid) => {
                 let node = arena.get_field(*fid);
@@ -457,5 +505,57 @@ mod tests {
             }
             other => panic!("expected ExprNode::Field, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn lowers_bitnot_to_arena_bitnot() {
+        use crate::tree::{UnaryOp as CoreUnaryOp, int};
+        let mut arena = ExprArena::new();
+        let mut interner = Interner::new();
+        let inner = int(7i32);
+        let expr = Expr::UnaryOp {
+            op: CoreUnaryOp::BitNot,
+            expr: alloc::boxed::Box::new(inner),
+        };
+        let id = lower_expr(&expr, &mut arena, &mut interner).unwrap();
+        match arena.get(id) {
+            ExprNode::UnaryOp { op, .. } => assert_eq!(*op, ArenaUnaryOp::BitNot),
+            other => panic!("expected ExprNode::UnaryOp, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn lowers_cast_with_stable_type_name() {
+        use crate::tree::int;
+        use dol_core::DataType;
+        let mut arena = ExprArena::new();
+        let mut interner = Interner::new();
+        let expr = Expr::Cast {
+            expr: alloc::boxed::Box::new(int(7i32)),
+            as_type: DataType::Int64,
+        };
+        let id = lower_expr(&expr, &mut arena, &mut interner).unwrap();
+        match arena.get(id) {
+            ExprNode::Cast { to, .. } => {
+                // `DataType::Int64` has the stable name `"int64"`.
+                assert_eq!(interner.get(*to), "int64");
+            }
+            other => panic!("expected ExprNode::Cast, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn rejects_window_with_non_func_head() {
+        use crate::tree::field;
+        let mut arena = ExprArena::new();
+        let mut interner = Interner::new();
+        let expr = Expr::Window {
+            func: alloc::boxed::Box::new(field("x")),
+            partition_by: alloc::vec::Vec::new(),
+            order_by: alloc::vec::Vec::new(),
+            frame: None,
+        };
+        let err = lower_expr(&expr, &mut arena, &mut interner).unwrap_err();
+        assert!(matches!(err, LowerError::UnsupportedWindowHead { .. }));
     }
 }

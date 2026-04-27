@@ -41,6 +41,10 @@ pub enum BinOp {
 pub enum UnaryOp {
     Neg,
     Not,
+    /// Bitwise NOT (one's complement) on integer-typed operands. Distinct
+    /// from `Not` (logical) so backends and lowerers cannot conflate the
+    /// two on integer expressions.
+    BitNot,
     IsNull,
     IsNotNull,
     IsTrue,
@@ -165,16 +169,16 @@ pub enum ExprNode {
     /// | KV         | namespace                     | `"sessions"`         |
     /// | Filesystem | directory path                | `"/var/data/"`       |
     ///
-    /// The string is interned; use [`ExprArena::alloc`] with this variant to
+    /// The string is interned; use `ExprArena::alloc` with this variant to
     /// build a namespace expression.
     Namespace(StrId),
     /// A field reference: the leaf column/attribute name plus an optional
     /// chain of traversal steps (JSON key access or array indexing).
     ///
-    /// The payload is stored in [`ExprArena::fields`]; this variant holds only
+    /// The payload is stored in `ExprArena::fields`; this variant holds only
     /// the [`FieldId`] pool index, keeping `ExprNode` within its size budget.
     ///
-    /// [`ExprArena::fields`]: crate::arena::ExprArena
+    /// `ExprArena::fields`: crate::arena::ExprArena
     Field(FieldId),
     Param,
     /// A literal constant. The actual [`Literal`] is stored in `ExprArena::lits`;
@@ -235,19 +239,19 @@ pub enum ExprNode {
         lo: NodeId,
         hi: NodeId,
     },
-    /// A SELECT sub-query. The payload is stored in [`ExprArena::queries`];
+    /// A SELECT sub-query. The payload is stored in `ExprArena::queries`;
     /// this variant holds only the pool index.
     Query(QueryId),
-    /// An INSERT statement. The payload is stored in [`ExprArena::inserts`];
+    /// An INSERT statement. The payload is stored in `ExprArena::inserts`;
     /// this variant holds only the pool index.
     Insert(InsertId),
-    /// An UPDATE statement. The payload is stored in [`ExprArena::updates`];
+    /// An UPDATE statement. The payload is stored in `ExprArena::updates`;
     /// this variant holds only the pool index.
     Update(UpdateId),
-    /// A DELETE statement. The payload is stored in [`ExprArena::deletes`];
+    /// A DELETE statement. The payload is stored in `ExprArena::deletes`;
     /// this variant holds only the pool index.
     Delete(DeleteId),
-    /// An UPSERT statement. The payload is stored in [`ExprArena::upserts`];
+    /// An UPSERT statement. The payload is stored in `ExprArena::upserts`;
     /// this variant holds only the pool index.
     Upsert(UpsertId),
 }

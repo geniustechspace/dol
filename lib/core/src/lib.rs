@@ -51,7 +51,7 @@
 //! | `numeric`  |   ✓     | The `numeric` module + `Decimal` variants and decimal-related `TypeError` arms.                       |
 //!
 //! `core::error::Error` is always available for [`TypeError`] and
-//! [`network::ParseMacAddrError`] (stable since Rust 1.81).
+//! `network::ParseMacAddrError` (stable since Rust 1.81).
 //!
 //! # Size guarantees (64-bit targets)
 //!

@@ -14,11 +14,13 @@ dol-schema = { workspace = true }
 dol-ir     = { workspace = true }
 smallvec   = { workspace = true }
 serde      = { workspace = true, optional = true }
+postcard   = { workspace = true, optional = true }
 
 [features]
 default = []
 serde   = [
     "dep:serde",
+    "dep:postcard",
     "dol-core/serde",
     "dol-expr/serde",
     "dol-schema/serde",
