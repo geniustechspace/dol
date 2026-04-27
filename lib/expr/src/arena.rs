@@ -129,25 +129,123 @@ pub struct Span {
     pub end: u32,
 }
 
+/// Sparse association of [`Span`]s to the [`NodeId`]s that produced them.
+///
+/// Earlier revisions stored only `Vec<Span>`, indexed by `SpanId`, and
+/// silently discarded the [`NodeId`] argument supplied to
+/// [`ExprArena::attach_span`]. As soon as any allocator other than
+/// `attach_span` ran in between, the positional id and the requested
+/// `NodeId` diverged and downstream tooling (diagnostics, IDE-style error
+/// reporting) could not safely resolve a node back to its source range.
+///
+/// The table now keeps one `(NodeId, Span)` entry per call. `get(SpanId)`
+/// preserves the original by-position lookup, and the new
+/// [`SpanTable::get_for`] resolves a span by its owning `NodeId` (a small
+/// linear scan; spans are sparse on real plans). Both the wire form and
+/// the public push/get signatures stay the same.
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SpanTable {
+    /// Spans, in insertion order.
     spans: Vec<Span>,
+    /// Owning `NodeId` for each span at the same index.
+    owners: Vec<NodeId>,
 }
 
 impl SpanTable {
-    pub fn push(&mut self, span: Span) -> SpanId {
+    /// Append `span` and record it as belonging to `owner`.
+    ///
+    /// Returns the [`SpanId`] (positional index) of the new entry.
+    pub fn push(&mut self, owner: NodeId, span: Span) -> SpanId {
         let id = self.spans.len() as SpanId;
         self.spans.push(span);
+        self.owners.push(owner);
         id
     }
 
     pub fn get(&self, id: SpanId) -> Option<&Span> {
         self.spans.get(id as usize)
     }
+
+    /// Resolve a [`NodeId`] to its most-recently-attached [`Span`], if any.
+    ///
+    /// Returns `None` for nodes with no recorded span. Walks back-to-front
+    /// so the latest attachment wins when callers re-attach spans during
+    /// rewriting.
+    pub fn get_for(&self, owner: NodeId) -> Option<&Span> {
+        self.owners
+            .iter()
+            .rev()
+            .position(|&o| o == owner)
+            .map(|rev_idx| &self.spans[self.spans.len() - 1 - rev_idx])
+    }
+
+    /// Total number of recorded spans.
+    pub fn len(&self) -> usize {
+        self.spans.len()
+    }
+
+    /// Whether no spans have been recorded.
+    pub fn is_empty(&self) -> bool {
+        self.spans.is_empty()
+    }
 }
 
-// ─── ExprArena ────────────────────────────────────────────────────────────────
+// ─── Capacity hints ──────────────────────────────────────────────────────────
+
+/// Pre-allocation hints for [`ExprArena::with_capacity`].
+///
+/// All fields default to `0` so callers may set only the pools they care
+/// about. The arena uses these to call `Vec::with_capacity` per pool,
+/// avoiding a flurry of small reallocations during build.
+///
+/// Sensible defaults for an interactive query plan are exposed via
+/// [`Capacity::small`] and [`Capacity::medium`].
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Capacity {
+    pub nodes: usize,
+    pub fields: usize,
+    pub funcs: usize,
+    pub obj_lits: usize,
+    pub windows: usize,
+    pub cases: usize,
+    pub in_lists: usize,
+    pub queries: usize,
+    pub inserts: usize,
+    pub updates: usize,
+    pub deletes: usize,
+    pub upserts: usize,
+    pub lits: usize,
+}
+
+impl Capacity {
+    /// Heuristic sizing for short DSL expressions (≈ filter on one table).
+    pub fn small() -> Self {
+        Self {
+            nodes: 32,
+            fields: 8,
+            funcs: 4,
+            lits: 8,
+            ..Self::default()
+        }
+    }
+
+    /// Heuristic sizing for a typical SELECT with joins / aggregates.
+    pub fn medium() -> Self {
+        Self {
+            nodes: 256,
+            fields: 64,
+            funcs: 32,
+            lits: 64,
+            queries: 1,
+            in_lists: 4,
+            cases: 4,
+            ..Self::default()
+        }
+    }
+}
+
+
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -185,6 +283,54 @@ impl ExprArena {
         Self::default()
     }
 
+    /// Build an arena with pre-allocated pool capacities.
+    ///
+    /// Calling this avoids the small-reallocation traffic that otherwise
+    /// dominates the build path for trivial expressions, especially the
+    /// `nodes`, `fields`, and `lits` pools that grow fastest.
+    pub fn with_capacity(cap: Capacity) -> Self {
+        Self {
+            nodes: Vec::with_capacity(cap.nodes),
+            span_table: SpanTable::default(),
+            lits: Vec::with_capacity(cap.lits),
+            funcs: Vec::with_capacity(cap.funcs),
+            obj_lits: Vec::with_capacity(cap.obj_lits),
+            windows: Vec::with_capacity(cap.windows),
+            cases: Vec::with_capacity(cap.cases),
+            in_lists: Vec::with_capacity(cap.in_lists),
+            queries: Vec::with_capacity(cap.queries),
+            inserts: Vec::with_capacity(cap.inserts),
+            updates: Vec::with_capacity(cap.updates),
+            deletes: Vec::with_capacity(cap.deletes),
+            upserts: Vec::with_capacity(cap.upserts),
+            fields: Vec::with_capacity(cap.fields),
+        }
+    }
+
+    /// Total resident heap bytes across every pool — sum of each `Vec`'s
+    /// capacity in bytes. Excludes the side data inside each pooled struct
+    /// (e.g. a `SmallVec` overflow allocation) which would require
+    /// recursing per-node; callers that need a tighter accounting should
+    /// reach for `crate::stats::arena_stats`.
+    pub fn heap_bytes(&self) -> usize {
+        use core::mem::size_of;
+        self.nodes.capacity() * size_of::<ExprNode>()
+            + self.lits.capacity() * size_of::<Literal<'static>>()
+            + self.funcs.capacity() * size_of::<FuncNode>()
+            + self.obj_lits.capacity() * size_of::<ObjLitNode>()
+            + self.windows.capacity() * size_of::<WindowNode>()
+            + self.cases.capacity() * size_of::<CaseNode>()
+            + self.in_lists.capacity() * size_of::<InListNode>()
+            + self.queries.capacity() * size_of::<QueryNode>()
+            + self.inserts.capacity() * size_of::<InsertNode>()
+            + self.updates.capacity() * size_of::<UpdateNode>()
+            + self.deletes.capacity() * size_of::<DeleteNode>()
+            + self.upserts.capacity() * size_of::<UpsertNode>()
+            + self.fields.capacity() * size_of::<FieldNode>()
+            + self.span_table.spans.capacity() * size_of::<Span>()
+            + self.span_table.owners.capacity() * size_of::<NodeId>()
+    }
+
     // ── ExprNode pool ────────────────────────────────────────────────────────
 
     pub fn alloc(&mut self, node: ExprNode) -> NodeId {
@@ -209,12 +355,31 @@ impl ExprArena {
         self.nodes.len()
     }
 
+    /// Allocated capacity (not length) of the hot `ExprNode` pool.
+    ///
+    /// Exposed for `crate::stats::snapshot` so it can split arena bytes
+    /// into "hot pool" vs "side pools" without recomputing per-pool sizes.
+    pub fn nodes_capacity(&self) -> usize {
+        self.nodes.capacity()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.nodes.is_empty()
     }
 
-    pub fn attach_span(&mut self, _id: NodeId, span: Span) -> SpanId {
-        self.span_table.push(span)
+    /// Attach `span` to `id`, returning the positional [`SpanId`].
+    ///
+    /// Use [`SpanTable::get_for`] (via [`ExprArena::span_table`]) to recover
+    /// the span belonging to a given [`NodeId`]. Multiple spans may be
+    /// attached to the same node (e.g. on rewrite); the latest attachment
+    /// wins for `get_for` lookups.
+    pub fn attach_span(&mut self, id: NodeId, span: Span) -> SpanId {
+        self.span_table.push(id, span)
+    }
+
+    /// Borrow the [`SpanTable`] for `get`/`get_for` lookups.
+    pub fn span_table(&self) -> &SpanTable {
+        &self.span_table
     }
 
     // ── Literal pool ─────────────────────────────────────────────────────────

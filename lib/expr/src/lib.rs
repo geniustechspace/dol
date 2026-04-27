@@ -37,13 +37,14 @@ pub mod lower;
 pub mod prelude;
 #[allow(missing_docs)] // tracking: docs follow-up
 pub mod session;
+pub mod stats;
 #[allow(missing_docs)] // tracking: docs follow-up
 pub mod tree;
 pub mod types;
 
 pub use arena::{
-    CaseNode, ExprArena, FieldNode, FieldStep, FuncNode, InListNode, ObjLitNode, Span, SpanTable,
-    WindowNode,
+    CaseNode, Capacity, ExprArena, FieldNode, FieldStep, FuncNode, InListNode, ObjLitNode, Span,
+    SpanTable, WindowNode,
 };
 pub use expr::{
     BinOp, ConflictClause, DeleteNode, ExprNode, InsertNode, JoinNode, JoinType, LockHint, Order,
