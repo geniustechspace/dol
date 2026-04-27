@@ -172,6 +172,12 @@ impl SpanTable {
     /// Returns `None` for nodes with no recorded span. Walks back-to-front
     /// so the latest attachment wins when callers re-attach spans during
     /// rewriting.
+    ///
+    /// **Complexity:** `O(n)` in the number of recorded spans. Spans are
+    /// expected to be sparse on real plans (parsers attach one span per
+    /// produced node, optimisers do not attach spans at all), so a linear
+    /// scan is intentional. Workloads that need dense `O(1)` lookup
+    /// should build a side-index from `(NodeId, SpanId)` pairs.
     pub fn get_for(&self, owner: NodeId) -> Option<&Span> {
         self.owners
             .iter()
