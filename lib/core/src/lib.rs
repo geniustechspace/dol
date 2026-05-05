@@ -70,7 +70,7 @@
 //! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 #![warn(missing_docs)]
 // TODO(docs): chip away at the missing-docs allowlist below. Each entry
 // represents a module whose public API surface still needs rustdoc coverage.

@@ -92,7 +92,7 @@ impl Interner {
         // Every byte slice in `bytes` was appended from a `&str` in
         // `intern`, which guarantees valid UTF-8 at the slice boundaries.
         // We still go through `from_utf8` so the crate stays
-        // `#![deny(unsafe_code)]`-clean; the cost is a single
+        // `#![forbid(unsafe_code)]`-clean; the cost is a single
         // bounds-checked validation against trusted input.
         core::str::from_utf8(raw).expect("interner stores only valid UTF-8")
     }

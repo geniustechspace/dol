@@ -34,7 +34,7 @@
 //! assert_eq!(program.operations[0].kind(), dol_ir::OpKind::Query);
 //! ```
 
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 pub mod control;

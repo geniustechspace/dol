@@ -25,7 +25,7 @@
 //! Diagnostics from [`capability_check`] use the structured
 //! [`CapabilityCheck`] key so message text is uniform across backends.
 
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 extern crate alloc;

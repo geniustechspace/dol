@@ -27,7 +27,7 @@
 //! [`mod@postcard`] and [`mod@json`] remain available for callers that
 //! want to encode their own `Serialize` payloads behind the same envelope.
 
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 mod header;

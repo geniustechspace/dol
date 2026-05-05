@@ -15,7 +15,7 @@
 //! typed payloads in [`extension`] (`WindowPayload`, `TimeSeriesPayload`,
 //! `SamplePayload`) and are validated by `dol-check`.
 
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 pub mod extension;

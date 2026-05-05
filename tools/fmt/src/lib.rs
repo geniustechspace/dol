@@ -19,7 +19,7 @@
 //! The exact shape is governed by snapshot tests; downstream tooling should
 //! treat any change as a breaking change.
 
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 extern crate alloc;

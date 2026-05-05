@@ -20,7 +20,7 @@
 //! | `serde` |    ✓    | `Serialize` / `Deserialize` for every schema type.                      |
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 
 extern crate alloc;
 

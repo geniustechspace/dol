@@ -23,7 +23,7 @@
 //! conservative (passes through known field lists) and is expected to grow
 //! alongside `dol-check`.
 
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 #![warn(missing_docs)]
 #![allow(clippy::large_enum_variant)]
 
