@@ -131,16 +131,16 @@ impl UpsertQuery {
             &self.name,
             &self.namespace,
         ));
-        let columns: smallvec::SmallVec<[u32; 8]> =
+        let columns: smallvec::SmallVec<[dol_expr::ids::StrId; 8]> =
             fields.iter().map(|f| interner.intern(f)).collect();
 
         // One Param per field.
-        let values: smallvec::SmallVec<[u32; 8]> = fields
+        let values: smallvec::SmallVec<[dol_expr::ids::NodeId; 8]> = fields
             .iter()
             .map(|_| arena.alloc(ExprNode::Param))
             .collect();
 
-        let returning: smallvec::SmallVec<[u32; 4]> = self
+        let returning: smallvec::SmallVec<[dol_expr::ids::NodeId; 4]> = self
             .returning
             .iter()
             .map(|r| {
@@ -157,7 +157,9 @@ impl UpsertQuery {
         let conflict = if self.then_skip_flag {
             Some(ConflictClause::DoNothing)
         } else if !self.update_fields.is_empty() {
-            let assignments: smallvec::SmallVec<[(u32, u32); 4]> = self
+            let assignments: smallvec::SmallVec<
+                [(dol_expr::ids::StrId, dol_expr::ids::NodeId); 4],
+            > = self
                 .update_fields
                 .iter()
                 .map(|col| {

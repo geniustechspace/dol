@@ -32,10 +32,10 @@ use crate::target::{Symbol, Target};
 /// // ALTER TABLE users ADD COLUMN email TEXT NOT NULL
 /// let op: Operation = FieldOp {
 ///     verb: StructuralVerb::Create,
-///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
-///     field: Symbol::new(1),
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(0))),
+///     field: Symbol::from_hash(1),
 ///     def: Some(FieldDef {
-///         name: Symbol::new(1),
+///         name: Symbol::from_hash(1),
 ///         data_type: DataType::unbounded_string(),
 ///         identity: false,
 ///         nullable: false,

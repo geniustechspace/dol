@@ -16,7 +16,7 @@ use crate::target::Target;
 ///
 /// // HEAD s3://artifacts/build.log
 /// let op: Operation = Probe {
-///     target: Target::new(TargetKind::Blob, Locator::new(Symbol::new(0))),
+///     target: Target::new(TargetKind::Blob, Locator::new(Symbol::from_hash(0))),
 ///     include_metadata: true,
 /// }
 /// .into();

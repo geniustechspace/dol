@@ -17,7 +17,7 @@ use crate::schema_catalog::SchemaCatalog;
 /// use dol_ir::Program;
 ///
 /// let insert = Insert {
-///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(0))),
 ///     source: InsertSource::Bindings,
 ///     returning: None,
 /// };
@@ -130,7 +130,7 @@ impl Program {
     /// let commit = Program::from_operation(Operation::Tx(Box::new(TxOp::Commit)));
     /// let dml = Program::from_operation(
     ///     Insert {
-    ///         target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
+    ///         target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(0))),
     ///         source: InsertSource::Bindings,
     ///         returning: None,
     ///     }

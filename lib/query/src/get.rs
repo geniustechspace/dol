@@ -316,7 +316,7 @@ impl GetQuery {
     /// available, all entity fields are selected by default.
     pub fn build(self) -> dol_ir::Program {
         use dol_expr::expr::{ExprNode, JoinNode, JoinType as ArenaJoinType, QueryNode};
-        use dol_expr::ids::NULL_NODE;
+        use dol_expr::ids::NodeId;
         use dol_expr::lower::{lower_expr, lower_exprs, lower_filters, lower_order_by};
         use dol_ir::TargetKind;
         use dol_ir::operation::Query as OpQuery;
@@ -341,7 +341,7 @@ impl GetQuery {
         } else {
             self.projections
         };
-        let columns: SmallVec<[u32; 8]> = lower_exprs(&proj_exprs, &mut arena, &mut interner)
+        let columns: SmallVec<[NodeId; 8]> = lower_exprs(&proj_exprs, &mut arena, &mut interner)
             .expect("dol-query GetQuery: lowering of projections failed");
 
         // Joins.
@@ -364,11 +364,12 @@ impl GetQuery {
                     JoinKind::Full => ArenaJoinType::Full,
                     JoinKind::Cross => ArenaJoinType::Cross,
                 };
-                // Build ON condition from pairs.
-                let on = if jc.on_conditions.is_empty() {
-                    NULL_NODE
+                // Build ON condition from pairs (`None` for absent, e.g.
+                // `CROSS JOIN`).
+                let on: Option<NodeId> = if jc.on_conditions.is_empty() {
+                    None
                 } else {
-                    let mut cond_ids: Vec<u32> = Vec::new();
+                    let mut cond_ids: Vec<NodeId> = Vec::new();
                     for (l, r) in &jc.on_conditions {
                         let lid = {
                             let col = interner.intern(l);
@@ -402,7 +403,7 @@ impl GetQuery {
                             rhs: *id,
                         });
                     }
-                    result
+                    Some(result)
                 };
                 JoinNode {
                     source,
@@ -416,7 +417,7 @@ impl GetQuery {
         let filter = lower_filters(&self.filters, &mut arena, &mut interner)
             .expect("dol-query GetQuery: lowering of filters failed");
 
-        let group_by: SmallVec<[u32; 4]> = self
+        let group_by: SmallVec<[NodeId; 4]> = self
             .group_by
             .iter()
             .map(|e| {
@@ -425,14 +426,14 @@ impl GetQuery {
             })
             .collect();
 
-        let having = if self.having.is_empty() {
-            NULL_NODE
+        let having: Option<NodeId> = if self.having.is_empty() {
+            None
         } else {
             lower_filters(&self.having, &mut arena, &mut interner)
                 .expect("dol-query GetQuery: lowering of HAVING failed")
         };
 
-        let order_by: SmallVec<[(u32, dol_expr::expr::Order); 4]> = self
+        let order_by: SmallVec<[(NodeId, dol_expr::expr::Order); 4]> = self
             .order_by
             .iter()
             .map(|ob| {

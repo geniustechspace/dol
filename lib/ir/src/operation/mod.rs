@@ -57,7 +57,7 @@ pub use tx::{IsolationLevel, TxBegin, TxOp, TxOptions};
 ///
 /// // Create an Insert operation for a SQL table
 /// let op: Operation = Insert {
-///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(0))),
 ///     source: InsertSource::Bindings,
 ///     returning: None,
 /// }
@@ -301,7 +301,7 @@ mod tests {
     #[test]
     fn kind_and_category() {
         let op: Operation = Insert {
-            target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
+            target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(0))),
             source: InsertSource::Bindings,
             returning: None,
         }
@@ -313,7 +313,7 @@ mod tests {
     #[test]
     fn primary_target_for_data_ops() {
         let op: Operation = Insert {
-            target: Target::new(TargetKind::Blob, Locator::new(Symbol::new(7))),
+            target: Target::new(TargetKind::Blob, Locator::new(Symbol::from_hash(7))),
             source: InsertSource::Bindings,
             returning: None,
         }
@@ -329,13 +329,13 @@ mod tests {
         use crate::operation::tx::{TxOp, TxOptions};
 
         let inner_a: Operation = Insert {
-            target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(1))),
+            target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(1))),
             source: InsertSource::Bindings,
             returning: None,
         }
         .into();
         let inner_b: Operation = Insert {
-            target: Target::new(TargetKind::Blob, Locator::new(Symbol::new(2))),
+            target: Target::new(TargetKind::Blob, Locator::new(Symbol::from_hash(2))),
             source: InsertSource::Bindings,
             returning: None,
         }

@@ -23,9 +23,21 @@ use crate::schema_ref::SchemaRef;
 /// produced it. Resolving a `Symbol` to its string form requires the same
 /// interner that interned it.
 #[repr(transparent)]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Symbol(pub dol_expr::ids::StrId);
+
+impl Default for Symbol {
+    /// A placeholder id (`StrId(1)`) used by test fixtures that don't
+    /// care which name a locator resolves to. Not a meaningful "empty"
+    /// name — production code should always construct symbols via
+    /// `Interner::intern`.
+    fn default() -> Self {
+        // `from_u32(1)` is the smallest valid `Id<StrTag>`; the unwrap
+        // is infallible.
+        Self(dol_expr::ids::StrId::from_u32(1).expect("StrId(1) is non-zero"))
+    }
+}
 
 impl Symbol {
     /// Wrap a raw interner id.
@@ -34,14 +46,33 @@ impl Symbol {
         Self(id)
     }
 
+    /// Build a [`Symbol`] from a 32-bit content hash (e.g. the FNV-1a
+    /// digest used by extension `*_SYMBOL` constants). Folds the
+    /// all-zero hash to `1` so the result fits the [`NonZeroU32`] niche
+    /// that backs [`StrId`].
+    ///
+    /// `const` so extension crates can publish their `Symbol` ids as
+    /// `pub const X: Symbol = Symbol::from_hash(fnv1a_32(NAME.as_bytes()));`.
+    #[inline]
+    pub const fn from_hash(hash: u32) -> Self {
+        let raw = if hash == 0 { 1 } else { hash };
+        // Safety-equivalent: `raw` is non-zero by construction; using
+        // `from_u32` keeps the crate `#![forbid(unsafe_code)]`-clean.
+        match dol_expr::ids::StrId::from_u32(raw) {
+            Some(id) => Self(id),
+            None => panic!("Symbol::from_hash: non-zero u32 unexpectedly None"),
+        }
+    }
+
     /// Underlying interner id.
     #[inline]
     pub const fn id(self) -> dol_expr::ids::StrId {
         self.0
     }
 
-    /// Resolve the symbol against `interner`. Panics if the id is unknown,
-    /// matching the existing `Interner::get` contract.
+    /// Resolve the symbol against `interner`. Panics if the id is
+    /// unknown; callers handling untrusted ids should use
+    /// [`Interner::get_opt`] directly.
     #[inline]
     pub fn resolve(self, interner: &dol_expr::interner::Interner) -> &str {
         interner.get(self.0)
@@ -171,9 +202,9 @@ pub enum SchemaBinding {
 /// // SQL table "public.users" with alias "u"
 /// let t = Target::new(
 ///     TargetKind::Relation,
-///     Locator::new(Symbol::new(1)).with_namespace(Symbol::new(0)),
+///     Locator::new(Symbol::from_hash(1)).with_namespace(Symbol::from_hash(0)),
 /// )
-/// .with_alias(Symbol::new(2))
+/// .with_alias(Symbol::from_hash(2))
 /// .with_schema(SchemaBinding::Inferred);
 ///
 /// assert_eq!(t.kind, TargetKind::Relation);
@@ -230,9 +261,9 @@ mod tests {
 
     #[test]
     fn locator_builders() {
-        let ns = Symbol::new(0);
-        let name = Symbol::new(1);
-        let seg = Symbol::new(2);
+        let ns = Symbol::from_hash(0);
+        let name = Symbol::from_hash(1);
+        let seg = Symbol::from_hash(2);
 
         let loc = Locator::new(name).with_namespace(ns).with_segment(seg);
         assert_eq!(loc.namespace, Some(ns));
@@ -242,23 +273,24 @@ mod tests {
 
     #[test]
     fn target_defaults_to_inferred() {
-        let t = Target::new(TargetKind::Relation, Locator::new(Symbol::new(7)));
+        let t = Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(7)));
         assert_eq!(t.schema, SchemaBinding::Inferred);
         assert!(t.alias.is_none());
     }
 
     #[test]
     fn target_explicit_opaque() {
-        let t = Target::new(TargetKind::Relation, Locator::new(Symbol::new(7)))
+        let t = Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(7)))
             .with_schema(SchemaBinding::Opaque);
         assert_eq!(t.schema, SchemaBinding::Opaque);
     }
 
     #[test]
     fn symbol_round_trips_through_strid() {
-        let s = Symbol::from(42u32);
-        let raw: dol_expr::ids::StrId = s.into();
-        assert_eq!(raw, 42);
-        assert_eq!(s.id(), 42);
+        let raw: dol_expr::ids::StrId = dol_expr::ids::StrId::from_u32(42).unwrap();
+        let s = Symbol::new(raw);
+        let back: dol_expr::ids::StrId = s.into();
+        assert_eq!(back, raw);
+        assert_eq!(s.id(), raw);
     }
 }

@@ -480,7 +480,7 @@ mod v2_tests {
     #[test]
     fn append_on_stream_topic_requires_append_and_stream_tags() {
         let op: Operation = crate::operation::Append {
-            target: Target::new(TargetKind::StreamTopic, Locator::new(Symbol::new(0))),
+            target: Target::new(TargetKind::StreamTopic, Locator::new(Symbol::from_hash(0))),
             source: InsertSource::Bindings,
             partition_key: None,
         }
@@ -493,7 +493,7 @@ mod v2_tests {
     #[test]
     fn plain_insert_has_no_required_tags() {
         let op: Operation = Insert {
-            target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0)))
+            target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(0)))
                 .with_schema(crate::target::SchemaBinding::Inferred),
             source: InsertSource::Bindings,
             returning: None,

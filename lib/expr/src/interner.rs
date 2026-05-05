@@ -1,6 +1,7 @@
 #[cfg(feature = "serde")]
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::num::NonZeroU32;
 use hashbrown::HashMap;
 
 use crate::ids::StrId;
@@ -55,7 +56,9 @@ pub enum InternError {
 impl core::fmt::Display for InternError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            InternError::Collision { id } => write!(f, "interner: hash collision on id {id:#010x}"),
+            InternError::Collision { id } => {
+                write!(f, "interner: hash collision on id {:#010x}", id.get())
+            }
         }
     }
 }
@@ -81,8 +84,9 @@ impl Interner {
             Ok(id) => id,
             Err(InternError::Collision { id }) => {
                 panic!(
-                    "dol-expr::Interner: 32-bit FNV-1a collision on id {id:#010x}; \
-                     use try_intern on adversarial input"
+                    "dol-expr::Interner: 32-bit FNV-1a collision on id {:#010x}; \
+                     use try_intern on adversarial input",
+                    id.get()
                 )
             }
         }
@@ -91,7 +95,7 @@ impl Interner {
     /// Intern `s`, returning a stable [`StrId`] — or [`InternError::Collision`]
     /// when a different string already occupies the same id.
     pub fn try_intern(&mut self, s: &str) -> Result<StrId, InternError> {
-        let id = fnv1a_32(s.as_bytes());
+        let id = strid_for(s.as_bytes());
         if let Some(&(off, len)) = self.slots.get(&id) {
             let stored = &self.bytes[off as usize..off as usize + len as usize];
             if stored == s.as_bytes() {
@@ -133,7 +137,7 @@ impl Interner {
 
     /// Return the [`StrId`] for `s` if it has already been interned.
     pub fn try_get(&self, s: &str) -> Option<StrId> {
-        let id = fnv1a_32(s.as_bytes());
+        let id = strid_for(s.as_bytes());
         let &(off, len) = self.slots.get(&id)?;
         let stored = &self.bytes[off as usize..off as usize + len as usize];
         (stored == s.as_bytes()).then_some(id)
@@ -162,6 +166,19 @@ impl Interner {
             * (core::mem::size_of::<StrId>() + core::mem::size_of::<(u32, u32)>());
         bytes_cap + slots_cap
     }
+}
+
+/// Compute the content-addressed [`StrId`] for an arbitrary byte slice.
+///
+/// Uses FNV-1a 32-bit and folds the all-zero hash to `1` so the result
+/// fits the [`NonZeroU32`] niche backing [`StrId`]. The fold introduces
+/// a single artificial collision (the empty hash and `1` map to the
+/// same id) at a one-in-2³² rate, surfaced through the standard
+/// [`InternError::Collision`] path.
+fn strid_for(bytes: &[u8]) -> StrId {
+    let h = fnv1a_32(bytes);
+    let nz = NonZeroU32::new(if h == 0 { 1 } else { h }).expect("non-zero by construction");
+    StrId::new(nz)
 }
 
 /// `const`-eval FNV-1a 32-bit hash. Stable; matches the spec basis/prime
@@ -198,7 +215,7 @@ impl serde::Serialize for Interner {
                 (id, s)
             })
             .collect();
-        entries.sort_unstable_by_key(|&(id, _)| id);
+        entries.sort_unstable_by_key(|&(id, _)| id.get());
         let mut seq = ser.serialize_seq(Some(entries.len()))?;
         for (_, s) in &entries {
             seq.serialize_element(s)?;

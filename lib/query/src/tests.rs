@@ -240,7 +240,7 @@ fn get_from_entity_filter() {
         .filter(dol_expr::tree::field("id").eq(dol_expr::tree::param()))
         .build();
     let q = unwrap_query(&p);
-    assert_ne!(q.filter, dol_expr::NULL_NODE);
+    assert!(q.filter.is_some());
 }
 
 // ── GetQuery from string ────────────────────────────────────────
@@ -255,7 +255,7 @@ fn get_from_string_columns() {
     let q = unwrap_query(&p);
     assert_eq!(p.interner.get(q.from), "users");
     assert_eq!(q.columns.len(), 2);
-    assert_ne!(q.filter, dol_expr::NULL_NODE);
+    assert!(q.filter.is_some());
 }
 
 #[test]
@@ -305,7 +305,7 @@ fn update_from_string() {
     assert_eq!(p.interner.get(upd.target), "users");
     assert_eq!(upd.columns.len(), 1);
     assert_eq!(upd.values.len(), 1);
-    assert_ne!(upd.filter, dol_expr::NULL_NODE);
+    assert!(upd.filter.is_some());
     assert_eq!(upd.returning.len(), 1);
 }
 
@@ -320,7 +320,7 @@ fn delete_from_string() {
         .build();
     let del = unwrap_delete(&p);
     assert_eq!(p.interner.get(del.target), "users");
-    assert_ne!(del.filter, dol_expr::NULL_NODE);
+    assert!(del.filter.is_some());
     assert_eq!(del.returning.len(), 1);
 }
 

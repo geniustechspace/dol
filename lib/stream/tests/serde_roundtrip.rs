@@ -3,6 +3,7 @@
 #![cfg(feature = "serde")]
 
 use dol_core::DataType;
+use dol_expr::ids::NodeId;
 use dol_stream::{
     Actuator, PayloadCodec, QoS, RetentionPolicy, Sample, Sensor, StoreAndForward, TimeSeriesOp,
     TimeUnit, Trigger, Watermark, WindowSpec,
@@ -16,20 +17,25 @@ where
     serde_json::from_str(&json).expect("deserialize")
 }
 
+/// 1-based [`NodeId`] helper for fixture data.
+fn nid(raw: u32) -> NodeId {
+    NodeId::from_u32(raw).expect("non-zero")
+}
+
 #[test]
 fn window_spec_round_trip() {
     let cases = [
         WindowSpec::Tumbling {
-            time: 1,
+            time: nid(1),
             size_ms: 1_000,
         },
         WindowSpec::Hopping {
-            time: 1,
+            time: nid(1),
             size_ms: 1_000,
             hop_ms: 250,
         },
         WindowSpec::Session {
-            time: 1,
+            time: nid(1),
             gap_ms: 500,
         },
         WindowSpec::CountBased { rows: 100 },
@@ -42,7 +48,7 @@ fn window_spec_round_trip() {
 #[test]
 fn watermark_round_trip() {
     let w = Watermark {
-        time: 7,
+        time: nid(7),
         max_out_of_order_ms: 500,
         allowed_lateness_ms: 1_000,
     };
@@ -81,19 +87,25 @@ fn time_unit_round_trip() {
 fn time_series_op_round_trip() {
     let cases = [
         TimeSeriesOp::TimeBucket {
-            time: 1,
+            time: nid(1),
             size: 5,
             unit: TimeUnit::Minute,
         },
-        TimeSeriesOp::Downsample { time: 1, factor: 4 },
+        TimeSeriesOp::Downsample {
+            time: nid(1),
+            factor: 4,
+        },
         TimeSeriesOp::GapFill {
-            time: 1,
+            time: nid(1),
             size: 1,
             unit: TimeUnit::Hour,
         },
-        TimeSeriesOp::Locf { column: 2 },
-        TimeSeriesOp::Rate { column: 2, time: 1 },
-        TimeSeriesOp::Delta { column: 2 },
+        TimeSeriesOp::Locf { column: nid(2) },
+        TimeSeriesOp::Rate {
+            column: nid(2),
+            time: nid(1),
+        },
+        TimeSeriesOp::Delta { column: nid(2) },
     ];
     for op in &cases {
         assert_eq!(op, &round_trip(op));

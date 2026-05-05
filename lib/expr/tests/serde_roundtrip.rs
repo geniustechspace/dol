@@ -8,6 +8,7 @@
 #![cfg(feature = "serde")]
 
 use dol_expr::arena::{FieldNode, FieldStep};
+use dol_expr::ids::{LiteralId, NodeId, StrId};
 use dol_expr::{
     BinOp, ConflictClause, DeleteNode, ExprArena, ExprNode, Interner, JoinNode, JoinType, LockHint,
     Order, QueryNode, UnaryOp, UpdateNode,
@@ -20,6 +21,19 @@ where
 {
     let json = serde_json::to_string(value).expect("serialize");
     serde_json::from_str(&json).expect("deserialize")
+}
+
+/// Helper: typed [`NodeId`] from a 1-based raw index.
+fn nid(raw: u32) -> NodeId {
+    NodeId::from_u32(raw).expect("non-zero")
+}
+/// Helper: typed [`StrId`] from a 1-based raw index.
+fn sid(raw: u32) -> StrId {
+    StrId::from_u32(raw).expect("non-zero")
+}
+/// Helper: typed [`LiteralId`] from a 1-based raw index.
+fn lid(raw: u32) -> LiteralId {
+    LiteralId::from_u32(raw).expect("non-zero")
 }
 
 #[test]
@@ -95,10 +109,10 @@ fn join_round_trip() {
         assert_eq!(jt, round_trip(&jt));
     }
     let j = JoinNode {
-        source: 1,
-        alias: Some(2),
+        source: sid(1),
+        alias: Some(sid(2)),
         join_type: JoinType::Left,
-        on: 3,
+        on: Some(nid(3)),
     };
     assert_eq!(j, round_trip(&j));
 }
@@ -108,7 +122,7 @@ fn conflict_clause_round_trip() {
     let cs = [
         ConflictClause::DoNothing,
         ConflictClause::DoUpdate {
-            assignments: smallvec![(0u32, 1u32), (2, 3)],
+            assignments: smallvec![(sid(1), nid(1)), (sid(2), nid(3))],
         },
     ];
     for c in &cs {
@@ -118,14 +132,14 @@ fn conflict_clause_round_trip() {
 
 #[test]
 fn field_step_and_node_round_trip() {
-    let steps = [FieldStep::Key(7), FieldStep::Index(0)];
+    let steps = [FieldStep::Key(sid(7)), FieldStep::Index(0)];
     for s in &steps {
         assert_eq!(s, &round_trip(s));
     }
     let fnode = FieldNode {
-        namespace: Some(1),
-        name: 2,
-        steps: smallvec![FieldStep::Key(3), FieldStep::Index(0)],
+        namespace: Some(sid(1)),
+        name: sid(2),
+        steps: smallvec![FieldStep::Key(sid(3)), FieldStep::Index(0)],
     };
     assert_eq!(fnode, round_trip(&fnode));
 }
@@ -133,30 +147,36 @@ fn field_step_and_node_round_trip() {
 #[test]
 fn expr_node_simple_variants_round_trip() {
     let nodes = vec![
-        ExprNode::Namespace(0),
+        ExprNode::Namespace(sid(1)),
         ExprNode::Param,
-        ExprNode::Lit(0),
-        ExprNode::Field(0),
-        ExprNode::ArrayLit(smallvec![1, 2, 3]),
+        ExprNode::Lit(lid(1)),
+        ExprNode::Field(dol_expr::ids::FieldId::from_u32(1).unwrap()),
+        ExprNode::ArrayLit(smallvec![nid(1), nid(2), nid(3)]),
         ExprNode::BinOp {
             op: BinOp::Eq,
-            lhs: 1,
-            rhs: 2,
+            lhs: nid(1),
+            rhs: nid(2),
         },
         ExprNode::UnaryOp {
             op: UnaryOp::Not,
-            operand: 1,
+            operand: nid(1),
         },
-        ExprNode::Cast { expr: 1, to: 2 },
-        ExprNode::Alias { expr: 1, name: 2 },
+        ExprNode::Cast {
+            expr: nid(1),
+            to: sid(2),
+        },
+        ExprNode::Alias {
+            expr: nid(1),
+            name: sid(2),
+        },
         ExprNode::Between {
-            expr: 1,
-            lo: 2,
-            hi: 3,
+            expr: nid(1),
+            lo: nid(2),
+            hi: nid(3),
         },
         ExprNode::Agg {
-            func: 1,
-            expr: 2,
+            func: sid(1),
+            expr: nid(2),
             distinct: true,
         },
     ];
@@ -168,14 +188,16 @@ fn expr_node_simple_variants_round_trip() {
 #[test]
 fn statement_node_payloads_round_trip() {
     let q = QueryNode {
-        from: 0,
+        from: sid(1),
         alias: None,
         joins: smallvec![],
-        filter: u32::MAX,
-        columns: smallvec![1, 2],
+        // `None` is the new "no filter" — replaces the previous
+        // `u32::MAX` sentinel now that `filter: Option<NodeId>`.
+        filter: None,
+        columns: smallvec![nid(1), nid(2)],
         group_by: smallvec![],
-        having: u32::MAX,
-        order_by: smallvec![(1, Order::Asc)],
+        having: None,
+        order_by: smallvec![(nid(1), Order::Asc)],
         limit: Some(10),
         offset: None,
         lock: Some(LockHint::ForUpdate),
@@ -183,18 +205,18 @@ fn statement_node_payloads_round_trip() {
     assert_eq!(q, round_trip(&q));
 
     let upd = UpdateNode {
-        target: 0,
-        columns: smallvec![1, 2],
-        values: smallvec![3, 4],
-        filter: 5,
-        returning: smallvec![6],
+        target: sid(1),
+        columns: smallvec![sid(1), sid(2)],
+        values: smallvec![nid(3), nid(4)],
+        filter: Some(nid(5)),
+        returning: smallvec![nid(6)],
     };
     assert_eq!(upd, round_trip(&upd));
 
     let del = DeleteNode {
-        target: 0,
-        filter: 1,
-        returning: smallvec![2],
+        target: sid(1),
+        filter: Some(nid(1)),
+        returning: smallvec![nid(2)],
     };
     assert_eq!(del, round_trip(&del));
 }

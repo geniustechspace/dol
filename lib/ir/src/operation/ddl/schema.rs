@@ -71,7 +71,7 @@ pub enum TypeBody {
 /// // CREATE TABLE users (...)
 /// let op: Operation = SchemaOp {
 ///     verb: StructuralVerb::Create,
-///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(0))),
 ///     body: SchemaBody::Entity {
 ///         schema: SchemaRef::local(SchemaId::new(0)),
 ///         if_not_exists: false,

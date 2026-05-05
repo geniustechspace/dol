@@ -13,8 +13,8 @@ pub use crate::expr::{
     QueryNode, UnaryOp, UpdateNode, UpsertNode,
 };
 pub use crate::ids::{
-    CaseId, DeleteId, FieldId, FuncId, InListId, InsertId, LiteralId, NULL_NODE, NodeId, ObjLitId,
-    QueryId, SpanId, StrId, TypeId, UpdateId, UpsertId, WindowId,
+    CaseId, DeleteId, FieldId, FuncId, InListId, InsertId, LiteralId, NodeId, ObjLitId, QueryId,
+    SpanId, StrId, TypeId, UpdateId, UpsertId, WindowId,
 };
 pub use crate::interner::Interner;
 pub use crate::session::BuildSession;

@@ -32,8 +32,8 @@ pub enum PolicyScope {
 /// // CREATE POLICY users_rls ON users FOR ALL USING (tenant_id = current_tenant())
 /// let op: Operation = PolicyOp {
 ///     verb: StructuralVerb::Create,
-///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
-///     name: Symbol::new(1),
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(0))),
+///     name: Symbol::from_hash(1),
 ///     scope: PolicyScope::All,
 ///     using_expr: None, // Would be set to arena NodeId for real policy
 ///     check_expr: None,

@@ -3,6 +3,7 @@
 #![cfg(feature = "serde")]
 
 use dol_core::DataType;
+use dol_expr::ids::NodeId;
 use dol_pipeline::{
     ColumnSchema, Graph, Node, NodeIdx, RowSchema, Sink, Source, Transform, node::JoinKind,
 };
@@ -14,6 +15,11 @@ where
 {
     let json = serde_json::to_string(value).expect("serialize");
     serde_json::from_str(&json).expect("deserialize")
+}
+
+/// 1-based [`NodeId`] helper for fixture data.
+fn nid(raw: u32) -> NodeId {
+    NodeId::from_u32(raw).expect("non-zero")
 }
 
 fn sample_schema() -> RowSchema {
@@ -73,37 +79,40 @@ fn source_round_trip() {
 #[test]
 fn transform_round_trip() {
     let cases = [
-        Transform::Filter { predicate: 1 },
+        Transform::Filter { predicate: nid(1) },
         Transform::Project {
-            exprs: smallvec![1, 2, 3],
+            exprs: smallvec![nid(1), nid(2), nid(3)],
         },
         Transform::Aggregate {
-            keys: smallvec![1, 2],
-            aggs: smallvec![3],
+            keys: smallvec![nid(1), nid(2)],
+            aggs: smallvec![nid(3)],
         },
         Transform::Join {
             kind: JoinKind::Inner,
-            on: 5,
+            on: nid(5),
         },
-        Transform::Unnest { column: 1 },
+        Transform::Unnest { column: nid(1) },
         Transform::Unpivot {
-            id_columns: smallvec![1],
-            value_columns: smallvec![2, 3],
+            id_columns: smallvec![nid(1)],
+            value_columns: smallvec![nid(2), nid(3)],
         },
-        Transform::Pivot { key: 1, value: 2 },
+        Transform::Pivot {
+            key: nid(1),
+            value: nid(2),
+        },
         Transform::AsofJoin {
-            on: 1,
-            left_time: 2,
-            right_time: 3,
+            on: nid(1),
+            left_time: nid(2),
+            right_time: nid(3),
         },
         Transform::GapFill {
-            time: 1,
+            time: nid(1),
             bucket: "1m".into(),
         },
-        Transform::Tdigest { column: 1 },
+        Transform::Tdigest { column: nid(1) },
         Transform::Approx {
             kind: "distinct".into(),
-            args: smallvec![1, 2],
+            args: smallvec![nid(1), nid(2)],
         },
         Transform::Limit { n: 100 },
         Transform::Offset { n: 5 },
@@ -160,7 +169,7 @@ fn graph_round_trip() {
     );
     let proj = g.add(
         Node::Transform(Transform::Project {
-            exprs: smallvec![1, 2],
+            exprs: smallvec![nid(1), nid(2)],
         }),
         [src],
     );

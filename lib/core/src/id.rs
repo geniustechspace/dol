@@ -178,6 +178,16 @@ impl<Tag: ?Sized> serde::Serialize for Id<Tag> {
     }
 }
 
+#[cfg(feature = "serde")]
+impl<'de, Tag: ?Sized> serde::Deserialize<'de> for Id<Tag> {
+    fn deserialize<D: serde::Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
+        let raw: u32 = serde::Deserialize::deserialize(de)?;
+        NonZeroU32::new(raw)
+            .map(Self::new)
+            .ok_or_else(|| <D::Error as serde::de::Error>::custom("Id<Tag>: zero is reserved"))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -246,5 +256,13 @@ mod tests {
         let id = FooId::from_index(41).unwrap();
         let s = serde_json::to_string(&id).unwrap();
         assert_eq!(s, "42");
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn deserializes_from_bare_u32_and_rejects_zero() {
+        let id: FooId = serde_json::from_str("42").unwrap();
+        assert_eq!(id.get(), 42);
+        assert!(serde_json::from_str::<FooId>("0").is_err());
     }
 }

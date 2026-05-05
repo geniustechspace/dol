@@ -89,17 +89,17 @@ impl InsertQuery {
             &self.name,
             &self.namespace,
         ));
-        let columns: smallvec::SmallVec<[u32; 8]> =
+        let columns: smallvec::SmallVec<[dol_expr::ids::StrId; 8]> =
             fields.iter().map(|f| interner.intern(f)).collect();
 
         // Generate one Param node per field per row.
-        let mut values = smallvec::SmallVec::new();
+        let mut values: smallvec::SmallVec<[dol_expr::ids::NodeId; 8]> = smallvec::SmallVec::new();
         for _ in 0..(self.row_count * fields.len()) {
             values.push(arena.alloc(ExprNode::Param));
         }
 
         // Returning columns as field-reference expressions.
-        let returning: smallvec::SmallVec<[u32; 4]> = self
+        let returning: smallvec::SmallVec<[dol_expr::ids::NodeId; 4]> = self
             .returning
             .iter()
             .map(|r| {

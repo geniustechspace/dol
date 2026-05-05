@@ -11,14 +11,14 @@ use crate::tree::Expr;
 
 /// Pre-interned ids for high-frequency function/operator names.
 pub struct WellKnownNames {
-    pub and: u32,
-    pub or: u32,
-    pub not: u32,
-    pub count: u32,
-    pub sum: u32,
-    pub avg: u32,
-    pub min: u32,
-    pub max: u32,
+    pub and: StrId,
+    pub or: StrId,
+    pub not: StrId,
+    pub count: StrId,
+    pub sum: StrId,
+    pub avg: StrId,
+    pub min: StrId,
+    pub max: StrId,
 }
 
 /// A long-lived expression-builder context.

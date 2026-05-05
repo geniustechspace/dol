@@ -115,9 +115,9 @@ mod tests {
     fn insert_and_get() {
         let mut cat = SchemaCatalog::new();
         let id = cat.insert(CatalogEntry::Type(TypeEntry {
-            name: Symbol::new(0),
+            name: Symbol::from_hash(0),
             kind: crate::operation::TypeBody::Enum,
-            members: smallvec::smallvec![Symbol::new(1), Symbol::new(2)],
+            members: smallvec::smallvec![Symbol::from_hash(1), Symbol::from_hash(2)],
         }));
         assert_eq!(cat.len(), 1);
         assert!(matches!(cat.get(id), Some(CatalogEntry::Type(_))));

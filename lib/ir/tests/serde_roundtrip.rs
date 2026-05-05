@@ -28,20 +28,20 @@ where
 
 #[test]
 fn target_round_trip() {
-    let t = Target::new(TargetKind::Relation, Locator::new(Symbol::new(7)));
+    let t = Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(7)));
     assert_eq!(t, round_trip(&t));
 }
 
 #[test]
 fn extension_id_round_trip() {
-    let id = ExtensionId::new(Symbol::new(42), 3);
+    let id = ExtensionId::new(Symbol::from_hash(42), 3);
     assert_eq!(id, round_trip(&id));
 }
 
 #[test]
 fn operation_extension_round_trip() {
     let ext = OperationExtension {
-        id: ExtensionId::new(Symbol::new(1), 1),
+        id: ExtensionId::new(Symbol::from_hash(1), 1),
         payload: alloc_vec(b"opaque-bytes"),
     };
     assert_eq!(ext, round_trip(&ext));

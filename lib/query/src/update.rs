@@ -94,8 +94,8 @@ impl UpdateQuery {
             &self.namespace,
         ));
 
-        let mut columns = smallvec::SmallVec::new();
-        let mut values = smallvec::SmallVec::new();
+        let mut columns: smallvec::SmallVec<[dol_expr::ids::StrId; 8]> = smallvec::SmallVec::new();
+        let mut values: smallvec::SmallVec<[dol_expr::ids::NodeId; 8]> = smallvec::SmallVec::new();
         for (col, expr) in &self.assignments {
             columns.push(interner.intern(col));
             values.push(
@@ -107,7 +107,7 @@ impl UpdateQuery {
         let filter = lower_filters(&self.filters, &mut arena, &mut interner)
             .expect("dol-query UpdateQuery: lowering of WHERE failed");
 
-        let returning: smallvec::SmallVec<[u32; 4]> = self
+        let returning: smallvec::SmallVec<[dol_expr::ids::NodeId; 4]> = self
             .returning
             .iter()
             .map(|r| {

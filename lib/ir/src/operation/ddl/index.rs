@@ -73,11 +73,11 @@ pub enum IndexMethod {
 /// // CREATE INDEX idx_users_email ON users (email ASC)
 /// let op: Operation = IndexOp {
 ///     verb: StructuralVerb::Create,
-///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
-///     name: Symbol::new(1),
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(0))),
+///     name: Symbol::from_hash(1),
 ///     method: IndexMethod::BTree,
 ///     keys: smallvec::smallvec![IndexKey::Field {
-///         name: Symbol::new(2),
+///         name: Symbol::from_hash(2),
 ///         direction: IndexDirection::Ascending,
 ///     }],
 ///     unique: false,

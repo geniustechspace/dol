@@ -51,8 +51,8 @@ pub use expr::{
     QueryNode, UnaryOp, UpdateNode, UpsertNode,
 };
 pub use ids::{
-    CaseId, DeleteId, FieldId, FuncId, InListId, InsertId, LiteralId, NULL_NODE, NodeId, ObjLitId,
-    QueryId, SpanId, StrId, TypeId, UpdateId, UpsertId, WindowId,
+    CaseId, DeleteId, FieldId, FuncId, InListId, InsertId, LiteralId, NodeId, ObjLitId, QueryId,
+    SpanId, StrId, TypeId, UpdateId, UpsertId, WindowId,
 };
 pub use interner::{InternError, Interner};
 pub use lower::{LowerError, lower_expr, lower_expr_with_budget};

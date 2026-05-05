@@ -19,7 +19,7 @@ use crate::target::Target;
 ///
 /// // SELECT * FROM users
 /// let op: Operation = Query {
-///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(0))),
 ///     node: None, // Would be set to arena NodeId for real query
 /// }
 /// .into();

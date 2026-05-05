@@ -28,8 +28,8 @@ use crate::target::{Symbol, Target};
 /// // GRANT SELECT, INSERT ON users TO app_role
 /// let op: Operation = Grant {
 ///     privileges: smallvec![Privilege::Select, Privilege::Insert],
-///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
-///     roles: smallvec![Symbol::new(1)],
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(0))),
+///     roles: smallvec![Symbol::from_hash(1)],
 ///     with_grant_option: false,
 /// }
 /// .into();

@@ -43,7 +43,7 @@ pub enum InsertSource {
 ///
 /// // INSERT INTO users (...) VALUES (...)
 /// let op: Operation = Insert {
-///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(0))),
 ///     source: InsertSource::Bindings,
 ///     returning: None,
 /// }

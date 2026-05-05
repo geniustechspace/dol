@@ -67,7 +67,7 @@ impl DeleteQuery {
         let filter = lower_filters(&self.filters, &mut arena, &mut interner)
             .expect("dol-query DeleteQuery: lowering of WHERE failed");
 
-        let returning: smallvec::SmallVec<[u32; 4]> = self
+        let returning: smallvec::SmallVec<[dol_expr::ids::NodeId; 4]> = self
             .returning
             .iter()
             .map(|r| {

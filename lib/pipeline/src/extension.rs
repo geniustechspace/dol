@@ -26,7 +26,7 @@ pub const EXTENSION_VERSION: u32 = 1;
 /// used to build the surrounding `Program` — produces the same id. This
 /// eliminates the previous design's process-global `AtomicU32`, which was
 /// brittle across `Program`s built or decoded with different interners.
-pub const EXTENSION_SYMBOL: Symbol = Symbol::new(fnv1a_32(EXTENSION_NAME.as_bytes()));
+pub const EXTENSION_SYMBOL: Symbol = Symbol::from_hash(fnv1a_32(EXTENSION_NAME.as_bytes()));
 
 /// `const`-eval FNV-1a 32-bit hash. Stable; matches the spec basis/prime.
 const fn fnv1a_32(bytes: &[u8]) -> u32 {

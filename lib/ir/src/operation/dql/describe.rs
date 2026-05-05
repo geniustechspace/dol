@@ -33,7 +33,7 @@ pub enum DescribeFacet {
 ///
 /// // DESCRIBE users (field metadata)
 /// let op: Operation = Describe {
-///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(0))),
 ///     facet: DescribeFacet::Fields,
 /// }
 /// .into();

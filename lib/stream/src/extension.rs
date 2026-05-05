@@ -33,11 +33,11 @@ pub const IOT_SAMPLE_NAME: &str = "dol.stream/iot.sample";
 pub const EXTENSION_VERSION: u32 = 1;
 
 /// Stable [`Symbol`] identifying [`WindowPayload`] on the wire.
-pub const WINDOW_SYMBOL: Symbol = Symbol::new(fnv1a_32(WINDOW_NAME.as_bytes()));
+pub const WINDOW_SYMBOL: Symbol = Symbol::from_hash(fnv1a_32(WINDOW_NAME.as_bytes()));
 /// Stable [`Symbol`] identifying [`TimeSeriesPayload`] on the wire.
-pub const TIMESERIES_SYMBOL: Symbol = Symbol::new(fnv1a_32(TIMESERIES_NAME.as_bytes()));
+pub const TIMESERIES_SYMBOL: Symbol = Symbol::from_hash(fnv1a_32(TIMESERIES_NAME.as_bytes()));
 /// Stable [`Symbol`] identifying [`SamplePayload`] on the wire.
-pub const IOT_SAMPLE_SYMBOL: Symbol = Symbol::new(fnv1a_32(IOT_SAMPLE_NAME.as_bytes()));
+pub const IOT_SAMPLE_SYMBOL: Symbol = Symbol::from_hash(fnv1a_32(IOT_SAMPLE_NAME.as_bytes()));
 
 /// `const`-eval FNV-1a 32-bit hash. Stable; matches the spec basis/prime.
 const fn fnv1a_32(bytes: &[u8]) -> u32 {

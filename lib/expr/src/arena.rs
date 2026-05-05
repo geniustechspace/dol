@@ -4,10 +4,31 @@ use smallvec::SmallVec;
 
 use crate::expr::{DeleteNode, ExprNode, InsertNode, Order, QueryNode, UpdateNode, UpsertNode};
 use crate::ids::{
-    CaseId, DeleteId, FieldId, FuncId, InListId, InsertId, LiteralId, NodeId, ObjLitId, QueryId,
-    SpanId, StrId, UpdateId, UpsertId, WindowId,
+    CaseId, DeleteId, FieldId, FuncId, Id, InListId, InsertId, LiteralId, NodeId, ObjLitId,
+    QueryId, SpanId, StrId, UpdateId, UpsertId, WindowId,
 };
 use crate::types::value::Literal;
+
+/// Push `item` into `vec` and return the typed [`Id<Tag>`] referring to
+/// the freshly-pushed slot. Panics on the (theoretical) overflow at
+/// `u32::MAX` entries — every caller is interactive and cannot
+/// realistically reach 4 G items per pool.
+#[inline]
+#[track_caller]
+fn alloc_in<T, Tag: ?Sized>(vec: &mut Vec<T>, item: T) -> Id<Tag> {
+    let idx = vec.len();
+    vec.push(item);
+    Id::from_index(idx).expect("dol-expr: arena pool overflow (>= 4 G entries)")
+}
+
+/// Borrow the slot at `id` from `vec`, panicking on out-of-range — same
+/// "design-time error" contract as the public `ExprArena::get_*`
+/// accessors.
+#[inline]
+#[track_caller]
+fn get_in<T, Tag: ?Sized>(vec: &[T], id: Id<Tag>) -> &T {
+    &vec[id.index()]
+}
 
 // ─── FieldStep / FieldNode ───────────────────────────────────────────────────
 
@@ -102,11 +123,15 @@ pub struct WindowNode {
 ///
 /// `SmallVec<[(NodeId, NodeId); 4]>` has a 32-byte inline buffer, making the
 /// variant payload 36+ bytes — pooled to keep `ExprNode` ≤ 32 bytes.
+///
+/// `else_` is `Option<NodeId>` (4 bytes via niche): `None` for an absent
+/// `ELSE` branch, replacing the previous `NULL_NODE: NodeId = u32::MAX`
+/// sentinel.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CaseNode {
     pub branches: SmallVec<[(NodeId, NodeId); 4]>,
-    pub else_: NodeId,
+    pub else_: Option<NodeId>,
 }
 
 /// Payload for [`ExprNode::InList`], stored in `ExprArena::in_lists`.
@@ -157,14 +182,14 @@ impl SpanTable {
     ///
     /// Returns the [`SpanId`] (positional index) of the new entry.
     pub fn push(&mut self, owner: NodeId, span: Span) -> SpanId {
-        let id = self.spans.len() as SpanId;
+        let idx = self.spans.len();
         self.spans.push(span);
         self.owners.push(owner);
-        id
+        SpanId::from_index(idx).expect("dol-expr: SpanTable overflow")
     }
 
     pub fn get(&self, id: SpanId) -> Option<&Span> {
-        self.spans.get(id as usize)
+        self.spans.get(id.index())
     }
 
     /// Resolve a [`NodeId`] to its most-recently-attached [`Span`], if any.
@@ -338,9 +363,7 @@ impl ExprArena {
     // ── ExprNode pool ────────────────────────────────────────────────────────
 
     pub fn alloc(&mut self, node: ExprNode) -> NodeId {
-        let id = self.nodes.len() as NodeId;
-        self.nodes.push(node);
-        id
+        alloc_in(&mut self.nodes, node)
     }
 
     /// Retrieve an [`ExprNode`] by its [`NodeId`].
@@ -352,7 +375,7 @@ impl ExprArena {
     /// All sibling `get_*` accessors follow the same contract.
     #[track_caller]
     pub fn get(&self, id: NodeId) -> &ExprNode {
-        &self.nodes[id as usize]
+        get_in(&self.nodes, id)
     }
 
     pub fn len(&self) -> usize {
@@ -388,181 +411,121 @@ impl ExprArena {
 
     // ── Literal pool ─────────────────────────────────────────────────────────
 
-    /// Store a [`Literal`] in the pool and return its [`LiteralId`].
     pub fn alloc_lit(&mut self, lit: Literal<'static>) -> LiteralId {
-        let id = self.lits.len() as LiteralId;
-        self.lits.push(lit);
-        id
+        alloc_in(&mut self.lits, lit)
     }
-
-    /// Retrieve a [`Literal`] by its [`LiteralId`].
     #[track_caller]
     pub fn get_lit(&self, id: LiteralId) -> &Literal<'static> {
-        &self.lits[id as usize]
+        get_in(&self.lits, id)
     }
 
     // ── FuncNode pool ─────────────────────────────────────────────────────────
 
-    /// Store a [`FuncNode`] in the pool and return its [`FuncId`].
     pub fn alloc_func(&mut self, func: FuncNode) -> FuncId {
-        let id = self.funcs.len() as FuncId;
-        self.funcs.push(func);
-        id
+        alloc_in(&mut self.funcs, func)
     }
-
-    /// Retrieve a [`FuncNode`] by its [`FuncId`].
     #[track_caller]
     pub fn get_func(&self, id: FuncId) -> &FuncNode {
-        &self.funcs[id as usize]
+        get_in(&self.funcs, id)
     }
 
     // ── ObjLitNode pool ───────────────────────────────────────────────────────
 
-    /// Store an [`ObjLitNode`] in the pool and return its [`ObjLitId`].
     pub fn alloc_obj_lit(&mut self, obj: ObjLitNode) -> ObjLitId {
-        let id = self.obj_lits.len() as ObjLitId;
-        self.obj_lits.push(obj);
-        id
+        alloc_in(&mut self.obj_lits, obj)
     }
-
-    /// Retrieve an [`ObjLitNode`] by its [`ObjLitId`].
     #[track_caller]
     pub fn get_obj_lit(&self, id: ObjLitId) -> &ObjLitNode {
-        &self.obj_lits[id as usize]
+        get_in(&self.obj_lits, id)
     }
 
     // ── WindowNode pool ───────────────────────────────────────────────────────
 
-    /// Store a [`WindowNode`] in the pool and return its [`WindowId`].
     pub fn alloc_window(&mut self, win: WindowNode) -> WindowId {
-        let id = self.windows.len() as WindowId;
-        self.windows.push(win);
-        id
+        alloc_in(&mut self.windows, win)
     }
-
-    /// Retrieve a [`WindowNode`] by its [`WindowId`].
     #[track_caller]
     pub fn get_window(&self, id: WindowId) -> &WindowNode {
-        &self.windows[id as usize]
+        get_in(&self.windows, id)
     }
 
     // ── CaseNode pool ─────────────────────────────────────────────────────────
 
-    /// Store a [`CaseNode`] in the pool and return its [`CaseId`].
     pub fn alloc_case(&mut self, case: CaseNode) -> CaseId {
-        let id = self.cases.len() as CaseId;
-        self.cases.push(case);
-        id
+        alloc_in(&mut self.cases, case)
     }
-
-    /// Retrieve a [`CaseNode`] by its [`CaseId`].
     #[track_caller]
     pub fn get_case(&self, id: CaseId) -> &CaseNode {
-        &self.cases[id as usize]
+        get_in(&self.cases, id)
     }
 
     // ── InListNode pool ───────────────────────────────────────────────────────
 
-    /// Store an [`InListNode`] in the pool and return its [`InListId`].
     pub fn alloc_in_list(&mut self, node: InListNode) -> InListId {
-        let id = self.in_lists.len() as InListId;
-        self.in_lists.push(node);
-        id
+        alloc_in(&mut self.in_lists, node)
     }
-
-    /// Retrieve an [`InListNode`] by its [`InListId`].
     #[track_caller]
     pub fn get_in_list(&self, id: InListId) -> &InListNode {
-        &self.in_lists[id as usize]
+        get_in(&self.in_lists, id)
     }
 
     // ── QueryNode pool ────────────────────────────────────────────────────────
 
-    /// Store a [`QueryNode`] in the pool and return its [`QueryId`].
     pub fn alloc_query(&mut self, query: QueryNode) -> QueryId {
-        let id = self.queries.len() as QueryId;
-        self.queries.push(query);
-        id
+        alloc_in(&mut self.queries, query)
     }
-
-    /// Retrieve a [`QueryNode`] by its [`QueryId`].
     #[track_caller]
     pub fn get_query(&self, id: QueryId) -> &QueryNode {
-        &self.queries[id as usize]
+        get_in(&self.queries, id)
     }
 
     // ── InsertNode pool ───────────────────────────────────────────────────────
 
-    /// Store an [`InsertNode`] in the pool and return its [`InsertId`].
     pub fn alloc_insert(&mut self, node: InsertNode) -> InsertId {
-        let id = self.inserts.len() as InsertId;
-        self.inserts.push(node);
-        id
+        alloc_in(&mut self.inserts, node)
     }
-
-    /// Retrieve an [`InsertNode`] by its [`InsertId`].
     #[track_caller]
     pub fn get_insert(&self, id: InsertId) -> &InsertNode {
-        &self.inserts[id as usize]
+        get_in(&self.inserts, id)
     }
 
     // ── UpdateNode pool ───────────────────────────────────────────────────────
 
-    /// Store an [`UpdateNode`] in the pool and return its [`UpdateId`].
     pub fn alloc_update(&mut self, node: UpdateNode) -> UpdateId {
-        let id = self.updates.len() as UpdateId;
-        self.updates.push(node);
-        id
+        alloc_in(&mut self.updates, node)
     }
-
-    /// Retrieve an [`UpdateNode`] by its [`UpdateId`].
     #[track_caller]
     pub fn get_update(&self, id: UpdateId) -> &UpdateNode {
-        &self.updates[id as usize]
+        get_in(&self.updates, id)
     }
 
     // ── DeleteNode pool ───────────────────────────────────────────────────────
 
-    /// Store a [`DeleteNode`] in the pool and return its [`DeleteId`].
     pub fn alloc_delete(&mut self, node: DeleteNode) -> DeleteId {
-        let id = self.deletes.len() as DeleteId;
-        self.deletes.push(node);
-        id
+        alloc_in(&mut self.deletes, node)
     }
-
-    /// Retrieve a [`DeleteNode`] by its [`DeleteId`].
     #[track_caller]
     pub fn get_delete(&self, id: DeleteId) -> &DeleteNode {
-        &self.deletes[id as usize]
+        get_in(&self.deletes, id)
     }
 
     // ── UpsertNode pool ───────────────────────────────────────────────────────
 
-    /// Store an [`UpsertNode`] in the pool and return its [`UpsertId`].
     pub fn alloc_upsert(&mut self, node: UpsertNode) -> UpsertId {
-        let id = self.upserts.len() as UpsertId;
-        self.upserts.push(node);
-        id
+        alloc_in(&mut self.upserts, node)
     }
-
-    /// Retrieve an [`UpsertNode`] by its [`UpsertId`].
     #[track_caller]
     pub fn get_upsert(&self, id: UpsertId) -> &UpsertNode {
-        &self.upserts[id as usize]
+        get_in(&self.upserts, id)
     }
 
     // ── FieldNode pool ────────────────────────────────────────────────────────
 
-    /// Store a [`FieldNode`] in the pool and return its [`FieldId`].
     pub fn alloc_field(&mut self, field: FieldNode) -> FieldId {
-        let id = self.fields.len() as FieldId;
-        self.fields.push(field);
-        id
+        alloc_in(&mut self.fields, field)
     }
-
-    /// Retrieve a [`FieldNode`] by its [`FieldId`].
     #[track_caller]
     pub fn get_field(&self, id: FieldId) -> &FieldNode {
-        &self.fields[id as usize]
+        get_in(&self.fields, id)
     }
 }

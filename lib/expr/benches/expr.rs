@@ -168,8 +168,10 @@ fn traverse_arena(c: &mut Criterion) {
             // line. Discriminant counts give the optimiser something it
             // cannot constant-fold away.
             let mut count = 0u32;
-            for i in 0..arena.len() as u32 {
-                if matches!(arena.get(i), ExprNode::BinOp { .. }) {
+            for i in 0..arena.len() {
+                let id = dol_expr::ids::NodeId::from_index(i)
+                    .expect("arena index fits in NodeId");
+                if matches!(arena.get(id), ExprNode::BinOp { .. }) {
                     count += 1;
                 }
             }

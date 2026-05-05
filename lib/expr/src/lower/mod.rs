@@ -17,7 +17,7 @@ use alloc::{
 
 use crate::arena::{ExprArena, FieldNode, FuncNode, InListNode, ObjLitNode};
 use crate::expr::{BinOp, ExprNode, Order, UnaryOp as ArenaUnaryOp};
-use crate::ids::{NULL_NODE, NodeId};
+use crate::ids::NodeId;
 use crate::interner::Interner;
 use crate::tree::{Direction, Expr, OrderByExpr};
 use dol_core::policy::{Budget, Limits};
@@ -223,7 +223,7 @@ fn lower_inner(
         }
 
         Expr::Object(fields) => {
-            let mut pairs: SmallVec<[(u32, NodeId); 4]> = SmallVec::new();
+            let mut pairs: SmallVec<[(crate::ids::StrId, NodeId); 4]> = SmallVec::new();
             for (k, v) in fields {
                 let kid = interner.intern(k.as_str());
                 let vid = lower_child(v, arena, interner, budget)?;
@@ -317,8 +317,8 @@ fn lower_inner(
                 branches.push((cid, tid));
             }
             let else_id = match else_expr.as_deref() {
-                Some(e) => lower_child(e, arena, interner, budget)?,
-                None => NULL_NODE,
+                Some(e) => Some(lower_child(e, arena, interner, budget)?),
+                None => None,
             };
             let cid = arena.alloc_case(crate::CaseNode {
                 branches,
@@ -463,14 +463,15 @@ pub fn qualified_name(name: &str, namespace: &Option<String>) -> String {
 }
 
 /// Lower multiple expressions and AND-join them, returning a single filter
-/// `NodeId` (or `NULL_NODE` if the list is empty).
+/// `NodeId` — or `None` if the list is empty (replaces the previous
+/// `NULL_NODE` sentinel).
 pub fn lower_filters(
     filters: &[Expr<'_>],
     arena: &mut ExprArena,
     interner: &mut Interner,
-) -> Result<NodeId, LowerError> {
+) -> Result<Option<NodeId>, LowerError> {
     if filters.is_empty() {
-        return Ok(NULL_NODE);
+        return Ok(None);
     }
     let mut ids: Vec<NodeId> = Vec::with_capacity(filters.len());
     for f in filters {
@@ -484,7 +485,7 @@ pub fn lower_filters(
             rhs: id,
         });
     }
-    Ok(result)
+    Ok(Some(result))
 }
 
 // ---------------------------------------------------------------------------

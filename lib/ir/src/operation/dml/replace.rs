@@ -36,7 +36,7 @@ pub enum ReplaceBody {
 ///
 /// // Replace a blob at s3://artifacts/build.log
 /// let op: Operation = Replace {
-///     target: Target::new(TargetKind::Blob, Locator::new(Symbol::new(0))),
+///     target: Target::new(TargetKind::Blob, Locator::new(Symbol::from_hash(0))),
 ///     body: ReplaceBody::Bindings,
 ///     filter: None,
 /// }

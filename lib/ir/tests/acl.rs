@@ -16,7 +16,10 @@ use dol_ir::{
 use smallvec::smallvec;
 
 fn rel(name_id: u32) -> Target {
-    Target::new(TargetKind::Relation, Locator::new(Symbol::new(name_id)))
+    Target::new(
+        TargetKind::Relation,
+        Locator::new(Symbol::from_hash(name_id)),
+    )
 }
 
 #[test]
@@ -24,7 +27,7 @@ fn policy_create_dispatches_correctly() {
     let op: Operation = PolicyOp {
         verb: StructuralVerb::Create,
         target: rel(0),
-        name: Symbol::new(1),
+        name: Symbol::from_hash(1),
         scope: PolicyScope::Read,
         using_expr: None,
         check_expr: None,
@@ -43,8 +46,8 @@ fn mask_emits_mask_policies_tag() {
     let op: Operation = MaskOp {
         verb: StructuralVerb::Create,
         target: rel(0),
-        name: Symbol::new(1),
-        fields: smallvec![Symbol::new(2)],
+        name: Symbol::from_hash(1),
+        fields: smallvec![Symbol::from_hash(2)],
         mask_expr: None,
     }
     .into();
@@ -61,7 +64,7 @@ fn quota_emits_quotas_tag_and_carries_kind() {
     let op: Operation = QuotaOp {
         verb: StructuralVerb::Create,
         target: rel(0),
-        name: Symbol::new(1),
+        name: Symbol::from_hash(1),
         kind: QuotaKind::Storage,
         limit: 1_000_000,
         role: None,
@@ -83,7 +86,7 @@ fn audit_emits_audit_tag_and_carries_event() {
     let op: Operation = AuditOp {
         verb: StructuralVerb::Create,
         target: rel(0),
-        name: Symbol::new(1),
+        name: Symbol::from_hash(1),
         event: AuditEvent::Write,
         sink: AuditSink::Default,
     }
@@ -103,7 +106,7 @@ fn grant_dispatches_to_acl_verb() {
     let op: Operation = Grant {
         privileges: smallvec![Privilege::Select, Privilege::Update],
         target: rel(0),
-        roles: smallvec![Symbol::new(1)],
+        roles: smallvec![Symbol::from_hash(1)],
         with_grant_option: false,
     }
     .into();
@@ -116,7 +119,7 @@ fn revoke_dispatches_to_acl_verb_with_cascade() {
     let op: Operation = Revoke {
         privileges: smallvec![Privilege::All],
         target: rel(0),
-        roles: smallvec![Symbol::new(1)],
+        roles: smallvec![Symbol::from_hash(1)],
         cascade: true,
     }
     .into();

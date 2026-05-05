@@ -31,8 +31,8 @@ pub enum QuotaKind {
 /// // Limit the "uploads" blob bucket to 10GB
 /// let op: Operation = QuotaOp {
 ///     verb: StructuralVerb::Create,
-///     target: Target::new(TargetKind::Blob, Locator::new(Symbol::new(0))),
-///     name: Symbol::new(1),
+///     target: Target::new(TargetKind::Blob, Locator::new(Symbol::from_hash(0))),
+///     name: Symbol::from_hash(1),
 ///     kind: QuotaKind::Storage,
 ///     limit: 10 * 1024 * 1024 * 1024, // 10GB in bytes
 ///     role: None,
