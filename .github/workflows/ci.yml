@@ -256,28 +256,33 @@ jobs:
         run: cargo run -q -p xtask -- readme
 
   cross-compile:
-    name: Cross-Compile (thumbv7em-none-eabihf)
+    name: Cross-Compile (${{ matrix.target }})
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - thumbv7em-none-eabihf
+          - riscv32imac-unknown-none-elf
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain (with thumbv7em target)
+      - name: Install Rust toolchain (with ${{ matrix.target }} target)
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: "1.94"
-          targets: thumbv7em-none-eabihf
+          targets: ${{ matrix.target }}
 
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: cross-thumbv7em
+          shared-key: cross-${{ matrix.target }}
 
-      - name: Cargo check no_std leaves on thumbv7em
+      - name: Cargo check no_std leaves on ${{ matrix.target }}
         run: |
-          cargo check -p dol-core -p dol-expr \
-            --no-default-features --target thumbv7em-none-eabihf
+          cargo run -p xtask -- mcu --target=${{ matrix.target }}
 
   deny:
     name: Cargo Deny (Security Audit)

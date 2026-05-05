@@ -7,7 +7,9 @@ description = "DOL schema language — Entity, Field, DataType, and constraints.
 readme = "README.md"
 
 [dependencies]
-dol-core = { workspace = true }
+# Hand-rolled (not `workspace = true`) so we can opt out of `dol-core`'s
+# default features and stay `no_std + alloc`-clean for embedded targets.
+dol-core = { path = "../core", default-features = false }
 serde    = { workspace = true, optional = true }
 
 [dev-dependencies]

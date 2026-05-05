@@ -12,6 +12,7 @@
 //! |----------|----------------------------------------------------------|
 //! | `size`   | print `size_of` for the public size-budgeted IR types.   |
 //! | `nostd`  | run `cargo test --no-default-features` on `no_std` crates. |
+//! | `mcu`    | `cargo check` the `no_std` leaves against bare-metal MCU targets. |
 //! | `doc`    | build workspace docs with all features.                  |
 //! | `readme` | verify every workspace member has a non-empty README.md. |
 //! | `help`   | print this list.                                         |
@@ -28,6 +29,7 @@ fn main() -> ExitCode {
     let ok = match cmd.as_str() {
         "size" => size_report(),
         "nostd" => nostd_check(),
+        "mcu" => mcu_check(&rest),
         "doc" => run_cargo(
             &["doc", "--workspace", "--all-features", "--no-deps"],
             &rest,
@@ -58,6 +60,9 @@ fn print_help() {
          Subcommands:\n  \
            size    print size_of for size-budgeted public IR types\n  \
            nostd   verify the no_std layer compiles without `std`\n  \
+           mcu     `cargo check` the no_std layer against MCU targets\n             \
+                  (default: riscv32imac-unknown-none-elf,\n             \
+                   thumbv7em-none-eabihf; pass `--target=<triple>` to override)\n  \
            doc     build workspace documentation\n  \
            readme  verify every workspace member has a non-empty README.md\n  \
            help    show this message\n"
@@ -150,7 +155,60 @@ fn nostd_check() -> bool {
     true
 }
 
-/// Verify every workspace member has a non-empty `README.md` and that its
+/// Cross-build the `no_std + alloc`-clean leaves against bare-metal MCU
+/// targets via `cargo check --no-default-features --target=<triple>`.
+///
+/// Targets default to the `thumbv7em-none-eabihf` (Cortex-M4F) and
+/// `riscv32imac-unknown-none-elf` (RISC-V 32-bit IMAC) triples that mirror
+/// the project's published embedded support matrix. Override with
+/// `xtask mcu --target=<triple>` to add or replace entries.
+///
+/// The target toolchain must already be installed (`rustup target add
+/// <triple>`); this command does not install it for you, so callers can
+/// fail loudly when the host is missing prerequisites.
+fn mcu_check(extra: &[String]) -> bool {
+    // Built-in targets that mirror the embedded matrix in `lib/dol`'s
+    // `iot-min` feature. Override / extend via `--target=<triple>` flags.
+    let mut targets: Vec<String> = vec![
+        "riscv32imac-unknown-none-elf".into(),
+        "thumbv7em-none-eabihf".into(),
+    ];
+    let mut overrides: Vec<String> = Vec::new();
+    for arg in extra {
+        if let Some(t) = arg.strip_prefix("--target=") {
+            overrides.push(t.into());
+        } else {
+            eprintln!("xtask: mcu: unknown argument `{arg}`");
+            return false;
+        }
+    }
+    if !overrides.is_empty() {
+        targets = overrides;
+    }
+
+    // The set of crates known to be `no_std + alloc`-clean. Matches the
+    // crates flagged with `#![cfg_attr(not(feature = "std"), no_std)]` and
+    // exercised by `nostd_check` plus `dol-schema`.
+    let crates = ["dol-core", "dol-expr", "dol-ir", "dol-schema"];
+    for target in &targets {
+        let mut args: Vec<&str> = Vec::with_capacity(2 * crates.len() + 4);
+        args.push("check");
+        for c in crates {
+            args.push("-p");
+            args.push(c);
+        }
+        args.push("--no-default-features");
+        args.push("--target");
+        args.push(target);
+        let ok = run_cargo(&args, &[]);
+        if !ok {
+            eprintln!("xtask: mcu check failed for target {target}");
+            return false;
+        }
+    }
+    true
+}
+
 /// `Cargo.toml` declares it via `readme = "README.md"`. Keeps per-crate docs
 /// from silently rotting away.
 fn readme_check() -> bool {
