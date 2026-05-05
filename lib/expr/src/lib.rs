@@ -43,7 +43,7 @@ pub mod tree;
 pub mod types;
 
 pub use arena::{
-    CaseNode, Capacity, ExprArena, FieldNode, FieldStep, FuncNode, InListNode, ObjLitNode, Span,
+    Capacity, CaseNode, ExprArena, FieldNode, FieldStep, FuncNode, InListNode, ObjLitNode, Span,
     SpanTable, WindowNode,
 };
 pub use expr::{
@@ -55,5 +55,10 @@ pub use ids::{
     QueryId, SpanId, StrId, TypeId, UpdateId, UpsertId, WindowId,
 };
 pub use interner::Interner;
+pub use lower::{LowerError, lower_expr, lower_expr_with_budget};
 pub use session::BuildSession;
 pub use types::{DataType, Literal, Value};
+
+// Re-export the core foundation primitives `dol-expr` consumers need so
+// they don't have to reach across crates for the most common imports.
+pub use dol_core::policy::{Budget, Limits};

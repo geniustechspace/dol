@@ -97,6 +97,26 @@ impl Limits {
             max_str_bytes: 128,
         }
     }
+
+    /// Effectively-unbounded preset: every cap is set to the maximum
+    /// representable value on the field's type (`usize::MAX` /
+    /// `u32::MAX`).
+    ///
+    /// Used by entry points that explicitly opt out of bounding (e.g.
+    /// the unbounded `lower_expr` in `dol-expr`) so the same `Budget`
+    /// machinery can drive both the bounded and unbounded paths without
+    /// branching on `Option<&mut Budget>`. Production code that handles
+    /// untrusted input should use [`Self::iot`] or [`Self::host`]
+    /// instead.
+    #[must_use]
+    pub const fn unbounded() -> Self {
+        Self {
+            max_nodes: usize::MAX,
+            max_depth: u32::MAX,
+            max_bytes: usize::MAX,
+            max_str_bytes: usize::MAX,
+        }
+    }
 }
 
 impl Default for Limits {
@@ -381,6 +401,20 @@ mod tests {
             b.check_str(Limits::iot().max_str_bytes + 1),
             Err(BudgetError::StrBytes)
         );
+    }
+
+    #[test]
+    fn unbounded_preset_admits_extreme_inputs() {
+        let mut b = Budget::new(Limits::unbounded());
+        // Anything short of `usize::MAX` must succeed; saturating_add
+        // means even the max value is rejected (would overflow), which
+        // is fine because no realistic traversal hits that.
+        assert!(b.tick(1_000_000).is_ok());
+        assert!(b.charge(1_000_000).is_ok());
+        b.descend(|b| {
+            assert_eq!(b.depth(), 1);
+        })
+        .unwrap();
     }
 
     #[test]

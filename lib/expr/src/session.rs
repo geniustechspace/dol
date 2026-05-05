@@ -1,12 +1,15 @@
 use smallvec::SmallVec;
 
+use dol_core::policy::{Budget, Limits};
+
 use crate::arena::{ExprArena, FieldNode, FieldStep};
 use crate::expr::ExprNode;
 use crate::ids::{NodeId, StrId};
 use crate::interner::Interner;
-use crate::lower::{LowerError, lower_expr_bounded};
+use crate::lower::{LowerError, lower_expr_with_budget};
 use crate::tree::Expr;
 
+/// Pre-interned ids for high-frequency function/operator names.
 pub struct WellKnownNames {
     pub and: u32,
     pub or: u32,
@@ -18,18 +21,40 @@ pub struct WellKnownNames {
     pub max: u32,
 }
 
+/// A long-lived expression-builder context.
+///
+/// Holds the arena, interner, and a [`Budget`] that accumulates node
+/// charges across every [`BuildSession::lower`] call so a single session
+/// can enforce a quota across the whole build pipeline rather than per
+/// `lower()` invocation.
 pub struct BuildSession {
     pub interner: Interner,
     pub arena: ExprArena,
     pub wkn: WellKnownNames,
-    fuel: u32,
-    depth: u32,
+    /// Caps applied on every `lower()` call. Mutate via
+    /// [`BuildSession::set_limits`].
+    limits: Limits,
+    /// Long-lived budget seeded from `limits`; node charges accumulate
+    /// across calls. Reset on `reset()` and re-seeded by `set_limits`.
+    budget: Budget,
 }
 
-const DEFAULT_FUEL: u32 = 100_000;
-const DEFAULT_DEPTH: u32 = 512;
+/// Default limits for a freshly-built session: generous enough for any
+/// realistic interactive workload, tight enough to refuse a runaway
+/// query before it OOMs the host.
+const DEFAULT_LIMITS: Limits = Limits {
+    max_nodes: 100_000,
+    max_depth: 512,
+    // Bytes / string-bytes are not yet charged from `lower`; surface
+    // sensible defaults so `BuildSession::set_limits(_)` callers can
+    // tighten them when sub-systems start charging.
+    max_bytes: 64 * 1024 * 1024,
+    max_str_bytes: 1024 * 1024,
+};
 
 impl BuildSession {
+    /// Build a session with the default [`Limits`] and the well-known
+    /// operator-name strings pre-interned.
     pub fn new() -> Self {
         let mut interner = Interner::new();
         let wkn = WellKnownNames {
@@ -46,71 +71,53 @@ impl BuildSession {
             interner,
             arena: ExprArena::new(),
             wkn,
-            fuel: DEFAULT_FUEL,
-            depth: DEFAULT_DEPTH,
+            limits: DEFAULT_LIMITS,
+            budget: Budget::new(DEFAULT_LIMITS),
         }
     }
 
+    /// Reset the arena and interner, and re-seed the budget from the
+    /// current limits.
     pub fn reset(&mut self) {
         self.interner.reset();
         self.arena = ExprArena::new();
-        self.fuel = DEFAULT_FUEL;
-        self.depth = DEFAULT_DEPTH;
+        self.budget = Budget::new(self.limits);
     }
 
-    pub fn remaining_fuel(&self) -> u32 {
-        self.fuel
-    }
-    pub fn max_depth(&self) -> u32 {
-        self.depth
+    /// Borrow the active limits.
+    #[inline]
+    pub fn limits(&self) -> &Limits {
+        &self.limits
     }
 
-    /// Override the per-lowering allocation budget.
+    /// Borrow the live budget — useful for inspecting how many nodes
+    /// have been charged so far.
+    #[inline]
+    pub fn budget(&self) -> &Budget {
+        &self.budget
+    }
+
+    /// Replace the active [`Limits`] and re-seed the budget so the new
+    /// caps take effect on the next [`BuildSession::lower`] call.
     ///
-    /// Each arena allocation during lowering decrements `fuel`; when it
-    /// hits zero, lowering returns [`LowerError::FuelExhausted`]. Use this
-    /// to harden the build path against pathologically large or
-    /// adversarial inputs without changing the default for benign ones.
-    pub fn set_fuel(&mut self, fuel: u32) {
-        self.fuel = fuel;
-    }
-
-    /// Override the maximum recursion depth allowed during lowering.
-    ///
-    /// Protects the host stack from deep `OR`/`AND` chains. Returns
-    /// [`LowerError::DepthExceeded`] when the limit is reached.
-    pub fn set_max_depth(&mut self, depth: u32) {
-        self.depth = depth;
+    /// Re-seeding clears any accumulated node count; if you need to
+    /// preserve usage, snapshot `budget()` first.
+    pub fn set_limits(&mut self, limits: Limits) {
+        self.limits = limits;
+        self.budget = Budget::new(limits);
     }
 
     /// Lower a tree expression into this session's arena, returning the
     /// root [`NodeId`].
     ///
     /// Unlike the free [`crate::lower::lower_expr`] function, this entry
-    /// point honours the session's `fuel` and `depth` budgets, decrementing
-    /// `fuel` on every arena allocation and tracking depth across recursive
-    /// calls. Once a budget is exhausted, the partial work already pushed
-    /// into the arena is left in place (lowering is not transactional —
-    /// callers that need rollback should snapshot/clone the arena first).
+    /// point honours the session's [`Limits`] and accumulates node
+    /// charges across calls. Once a budget is exhausted, the partial
+    /// work already pushed into the arena is left in place (lowering is
+    /// not transactional — callers that need rollback should snapshot
+    /// or clone the arena first).
     pub fn lower(&mut self, expr: &Expr<'_>) -> Result<NodeId, LowerError> {
-        // Snapshot the limits and run the bounded entry point. We pass
-        // the limits by mutable ref so the lowering helpers can decrement
-        // them in place; the session's view stays consistent because we
-        // copy the surviving values back when done.
-        let mut fuel = self.fuel;
-        let mut depth_left = self.depth;
-        let res = lower_expr_bounded(
-            expr,
-            &mut self.arena,
-            &mut self.interner,
-            &mut fuel,
-            &mut depth_left,
-            self.depth,
-        );
-        // Always copy back, even on error, so subsequent operations see the
-        // remaining budget.
-        self.fuel = fuel;
-        res
+        lower_expr_with_budget(expr, &mut self.arena, &mut self.interner, &mut self.budget)
     }
 
     // ── Field / Namespace helpers ─────────────────────────────────────────────

@@ -20,6 +20,7 @@ use crate::expr::{BinOp, ExprNode, Order, UnaryOp as ArenaUnaryOp};
 use crate::ids::{NULL_NODE, NodeId};
 use crate::interner::Interner;
 use crate::tree::{Direction, Expr, OrderByExpr};
+use dol_core::policy::{Budget, Limits};
 use smallvec::SmallVec;
 
 /// Errors produced by the tree → arena lowering pipeline.
@@ -45,14 +46,16 @@ pub enum LowerError {
         /// Free-form description of the rejected base shape.
         base: String,
     },
-    /// The `BuildSession`'s allocation budget (`fuel`) ran out mid-lowering.
-    /// Indicates the input `Expr<'_>` produced more arena allocations than
-    /// the configured limit; raise the budget via [`crate::BuildSession`]
-    /// or simplify the source.
+    /// The traversal `Budget` ran out of node fuel mid-lowering — the
+    /// input `Expr<'_>` produced more arena allocations than the
+    /// configured [`Limits::max_nodes`]. Raise the limit on the
+    /// [`crate::BuildSession`] (or pass a more generous `Budget` to
+    /// [`lower_expr_with_budget`]) or simplify the source.
     FuelExhausted,
-    /// The recursion / tree depth exceeded the session's configured limit.
-    /// Protects against pathologically deep expressions (deep `OR`-chains,
-    /// untrusted IR) that would otherwise overflow the host stack.
+    /// The recursion / tree depth exceeded the traversal's configured
+    /// [`Limits::max_depth`]. Protects against pathologically deep
+    /// expressions (deep `OR`-chains, untrusted IR) that would
+    /// otherwise overflow the host stack.
     DepthExceeded {
         /// Depth at which the limit was hit.
         depth: u32,
@@ -86,75 +89,82 @@ impl std::error::Error for LowerError {}
 /// has no faithful arena representation; callers should propagate the
 /// diagnostic rather than swallow it.
 ///
-/// **Unbounded:** this entry point performs no fuel / depth checking. For
-/// untrusted or adversarial input, prefer [`crate::BuildSession::lower`]
-/// (or call [`lower_expr_bounded`] directly) so deeply-nested expressions
-/// or runaway allocation are rejected with a `LowerError` rather than
-/// blowing the stack or the heap.
+/// **Unbounded:** this entry point uses [`Limits::unbounded`], so it
+/// performs no effective fuel / depth checking. For untrusted or
+/// adversarial input, prefer [`crate::BuildSession::lower`] (or call
+/// [`lower_expr_with_budget`] directly with a tighter [`Budget`]) so
+/// deeply-nested expressions or runaway allocation are rejected with a
+/// `LowerError` rather than blowing the stack or the heap.
 pub fn lower_expr(
     expr: &Expr<'_>,
     arena: &mut ExprArena,
     interner: &mut Interner,
 ) -> Result<NodeId, LowerError> {
-    // Effectively unlimited budgets: u32::MAX allocations and u32::MAX
-    // recursion depth. The shared implementation still pays one branch per
-    // allocation, but the cost is negligible compared to the allocation
-    // itself, and consolidating keeps the two entry points byte-identical
-    // in observable behaviour.
-    let mut fuel = u32::MAX;
-    let mut depth_left = u32::MAX;
-    lower_expr_bounded(expr, arena, interner, &mut fuel, &mut depth_left, u32::MAX)
+    // The shared bounded implementation pays one branch per allocation
+    // even on this path, but the cost is negligible compared to the
+    // allocation itself, and consolidating keeps both entry points
+    // byte-identical in observable behaviour.
+    let mut budget = Budget::new(Limits::unbounded());
+    lower_expr_with_budget(expr, arena, interner, &mut budget)
 }
 
 /// Bounded counterpart to [`lower_expr`].
 ///
-/// `fuel` is decremented on each `lower_expr_bounded` invocation (one per
-/// tree node) and lowering aborts with [`LowerError::FuelExhausted`] once
-/// it reaches zero. `depth_left` is decremented before each recursive
-/// descent and restored on return; when it would go below zero, lowering
-/// aborts with [`LowerError::DepthExceeded`] reporting the failing depth
-/// (relative to the caller-supplied `max_depth`).
+/// Threads a [`Budget`] through the recursion: each node charges one
+/// tick (mapping [`dol_core::policy::BudgetError::Nodes`] →
+/// [`LowerError::FuelExhausted`]) and each recursive descent calls
+/// [`Budget::descend`] (mapping
+/// [`dol_core::policy::BudgetError::Depth`] →
+/// [`LowerError::DepthExceeded`] with `depth = budget.limits().max_depth`,
+/// the cap that was hit).
 ///
-/// This is the implementation backing both the unchecked free function
-/// and the [`crate::BuildSession`]-driven entry point.
-pub fn lower_expr_bounded(
+/// The supplied `budget` keeps accumulating across calls — node ticks
+/// are not refunded between separate `lower_expr_with_budget`
+/// invocations on the same `Budget`. This is intentional so that
+/// [`crate::BuildSession`] can enforce a quota across the whole session
+/// rather than per `lower()` call.
+pub fn lower_expr_with_budget(
     expr: &Expr<'_>,
     arena: &mut ExprArena,
     interner: &mut Interner,
-    fuel: &mut u32,
-    depth_left: &mut u32,
-    max_depth: u32,
+    budget: &mut Budget,
 ) -> Result<NodeId, LowerError> {
-    if *depth_left == 0 {
-        return Err(LowerError::DepthExceeded {
-            depth: max_depth.saturating_sub(*depth_left),
-        });
+    lower_child(expr, arena, interner, budget)
+}
+
+/// Lower one tree node *as a child* of an enclosing context: descends
+/// the budget by one level, runs `lower_inner`, and on either fuel- or
+/// depth-exhaustion produces the matching [`LowerError`].
+///
+/// All recursive lowering ultimately routes through here so the budget
+/// machinery lives in one place.
+fn lower_child(
+    expr: &Expr<'_>,
+    arena: &mut ExprArena,
+    interner: &mut Interner,
+    budget: &mut Budget,
+) -> Result<NodeId, LowerError> {
+    let max_depth = budget.limits().max_depth;
+    match budget.descend(|b| lower_inner(expr, arena, interner, b)) {
+        Ok(inner) => inner,
+        Err(_) => Err(LowerError::DepthExceeded { depth: max_depth }),
     }
-    *depth_left -= 1;
-    let result = lower_inner(expr, arena, interner, fuel, depth_left, max_depth);
-    *depth_left += 1;
-    result
 }
 
 fn lower_inner(
     expr: &Expr<'_>,
     arena: &mut ExprArena,
     interner: &mut Interner,
-    fuel: &mut u32,
-    depth_left: &mut u32,
-    max_depth: u32,
+    budget: &mut Budget,
 ) -> Result<NodeId, LowerError> {
     use crate::arena::FieldStep;
 
     // Each `lower_inner` invocation lowers one tree node, which always
-    // allocates at least one arena node in every match arm below. Charging
-    // fuel here (instead of at every individual `arena.alloc` call site)
-    // keeps the bounded path readable while still bounding total
-    // allocations to within a small constant factor of `fuel`.
-    if *fuel == 0 {
-        return Err(LowerError::FuelExhausted);
-    }
-    *fuel -= 1;
+    // allocates at least one arena node in every match arm below.
+    // Charging here (instead of at every individual `arena.alloc` call
+    // site) keeps the bounded path readable while still bounding total
+    // allocations to within a small constant factor of `max_nodes`.
+    budget.tick(1).map_err(|_| LowerError::FuelExhausted)?;
 
     match expr {
         Expr::Namespace(path) => {
@@ -207,7 +217,7 @@ fn lower_inner(
         Expr::Array(elements) => {
             let mut ids: SmallVec<[NodeId; 4]> = SmallVec::new();
             for e in elements {
-                ids.push(lower_expr_bounded(e, arena, interner, fuel, depth_left, max_depth)?);
+                ids.push(lower_child(e, arena, interner, budget)?);
             }
             Ok(arena.alloc(ExprNode::ArrayLit(ids)))
         }
@@ -216,7 +226,7 @@ fn lower_inner(
             let mut pairs: SmallVec<[(u32, NodeId); 4]> = SmallVec::new();
             for (k, v) in fields {
                 let kid = interner.intern(k.as_str());
-                let vid = lower_expr_bounded(v, arena, interner, fuel, depth_left, max_depth)?;
+                let vid = lower_child(v, arena, interner, budget)?;
                 pairs.push((kid, vid));
             }
             let oid = arena.alloc_obj_lit(ObjLitNode(pairs));
@@ -224,8 +234,8 @@ fn lower_inner(
         }
 
         Expr::BinaryOp { left, op, right } => {
-            let lhs = lower_expr_bounded(left, arena, interner, fuel, depth_left, max_depth)?;
-            let rhs = lower_expr_bounded(right, arena, interner, fuel, depth_left, max_depth)?;
+            let lhs = lower_child(left, arena, interner, budget)?;
+            let rhs = lower_child(right, arena, interner, budget)?;
             let bin_op = lower_binop(op);
             Ok(arena.alloc(ExprNode::BinOp {
                 op: bin_op,
@@ -241,16 +251,14 @@ fn lower_inner(
             if *op == CoreUnaryOp::Not {
                 if let Expr::InList { expr: ie, list } = inner.as_ref() {
                     // Lower as NOT + InList.
-                    let in_node = lower_expr_bounded(
+                    let in_node = lower_child(
                         &Expr::InList {
                             expr: ie.clone(),
                             list: list.clone(),
                         },
                         arena,
                         interner,
-                        fuel,
-                        depth_left,
-                        max_depth,
+                        budget,
                     )?;
                     return Ok(arena.alloc(ExprNode::UnaryOp {
                         op: ArenaUnaryOp::Not,
@@ -259,7 +267,7 @@ fn lower_inner(
                 }
             }
 
-            let inner_id = lower_expr_bounded(inner, arena, interner, fuel, depth_left, max_depth)?;
+            let inner_id = lower_child(inner, arena, interner, budget)?;
             let arena_op = match op {
                 CoreUnaryOp::Not => ArenaUnaryOp::Not,
                 CoreUnaryOp::Neg => ArenaUnaryOp::Neg,
@@ -277,7 +285,7 @@ fn lower_inner(
             let func_name = interner.intern(name.name());
             let mut arg_ids: SmallVec<[NodeId; 4]> = SmallVec::new();
             for a in args {
-                arg_ids.push(lower_expr_bounded(a, arena, interner, fuel, depth_left, max_depth)?);
+                arg_ids.push(lower_child(a, arena, interner, budget)?);
             }
             let fid = arena.alloc_func(FuncNode {
                 name: func_name,
@@ -290,7 +298,7 @@ fn lower_inner(
             expr: inner,
             as_type,
         } => {
-            let inner_id = lower_expr_bounded(inner, arena, interner, fuel, depth_left, max_depth)?;
+            let inner_id = lower_child(inner, arena, interner, budget)?;
             // Use the stable `DataType::type_name()` rather than a `Debug`
             // rendering so the interned type name is wire-stable across
             // Rust toolchain upgrades.
@@ -304,12 +312,12 @@ fn lower_inner(
         Expr::Case { whens, else_expr } => {
             let mut branches: SmallVec<[(NodeId, NodeId); 4]> = SmallVec::new();
             for (c, t) in whens {
-                let cid = lower_expr_bounded(c, arena, interner, fuel, depth_left, max_depth)?;
-                let tid = lower_expr_bounded(t, arena, interner, fuel, depth_left, max_depth)?;
+                let cid = lower_child(c, arena, interner, budget)?;
+                let tid = lower_child(t, arena, interner, budget)?;
                 branches.push((cid, tid));
             }
             let else_id = match else_expr.as_deref() {
-                Some(e) => lower_expr_bounded(e, arena, interner, fuel, depth_left, max_depth)?,
+                Some(e) => lower_child(e, arena, interner, budget)?,
                 None => NULL_NODE,
             };
             let cid = arena.alloc_case(crate::CaseNode {
@@ -324,17 +332,17 @@ fn lower_inner(
             low,
             high,
         } => {
-            let eid = lower_expr_bounded(inner, arena, interner, fuel, depth_left, max_depth)?;
-            let lo = lower_expr_bounded(low, arena, interner, fuel, depth_left, max_depth)?;
-            let hi = lower_expr_bounded(high, arena, interner, fuel, depth_left, max_depth)?;
+            let eid = lower_child(inner, arena, interner, budget)?;
+            let lo = lower_child(low, arena, interner, budget)?;
+            let hi = lower_child(high, arena, interner, budget)?;
             Ok(arena.alloc(ExprNode::Between { expr: eid, lo, hi }))
         }
 
         Expr::InList { expr: inner, list } => {
-            let eid = lower_expr_bounded(inner, arena, interner, fuel, depth_left, max_depth)?;
+            let eid = lower_child(inner, arena, interner, budget)?;
             let mut ids: SmallVec<[NodeId; 8]> = SmallVec::new();
             for e in list {
-                ids.push(lower_expr_bounded(e, arena, interner, fuel, depth_left, max_depth)?);
+                ids.push(lower_child(e, arena, interner, budget)?);
             }
             let in_id = arena.alloc_in_list(InListNode {
                 expr: eid,
@@ -344,7 +352,7 @@ fn lower_inner(
         }
 
         Expr::Alias { expr: inner, alias } => {
-            let inner_id = lower_expr_bounded(inner, arena, interner, fuel, depth_left, max_depth)?;
+            let inner_id = lower_child(inner, arena, interner, budget)?;
             let aid = interner.intern(alias.as_str());
             Ok(arena.alloc(ExprNode::Alias {
                 expr: inner_id,
@@ -397,11 +405,11 @@ fn lower_inner(
             };
             let mut partition: SmallVec<[NodeId; 4]> = SmallVec::new();
             for e in partition_by {
-                partition.push(lower_expr_bounded(e, arena, interner, fuel, depth_left, max_depth)?);
+                partition.push(lower_child(e, arena, interner, budget)?);
             }
             let mut order: SmallVec<[(NodeId, Order); 2]> = SmallVec::new();
             for ob in order_by {
-                let eid = lower_expr_bounded(&ob.expr, arena, interner, fuel, depth_left, max_depth)?;
+                let eid = lower_child(&ob.expr, arena, interner, budget)?;
                 let dir = match ob.direction {
                     Direction::Asc => Order::Asc,
                     Direction::Desc => Order::Desc,
@@ -642,7 +650,7 @@ mod tests {
         assert!(matches!(err, LowerError::UnsupportedWindowHead { .. }));
     }
 
-    // ── Bounded lowering — fuel + depth ─────────────────────────────────────
+    // ── Bounded lowering — Budget ──────────────────────────────────────────
 
     #[test]
     fn bounded_lower_succeeds_with_ample_budget() {
@@ -650,41 +658,34 @@ mod tests {
         let mut arena = ExprArena::new();
         let mut interner = Interner::new();
         let expr = field("a").eq(int(1i32));
-        let mut fuel = 100;
-        let mut depth_left = 100;
-        let id = lower_expr_bounded(
-            &expr,
-            &mut arena,
-            &mut interner,
-            &mut fuel,
-            &mut depth_left,
-            100,
-        )
-        .unwrap();
-        // Fuel decremented at least once (the BinOp itself).
-        assert!(fuel < 100);
+        let mut budget = Budget::new(Limits {
+            max_nodes: 100,
+            max_depth: 100,
+            max_bytes: 1 << 20,
+            max_str_bytes: 1024,
+        });
+        let id = lower_expr_with_budget(&expr, &mut arena, &mut interner, &mut budget).unwrap();
+        // At least one tick was charged (the BinOp itself).
+        assert!(budget.nodes() > 0);
         // Depth fully restored after the call returns.
-        assert_eq!(depth_left, 100);
+        assert_eq!(budget.depth(), 0);
         // And the node is a BinOp.
         assert!(matches!(arena.get(id), ExprNode::BinOp { .. }));
     }
 
     #[test]
-    fn bounded_lower_rejects_zero_fuel() {
+    fn bounded_lower_rejects_exhausted_node_budget() {
         let mut arena = ExprArena::new();
         let mut interner = Interner::new();
         let expr = field("a");
-        let mut fuel = 0;
-        let mut depth_left = 32;
-        let err = lower_expr_bounded(
-            &expr,
-            &mut arena,
-            &mut interner,
-            &mut fuel,
-            &mut depth_left,
-            32,
-        )
-        .unwrap_err();
+        let mut budget = Budget::new(Limits {
+            max_nodes: 0,
+            max_depth: 32,
+            max_bytes: 1 << 20,
+            max_str_bytes: 1024,
+        });
+        let err =
+            lower_expr_with_budget(&expr, &mut arena, &mut interner, &mut budget).unwrap_err();
         assert!(matches!(err, LowerError::FuelExhausted));
     }
 
@@ -698,29 +699,33 @@ mod tests {
         }
         let mut arena = ExprArena::new();
         let mut interner = Interner::new();
-        let mut fuel = 1000;
         // Cap at depth 4 so the chain is rejected.
-        let mut depth_left = 4;
-        let err = lower_expr_bounded(
-            &e,
-            &mut arena,
-            &mut interner,
-            &mut fuel,
-            &mut depth_left,
-            4,
-        )
-        .unwrap_err();
-        assert!(matches!(err, LowerError::DepthExceeded { .. }));
+        let mut budget = Budget::new(Limits {
+            max_nodes: 1000,
+            max_depth: 4,
+            max_bytes: 1 << 20,
+            max_str_bytes: 1024,
+        });
+        let err = lower_expr_with_budget(&e, &mut arena, &mut interner, &mut budget).unwrap_err();
+        assert!(
+            matches!(err, LowerError::DepthExceeded { depth } if depth == 4),
+            "expected DepthExceeded {{ depth: 4 }}, got {err:?}"
+        );
     }
 
     #[test]
-    fn build_session_lower_threads_fuel_through() {
+    fn build_session_lower_threads_budget_through() {
         use crate::session::BuildSession;
         use crate::tree::int;
         let mut sess = BuildSession::new();
-        sess.set_fuel(2);
         // A two-arm AND has 5 arena nodes (field x2, lit x2, eq x2, and),
-        // which exceeds fuel=2 and must surface as FuelExhausted.
+        // which exceeds max_nodes=2 and must surface as FuelExhausted.
+        sess.set_limits(Limits {
+            max_nodes: 2,
+            max_depth: 512,
+            max_bytes: 1 << 20,
+            max_str_bytes: 1024,
+        });
         let expr = field("a").eq(int(1i32)) & field("b").eq(int(2i32));
         let err = sess.lower(&expr).unwrap_err();
         assert!(matches!(err, LowerError::FuelExhausted));
