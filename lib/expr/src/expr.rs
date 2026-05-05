@@ -259,6 +259,15 @@ pub enum ExprNode {
     Upsert(UpsertId),
 }
 
+// Compile-time guarantee: `ExprNode` ≤ 32 bytes. Bumps from new variants
+// land here as a build error rather than a `xtask size` regression.
+const _: () = {
+    assert!(
+        core::mem::size_of::<ExprNode>() <= 32,
+        "ExprNode exceeds the 32-byte budget — pool the new payload via ExprArena",
+    );
+};
+
 #[cfg(test)]
 mod size_tests {
     use core::mem::size_of;
