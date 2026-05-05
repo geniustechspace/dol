@@ -383,6 +383,10 @@ impl GetQuery {
                 // can't run unbounded.
                 let mut cond_ids: Vec<NodeId> = Vec::new();
                 for (l, r) in &jc.on_conditions {
+                    // Charge two ticks: one for each `Field` allocation
+                    // (left and right column references) emitted below.
+                    // Keeps the worst-case `ON a=b AND c=d AND ...`
+                    // chain bounded by the configured fuel cap.
                     budget
                         .tick(2)
                         .map_err(|e| crate::BuildError::JoinOn(dol_expr::lower::LowerError::from(e)))?;

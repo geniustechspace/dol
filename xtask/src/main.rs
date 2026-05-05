@@ -395,16 +395,19 @@ fn collect_rs(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
         let p = ent.path();
         if p.is_dir() {
             // Skip target/ caches and tests/ trees — gate is about
-            // production library code only.
-            let name = p.file_name().and_then(|s| s.to_str()).unwrap_or("");
-            if matches!(name, "target" | "tests" | "benches" | "examples") {
+            // production library code only. Use `to_string_lossy()`
+            // rather than `to_str()` so a non-UTF-8 directory name
+            // (legal on Linux/macOS) still lets us match the filter
+            // strings instead of silently skipping the directory.
+            let name = p.file_name().map(|s| s.to_string_lossy()).unwrap_or_default();
+            if matches!(name.as_ref(), "target" | "tests" | "benches" | "examples") {
                 continue;
             }
             collect_rs(&p, out);
         } else if p.extension().and_then(|s| s.to_str()) == Some("rs") {
             // Also skip `tests.rs` and `*_tests.rs` modules — production
             // gate, not a test-code gate.
-            let name = p.file_name().and_then(|s| s.to_str()).unwrap_or("");
+            let name = p.file_name().map(|s| s.to_string_lossy()).unwrap_or_default();
             if name == "tests.rs" || name.ends_with("_tests.rs") {
                 continue;
             }
