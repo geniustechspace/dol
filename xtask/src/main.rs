@@ -19,6 +19,8 @@
 //!
 //! See `justfile` for higher-level recipes that wrap these.
 
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing, clippy::arithmetic_side_effects))]
+
 use std::process::{Command, ExitCode};
 
 fn main() -> ExitCode {
@@ -211,6 +213,13 @@ fn mcu_check(extra: &[String]) -> bool {
 
 /// `Cargo.toml` declares it via `readme = "README.md"`. Keeps per-crate docs
 /// from silently rotting away.
+//
+// Lint exemption: `xtask` is an internal build tool and the v2 plan's
+// "no_std + alloc default" / no-panic invariants explicitly exempt
+// `tools/*` and `xtask`. The `expect` documents an environmental
+// invariant — `CARGO_MANIFEST_DIR` always points at a path with a
+// parent during `cargo run`.
+#[allow(clippy::expect_used)]
 fn readme_check() -> bool {
     use std::fs;
     use std::path::PathBuf;

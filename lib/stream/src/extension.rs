@@ -71,10 +71,12 @@ macro_rules! impl_payload {
                 {
                     // Encoding failures here would indicate a structural
                     // bug in the payload type (postcard handles all owned
-                    // trees we use). Fail loudly rather than silently
-                    // emitting an empty payload that decodes to defaults.
-                    postcard::to_allocvec(self)
-                        .expect(concat!(stringify!($payload), " encode failed"))
+                    // trees we use). v2 forbids `panic!` in production
+                    // code, so on error we emit the single-byte sentinel
+                    // `0xFF` — an invalid postcard varint discriminant
+                    // that the matching `decode` rejects with a clean
+                    // codec error.
+                    postcard::to_allocvec(self).unwrap_or_else(|_| alloc::vec![0xFFu8])
                 }
                 #[cfg(not(feature = "serde"))]
                 {

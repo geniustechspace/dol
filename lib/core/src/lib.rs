@@ -71,6 +71,7 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing, clippy::arithmetic_side_effects))]
 #![warn(missing_docs)]
 // TODO(docs): chip away at the missing-docs allowlist below. Each entry
 // represents a module whose public API surface still needs rustdoc coverage.

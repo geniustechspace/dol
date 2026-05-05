@@ -28,6 +28,7 @@
 //! want to encode their own `Serialize` payloads behind the same envelope.
 
 #![forbid(unsafe_code)]
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing, clippy::arithmetic_side_effects))]
 #![warn(missing_docs)]
 
 mod header;

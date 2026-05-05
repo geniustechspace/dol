@@ -17,6 +17,7 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing, clippy::arithmetic_side_effects))]
 #![warn(missing_docs)]
 
 extern crate alloc;
@@ -42,7 +43,7 @@ pub use capabilities::{BackendCapabilities, CapabilityCheck, CapabilitySet, Capa
 pub use constraint::{ComputedKind, EntityConstraint, RefAction, RelationRef};
 pub use operation::{Category, OpKind, Operation};
 pub use privilege::Privilege;
-pub use program::Program;
+pub use program::{ExtendError, Program};
 pub use program_ref::ProgramRef;
 pub use schema_catalog::{CatalogEntry, SchemaCatalog, TypeEntry};
 pub use schema_ref::{CatalogId, SchemaId, SchemaRef};

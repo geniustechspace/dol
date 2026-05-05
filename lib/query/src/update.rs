@@ -80,6 +80,12 @@ impl UpdateQuery {
     /// Build the arena-based IR as a [`dol_ir::Program`] containing a
     /// single [`dol_ir::Operation::Update`] referencing an arena
     /// [`ExprNode::Update`](dol_expr::expr::ExprNode::Update).
+    //
+    // Lint exemption: same v2 carve-out as `DeleteQuery::build` —
+    // structural failures in `lower_*` reflect a builder bug rather than
+    // runtime input. Slated for `try_build()` conversion in the Phase 3
+    // Decoder reshape.
+    #[allow(clippy::expect_used)]
     pub fn build(self) -> dol_ir::Program {
         use dol_expr::expr::{ExprNode, UpdateNode};
         use dol_expr::lower::{lower_expr, lower_filters};

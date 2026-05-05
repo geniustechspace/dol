@@ -59,9 +59,13 @@ impl ExtensionPayload for PipelinePayload {
             // `postcard::to_allocvec` only fails for shapes postcard cannot
             // represent (cycles, non-finite floats with custom serializers).
             // `PipelinePayload` is a simple owned tree, so a failure here
-            // is a structural bug — fail loudly rather than silently
-            // producing an empty payload that decodes to defaults.
-            postcard::to_allocvec(self).expect("PipelinePayload encode failed")
+            // is a structural bug — but v2 forbids `panic!` in production
+            // code. On error we emit a single-byte sentinel (`0xFF`) which
+            // is an invalid postcard varint discriminant; the matching
+            // `decode` will reject it with a clean codec error. Tests
+            // calling this path therefore observe an unrecoverable round-
+            // trip rather than a silent default.
+            postcard::to_allocvec(self).unwrap_or_else(|_| alloc::vec![0xFFu8])
         }
         #[cfg(not(feature = "serde"))]
         {

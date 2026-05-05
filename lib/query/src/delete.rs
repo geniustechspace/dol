@@ -51,6 +51,13 @@ impl DeleteQuery {
     /// Build the arena-based IR as a [`dol_ir::Program`] containing a
     /// single [`dol_ir::Operation::Delete`] referencing an arena
     /// [`ExprNode::Delete`](dol_expr::expr::ExprNode::Delete).
+    //
+    // Lint exemption: the `expect` on `lower_filters` reports a
+    // structural bug in the builder chain — `DeleteQuery` validates
+    // its filter expressions at construction. v2 task: convert this to
+    // `try_build() -> Result<Program, BuildError>` once `dol-wire::Decoder`
+    // (Phase 3) reshapes the lower / decoder boundary.
+    #[allow(clippy::expect_used)]
     pub fn build(self) -> dol_ir::Program {
         use dol_expr::expr::{DeleteNode, ExprNode};
         use dol_expr::lower::lower_filters;

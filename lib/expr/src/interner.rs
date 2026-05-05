@@ -79,6 +79,11 @@ impl Interner {
     /// Panics on a 32-bit FNV-1a collision (two distinct strings that
     /// share the same id). Use [`try_intern`](Self::try_intern) on any
     /// path that handles untrusted input.
+    //
+    // Lint exemption: this is the documented "panic on collision"
+    // counterpart to `try_intern`; v2's no-panic invariant carves out
+    // panics that appear in `# Panics` rustdoc with a fallible sibling.
+    #[allow(clippy::panic)]
     pub fn intern(&mut self, s: &str) -> StrId {
         match self.try_intern(s) {
             Ok(id) => id,
@@ -117,6 +122,10 @@ impl Interner {
     ///
     /// Panics if `id` was not produced by this interner. Callers
     /// processing untrusted data should use [`get_opt`](Self::get_opt).
+    //
+    // Lint exemption: documented "panic on unknown id" counterpart to
+    // `get_opt`; same carve-out as `intern` vs `try_intern`.
+    #[allow(clippy::expect_used)]
     pub fn get(&self, id: StrId) -> &str {
         self.get_opt(id)
             .expect("dol-expr::Interner::get: unknown StrId")
@@ -124,14 +133,16 @@ impl Interner {
 
     /// Retrieve a previously-interned string by its [`StrId`], returning
     /// `None` when the id was not produced by this interner.
+    //
+    // Lint exemption: the inner `from_utf8(...).expect(...)` upholds an
+    // internal invariant — every byte slice in `bytes` was appended from
+    // a `&str` in `intern`, which guarantees valid UTF-8 at the slice
+    // boundaries. We still go through `from_utf8` so the crate stays
+    // `#![forbid(unsafe_code)]`-clean.
+    #[allow(clippy::expect_used)]
     pub fn get_opt(&self, id: StrId) -> Option<&str> {
         let &(off, len) = self.slots.get(&id)?;
         let raw = &self.bytes[off as usize..off as usize + len as usize];
-        // Every byte slice in `bytes` was appended from a `&str` in
-        // `intern`, which guarantees valid UTF-8 at the slice boundaries.
-        // We still go through `from_utf8` so the crate stays
-        // `#![forbid(unsafe_code)]`-clean; the cost is a single
-        // bounds-checked validation against trusted input.
         Some(core::str::from_utf8(raw).expect("interner stores only valid UTF-8"))
     }
 
@@ -175,6 +186,11 @@ impl Interner {
 /// a single artificial collision (the empty hash and `1` map to the
 /// same id) at a one-in-2³² rate, surfaced through the standard
 /// [`InternError::Collision`] path.
+//
+// Lint exemption: `NonZeroU32::new(...)` is fed a value that has just
+// been folded away from zero; the `expect` documents an internal
+// invariant rather than a runtime failure path.
+#[allow(clippy::expect_used)]
 fn strid_for(bytes: &[u8]) -> StrId {
     let h = fnv1a_32(bytes);
     let nz = NonZeroU32::new(if h == 0 { 1 } else { h }).expect("non-zero by construction");
@@ -201,6 +217,10 @@ const fn fnv1a_32(bytes: &[u8]) -> u32 {
 
 #[cfg(feature = "serde")]
 impl serde::Serialize for Interner {
+    // Lint exemption: same internal-invariant carve-out as `get_opt` —
+    // the `from_utf8(...).expect(...)` documents that every slice in
+    // `bytes` was sourced from a `&str` in `intern`.
+    #[allow(clippy::expect_used)]
     fn serialize<S: serde::Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
         // Serialise as a flat `Vec<String>` in canonical (sorted-by-id)
         // order so two interners with the same string set serialise

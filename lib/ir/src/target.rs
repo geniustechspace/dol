@@ -32,9 +32,12 @@ impl Default for Symbol {
     /// care which name a locator resolves to. Not a meaningful "empty"
     /// name — production code should always construct symbols via
     /// `Interner::intern`.
+    //
+    // Lint exemption: `StrId::from_u32(1)` is infallible by construction
+    // (1 is a valid `NonZeroU32`); the `expect` documents the invariant
+    // without introducing a runtime failure path.
+    #[allow(clippy::expect_used)]
     fn default() -> Self {
-        // `from_u32(1)` is the smallest valid `Id<StrTag>`; the unwrap
-        // is infallible.
         Self(dol_expr::ids::StrId::from_u32(1).expect("StrId(1) is non-zero"))
     }
 }
@@ -53,6 +56,12 @@ impl Symbol {
     ///
     /// `const` so extension crates can publish their `Symbol` ids as
     /// `pub const X: Symbol = Symbol::from_hash(fnv1a_32(NAME.as_bytes()));`.
+    //
+    // Lint exemption: the `panic!` arm is unreachable — `raw` is folded to
+    // `1` when `hash == 0`, so the input to `from_u32` is always non-zero.
+    // The arm exists because `const fn` cannot use `?` or `.expect()`; it
+    // documents the invariant without introducing a runtime failure path.
+    #[allow(clippy::panic)]
     #[inline]
     pub const fn from_hash(hash: u32) -> Self {
         let raw = if hash == 0 { 1 } else { hash };

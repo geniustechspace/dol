@@ -314,6 +314,12 @@ impl GetQuery {
     ///
     /// When no projections have been set and Entity field metadata is
     /// available, all entity fields are selected by default.
+    //
+    // Lint exemption: same v2 carve-out as `DeleteQuery::build` and
+    // `UpdateQuery::build` — `lower_*` failures reflect builder-state
+    // structural bugs. Slated for `try_build()` conversion in the
+    // Phase 3 Decoder reshape.
+    #[allow(clippy::expect_used)]
     pub fn build(self) -> dol_ir::Program {
         use dol_expr::expr::{ExprNode, JoinNode, JoinType as ArenaJoinType, QueryNode};
         use dol_expr::ids::NodeId;

@@ -55,9 +55,22 @@ publish = false
 unsafe_code = "forbid"
 
 [workspace.lints.clippy]
-unwrap_used             = "warn"
-expect_used             = "warn"
-panic                   = "warn"
+# v2 invariant: zero panic-paths in production code. Tests carry the
+# `#![cfg_attr(test, allow(...))]` exemption at every crate root, so these
+# `deny` levels apply only to non-test compilation. Documented invariant
+# panics (e.g. `Interner::intern`'s collision panic, `Symbol::from_hash`'s
+# unreachable arm, the arena overflow guards) carry per-fn `#[allow]`
+# attributes with a prose justification.
+unwrap_used             = "deny"
+expect_used             = "deny"
+panic                   = "deny"
+# `indexing_slicing` and `arithmetic_side_effects` stay at `warn` for v2:
+# they fire on every `+`, `-`, `arr[i]` in correct integer arithmetic
+# (calendar conversions, hashing inner loops, well-bounded indexing) and
+# converting them to `checked_*` / `.get(...)` would rewrite a substantial
+# amount of provably-correct code with no runtime benefit. CI surfaces new
+# offenders without breaking the build; the eventual deny-flip happens
+# alongside a function-level audit.
 indexing_slicing        = "warn"
 arithmetic_side_effects = "warn"
 

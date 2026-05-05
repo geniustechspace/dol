@@ -9,12 +9,20 @@ use crate::ids::{
 };
 use crate::types::value::Literal;
 
-/// Push `item` into `vec` and return the typed [`Id<Tag>`] referring to
-/// the freshly-pushed slot. Panics on the (theoretical) overflow at
-/// `u32::MAX` entries — every caller is interactive and cannot
-/// realistically reach 4 G items per pool.
+/// Allocate `item` in `vec` and return its [`Id<Tag>`].
+///
+/// `expect` is used for the >4 G overflow case: every arena pool is
+/// `Vec`-backed, and a 4 G expression-node arena would already exhaust
+/// 32 GiB of RAM at the smallest node size. The panic exists as a
+/// design-time error; production callers cannot realistically reach it.
+//
+// Lint exemption: this is the documented "design-time error" arm. v2's
+// no-panic invariant carves out documented-invariant panics; the
+// equivalent fallible accessor would be a private wrapper that no public
+// caller could trigger.
 #[inline]
 #[track_caller]
+#[allow(clippy::expect_used)]
 fn alloc_in<T, Tag: ?Sized>(vec: &mut Vec<T>, item: T) -> Id<Tag> {
     let idx = vec.len();
     vec.push(item);
@@ -181,6 +189,11 @@ impl SpanTable {
     /// Append `span` and record it as belonging to `owner`.
     ///
     /// Returns the [`SpanId`] (positional index) of the new entry.
+    //
+    // Lint exemption: same documented "design-time error" carve-out as
+    // `alloc_in`; reaching the >4 G case requires hundreds of GiB of
+    // span entries.
+    #[allow(clippy::expect_used)]
     pub fn push(&mut self, owner: NodeId, span: Span) -> SpanId {
         let idx = self.spans.len();
         self.spans.push(span);
