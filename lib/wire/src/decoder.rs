@@ -40,14 +40,21 @@
 //!
 //! v2 (0.2.0) lands the trait, the [`Reader`] cursor, the helpers, and
 //! `Decode` impls for every primitive plus a representative compound
-//! ([`DecodeWrap`]) as architectural proof. The remaining ~150 in-memory
-//! IR/AST `Decode` impls (across `dol-core`, `dol-expr`, `dol-schema`,
-//! `dol-ir`, `dol-pipeline`, `dol-stream`) and the corresponding
-//! `Deserialize`-derive deletions land in a focused follow-up PR. Until that
-//! PR merges, the legacy `decode_postcard<T: Deserialize>` /
-//! `decode_json<T: Deserialize>` helpers in [`crate::postcard`] / [`crate::json`]
-//! remain the runtime entry points; the v2 `Decode` trait is reachable via
-//! [`Reader::new`] + `T::decode(...)` for any type that has been migrated.
+//! ([`DecodeWrap`]) as architectural proof. The first follow-up cut adds
+//! `Decode` impls for the dol-core leaf type families
+//! (`Date`, `Time`, `DateTime`, `Offset`, `TimestampTz`, `Interval`,
+//! `Decimal`, `BitString`, `FileId`, `Point`, `Line`, `Segment`,
+//! `Rect`, `Circle`) — see [`crate::decode_core`]. The
+//! `decode_core_roundtrip` integration test asserts byte-for-byte
+//! parity with `postcard::to_allocvec(&v)` for every covered type.
+//!
+//! Still outstanding (next focused PR): the recursive enums in dol-core
+//! (`Value`, `Literal<'a>`, `LiteralRange<'a>`, `ValueRange`, `EnumDef`,
+//! `DataType`, `StructField`); the `Decode` impls in `dol-expr`,
+//! `dol-schema`, `dol-ir`, `dol-pipeline`, `dol-stream`; and finally the
+//! `Deserialize`-derive strip plus retirement of
+//! `decode_postcard<T: Deserialize>` / `decode_json<T: Deserialize>`
+//! once every type is migrated.
 //!
 //! # Example
 //!
@@ -170,6 +177,34 @@ impl<'a> Reader<'a> {
             shift = shift.saturating_add(7);
         }
         Err(DecodeError::LengthOverflow)
+    }
+
+    /// Read a postcard-style unsigned varint, max 19 bytes (`u128`).
+    pub fn read_varint_u128(&mut self) -> Result<u128, DecodeError> {
+        let mut result: u128 = 0;
+        let mut shift: u32 = 0;
+        for _ in 0..19 {
+            let byte = self.read_u8()?;
+            let chunk = (byte & 0x7F) as u128;
+            result |= chunk
+                .checked_shl(shift)
+                .ok_or(DecodeError::LengthOverflow)?;
+            if byte & 0x80 == 0 {
+                return Ok(result);
+            }
+            shift = shift.saturating_add(7);
+        }
+        Err(DecodeError::LengthOverflow)
+    }
+
+    /// Read `N` raw bytes as a fixed-length array. Postcard encodes
+    /// `[u8; N]` (and any fixed-array `[T; N]`) without a length prefix —
+    /// `N` is part of the type contract, not the wire.
+    pub fn read_array<const N: usize>(&mut self) -> Result<[u8; N], DecodeError> {
+        let slice = self.read_bytes(N)?;
+        let mut out = [0u8; N];
+        out.copy_from_slice(slice);
+        Ok(out)
     }
 
     /// Read a varint length and use it to slice the next `len` bytes,
@@ -344,6 +379,52 @@ impl Decode for String {
         let bytes = reader.read_seq_bytes(budget, 16 * 1024 * 1024)?;
         let s = core::str::from_utf8(bytes).map_err(|_| DecodeError::Utf8)?;
         Ok(String::from(s))
+    }
+}
+
+impl Decode for alloc::boxed::Box<str> {
+    fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
+        Ok(String::decode(reader, budget)?.into_boxed_str())
+    }
+}
+
+impl Decode for alloc::boxed::Box<[u8]> {
+    fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
+        let bytes = reader.read_seq_bytes(budget, 16 * 1024 * 1024)?;
+        Ok(Vec::from(bytes).into_boxed_slice())
+    }
+}
+
+impl Decode for f32 {
+    #[inline]
+    fn decode(reader: &mut Reader<'_>, _b: &mut Budget) -> Result<Self, DecodeError> {
+        // Postcard encodes f32 as 4 raw little-endian bytes.
+        Ok(f32::from_le_bytes(reader.read_array::<4>()?))
+    }
+}
+
+impl Decode for f64 {
+    #[inline]
+    fn decode(reader: &mut Reader<'_>, _b: &mut Budget) -> Result<Self, DecodeError> {
+        // Postcard encodes f64 as 8 raw little-endian bytes.
+        Ok(f64::from_le_bytes(reader.read_array::<8>()?))
+    }
+}
+
+impl Decode for u128 {
+    #[inline]
+    fn decode(reader: &mut Reader<'_>, _b: &mut Budget) -> Result<Self, DecodeError> {
+        reader.read_varint_u128()
+    }
+}
+
+impl Decode for i128 {
+    #[inline]
+    fn decode(reader: &mut Reader<'_>, _b: &mut Budget) -> Result<Self, DecodeError> {
+        // Postcard signed varint = zig-zag over the unsigned varint.
+        // Zig-zag decode for i128: (raw >> 1) ^ -(raw & 1).
+        let raw = reader.read_varint_u128()?;
+        Ok(((raw >> 1) as i128) ^ -((raw & 1) as i128))
     }
 }
 

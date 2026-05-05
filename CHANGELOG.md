@@ -177,12 +177,49 @@ the same release line; this entry is updated as each phase merges.
   (`Filter` / `Having` / `Projection` / `GroupBy` / `OrderBy` /
   `SetValue { column, cause }` / `JoinOn`). Test fixtures call
   `.try_build().expect(...)` to keep the assertion shape clear.
-- **Outstanding:** the ~150 `Decode` impls on `dol-core`, `dol-expr`,
-  `dol-schema`, `dol-ir`, `dol-pipeline`, `dol-stream` IR/AST types and
-  the corresponding `#[derive(serde::Deserialize)]` strip + retirement
-  of `decode_postcard<T: Deserialize>` / `decode_json<T: Deserialize>`
-  remain the focused Phase 3 cut-over PR. The byte format, trait shape,
-  and primitive impls are fixed in 0.2.0.
+- **Outstanding:** the recursive enums (`Value`, `Literal<'a>`,
+  `LiteralRange<'a>`, `ValueRange`, `EnumDef`, `DataType`, `StructField`)
+  and every `Decode` impl in `dol-expr`, `dol-schema`, `dol-ir`,
+  `dol-pipeline`, `dol-stream`, plus the `#[derive(serde::Deserialize)]`
+  strip + retirement of `decode_postcard<T: Deserialize>` /
+  `decode_json<T: Deserialize>` remain the focused Phase 3 follow-up
+  PRs. The byte format, trait shape, and the dol-core leaf-type impls
+  are fixed in 0.2.0 — every subsequent PR is incremental within that
+  contract.
+
+#### Phase 3 follow-up — dol-core leaf-type `Decode` impls
+
+- **`Decode` impls landed for the dol-core leaf type families.** Covers
+  `BitString`, `FileId`, `Date`, `Time`, `DateTime`, `Offset`,
+  `TimestampTz`, `Interval`, `Decimal`, `Point`, `Line`, `Segment`,
+  `Rect`, `Circle`. Each impl threads `&mut Budget` through every field
+  via `budget.descend(...)` so adversarial nested input charges depth
+  honestly.
+- **Primitive prerequisites** added to the `Decode` core: `f32`, `f64`
+  (8-byte little-endian, matching postcard), `u128` / `i128` (varint /
+  zig-zag varint up to 19 bytes), `Box<str>`, `Box<[u8]>`, and a fixed
+  `read_array::<N>()` helper for postcard's prefix-free `[u8; N]` shape.
+- **Domain validation in `Decode`.** `Date::decode` rejects
+  month / day out of range; `Time::decode` rejects clock-field overflow;
+  `Offset::decode` rejects out-of-range timezone offsets;
+  `Decimal::decode` rejects scale > `MAX_SCALE`;
+  `BitString::decode` rejects byte counts that disagree with
+  `len.div_ceil(8)`. Malformed wire input surfaces as
+  `DecodeError::Custom(...)` rather than constructing an invalid value.
+- **`decode_core_roundtrip` integration test** asserts byte-for-byte
+  parity with `postcard::to_allocvec(&v)` for every covered type. 17
+  positive round-trips + 3 negative-path tests (invalid date, invalid
+  decimal scale, mismatched bit-string byte count). Gated by the new
+  `dol-wire` pass-through features `datetime`, `numeric`, `geo`,
+  `network`, all rolled into `full`.
+- **Deferred to the next PR:** the recursive enums (`Value`,
+  `Literal<'a>`, `DataType`, `EnumDef`, `LiteralRange<'a>`,
+  `ValueRange`, `StructField`); the `serde(untagged)` types
+  (`IpAddr`, `MacAddr`, `Path`) — postcard currently returns
+  `WontImplement` for these, so they need a hand-written
+  `Encode`/`Decode` pair with an explicit discriminant byte;
+  `Span` / `SpanTable` (need a `Span::from_raw_u64` accessor that
+  doesn't exist yet).
 
 ### IR redesign — breaking
 

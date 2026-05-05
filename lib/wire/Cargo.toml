@@ -36,12 +36,22 @@ postcard    = ["serde", "std", "dep:postcard"]
 json        = ["serde", "std", "dep:serde_json"]
 # Content hashing of canonical wire bytes via BLAKE3.
 hash        = ["std", "dep:blake3"]
+# Pass-through gates that surface dol-core's optional type families to
+# this crate. Required for the matching `Decode` impls
+# (`Date`, `Time`, …, `Decimal`, `BitString`, geo / network leaves) to
+# compile and round-trip against `postcard::to_allocvec`.
+datetime    = ["dol-core/datetime"]
+numeric     = ["dol-core/numeric"]
+geo         = ["dol-core/geo"]
+network     = ["dol-core/network"]
 # Convenience: pull in everything.
-full        = ["postcard", "json", "hash"]
+full        = ["postcard", "json", "hash", "datetime", "numeric", "geo", "network"]
 
 [dev-dependencies]
 serde_json = { workspace = true }
 dol-expr   = { workspace = true, features = ["serde"] }
+dol-core   = { workspace = true, features = ["serde", "datetime", "numeric", "geo", "network"] }
+postcard   = { workspace = true }
 smallvec   = { workspace = true }
 
 [lints]
