@@ -112,19 +112,51 @@ the same release line; this entry is updated as each phase merges.
 
 #### Phase 3 — `dol-wire::Decoder` and the Deserialize strip
 
-- **Phase 3** — `dol-wire::Decoder`: a single validating, budget-aware
-  wire-in entry point. Strip `serde::Deserialize` from every in-memory
-  IR/AST type (~150 sites across `core::{value,literal,data_type}`,
-  `expr`, `schema`, `ir`, `pipeline`, `stream`). Hand-write `Decoder` impls
-  for each. Delete the old `decode_postcard<T: Deserialize>` and
-  `decode_json<T: Deserialize>` helpers; the new `Decoder` trait is the
-  only path from bytes to a validated in-memory IR.
-- **Phase 4** — thread `&mut Budget` through every recursive entry point in
-  `ir`, `pipeline`, and the new `Decoder`. Add an `xtask` grep gate that
-  fails CI on any `pub fn (walk|visit|decode|lower)*` lacking a `Budget`
-  argument. Add the `cargo test --workspace --doc --no-default-features
-  --features alloc` job to CI; backfill doc examples on every public item
-  that lacks one.
+- **Architectural foundation landed in 0.2.0:** new `dol_wire::decoder`
+  module with the [`Decode`] trait, a [`Reader`] cursor, and the helpers
+  every in-memory IR/AST `Decode` impl will compose on. Highlights:
+  - [`Decode`] takes `&mut Budget` so recursive payloads cannot blow the
+    call stack with adversarial nesting (every recursive read is wrapped
+    in `budget.descend(…)`).
+  - [`Reader`] exposes only bounds-checked reads — no `unwrap`, no panic
+    on truncated input. Helpers cover `read_u8`, `read_bytes`,
+    `read_varint_u32` (5-byte cap), `read_varint_u64` (10-byte cap), and
+    `read_seq_bytes` (varint length + payload, budget-charged).
+  - [`DecodeError`] enumerates: `Eof { needed, had }`, `InvalidVariant
+    { type_name, seen }`, `LengthOverflow`, `Utf8`, `Budget(BudgetError)`,
+    `Custom(&'static str)`. `BudgetError → DecodeError` via `From`, so
+    `?` chaining works in every impl.
+  - `Decode` impls landed for the postcard-byte-compatible primitive set:
+    `bool`, `u8`/`i8`, `u16`/`u32`/`u64`/`usize` (varint), `i16`/`i32`/
+    `i64`/`isize` (zig-zag varint), `String`, `Option<T>`, `Vec<T>`.
+  - Architectural proof: a `DecodeWrap` compound type (label + count +
+    flags) demonstrates field-order decoding with budget descent. 11
+    unit tests cover round-tripping, EOF, invalid discriminants, varint
+    overflow, invalid UTF-8, and budget exhaustion.
+  - The wire format is documented as a table in the module-level rustdoc.
+- **Cut-over follow-up (separate PR):** the remaining ~150 hand-written
+  `Decode` impls across `dol-core`, `dol-expr`, `dol-schema`, `dol-ir`,
+  `dol-pipeline`, `dol-stream` plus the corresponding
+  `#[derive(serde::Deserialize)]` deletions and the
+  `decode_postcard<T: Deserialize>` / `decode_json<T: Deserialize>`
+  retirement. Until that PR merges, the legacy helpers remain the
+  runtime entry points; the v2 [`Decode`] trait is reachable via
+  `Reader::new(...)` + `T::decode(...)` for any type that has been
+  migrated. The byte format is fixed in v2 (0.2.0) so the follow-up is
+  pure mechanical fill-in, not architecture.
+
+#### Phase 4 — Budget threading & doc-test gate (partial)
+
+- **CI no-default-features doctest gate** added to the `test` job:
+  `cargo test --workspace --doc --no-default-features`. Catches doc
+  examples that quietly depend on `std::*` or on a feature-gated type
+  without the appropriate `cfg`. The gate currently passes locally
+  against the 0.2.0 cut.
+- **Outstanding:** thread `&mut Budget` through every recursive entry
+  point in `ir` and `pipeline`; add the `xtask` grep gate that fails
+  CI on any `pub fn (walk|visit|decode|lower)*` lacking a `Budget`
+  argument. Will land alongside the Phase 3 follow-up cut once the new
+  `Decode` impls have stabilized the recursion shape.
 
 ### IR redesign — breaking
 

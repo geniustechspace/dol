@@ -100,6 +100,15 @@ jobs:
           cargo test --doc --workspace --all-features
           cargo doc --workspace --all-features --no-deps
 
+      # v2 invariant: no_std + alloc is the default, and every public-item
+      # rustdoc example must compile in that minimal configuration. This
+      # gate catches doc examples that quietly depend on `std::*` or on a
+      # feature-gated type without the appropriate `cfg`. Distinct from
+      # the `test-features` matrix above (which runs unit + integration
+      # tests, not doctests).
+      - name: Doctests (no-default-features)
+        run: cargo test --workspace --doc --no-default-features
+
       # Dedicated gate: every public IR / schema / value type must
       # serde-round-trip. Failing this gate is a regression on universal
       # serde — see the project restructuring plan.

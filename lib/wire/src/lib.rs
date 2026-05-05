@@ -34,6 +34,9 @@
 mod header;
 pub use header::{CURRENT_VERSION, WireHeader, WireSchemaVersion};
 
+pub mod decoder;
+pub use decoder::{Decode, DecodeError, Reader};
+
 #[cfg(feature = "hash")]
 pub mod hash;
 #[cfg(feature = "json")]
