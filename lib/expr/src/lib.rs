@@ -54,7 +54,7 @@ pub use ids::{
     CaseId, DeleteId, FieldId, FuncId, InListId, InsertId, LiteralId, NULL_NODE, NodeId, ObjLitId,
     QueryId, SpanId, StrId, TypeId, UpdateId, UpsertId, WindowId,
 };
-pub use interner::Interner;
+pub use interner::{InternError, Interner};
 pub use lower::{LowerError, lower_expr, lower_expr_with_budget};
 pub use session::BuildSession;
 pub use types::{DataType, Literal, Value};

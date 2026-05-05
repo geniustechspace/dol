@@ -28,14 +28,23 @@ proptest! {
         prop_assert_eq!(i.get(a), s.as_str());
     }
 
-    /// Interning a sequence is deterministic: the same input order produces
-    /// the same `(StrId, &str)` pairs in the same positions.
+    /// Interning a sequence is deterministic and content-addressed: the
+    /// id assigned to each input is independent of insertion order, so
+    /// two interners populated identically in any order agree on every
+    /// `(StrId, &str)` pair.
     #[test]
     fn intern_is_order_deterministic(strings in proptest::collection::vec("\\PC{0,16}", 0..16)) {
         let mut a = Interner::new();
         let mut b = Interner::new();
         let ids_a: Vec<_> = strings.iter().map(|s| a.intern(s)).collect();
-        let ids_b: Vec<_> = strings.iter().map(|s| b.intern(s)).collect();
+        // Reverse the insertion order on `b` to exercise the
+        // content-addressed property.
+        let mut reversed: Vec<_> = strings.clone();
+        reversed.reverse();
+        for s in &reversed {
+            b.intern(s);
+        }
+        let ids_b: Vec<_> = strings.iter().map(|s| b.try_get(s).expect("just interned")).collect();
         prop_assert_eq!(ids_a, ids_b);
         prop_assert_eq!(a.len(), b.len());
         // Each interned id must round-trip through `get`. The number of
@@ -71,22 +80,25 @@ proptest! {
         }
     }
 
-    /// JSON serialisation of an interner is deterministic for a given
-    /// insertion order — two interners populated identically produce the
-    /// same JSON byte-for-byte.
+    /// JSON serialisation of an interner is **content-canonical**:
+    /// inserting the same set of strings in different orders produces
+    /// the same JSON byte-for-byte. Stronger than the previous
+    /// "insertion-order canonical" guarantee.
     #[test]
-    fn intern_json_is_insertion_order_canonical(
+    fn intern_json_is_content_canonical(
         strings in proptest::collection::vec("\\PC{0,16}", 0..16)
     ) {
-        let make = || {
+        let make = |order: &[String]| {
             let mut i = Interner::new();
-            for s in &strings {
+            for s in order {
                 i.intern(s);
             }
             i
         };
-        let a = serde_json::to_string(&make()).unwrap();
-        let b = serde_json::to_string(&make()).unwrap();
+        let mut reversed: Vec<_> = strings.clone();
+        reversed.reverse();
+        let a = serde_json::to_string(&make(&strings)).unwrap();
+        let b = serde_json::to_string(&make(&reversed)).unwrap();
         prop_assert_eq!(a, b);
     }
 }

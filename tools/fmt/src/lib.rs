@@ -78,16 +78,18 @@ fn write_target(w: &mut String, t: &Target, interner: &Interner) -> core::fmt::R
 /// placeholder when the symbol came from a different interner (e.g. test
 /// fixtures that build a [`Symbol`](dol_ir::Symbol) from a literal).
 ///
-/// `StrId` is a transparent `u32` ([`dol_expr::ids::StrId`]); the cast to
-/// `usize` widens losslessly on every platform Rust supports
-/// (`usize >= 32` bits) and is purely a length comparison.
+/// With content-addressed [`StrId`](dol_expr::ids::StrId)s a known id can
+/// land anywhere in `u32` space, so we ask the interner directly via
+/// [`Interner::get_opt`] rather than treating the id as a sequential
+/// index.
 fn resolve(interner: &Interner, id: dol_expr::ids::StrId) -> alloc::borrow::Cow<'_, str> {
-    if (id as usize) < interner.len() {
-        alloc::borrow::Cow::Borrowed(interner.get(id))
-    } else {
-        let mut s = String::new();
-        let _ = write!(s, "#{id}");
-        alloc::borrow::Cow::Owned(s)
+    match interner.get_opt(id) {
+        Some(s) => alloc::borrow::Cow::Borrowed(s),
+        None => {
+            let mut s = String::new();
+            let _ = write!(s, "#{id}");
+            alloc::borrow::Cow::Owned(s)
+        }
     }
 }
 

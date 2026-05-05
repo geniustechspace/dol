@@ -1,160 +1,207 @@
 #[cfg(feature = "serde")]
 use alloc::string::String;
 use alloc::vec::Vec;
-use core::hash::{BuildHasher, Hasher};
-use hashbrown::{DefaultHashBuilder, HashTable};
+use hashbrown::HashMap;
 
 use crate::ids::StrId;
 
-/// String interner backed by a single bump-allocated byte blob.
+/// String interner with **content-addressed** [`StrId`]s.
 ///
-/// Each unique string is appended once to `bytes`; the public `StrId` is an
-/// index into `slices`, which records `(offset, len)` pairs so that
-/// `get(id)` performs a single bounds-checked byte slice lookup. The lookup
-/// table stores only `StrId`s and recovers the string content from the
-/// bytes blob on demand, so insertion needs no per-string heap allocation
-/// beyond the bytes themselves.
+/// Each [`StrId`] is the FNV-1a 32-bit hash of the string's bytes —
+/// the same hash that backs the workspace's extension `Symbol` ids
+/// (`lib/pipeline/src/extension.rs`, `lib/stream/src/extension.rs`).
+/// Two interner instances therefore produce **identical** ids for the
+/// same string, even across processes / machines, which lets ids be
+/// reused as plan-cache keys, on-disk indices, and IoT idempotency
+/// tokens without coordinating an in-memory registry.
 ///
-/// This replaces an earlier `Vec<Arc<str>> + HashMap<Arc<str>, StrId>`
-/// design which paid for an extra `Arc` allocation (and 16 B refcount
-/// header) per unique string. For a typical query plan dominated by short
-/// identifiers (column / table names) that overhead routinely exceeded the
-/// payload itself.
+/// Strings themselves still live in a single bump-allocated byte blob
+/// (`bytes`), with a `(offset, len)` slot per id stored in `slots`.
+/// Collisions in the 32-bit hash space are detected on insertion and
+/// surfaced as [`InternError::Collision`]; for typical query workloads
+/// (a few thousand identifiers) the birthday probability is negligible
+/// (~2⁻²⁰ at 4 K strings), but we never silently fold two distinct
+/// strings together — that would invalidate every property the rest of
+/// the IR relies on.
 ///
-/// The on-the-wire serde codec is unchanged: a flat `Vec<String>` whose
-/// order matches `StrId` assignment.
+/// The on-the-wire serde codec is a flat `Vec<String>` in
+/// **canonical (sorted-by-id) order**, so two interners populated with
+/// the same set of strings (in any order) serialise byte-for-byte
+/// identically. Decoding re-interns each entry, so wire bytes that
+/// happen to encode different strings under the same id will surface
+/// the collision as a deserialisation error.
 #[derive(Debug, Clone, Default)]
 pub struct Interner {
     /// Concatenated UTF-8 bytes for every interned string.
     bytes: Vec<u8>,
-    /// `(offset, len)` into `bytes` for each `StrId`.
-    slices: Vec<(u32, u32)>,
-    /// Lookup table from interned string content to its `StrId`.
-    ///
-    /// Stores only the `StrId`; equality is checked against the bytes blob
-    /// on demand so the table itself carries no string data.
-    table: HashTable<StrId>,
-    /// Owned `BuildHasher` so the *same* hash is produced for the same
-    /// bytes throughout this interner's lifetime — `DefaultHashBuilder`
-    /// (foldhash) seeds a new random state on every `default()` call, so a
-    /// per-call builder would mean `intern("x")` and `try_get("x")` see
-    /// different hashes and never collide.
-    hasher: DefaultHashBuilder,
+    /// `id -> (offset, len)` into `bytes`. The id is the FNV-1a 32-bit
+    /// hash of the slice; we store the slot directly so `get(id)` is a
+    /// single hash-map lookup.
+    slots: HashMap<StrId, (u32, u32)>,
 }
 
+/// Errors produced by [`Interner::try_intern`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum InternError {
+    /// Two distinct strings hashed to the same 32-bit id. Surface this
+    /// to the caller rather than silently aliasing the strings.
+    Collision {
+        /// The colliding id.
+        id: StrId,
+    },
+}
+
+impl core::fmt::Display for InternError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            InternError::Collision { id } => write!(f, "interner: hash collision on id {id:#010x}"),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for InternError {}
+
 impl Interner {
+    /// Build an empty interner.
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Intern `s`, returning a stable [`StrId`].
     ///
-    /// Idempotent: repeated calls with equal `&str`s return the same id
-    /// without appending to the bytes blob.
+    /// # Panics
+    ///
+    /// Panics on a 32-bit FNV-1a collision (two distinct strings that
+    /// share the same id). Use [`try_intern`](Self::try_intern) on any
+    /// path that handles untrusted input.
     pub fn intern(&mut self, s: &str) -> StrId {
-        let hash = self.hash_bytes(s.as_bytes());
+        match self.try_intern(s) {
+            Ok(id) => id,
+            Err(InternError::Collision { id }) => {
+                panic!(
+                    "dol-expr::Interner: 32-bit FNV-1a collision on id {id:#010x}; \
+                     use try_intern on adversarial input"
+                )
+            }
+        }
+    }
 
-        if let Some(&existing) = self.table.find(hash, |&id| {
-            let (off, len) = self.slices[id as usize];
+    /// Intern `s`, returning a stable [`StrId`] — or [`InternError::Collision`]
+    /// when a different string already occupies the same id.
+    pub fn try_intern(&mut self, s: &str) -> Result<StrId, InternError> {
+        let id = fnv1a_32(s.as_bytes());
+        if let Some(&(off, len)) = self.slots.get(&id) {
             let stored = &self.bytes[off as usize..off as usize + len as usize];
-            stored == s.as_bytes()
-        }) {
-            return existing;
+            if stored == s.as_bytes() {
+                return Ok(id);
+            }
+            return Err(InternError::Collision { id });
         }
 
-        let id = self.slices.len() as StrId;
         let off = self.bytes.len() as u32;
         let len = s.len() as u32;
         self.bytes.extend_from_slice(s.as_bytes());
-        self.slices.push((off, len));
-
-        let bytes = &self.bytes;
-        let slices = &self.slices;
-        let hasher = &self.hasher;
-        self.table.insert_unique(hash, id, |&inserted| {
-            let (off, len) = slices[inserted as usize];
-            let stored = &bytes[off as usize..off as usize + len as usize];
-            let mut h = hasher.build_hasher();
-            h.write(stored);
-            h.finish()
-        });
-        id
+        self.slots.insert(id, (off, len));
+        Ok(id)
     }
 
     /// Retrieve a previously-interned string by its [`StrId`].
     ///
     /// # Panics
     ///
-    /// Panics if `id` was not produced by this interner (out-of-range).
+    /// Panics if `id` was not produced by this interner. Callers
+    /// processing untrusted data should use [`get_opt`](Self::get_opt).
     pub fn get(&self, id: StrId) -> &str {
-        let (off, len) = self.slices[id as usize];
+        self.get_opt(id)
+            .expect("dol-expr::Interner::get: unknown StrId")
+    }
+
+    /// Retrieve a previously-interned string by its [`StrId`], returning
+    /// `None` when the id was not produced by this interner.
+    pub fn get_opt(&self, id: StrId) -> Option<&str> {
+        let &(off, len) = self.slots.get(&id)?;
         let raw = &self.bytes[off as usize..off as usize + len as usize];
         // Every byte slice in `bytes` was appended from a `&str` in
         // `intern`, which guarantees valid UTF-8 at the slice boundaries.
         // We still go through `from_utf8` so the crate stays
         // `#![forbid(unsafe_code)]`-clean; the cost is a single
         // bounds-checked validation against trusted input.
-        core::str::from_utf8(raw).expect("interner stores only valid UTF-8")
+        Some(core::str::from_utf8(raw).expect("interner stores only valid UTF-8"))
     }
 
     /// Return the [`StrId`] for `s` if it has already been interned.
     pub fn try_get(&self, s: &str) -> Option<StrId> {
-        let hash = self.hash_bytes(s.as_bytes());
-        self.table
-            .find(hash, |&id| {
-                let (off, len) = self.slices[id as usize];
-                let stored = &self.bytes[off as usize..off as usize + len as usize];
-                stored == s.as_bytes()
-            })
-            .copied()
+        let id = fnv1a_32(s.as_bytes());
+        let &(off, len) = self.slots.get(&id)?;
+        let stored = &self.bytes[off as usize..off as usize + len as usize];
+        (stored == s.as_bytes()).then_some(id)
     }
 
     pub fn len(&self) -> usize {
-        self.slices.len()
+        self.slots.len()
     }
     pub fn is_empty(&self) -> bool {
-        self.slices.is_empty()
+        self.slots.is_empty()
     }
     pub fn reset(&mut self) {
         self.bytes.clear();
-        self.slices.clear();
-        self.table.clear();
-        // The hasher's seed stays — clearing it would re-randomise and
-        // invalidate any `StrId` callers cached across `reset()`.
+        self.slots.clear();
     }
 
     /// Return the total bytes resident in this interner — the bytes blob
-    /// plus the slice index plus an estimate of the table footprint.
+    /// plus an estimate of the slot table footprint.
     ///
     /// Used by `crate::stats` to track memory wins between revisions.
     pub fn heap_bytes(&self) -> usize {
         let bytes_cap = self.bytes.capacity();
-        let slices_cap = self.slices.capacity() * core::mem::size_of::<(u32, u32)>();
-        // Conservative table footprint: one slot per allocated capacity
-        // entry, sized to `StrId`. hashbrown adds metadata (~1 byte / entry)
-        // and load-factor headroom but doesn't expose either; for
-        // regression-tracking purposes the dominant term is the bytes blob.
-        let table_cap = self.table.capacity() * (core::mem::size_of::<StrId>() + 1);
-        bytes_cap + slices_cap + table_cap
+        // hashbrown doesn't expose the underlying allocation size, so
+        // approximate as one slot's worth per allocated capacity entry.
+        let slots_cap = self.slots.capacity()
+            * (core::mem::size_of::<StrId>() + core::mem::size_of::<(u32, u32)>());
+        bytes_cap + slots_cap
     }
+}
 
-    fn hash_bytes(&self, bytes: &[u8]) -> u64 {
-        let mut h = self.hasher.build_hasher();
-        h.write(bytes);
-        h.finish()
+/// `const`-eval FNV-1a 32-bit hash. Stable; matches the spec basis/prime
+/// and the [`Symbol`] convention used by extensions in
+/// `lib/pipeline/src/extension.rs` and `lib/stream/src/extension.rs`.
+///
+/// [`Symbol`]: dol_core::ext::Symbol
+const fn fnv1a_32(bytes: &[u8]) -> u32 {
+    // FNV-1a 32-bit constants per the reference spec.
+    let mut hash: u32 = 0x811c_9dc5;
+    let prime: u32 = 0x0100_0193;
+    let mut i = 0;
+    while i < bytes.len() {
+        hash ^= bytes[i] as u32;
+        hash = hash.wrapping_mul(prime);
+        i += 1;
     }
+    hash
 }
 
 #[cfg(feature = "serde")]
 impl serde::Serialize for Interner {
     fn serialize<S: serde::Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-        // The `map` field is a derived index over the bytes blob — serialise
-        // the canonical sequence of strings so the wire form stays minimal
-        // and independent of HashMap iteration order.
+        // Serialise as a flat `Vec<String>` in canonical (sorted-by-id)
+        // order so two interners with the same string set serialise
+        // byte-for-byte identically regardless of insertion order.
         use serde::ser::SerializeSeq;
-        let mut seq = ser.serialize_seq(Some(self.slices.len()))?;
-        for i in 0..self.slices.len() {
-            seq.serialize_element(self.get(i as StrId))?;
+        let mut entries: Vec<(StrId, &str)> = self
+            .slots
+            .iter()
+            .map(|(&id, &(off, len))| {
+                let raw = &self.bytes[off as usize..off as usize + len as usize];
+                let s = core::str::from_utf8(raw).expect("interner stores only valid UTF-8");
+                (id, s)
+            })
+            .collect();
+        entries.sort_unstable_by_key(|&(id, _)| id);
+        let mut seq = ser.serialize_seq(Some(entries.len()))?;
+        for (_, s) in &entries {
+            seq.serialize_element(s)?;
         }
         seq.end()
     }
@@ -165,23 +212,14 @@ impl<'de> serde::Deserialize<'de> for Interner {
     fn deserialize<D: serde::Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
         let strings: Vec<String> = serde::Deserialize::deserialize(de)?;
         let mut interner = Interner::default();
-        interner.slices.reserve(strings.len());
-        // Pre-size the table so the rehash callback below isn't called
-        // during normal insertion.
-        let bytes = &interner.bytes;
-        let slices = &interner.slices;
-        let hasher = &interner.hasher;
-        interner.table.reserve(strings.len(), |&id| {
-            let (off, len) = slices[id as usize];
-            let mut h = hasher.build_hasher();
-            h.write(&bytes[off as usize..off as usize + len as usize]);
-            h.finish()
-        });
         for s in &strings {
-            // Re-intern through the canonical path so the lookup map and
-            // bytes blob stay consistent with one another regardless of
-            // duplicates encountered in malformed input.
-            interner.intern(s);
+            // Re-intern through the canonical path so the slot map and
+            // bytes blob stay consistent with one another. A collision
+            // in the wire payload (two distinct strings that hash to the
+            // same id) is surfaced as a serde error rather than a panic.
+            interner
+                .try_intern(s)
+                .map_err(<D::Error as serde::de::Error>::custom)?;
         }
         Ok(interner)
     }
