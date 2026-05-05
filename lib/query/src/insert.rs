@@ -8,7 +8,7 @@
 ///
 /// Construct via [`Query::from(...).insert()`](crate::Query::insert).
 #[derive(Debug, Clone)]
-#[must_use = "builders do nothing until .build() is called"]
+#[must_use = "builders do nothing until .try_build() is called"]
 pub struct InsertQuery {
     name: String,
     namespace: Option<String>,
@@ -71,7 +71,12 @@ impl InsertQuery {
     /// Build the arena-based IR as a [`dol_ir::Program`] containing a
     /// single [`dol_ir::Operation::Insert`] referencing an arena
     /// [`ExprNode::Insert`](dol_expr::expr::ExprNode::Insert).
-    pub fn build(self) -> dol_ir::Program {
+    ///
+    /// Infallible in current shape (the builder only allocates `Param`
+    /// placeholders), but returns `Result` for API consistency with the
+    /// other builders. Will gain real failure modes once user-supplied
+    /// VALUES expressions are supported.
+    pub fn try_build(self) -> Result<dol_ir::Program, crate::BuildError> {
         use dol_expr::expr::{ExprNode, InsertNode};
         use dol_ir::TargetKind;
         use dol_ir::operation::{Insert, InsertSource};
@@ -135,6 +140,6 @@ impl InsertQuery {
             returning: None,
         }
         .into();
-        dol_ir::Program::new(op, arena, interner)
+        Ok(dol_ir::Program::new(op, arena, interner))
     }
 }

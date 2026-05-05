@@ -82,6 +82,17 @@ impl core::fmt::Display for LowerError {
 #[cfg(feature = "std")]
 impl std::error::Error for LowerError {}
 
+impl From<dol_core::policy::BudgetError> for LowerError {
+    fn from(e: dol_core::policy::BudgetError) -> Self {
+        match e {
+            dol_core::policy::BudgetError::Depth => LowerError::DepthExceeded { depth: 0 },
+            dol_core::policy::BudgetError::Nodes
+            | dol_core::policy::BudgetError::Bytes
+            | dol_core::policy::BudgetError::StrBytes => LowerError::FuelExhausted,
+        }
+    }
+}
+
 /// Lowers an `Expr<'static>` into the arena, returning the root `NodeId`.
 ///
 /// All strings are interned into `interner`. Sub-expressions are recursively
@@ -95,6 +106,8 @@ impl std::error::Error for LowerError {}
 /// [`lower_expr_with_budget`] directly with a tighter [`Budget`]) so
 /// deeply-nested expressions or runaway allocation are rejected with a
 /// `LowerError` rather than blowing the stack or the heap.
+// budget-gate: opt-out: documented unbounded convenience entry point;
+// the bounded sibling `lower_expr_with_budget` is the production path.
 pub fn lower_expr(
     expr: &Expr<'_>,
     arena: &mut ExprArena,
@@ -428,12 +441,16 @@ fn lower_inner(
 }
 
 /// Lower an `OrderByExpr<'static>` into the arena, returning `(NodeId, Order)`.
+///
+/// Budget-aware. The supplied [`Budget`] is threaded into the inner
+/// [`lower_expr_with_budget`] call.
 pub fn lower_order_by(
     ob: &OrderByExpr<'_>,
     arena: &mut ExprArena,
     interner: &mut Interner,
+    budget: &mut Budget,
 ) -> Result<(NodeId, Order), LowerError> {
-    let nid = lower_expr(&ob.expr, arena, interner)?;
+    let nid = lower_expr_with_budget(&ob.expr, arena, interner, budget)?;
     let dir = match ob.direction {
         Direction::Asc => Order::Asc,
         Direction::Desc => Order::Desc,
@@ -442,14 +459,18 @@ pub fn lower_order_by(
 }
 
 /// Lower multiple expressions, returning `NodeId`s.
+///
+/// Budget-aware. Each element charges through the shared
+/// [`lower_expr_with_budget`] path.
 pub fn lower_exprs(
     exprs: &[Expr<'_>],
     arena: &mut ExprArena,
     interner: &mut Interner,
+    budget: &mut Budget,
 ) -> Result<SmallVec<[NodeId; 8]>, LowerError> {
     let mut out: SmallVec<[NodeId; 8]> = SmallVec::new();
     for e in exprs {
-        out.push(lower_expr(e, arena, interner)?);
+        out.push(lower_expr_with_budget(e, arena, interner, budget)?);
     }
     Ok(out)
 }
@@ -465,17 +486,21 @@ pub fn qualified_name(name: &str, namespace: &Option<String>) -> String {
 /// Lower multiple expressions and AND-join them, returning a single filter
 /// `NodeId` — or `None` if the list is empty (replaces the previous
 /// `NULL_NODE` sentinel).
+///
+/// Budget-aware. Each element charges through the shared
+/// [`lower_expr_with_budget`] path.
 pub fn lower_filters(
     filters: &[Expr<'_>],
     arena: &mut ExprArena,
     interner: &mut Interner,
+    budget: &mut Budget,
 ) -> Result<Option<NodeId>, LowerError> {
     if filters.is_empty() {
         return Ok(None);
     }
     let mut ids: Vec<NodeId> = Vec::with_capacity(filters.len());
     for f in filters {
-        ids.push(lower_expr(f, arena, interner)?);
+        ids.push(lower_expr_with_budget(f, arena, interner, budget)?);
     }
     let mut result = ids.remove(0);
     for id in ids {

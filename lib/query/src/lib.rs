@@ -4,7 +4,7 @@
 //! for DOL. Builders accept an [`Entity`] reference *or*
 //! a plain entity-name string; runtime-known names are first-class.
 //!
-//! Every `.build()` returns a [`dol_ir::Program`] containing one or more
+//! Every `.try_build()` returns a [`dol_ir::Program`] containing one or more
 //! [`dol_ir::Operation`]s.
 //!
 //! # Quick Start
@@ -23,14 +23,16 @@
 //! let program = Query::from(&users)
 //!     .get()
 //!     .filter(field("id").eq(param()))
-//!     .build();
+//!     .try_build()
+//!     .expect("doc example: trivial filter must lower");
 //! assert_eq!(program.operations[0].kind(), dol_ir::OpKind::Query);
 //!
 //! // From a plain string — no field metadata needed.
 //! let program = Query::from("users")
 //!     .get()
 //!     .fields(&["id", "email"])
-//!     .build();
+//!     .try_build()
+//!     .expect("doc example: trivial projection must lower");
 //! assert_eq!(program.operations[0].kind(), dol_ir::OpKind::Query);
 //! ```
 
@@ -41,6 +43,7 @@
 pub mod control;
 pub mod ddl;
 mod delete;
+mod error;
 mod get;
 mod insert;
 pub mod prelude;
@@ -55,6 +58,7 @@ pub use ddl::{
     drop_entity, drop_field, drop_lookup, rename_field,
 };
 pub use delete::DeleteQuery;
+pub use error::BuildError;
 pub use get::GetQuery;
 pub use insert::InsertQuery;
 pub use storage::{

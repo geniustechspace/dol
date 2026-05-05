@@ -64,6 +64,9 @@ pub fn max<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
 // String functions
 // ---------------------------------------------------------------------------
 
+// budget-gate: opt-out: SQL `LOWER(expr)` builder helper, not a recursive
+// walker — name collides with the `lower_*` family but is a single-call
+// constructor that allocates one tree node.
 pub fn lower<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
     known_def(registry::Lower::def(), vec![expr.into()])
 }

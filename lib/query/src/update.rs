@@ -10,7 +10,7 @@ use dol_expr::tree::{Expr, field_dyn};
 ///
 /// Construct via [`Query::from(...).update()`](crate::Query::update).
 #[derive(Debug, Clone)]
-#[must_use = "builders do nothing until .build() is called"]
+#[must_use = "builders do nothing until .try_build() is called"]
 pub struct UpdateQuery {
     name: String,
     namespace: Option<String>,
@@ -80,20 +80,20 @@ impl UpdateQuery {
     /// Build the arena-based IR as a [`dol_ir::Program`] containing a
     /// single [`dol_ir::Operation::Update`] referencing an arena
     /// [`ExprNode::Update`](dol_expr::expr::ExprNode::Update).
-    //
-    // Lint exemption: same v2 carve-out as `DeleteQuery::build` —
-    // structural failures in `lower_*` reflect a builder bug rather than
-    // runtime input. Slated for `try_build()` conversion in the Phase 3
-    // Decoder reshape.
-    #[allow(clippy::expect_used)]
-    pub fn build(self) -> dol_ir::Program {
+    ///
+    /// Fallible: returns [`BuildError::SetValue`] /
+    /// [`BuildError::Filter`] when lowering an assignment RHS or the WHERE
+    /// clause exhausts the default budget.
+    pub fn try_build(self) -> Result<dol_ir::Program, crate::BuildError> {
+        use dol_core::policy::{Budget, Limits};
         use dol_expr::expr::{ExprNode, UpdateNode};
-        use dol_expr::lower::{lower_expr, lower_filters};
+        use dol_expr::lower::{lower_expr_with_budget, lower_filters};
         use dol_ir::TargetKind;
         use dol_ir::operation::Update;
 
         let mut arena = dol_expr::ExprArena::new();
         let mut interner = dol_expr::Interner::new();
+        let mut budget = Budget::new(Limits::host());
 
         let target_str = interner.intern(&dol_expr::lower::qualified_name(
             &self.name,
@@ -104,14 +104,16 @@ impl UpdateQuery {
         let mut values: smallvec::SmallVec<[dol_expr::ids::NodeId; 8]> = smallvec::SmallVec::new();
         for (col, expr) in &self.assignments {
             columns.push(interner.intern(col));
-            values.push(
-                lower_expr(expr, &mut arena, &mut interner)
-                    .expect("dol-query UpdateQuery: lowering of SET expression failed"),
-            );
+            let nid = lower_expr_with_budget(expr, &mut arena, &mut interner, &mut budget)
+                .map_err(|cause| crate::BuildError::SetValue {
+                    column: col.clone(),
+                    cause,
+                })?;
+            values.push(nid);
         }
 
-        let filter = lower_filters(&self.filters, &mut arena, &mut interner)
-            .expect("dol-query UpdateQuery: lowering of WHERE failed");
+        let filter = lower_filters(&self.filters, &mut arena, &mut interner, &mut budget)
+            .map_err(crate::BuildError::Filter)?;
 
         let returning: smallvec::SmallVec<[dol_expr::ids::NodeId; 4]> = self
             .returning
@@ -144,6 +146,6 @@ impl UpdateQuery {
             self.namespace.as_deref(),
         );
         let op: dol_ir::Operation = Update { target, node: body }.into();
-        dol_ir::Program::new(op, arena, interner)
+        Ok(dol_ir::Program::new(op, arena, interner))
     }
 }

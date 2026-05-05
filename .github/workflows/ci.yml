@@ -109,6 +109,14 @@ jobs:
       - name: Doctests (no-default-features)
         run: cargo test --workspace --doc --no-default-features
 
+      # v2 invariant gate: every public recursive entry point
+      # (`pub fn (walk|visit|decode|lower)*`) must thread `&mut Budget`
+      # so adversarial input cannot blow the stack or host memory. Each
+      # opt-out (e.g. legacy serde shims slated for retirement) is
+      # explicit prose attached to the offending site.
+      - name: Budget-gate (recursive entry points)
+        run: cargo run -p xtask -- budget-gate
+
       # Dedicated gate: every public IR / schema / value type must
       # serde-round-trip. Failing this gate is a regression on universal
       # serde — see the project restructuring plan.

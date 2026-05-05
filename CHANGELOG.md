@@ -145,18 +145,44 @@ the same release line; this entry is updated as each phase merges.
   migrated. The byte format is fixed in v2 (0.2.0) so the follow-up is
   pure mechanical fill-in, not architecture.
 
-#### Phase 4 — Budget threading & doc-test gate (partial)
+#### Phase 4 — Budget threading & doc-test gate
 
 - **CI no-default-features doctest gate** added to the `test` job:
   `cargo test --workspace --doc --no-default-features`. Catches doc
   examples that quietly depend on `std::*` or on a feature-gated type
   without the appropriate `cfg`. The gate currently passes locally
   against the 0.2.0 cut.
-- **Outstanding:** thread `&mut Budget` through every recursive entry
-  point in `ir` and `pipeline`; add the `xtask` grep gate that fails
-  CI on any `pub fn (walk|visit|decode|lower)*` lacking a `Budget`
-  argument. Will land alongside the Phase 3 follow-up cut once the new
-  `Decode` impls have stabilized the recursion shape.
+- **`xtask budget-gate` subcommand & CI gate** — scans every
+  `lib/**/src/**/*.rs` source file and refuses any `pub fn
+  (walk|visit|decode|lower)*` whose signature lacks `&mut Budget`.
+  Functions that legitimately do not need a budget (the documented
+  unbounded `lower_expr`, the `tree::func::lower` builder helper, the
+  legacy serde decoders slated for retirement in the Phase 3 cut-over)
+  carry an explicit `// budget-gate: opt-out: <reason>` line attached to
+  the offending site. Wired into the `test` CI job. The scanner has its
+  own unit tests (5 cases) so it does not silently rot.
+- **`dol_expr::lower::lower_exprs` / `lower_filters` / `lower_order_by`
+  now take `&mut Budget`.** They previously composed the unbounded
+  `lower_expr`; threading a budget makes the four-builder
+  `dol_query::*::try_build` paths uniformly bounded. `LowerError` gains
+  `From<dol_core::policy::BudgetError>`.
+- **`dol_query::*::try_build()` family.** Each of the five builders
+  (`DeleteQuery`, `UpdateQuery`, `InsertQuery`, `UpsertQuery`,
+  `GetQuery`) now exposes a fallible
+  `try_build(self) -> Result<Program, BuildError>` that threads a
+  default `Budget::new(Limits::host())` through `lower_*`. The old
+  infallible `build()` and its prose-justified
+  `#[allow(clippy::expect_used)]` exemptions are deleted. `BuildError`
+  is the new public error type, with a variant per failure site
+  (`Filter` / `Having` / `Projection` / `GroupBy` / `OrderBy` /
+  `SetValue { column, cause }` / `JoinOn`). Test fixtures call
+  `.try_build().expect(...)` to keep the assertion shape clear.
+- **Outstanding:** the ~150 `Decode` impls on `dol-core`, `dol-expr`,
+  `dol-schema`, `dol-ir`, `dol-pipeline`, `dol-stream` IR/AST types and
+  the corresponding `#[derive(serde::Deserialize)]` strip + retirement
+  of `decode_postcard<T: Deserialize>` / `decode_json<T: Deserialize>`
+  remain the focused Phase 3 cut-over PR. The byte format, trait shape,
+  and primitive impls are fixed in 0.2.0.
 
 ### IR redesign — breaking
 

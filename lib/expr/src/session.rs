@@ -116,6 +116,8 @@ impl BuildSession {
     /// work already pushed into the arena is left in place (lowering is
     /// not transactional — callers that need rollback should snapshot
     /// or clone the arena first).
+    // budget-gate: opt-out: budget is threaded via `&mut self.budget`,
+    // not as an explicit parameter.
     pub fn lower(&mut self, expr: &Expr<'_>) -> Result<NodeId, LowerError> {
         lower_expr_with_budget(expr, &mut self.arena, &mut self.interner, &mut self.budget)
     }

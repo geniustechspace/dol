@@ -28,6 +28,9 @@ pub fn encode_postcard(program: &Program) -> Result<Vec<u8>, WireError> {
 }
 
 /// Decode a postcard-encoded [`Program`].
+// budget-gate: opt-out: legacy serde-based wire-in path. Slated for
+// retirement in the Phase 3 cut-over (`dol_wire::decoder::Decode` for
+// `Program` is the budget-aware replacement).
 #[cfg(feature = "postcard")]
 pub fn decode_postcard(bytes: &[u8]) -> Result<Program, WireError> {
     crate::postcard::decode(bytes)
@@ -40,6 +43,9 @@ pub fn encode_json(program: &Program) -> Result<String, WireError> {
 }
 
 /// Decode a JSON-encoded [`Program`].
+// budget-gate: opt-out: legacy serde-based wire-in path. Slated for
+// retirement in the Phase 3 cut-over (the budget-aware replacement
+// drives `dol_wire::decoder::Decode` from a JSON-shape source).
 #[cfg(feature = "json")]
 pub fn decode_json(s: &str) -> Result<Program, WireError> {
     crate::json::decode(s)

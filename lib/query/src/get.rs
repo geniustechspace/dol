@@ -29,7 +29,7 @@ struct JoinClause {
 ///
 /// Construct via [`Query::from(...).get()`](crate::Query::get).
 #[derive(Debug, Clone)]
-#[must_use = "builders do nothing until .build() is called"]
+#[must_use = "builders do nothing until .try_build() is called"]
 pub struct GetQuery {
     name: String,
     namespace: Option<String>,
@@ -314,22 +314,24 @@ impl GetQuery {
     ///
     /// When no projections have been set and Entity field metadata is
     /// available, all entity fields are selected by default.
-    //
-    // Lint exemption: same v2 carve-out as `DeleteQuery::build` and
-    // `UpdateQuery::build` — `lower_*` failures reflect builder-state
-    // structural bugs. Slated for `try_build()` conversion in the
-    // Phase 3 Decoder reshape.
-    #[allow(clippy::expect_used)]
-    pub fn build(self) -> dol_ir::Program {
+    ///
+    /// Fallible: returns the matching [`BuildError`] variant when lowering
+    /// any of the projection / WHERE / GROUP BY / HAVING / ORDER BY
+    /// expressions exhausts the default budget.
+    pub fn try_build(self) -> Result<dol_ir::Program, crate::BuildError> {
+        use dol_core::policy::{Budget, Limits};
         use dol_expr::expr::{ExprNode, JoinNode, JoinType as ArenaJoinType, QueryNode};
         use dol_expr::ids::NodeId;
-        use dol_expr::lower::{lower_expr, lower_exprs, lower_filters, lower_order_by};
+        use dol_expr::lower::{
+            lower_exprs, lower_expr_with_budget, lower_filters, lower_order_by,
+        };
         use dol_ir::TargetKind;
         use dol_ir::operation::Query as OpQuery;
         use smallvec::SmallVec;
 
         let mut arena = dol_expr::ExprArena::new();
         let mut interner = dol_expr::Interner::new();
+        let mut budget = Budget::new(Limits::host());
 
         let from = interner.intern(&dol_expr::lower::qualified_name(
             &self.name,
@@ -347,106 +349,108 @@ impl GetQuery {
         } else {
             self.projections
         };
-        let columns: SmallVec<[NodeId; 8]> = lower_exprs(&proj_exprs, &mut arena, &mut interner)
-            .expect("dol-query GetQuery: lowering of projections failed");
+        let columns: SmallVec<[NodeId; 8]> =
+            lower_exprs(&proj_exprs, &mut arena, &mut interner, &mut budget)
+                .map_err(crate::BuildError::Projection)?;
 
         // Joins.
-        let joins: SmallVec<[JoinNode; 2]> = self
-            .joins
-            .into_iter()
-            .map(|jc| {
-                // Honor the parsed `"namespace.name"` form by re-joining the
-                // dotted source. The interner deduplicates so this is cheap;
-                // backends parse the dotted form when they need the parts.
-                let source = match &jc.target_namespace {
-                    Some(ns) => interner.intern(&format!("{ns}.{}", jc.target_name)),
-                    None => interner.intern(&jc.target_name),
-                };
-                let alias = jc.alias.as_deref().map(|a| interner.intern(a));
-                let join_type = match jc.join_type {
-                    JoinKind::Inner => ArenaJoinType::Inner,
-                    JoinKind::Left => ArenaJoinType::Left,
-                    JoinKind::Right => ArenaJoinType::Right,
-                    JoinKind::Full => ArenaJoinType::Full,
-                    JoinKind::Cross => ArenaJoinType::Cross,
-                };
-                // Build ON condition from pairs (`None` for absent, e.g.
-                // `CROSS JOIN`).
-                let on: Option<NodeId> = if jc.on_conditions.is_empty() {
-                    None
-                } else {
-                    let mut cond_ids: Vec<NodeId> = Vec::new();
-                    for (l, r) in &jc.on_conditions {
-                        let lid = {
-                            let col = interner.intern(l);
-                            let fid = arena.alloc_field(dol_expr::FieldNode {
-                                namespace: None,
-                                name: col,
-                                steps: SmallVec::new(),
-                            });
-                            arena.alloc(ExprNode::Field(fid))
-                        };
-                        let rid = {
-                            let col = interner.intern(r);
-                            let fid = arena.alloc_field(dol_expr::FieldNode {
-                                namespace: None,
-                                name: col,
-                                steps: SmallVec::new(),
-                            });
-                            arena.alloc(ExprNode::Field(fid))
-                        };
-                        cond_ids.push(arena.alloc(ExprNode::BinOp {
-                            op: dol_expr::expr::BinOp::Eq,
-                            lhs: lid,
-                            rhs: rid,
-                        }));
-                    }
-                    let mut result = cond_ids[0];
-                    for id in &cond_ids[1..] {
-                        result = arena.alloc(ExprNode::BinOp {
-                            op: dol_expr::expr::BinOp::And,
-                            lhs: result,
-                            rhs: *id,
+        let mut joins: SmallVec<[JoinNode; 2]> = SmallVec::new();
+        for jc in self.joins {
+            // Honor the parsed `"namespace.name"` form by re-joining the
+            // dotted source. The interner deduplicates so this is cheap;
+            // backends parse the dotted form when they need the parts.
+            let source = match &jc.target_namespace {
+                Some(ns) => interner.intern(&format!("{ns}.{}", jc.target_name)),
+                None => interner.intern(&jc.target_name),
+            };
+            let alias = jc.alias.as_deref().map(|a| interner.intern(a));
+            let join_type = match jc.join_type {
+                JoinKind::Inner => ArenaJoinType::Inner,
+                JoinKind::Left => ArenaJoinType::Left,
+                JoinKind::Right => ArenaJoinType::Right,
+                JoinKind::Full => ArenaJoinType::Full,
+                JoinKind::Cross => ArenaJoinType::Cross,
+            };
+            // Build ON condition from pairs (`None` for absent, e.g.
+            // `CROSS JOIN`).
+            let on: Option<NodeId> = if jc.on_conditions.is_empty() {
+                None
+            } else {
+                // ON-conditions are simple `col = col` pairs and don't
+                // need budget-aware lowering — they're constructed
+                // structurally from interner ids. We still charge the
+                // budget at allocation so a 4 G `ON ... AND ...` chain
+                // can't run unbounded.
+                let mut cond_ids: Vec<NodeId> = Vec::new();
+                for (l, r) in &jc.on_conditions {
+                    budget
+                        .tick(2)
+                        .map_err(|e| crate::BuildError::JoinOn(dol_expr::lower::LowerError::from(e)))?;
+                    let lid = {
+                        let col = interner.intern(l);
+                        let fid = arena.alloc_field(dol_expr::FieldNode {
+                            namespace: None,
+                            name: col,
+                            steps: SmallVec::new(),
                         });
-                    }
-                    Some(result)
-                };
-                JoinNode {
-                    source,
-                    alias,
-                    join_type,
-                    on,
+                        arena.alloc(ExprNode::Field(fid))
+                    };
+                    let rid = {
+                        let col = interner.intern(r);
+                        let fid = arena.alloc_field(dol_expr::FieldNode {
+                            namespace: None,
+                            name: col,
+                            steps: SmallVec::new(),
+                        });
+                        arena.alloc(ExprNode::Field(fid))
+                    };
+                    cond_ids.push(arena.alloc(ExprNode::BinOp {
+                        op: dol_expr::expr::BinOp::Eq,
+                        lhs: lid,
+                        rhs: rid,
+                    }));
                 }
-            })
-            .collect();
+                let mut result = cond_ids[0];
+                for id in &cond_ids[1..] {
+                    result = arena.alloc(ExprNode::BinOp {
+                        op: dol_expr::expr::BinOp::And,
+                        lhs: result,
+                        rhs: *id,
+                    });
+                }
+                Some(result)
+            };
+            joins.push(JoinNode {
+                source,
+                alias,
+                join_type,
+                on,
+            });
+        }
 
-        let filter = lower_filters(&self.filters, &mut arena, &mut interner)
-            .expect("dol-query GetQuery: lowering of filters failed");
+        let filter = lower_filters(&self.filters, &mut arena, &mut interner, &mut budget)
+            .map_err(crate::BuildError::Filter)?;
 
-        let group_by: SmallVec<[NodeId; 4]> = self
-            .group_by
-            .iter()
-            .map(|e| {
-                lower_expr(e, &mut arena, &mut interner)
-                    .expect("dol-query GetQuery: lowering of GROUP BY failed")
-            })
-            .collect();
+        let mut group_by: SmallVec<[NodeId; 4]> = SmallVec::new();
+        for e in &self.group_by {
+            let nid = lower_expr_with_budget(e, &mut arena, &mut interner, &mut budget)
+                .map_err(crate::BuildError::GroupBy)?;
+            group_by.push(nid);
+        }
 
         let having: Option<NodeId> = if self.having.is_empty() {
             None
         } else {
-            lower_filters(&self.having, &mut arena, &mut interner)
-                .expect("dol-query GetQuery: lowering of HAVING failed")
+            lower_filters(&self.having, &mut arena, &mut interner, &mut budget)
+                .map_err(crate::BuildError::Having)?
         };
 
-        let order_by: SmallVec<[(NodeId, dol_expr::expr::Order); 4]> = self
-            .order_by
-            .iter()
-            .map(|ob| {
-                lower_order_by(ob, &mut arena, &mut interner)
-                    .expect("dol-query GetQuery: lowering of ORDER BY failed")
-            })
-            .collect();
+        let mut order_by: SmallVec<[(NodeId, dol_expr::expr::Order); 4]> = SmallVec::new();
+        for ob in &self.order_by {
+            let pair = lower_order_by(ob, &mut arena, &mut interner, &mut budget)
+                .map_err(crate::BuildError::OrderBy)?;
+            order_by.push(pair);
+        }
 
         #[cfg(feature = "sql")]
         let lock = self.lock_mode;
@@ -483,7 +487,7 @@ impl GetQuery {
             node: Some(body),
         }
         .into();
-        dol_ir::Program::new(op, arena, interner)
+        Ok(dol_ir::Program::new(op, arena, interner))
     }
 }
 

@@ -27,6 +27,9 @@ pub fn encode<T: serde::Serialize>(payload: &T) -> Result<Vec<u8>, WireError> {
 }
 
 /// Verify the [`WireHeader`] and decode the postcard body into `T`.
+// budget-gate: opt-out: generic serde shim that will be retired by the
+// Phase 3 cut-over. The replacement is `dol_wire::decoder::Decode`,
+// which threads `&mut Budget` end-to-end.
 pub fn decode<'de, T: serde::Deserialize<'de>>(bytes: &'de [u8]) -> Result<T, WireError> {
     let body = crate::unframe(bytes)?;
     ::postcard::from_bytes::<T>(body).map_err(|e| WireError::Codec(alloc::format!("{e}")))

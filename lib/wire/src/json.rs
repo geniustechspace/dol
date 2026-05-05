@@ -41,6 +41,9 @@ pub fn encode_bytes<T: serde::Serialize>(payload: &T) -> Result<Vec<u8>, WireErr
 }
 
 /// Decode a JSON-encoded envelope into `T`, verifying magic + version.
+// budget-gate: opt-out: generic serde shim that will be retired by the
+// Phase 3 cut-over (the replacement drives `dol_wire::decoder::Decode`
+// from a JSON-shape source with a budget threaded end-to-end).
 pub fn decode<T: for<'de> serde::Deserialize<'de>>(s: &str) -> Result<T, WireError> {
     let env: DecEnvelope<T> =
         serde_json::from_str(s).map_err(|e| WireError::Codec(alloc::format!("{e}")))?;
