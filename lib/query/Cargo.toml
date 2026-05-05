@@ -27,3 +27,6 @@ serde = [
     "dol-core/serde",
     "dol-expr/serde",
 ]
+
+[lints]
+workspace = true

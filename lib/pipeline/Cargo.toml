@@ -30,3 +30,6 @@ serde   = [
     "dol-ir/serde",
     "smallvec/serde",
 ]
+
+[lints]
+workspace = true

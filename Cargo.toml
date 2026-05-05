@@ -32,10 +32,34 @@ members  = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.85"
 publish = false
+
+# ── Workspace-wide lints ─────────────────────────────────────────────────────
+#
+# v2 invariants enforced from the workspace level so every crate inherits them
+# uniformly (each crate root opts in via `[lints] workspace = true`).
+#
+#   * `unsafe_code = "forbid"` is already declared per-crate; reasserted here
+#     so a future crate added without the per-crate attribute still fails
+#     closed.
+#   * The five clippy lints below are workspace-wide *warnings* in 0.2.0.
+#     Phase 2 of the v2 cut elevates them to `deny` once every production
+#     call-site has been audited and test modules carry the
+#     `#![cfg_attr(test, allow(...))]` exemption. Until then `warn` keeps CI
+#     green while still surfacing every remaining offender in `cargo clippy`
+#     output.
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+unwrap_used             = "warn"
+expect_used             = "warn"
+panic                   = "warn"
+indexing_slicing        = "warn"
+arithmetic_side_effects = "warn"
 
 [workspace.dependencies]
 # ── Collections / utility ────────────────────────────────────────────────────
@@ -52,7 +76,13 @@ postcard     = { version = "1", default-features = false, features = ["alloc"] }
 blake3       = { version = "1", default-features = false }
 
 # ── Internal crates ──────────────────────────────────────────────────────────
-dol-core     = { path = "lib/core" }
+# `dol-core` carries `default-features = false` at the workspace level so
+# every consumer that says `dol-core = { workspace = true }` inherits the
+# minimal `no_std + alloc` shape. Crates that need `serde`, `std`, `geo`,
+# `network`, `datetime`, or `numeric` from `dol-core` must forward those
+# explicitly through their own feature flags. This locks v2's "no_std + alloc
+# is default; std is opt-in" invariant in at the workspace edge.
+dol-core     = { path = "lib/core", default-features = false }
 dol-expr     = { path = "lib/expr" }
 dol-schema   = { path = "lib/schema" }
 dol-ir       = { path = "lib/ir" }

@@ -84,6 +84,7 @@ extern crate alloc;
 pub mod diag;
 pub mod id;
 pub mod policy;
+pub mod signing;
 pub mod span;
 pub mod storage;
 

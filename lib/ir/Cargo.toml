@@ -27,3 +27,6 @@ default = []
 std = ["dol-core/std", "dol-expr/std"]
 serde = ["dep:serde", "dol-expr/serde", "dol-schema/serde", "dol-core/serde", "smallvec/serde"]
 raw = []
+
+[lints]
+workspace = true

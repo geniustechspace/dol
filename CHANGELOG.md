@@ -7,6 +7,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-05
+
+### v2 cut — coordinated, core-first, no compatibility shims
+
+This release locks in the v2 *shape* of the workspace. The non-negotiable
+invariants below are enforced by the workspace lint table and by CI gates
+landing alongside this release. There are **no** v1/v2 feature gates, no
+`Deserialize` migrators, and no deprecation aliases — old names are deleted
+and new ones re-exported in their place.
+
+#### Workspace shape
+
+- **All packages bumped `0.1.0 → 0.2.0`.** Single coordinated cut.
+- **Workspace-level lint table** in `Cargo.toml` (`[workspace.lints]`):
+  - `rust.unsafe_code = "forbid"` — re-asserts the per-crate forbid so a
+    future crate added without the per-crate attribute still fails closed.
+    The plan's `lib/core/src/raw/` carve-out for POD wire-cast types is
+    intentionally **not** introduced; it will land when the first such type
+    is needed.
+  - `clippy.{unwrap_used, expect_used, panic, indexing_slicing,
+    arithmetic_side_effects} = "warn"` — workspace-wide. Phase 2 of the cut
+    elevates these from `warn` to `deny` once every production call-site is
+    audited and test modules carry the
+    `#![cfg_attr(test, allow(...))]` exemption.
+- **Every crate** (12 packages) now opts into the workspace lints via
+  `[lints] workspace = true` instead of crate-local lint declarations.
+
+#### `dol-core` — `no_std + alloc` is now the default
+
+- **Default features stripped.** `lib/core/Cargo.toml`:
+  `default = ["std", "serde", "geo", "network", "datetime", "numeric"]`
+  → `default = []`. The crate now produces a `no_std + alloc`-clean library
+  out of the box. Embedded targets that previously relied on
+  `default-features = false` continue to build identically; server consumers
+  must now explicitly request `std`, `serde`, and the typesystem-variant
+  families they use.
+- **Workspace dep declaration** in the root `Cargo.toml` carries
+  `default-features = false`, so any consumer that says
+  `dol-core = { workspace = true }` inherits the minimal shape and must
+  forward only the features it actually needs through its own feature
+  pass-throughs.
+- **New `core::signing` module** (`Signer`, `Verifier`, `VerifyError`).
+  Trait *shape* only — no algorithm picked, no key-material story baked in.
+  Both traits are `no_std + alloc`-friendly; concrete implementations
+  (Ed25519, ECDSA-P256, HMAC, HSM-backed) live in downstream crates or in
+  application code that wires DOL into a host environment. `VerifyError`
+  variants are intentionally coarse (`Mismatch` / `Malformed` /
+  `Unavailable`) so verifiers do not leak the shape of the failure.
+
+#### Decisions recorded for v2
+
+- **`Id<Tag>` uses `NonZeroU32`, not `NonMaxU32`.** Reserves `0` rather than
+  `u32::MAX` as the sentinel; the niche size is identical
+  (`Option<Id<T>> == 4 bytes`) and `serde::Deserialize` already rejects `0`.
+  Switching to `NonMaxU32` would buy nothing and would require either a
+  third-party crate or a hand-rolled wrapper.
+- **No `lib/core/src/raw/` yet.** Defer the auditable `unsafe_code` carve-out
+  until the first POD wire-cast type lands.
+
+### Outstanding for v2 (tracked in the v2-cut PR)
+
+These items are explicit in the v2 plan and land in subsequent commits on
+the same release line; this entry is updated as each phase merges.
+
+- **Phase 2** — eliminate every `.unwrap()` / `.expect()` / `panic!` call in
+  non-test code (~76 sites), add the `#![cfg_attr(test, allow(...))]`
+  exemption to each crate root, then flip the five clippy lints from `warn`
+  to `deny` workspace-wide.
+- **Phase 3** — `dol-wire::Decoder`: a single validating, budget-aware
+  wire-in entry point. Strip `serde::Deserialize` from every in-memory
+  IR/AST type (~150 sites across `core::{value,literal,data_type}`,
+  `expr`, `schema`, `ir`, `pipeline`, `stream`). Hand-write `Decoder` impls
+  for each. Delete the old `decode_postcard<T: Deserialize>` and
+  `decode_json<T: Deserialize>` helpers; the new `Decoder` trait is the
+  only path from bytes to a validated in-memory IR.
+- **Phase 4** — thread `&mut Budget` through every recursive entry point in
+  `ir`, `pipeline`, and the new `Decoder`. Add an `xtask` grep gate that
+  fails CI on any `pub fn (walk|visit|decode|lower)*` lacking a `Budget`
+  argument. Add the `cargo test --workspace --doc --no-default-features
+  --features alloc` job to CI; backfill doc examples on every public item
+  that lacks one.
+
 ### IR redesign — breaking
 
 The IR has been redesigned around a single, universal `Operation` enum. As

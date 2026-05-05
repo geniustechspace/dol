@@ -24,3 +24,6 @@ serde = ["dep:serde", "dol-core/serde"]
 # `std`-aware build. The crate is `no_std + alloc` clean by default; this
 # feature only forwards `std` to `dol-core` for parity with `dol-expr`.
 std = ["dol-core/std"]
+
+[lints]
+workspace = true

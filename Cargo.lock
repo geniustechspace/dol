@@ -222,7 +222,7 @@ checksum = "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5"
 
 [[package]]
 name = "dol"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "dol-check",
  "dol-core",
@@ -238,7 +238,7 @@ dependencies = [
 
 [[package]]
 name = "dol-check"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "dol-core",
  "dol-expr",
@@ -249,7 +249,7 @@ dependencies = [
 
 [[package]]
 name = "dol-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "proptest",
  "serde",
@@ -259,7 +259,7 @@ dependencies = [
 
 [[package]]
 name = "dol-expr"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "criterion",
  "dol-core",
@@ -272,7 +272,7 @@ dependencies = [
 
 [[package]]
 name = "dol-fmt"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "dol-core",
  "dol-expr",
@@ -282,7 +282,7 @@ dependencies = [
 
 [[package]]
 name = "dol-ir"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "dol-core",
  "dol-expr",
@@ -294,7 +294,7 @@ dependencies = [
 
 [[package]]
 name = "dol-pipeline"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "dol-core",
  "dol-expr",
@@ -308,7 +308,7 @@ dependencies = [
 
 [[package]]
 name = "dol-query"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "dol-core",
  "dol-expr",
@@ -321,7 +321,7 @@ dependencies = [
 
 [[package]]
 name = "dol-schema"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "dol-core",
  "serde",
@@ -330,7 +330,7 @@ dependencies = [
 
 [[package]]
 name = "dol-stream"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "dol-core",
  "dol-expr",
@@ -344,7 +344,7 @@ dependencies = [
 
 [[package]]
 name = "dol-wire"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "blake3",
  "dol-core",
@@ -1087,7 +1087,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "dol-core",
  "dol-expr",

@@ -43,3 +43,6 @@ full        = ["postcard", "json", "hash"]
 serde_json = { workspace = true }
 dol-expr   = { workspace = true, features = ["serde"] }
 smallvec   = { workspace = true }
+
+[lints]
+workspace = true

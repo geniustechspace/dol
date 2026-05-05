@@ -20,21 +20,27 @@ smallvec = { workspace = true }
 serde    = { workspace = true, optional = true }
 
 [features]
-# `serde` and `std` are on by default. The crate is `no_std + alloc`-clean
-# when both are disabled, suitable for embedded targets that cannot link
-# `std`. Embedded users opt out with `default-features = false`.
+# ── Cargo features ───────────────────────────────────────────────────────────
 #
-# The granular feature flags `geo`, `network`, `datetime`, `numeric` are
-# default-on; turning them off (with `default-features = false`) drops the
-# corresponding `Value` / `Literal` / `DataType` / `TypeError` variants and
-# the entire owning module from the compiled crate. Useful for embedded
-# builds that only need a subset of the type system.
-default = ["std", "serde", "geo", "network", "datetime", "numeric"]
-serde   = ["dep:serde", "smallvec/serde"]
-# Enables the wall-clock factory helpers (`datetime::today`, `datetime::now`,
-# `datetime::now_tz`) that require `std::time::SystemTime`. The
-# `core::error::Error` impl on `TypeError` is always available
-# (stable since Rust 1.81).
+# v2 (0.2.0) shape: `no_std + alloc` is the default. Every capability beyond
+# the universal type vocabulary is an opt-in feature, mirroring the
+# workspace-wide invariant declared in `Cargo.toml`. Embedded users get the
+# minimal shape for free; server users opt into `std`, `serde`, and the
+# typesystem-variant families they need.
+#
+# | feature    | effect                                                                                                     |
+# | ---------- | ---------------------------------------------------------------------------------------------------------- |
+# | `std`      | Wall-clock factory helpers (`datetime::today/now/now_tz`); implies `datetime`. Adds nothing else by itself.|
+# | `serde`    | `Serialize` / `Deserialize` for every type that implements them. (Pre-v2 was default-on.)                  |
+# | `geo`      | `geo` module + `Value`/`Literal`/`DataType`/`TypeError` variants for geometric types.                      |
+# | `network`  | `network` module + `Inet` / `MacAddr` variants on `Value` / `Literal` / `DataType`.                        |
+# | `datetime` | `datetime` module + `Date` / `Time` / `DateTime` / `TimestampTz` / `Interval` variants.                    |
+# | `numeric`  | `numeric` module + `Decimal` variants and decimal-related `TypeError` arms.                                |
+#
+# `core::error::Error` impls on `TypeError` and `ParseMacAddrError` are
+# always available regardless of features (stable since Rust 1.81).
+default  = []
+serde    = ["dep:serde", "smallvec/serde"]
 std      = ["datetime"]
 geo      = []
 network  = []
@@ -44,3 +50,6 @@ numeric  = []
 [dev-dependencies]
 serde_json = { workspace = true }
 proptest = "1"
+
+[lints]
+workspace = true

@@ -85,3 +85,6 @@ serde    = [
     "dol-check?/serde",
     "dol-query?/serde",
 ]
+
+[lints]
+workspace = true
