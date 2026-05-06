@@ -85,6 +85,7 @@ extern crate alloc;
 pub mod diag;
 pub mod id;
 pub mod policy;
+pub mod raw;
 pub mod signing;
 pub mod span;
 pub mod storage;
@@ -115,10 +116,6 @@ pub mod numeric;
 pub mod prelude;
 #[allow(missing_docs)] // tracking: docs follow-up
 pub mod value;
-
-/// Compatibility re-export — the old `descriptor` module has moved to [`data_type`].
-#[doc(hidden)]
-pub use data_type as descriptor;
 
 // ─── Flat top-level re-exports — the 5–10 most-used items ────────────────────
 

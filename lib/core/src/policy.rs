@@ -297,6 +297,121 @@ impl Budget {
     }
 }
 
+/// Cumulative resource quota that spans many independent traversals.
+///
+/// [`Limits`] caps a *single* traversal; [`Quota`] caps the total work a
+/// caller (tenant, session, request batch) is allowed across the lifetime
+/// of the quota object. Common pattern:
+///
+/// ```text
+/// // Once per tenant.
+/// let mut quota = Quota::new(QuotaCaps {
+///     max_total_nodes: 1_000_000,
+///     max_total_bytes: 100 * 1024 * 1024,
+/// });
+///
+/// // Per request:
+/// let mut budget = Budget::new(Limits::host());
+/// run_traversal(&mut budget)?;     // mutates `budget`
+/// quota.consume(&budget)?;          // rolls budget into quota
+/// ```
+///
+/// `Quota::consume` performs saturating addition of the per-traversal
+/// counters into per-quota totals and returns [`BudgetError`] if any
+/// total would exceed its cap. The quota is otherwise free of policy
+/// — it does not enforce per-traversal `Limits`; that remains the
+/// `Budget`'s job.
+///
+/// `Quota` is `Copy + 'static`-clean (`Clone + Debug`), `no_std`, and
+/// never allocates. It is **not** `Sync`-protected: callers wanting
+/// shared-mutable access wrap it in `Mutex` / `parking_lot::Mutex`.
+#[derive(Clone, Debug)]
+pub struct Quota {
+    caps: QuotaCaps,
+    total_nodes: usize,
+    total_bytes: usize,
+}
+
+/// Static caps for a [`Quota`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub struct QuotaCaps {
+    /// Total nodes allowed across the lifetime of the quota.
+    pub max_total_nodes: usize,
+    /// Total bytes allowed across the lifetime of the quota.
+    pub max_total_bytes: usize,
+}
+
+impl QuotaCaps {
+    /// Effectively-unbounded caps; both fields set to `usize::MAX`.
+    #[must_use]
+    pub const fn unbounded() -> Self {
+        Self {
+            max_total_nodes: usize::MAX,
+            max_total_bytes: usize::MAX,
+        }
+    }
+}
+
+impl Default for QuotaCaps {
+    fn default() -> Self {
+        Self::unbounded()
+    }
+}
+
+impl Quota {
+    /// Create a fresh quota with the supplied caps.
+    #[must_use]
+    pub const fn new(caps: QuotaCaps) -> Self {
+        Self {
+            caps,
+            total_nodes: 0,
+            total_bytes: 0,
+        }
+    }
+
+    /// Borrow the underlying [`QuotaCaps`].
+    #[inline]
+    #[must_use]
+    pub const fn caps(&self) -> &QuotaCaps {
+        &self.caps
+    }
+
+    /// Roll a finished traversal's [`Budget`] into the quota.
+    ///
+    /// On success the quota's totals are advanced. On error the totals
+    /// are unchanged and the offending [`BudgetError`] is returned —
+    /// the caller should treat the traversal as accounted-for elsewhere
+    /// (e.g. surface a 429 / quota-exceeded diagnostic).
+    pub fn consume(&mut self, budget: &Budget) -> Result<(), BudgetError> {
+        let nodes = self.total_nodes.saturating_add(budget.nodes());
+        let bytes = self.total_bytes.saturating_add(budget.bytes());
+        if nodes > self.caps.max_total_nodes {
+            return Err(BudgetError::Nodes);
+        }
+        if bytes > self.caps.max_total_bytes {
+            return Err(BudgetError::Bytes);
+        }
+        self.total_nodes = nodes;
+        self.total_bytes = bytes;
+        Ok(())
+    }
+
+    /// Cumulative nodes consumed.
+    #[inline]
+    #[must_use]
+    pub const fn total_nodes(&self) -> usize {
+        self.total_nodes
+    }
+
+    /// Cumulative bytes consumed.
+    #[inline]
+    #[must_use]
+    pub const fn total_bytes(&self) -> usize {
+        self.total_bytes
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -424,5 +539,46 @@ mod tests {
         // rather than panic on overflow.
         assert_eq!(b.tick(usize::MAX), Err(BudgetError::Nodes));
         assert_eq!(b.charge(usize::MAX), Err(BudgetError::Bytes));
+    }
+
+    #[test]
+    fn quota_consumes_finished_budgets_until_capped() {
+        let mut quota = Quota::new(QuotaCaps {
+            max_total_nodes: 10,
+            max_total_bytes: 100,
+        });
+        let mut b1 = Budget::new(Limits::host());
+        b1.tick(4).unwrap();
+        b1.charge(40).unwrap();
+        quota.consume(&b1).unwrap();
+        assert_eq!(quota.total_nodes(), 4);
+        assert_eq!(quota.total_bytes(), 40);
+
+        let mut b2 = Budget::new(Limits::host());
+        b2.tick(5).unwrap();
+        b2.charge(50).unwrap();
+        quota.consume(&b2).unwrap();
+        assert_eq!(quota.total_nodes(), 9);
+        assert_eq!(quota.total_bytes(), 90);
+
+        // Third traversal pushes us over the node cap; quota state
+        // must be unchanged on rejection.
+        let mut b3 = Budget::new(Limits::host());
+        b3.tick(2).unwrap();
+        b3.charge(5).unwrap();
+        assert_eq!(quota.consume(&b3), Err(BudgetError::Nodes));
+        assert_eq!(quota.total_nodes(), 9);
+        assert_eq!(quota.total_bytes(), 90);
+    }
+
+    #[test]
+    fn quota_caps_unbounded_never_refuses() {
+        let mut quota = Quota::new(QuotaCaps::unbounded());
+        let mut b = Budget::new(Limits::host());
+        b.tick(1_000_000).unwrap();
+        b.charge(1_000_000).unwrap();
+        quota.consume(&b).unwrap();
+        assert_eq!(quota.total_nodes(), 1_000_000);
+        assert_eq!(quota.total_bytes(), 1_000_000);
     }
 }
