@@ -52,7 +52,7 @@
 //! | feature    | default | effect                                                                                                |
 //! | ---------- | :-----: | ----------------------------------------------------------------------------------------------------- |
 //! | `std`      |   ✓     | Enables wall-clock factory helpers (implies `datetime`).                                              |
-//! | `serde`    |   ✓     | `Serialize` for every public type, including [`Span`] and [`Diagnostic`]. v2 wire-in goes through [`dol_wire::Decode`] — no `Deserialize` impls. |
+//! | `serde`    |   ✓     | `Serialize` for every public type, including [`Span`] and [`Diagnostic`]. v2 wire-in goes through `dol_wire::Decode` — no `Deserialize` impls. |
 //! | `geo`      |   ✓     | The `geo` module + `Value`/`Literal`/`DataType`/`TypeError` variants for geometric types.             |
 //! | `network`  |   ✓     | The `network` module + `Inet`/`MacAddr` variants on `Value`/`Literal`/`DataType`.                     |
 //! | `datetime` |   ✓     | The `datetime` module + `Date`/`Time`/`DateTime`/`TimestampTz`/`Interval` variants.                   |

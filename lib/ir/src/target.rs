@@ -51,8 +51,8 @@ impl Symbol {
 
     /// Build a [`Symbol`] from a 32-bit content hash (e.g. the FNV-1a
     /// digest used by extension `*_SYMBOL` constants). Folds the
-    /// all-zero hash to `1` so the result fits the [`NonZeroU32`] niche
-    /// that backs [`StrId`].
+    /// all-zero hash to `1` so the result fits the `NonZeroU32` niche
+    /// that backs `StrId`.
     ///
     /// `const` so extension crates can publish their `Symbol` ids as
     /// `pub const X: Symbol = Symbol::from_hash(fnv1a_32(NAME.as_bytes()));`.
@@ -81,7 +81,8 @@ impl Symbol {
 
     /// Resolve the symbol against `interner`. Panics if the id is
     /// unknown; callers handling untrusted ids should use
-    /// [`Interner::get_opt`] directly.
+    /// [`Interner::get_opt`](dol_expr::interner::Interner::get_opt)
+    /// directly.
     #[inline]
     pub fn resolve(self, interner: &dol_expr::interner::Interner) -> &str {
         interner.get(self.0)

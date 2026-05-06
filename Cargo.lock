@@ -372,7 +372,6 @@ dependencies = [
  "dol-schema",
  "postcard",
  "serde",
- "serde_json",
  "smallvec",
 ]
 
@@ -385,7 +384,6 @@ dependencies = [
  "dol-ir",
  "dol-schema",
  "serde",
- "serde_json",
  "smallvec",
 ]
 
@@ -395,7 +393,6 @@ version = "0.2.0"
 dependencies = [
  "dol-core",
  "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -408,7 +405,6 @@ dependencies = [
  "dol-schema",
  "postcard",
  "serde",
- "serde_json",
  "smallvec",
 ]
 

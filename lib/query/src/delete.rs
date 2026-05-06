@@ -58,7 +58,7 @@ impl DeleteQuery {
     /// single [`dol_ir::Operation::Delete`] referencing an arena
     /// [`ExprNode::Delete`](dol_expr::expr::ExprNode::Delete).
     ///
-    /// Fallible: returns [`BuildError::Filter`] when lowering the WHERE
+    /// Fallible: returns [`BuildError::Filter`](crate::BuildError::Filter) when lowering the WHERE
     /// clause exhausts the default [`Budget`](dol_core::policy::Budget)
     /// (depth or fuel cap from [`Limits::host`](dol_core::policy::Limits::host)).
     /// Callers needing a non-default budget can build the program manually

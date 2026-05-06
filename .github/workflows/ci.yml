@@ -335,11 +335,11 @@ jobs:
 
       - name: Smoke-fuzz `unframe`
         working-directory: lib/wire/fuzz
-        run: cargo +nightly fuzz run unframe -- -max_total_time=60
+        run: cargo +nightly fuzz run --target x86_64-unknown-linux-gnu unframe -- -max_total_time=60
 
       - name: Smoke-fuzz `decode_program`
         working-directory: lib/wire/fuzz
-        run: cargo +nightly fuzz run decode_program -- -max_total_time=60
+        run: cargo +nightly fuzz run --target x86_64-unknown-linux-gnu decode_program -- -max_total_time=60
 
       - name: Upload crash artifacts on failure
         if: failure()

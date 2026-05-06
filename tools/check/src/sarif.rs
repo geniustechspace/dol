@@ -49,7 +49,7 @@ use dol_core::span::Span;
 ///   `warning` (matching how clippy is rendered in IDEs).
 /// - `message.text` is the diagnostic's short message.
 /// - `locations` is populated only when the [`Span`]'s file is not
-///   [`FileId::NONE`]. SARIF requires absolute or relative URIs; we use
+///   `FileId::NONE`. SARIF requires absolute or relative URIs; we use
 ///   the synthetic scheme `dol-file://{file_id}` because DOL spans carry
 ///   numeric file ids rather than paths. Tooling that owns the file
 ///   table (the parser, an LSP server, …) can rewrite this URI to a real

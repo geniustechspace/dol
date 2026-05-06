@@ -12,9 +12,6 @@ readme = "README.md"
 dol-core = { path = "../core", default-features = false }
 serde    = { workspace = true, optional = true }
 
-[dev-dependencies]
-serde_json = { workspace = true }
-
 [features]
 # `serde` is on by default: schema definitions are almost always serialized
 # (config files, wire envelopes, golden tests). Embedded users can opt out

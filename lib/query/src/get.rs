@@ -321,7 +321,7 @@ impl GetQuery {
     /// When no projections have been set and Entity field metadata is
     /// available, all entity fields are selected by default.
     ///
-    /// Fallible: returns the matching [`BuildError`] variant when lowering
+    /// Fallible: returns the matching [`BuildError`](crate::BuildError) variant when lowering
     /// any of the projection / WHERE / GROUP BY / HAVING / ORDER BY
     /// expressions exhausts the default budget.
     pub fn try_build(self) -> Result<dol_ir::Program, crate::BuildError> {

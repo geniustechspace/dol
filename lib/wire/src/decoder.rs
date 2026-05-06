@@ -12,7 +12,7 @@
 //!   malformed input), and
 //! - shares postcard's byte format with the existing `encode_postcard` helper
 //!   for postcard-compatible types; types that require stable discriminants
-//!   (see [`crate::decode_core`]) use a custom but stable encoding.
+//!   (see `decode_core`) use a custom but stable encoding.
 //!
 //! # Wire format (postcard-compatible)
 //!
@@ -38,7 +38,7 @@
 //!
 //! # Cut-over status — v2 complete
 //!
-//! All `dol-core` leaf types have `Decode` impls in [`crate::decode_core`]:
+//! All `dol-core` leaf types have `Decode` impls in `decode_core`:
 //! primitives, datetime, numeric, geo, network, `DataType`, `StructField`,
 //! `Value`, `ValueRange`, `Literal<'static>`, and `LiteralRange<'static>`.
 //! The `decode_core_roundtrip` integration test asserts byte-for-byte parity

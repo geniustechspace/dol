@@ -19,7 +19,7 @@ pub type NodeId = Id<NodeTag>;
 /// Tag for [`crate::Interner`] string ids. Phantom marker.
 pub enum StrTag {}
 /// Content-addressed id for an interned string (leading 32 bits of
-/// BLAKE3, stored one-based to fit the [`NonZeroU32`] niche).
+/// BLAKE3, stored one-based to fit the `NonZeroU32` niche).
 pub type StrId = Id<StrTag>;
 
 /// Tag for `TypeArena::types` ids. Phantom marker.

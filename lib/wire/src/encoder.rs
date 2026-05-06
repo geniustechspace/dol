@@ -5,10 +5,10 @@
 //!
 //! - takes a [`&mut Budget`](dol_core::policy::Budget) so deeply nested
 //!   payloads charge per-descent against the same recursion cap as
-//!   [`Decode`] (a producer cannot accidentally emit a `Vec<Vec<…>>`
+//!   [`Decode`](crate::decoder::Decode) (a producer cannot accidentally emit a `Vec<Vec<…>>`
 //!   tower the peer can't decode), and
 //! - shares postcard's byte format with the existing
-//!   [`encode_postcard`](crate::postcard::encode_postcard) helper so the
+//!   [`encode_postcard`](crate::postcard::encode) helper so the
 //!   cut-over from `Serialize`-derived encoding is byte-for-byte
 //!   transparent. The `encode_core_roundtrip` integration test asserts
 //!   parity against `postcard::to_allocvec(&value)` for every type that
@@ -37,11 +37,11 @@
 //!
 //! v2 (0.2.0) lands the trait, the [`Writer`] sink, the helpers, and
 //! `Encode` impls for every primitive plus the same dol-core leaves that
-//! [`crate::decode_core`] covers
+//! `decode_core` covers
 //! (`BitString`, `FileId`, `Date`, `Time`, `DateTime`, `Offset`,
 //! `TimestampTz`, `Interval`, `Decimal`, `Point`, `Line`, `Segment`,
 //! `Rect`, `Circle`). Recursive enums and the `Deserialize`-derive strip
-//! follow in the next focused PR (matching the [`Decode`] follow-up).
+//! follow in the next focused PR (matching the [`Decode`](crate::decoder::Decode) follow-up).
 //!
 //! # Example
 //!

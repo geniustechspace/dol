@@ -90,8 +90,8 @@ impl UpdateQuery {
     /// single [`dol_ir::Operation::Update`] referencing an arena
     /// [`ExprNode::Update`](dol_expr::expr::ExprNode::Update).
     ///
-    /// Fallible: returns [`BuildError::SetValue`] /
-    /// [`BuildError::Filter`] when lowering an assignment RHS or the WHERE
+    /// Fallible: returns [`BuildError::SetValue`](crate::BuildError::SetValue) /
+    /// [`BuildError::Filter`](crate::BuildError::Filter) when lowering an assignment RHS or the WHERE
     /// clause exhausts the default budget.
     pub fn try_build(self) -> Result<dol_ir::Program, crate::BuildError> {
         use dol_core::policy::{Budget, Limits};
