@@ -41,6 +41,7 @@ fn main() -> ExitCode {
         ),
         "readme" => readme_check(),
         "budget-gate" => budget_gate(),
+        "ci" => ci_gate(&rest),
         "help" | "-h" | "--help" => {
             print_help();
             true
@@ -75,6 +76,10 @@ fn print_help() {
                         (`pub fn (walk|visit|decode|lower)*`) must take a\n             \
                         `&mut Budget`. Fails CI on any offender that lacks\n             \
                         an explicit `// budget-gate: opt-out` marker.\n  \
+           ci           run the same gate chain as `.github/workflows/ci.yml`\n             \
+                        locally (fmt, clippy, check, test, doctest no-default,\n             \
+                        budget-gate, size, nostd, readme, mcu). Pass `--quick`\n             \
+                        to skip the cross-compile (`mcu`) gate. Per v2 plan §78.\n  \
            help         show this message\n"
     );
 }
@@ -309,6 +314,103 @@ fn readme_check() -> bool {
         );
     }
     ok
+}
+
+// ---------------------------------------------------------------------------
+// ci
+// ---------------------------------------------------------------------------
+
+/// Local mirror of `.github/workflows/ci.yml` per v2 plan §78
+/// (*"`xtask ci` runs the exact same gates locally as in CI"*).
+///
+/// Runs the gate chain that does not require third-party tools
+/// (`cargo-deny`, `cargo-udeps`, `miri`, `cargo-fuzz` are CI-only —
+/// install them yourself if you want to mirror those steps too). Steps:
+///
+/// 1. `cargo fmt --all -- --check`
+/// 2. `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+/// 3. `cargo check --workspace --all-targets --all-features`
+/// 4. `cargo test  --workspace --all-features`
+/// 5. `cargo test  --workspace --doc --no-default-features` *(v2 doctest gate)*
+/// 6. `xtask budget-gate`
+/// 7. `xtask size` / `nostd` / `readme`
+/// 8. `xtask mcu` *(skipped under `--quick`)*
+///
+/// Fails fast on the first failing step; subsequent steps are skipped.
+fn ci_gate(extra: &[String]) -> bool {
+    let mut quick = false;
+    for arg in extra {
+        match arg.as_str() {
+            "--quick" | "-q" => quick = true,
+            other => {
+                eprintln!("xtask: ci: unknown argument `{other}` (expected `--quick`)");
+                return false;
+            }
+        }
+    }
+
+    // Each step is `(human-readable label, closure -> bool)`. Closures
+    // let `mcu_check`/`budget_gate`/etc. share a uniform reporting path
+    // with the `cargo`-shelling steps.
+    let steps: [(&str, &dyn Fn() -> bool); 9] = [
+        ("fmt", &|| {
+            run_cargo(&["fmt", "--all", "--", "--check"], &[])
+        }),
+        ("clippy", &|| {
+            run_cargo(
+                &[
+                    "clippy",
+                    "--workspace",
+                    "--all-targets",
+                    "--all-features",
+                    "--",
+                    "-D",
+                    "warnings",
+                ],
+                &[],
+            )
+        }),
+        ("check", &|| {
+            run_cargo(
+                &["check", "--workspace", "--all-targets", "--all-features"],
+                &[],
+            )
+        }),
+        ("test", &|| {
+            run_cargo(&["test", "--workspace", "--all-features"], &[])
+        }),
+        ("doc-no-default", &|| {
+            run_cargo(
+                &["test", "--workspace", "--doc", "--no-default-features"],
+                &[],
+            )
+        }),
+        ("budget-gate", &budget_gate),
+        ("size", &size_report),
+        ("nostd", &nostd_check),
+        ("readme", &readme_check),
+    ];
+
+    for (label, run) in &steps {
+        eprintln!("\nxtask ci: ── step `{label}` ──");
+        if !run() {
+            eprintln!("\nxtask ci: step `{label}` FAILED");
+            return false;
+        }
+    }
+
+    if !quick {
+        eprintln!("\nxtask ci: ── step `mcu` ──");
+        if !mcu_check(&[]) {
+            eprintln!("\nxtask ci: step `mcu` FAILED");
+            return false;
+        }
+    } else {
+        eprintln!("\nxtask ci: skipping `mcu` (--quick)");
+    }
+
+    eprintln!("\nxtask ci: all gates passed");
+    true
 }
 
 // ---------------------------------------------------------------------------

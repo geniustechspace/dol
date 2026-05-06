@@ -34,6 +34,15 @@ documented under "0.2.0" below.
 
 #### Added
 
+- **`xtask ci` super-task** — local mirror of
+  `.github/workflows/ci.yml` per `docs/v2_plan.md` §78
+  (*"`xtask ci` runs the exact same gates locally as in CI"*). Runs
+  `fmt`, `clippy -D warnings`, `check`, `test`, the `--no-default-features`
+  doctest gate, `budget-gate`, `size`, `nostd`, `readme`, and the
+  cross-compile `mcu` gate in one command. Pass `--quick` to skip the
+  `mcu` step on hosts without the embedded targets installed. Fails
+  fast on the first failing step. Third-party-tool gates
+  (`cargo-deny`, `cargo-udeps`, `miri`, `cargo-fuzz`) stay CI-only.
 - **`lib/wire/fuzz/` — `cargo-fuzz` harnesses for every `dol-wire`
   decoder.** Per `docs/v2_plan.md` §57 (*"Fuzz targets in
   `lib/wire/fuzz/` for every decoder, run in CI nightly"*) and §78.
