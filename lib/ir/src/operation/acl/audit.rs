@@ -5,7 +5,7 @@ use crate::target::{Symbol, Target};
 
 /// What event class to audit.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum AuditEvent {
     /// Audit read operations (SELECT, Query).
     Read,
@@ -21,7 +21,7 @@ pub enum AuditEvent {
 
 /// Where audit records are written.
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum AuditSink {
     /// Backend's default audit log.
     Default,
@@ -53,7 +53,7 @@ pub enum AuditSink {
 /// assert_eq!(op.kind(), dol_ir::OpKind::Audit);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct AuditOp {
     /// `Create` / `Drop` / `Alter`.
     pub verb: StructuralVerb,

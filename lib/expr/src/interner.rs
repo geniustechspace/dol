@@ -1,5 +1,3 @@
-#[cfg(feature = "serde")]
-use alloc::string::String;
 use alloc::vec::Vec;
 use core::num::NonZeroU32;
 use hashbrown::HashMap;
@@ -256,20 +254,7 @@ impl serde::Serialize for Interner {
     }
 }
 
-#[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for Interner {
-    fn deserialize<D: serde::Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
-        let strings: Vec<String> = serde::Deserialize::deserialize(de)?;
-        let mut interner = Interner::default();
-        for s in &strings {
-            // Re-intern through the canonical path so the slot map and
-            // bytes blob stay consistent with one another. A collision
-            // in the wire payload (two distinct strings that hash to the
-            // same id) is surfaced as a serde error rather than a panic.
-            interner
-                .try_intern(s)
-                .map_err(<D::Error as serde::de::Error>::custom)?;
-        }
-        Ok(interner)
-    }
-}
+// `Deserialize` is intentionally NOT implemented for `Interner` in v2.
+// Wire-in for an `Interner` goes through `dol_wire::Decode` so the
+// re-intern path threads `&mut Budget` and surfaces collisions as a
+// `DecodeError`. `Serialize` is kept for human-readable JSON dumps.

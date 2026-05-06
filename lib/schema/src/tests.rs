@@ -96,7 +96,9 @@ fn qualified_name_with_namespace() {
 #[test]
 fn field_lookup_success() {
     let m = basic_model();
-    let f = m.try_field("email").expect("email field defined in basic_model");
+    let f = m
+        .try_field("email")
+        .expect("email field defined in basic_model");
     assert_eq!(&*f.name, "email");
     assert!(f.nullable);
 }

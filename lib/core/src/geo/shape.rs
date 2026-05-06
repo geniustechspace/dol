@@ -5,7 +5,7 @@ use core::fmt;
 
 /// An axis-aligned 2D rectangle defined by two corners.
 #[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Rect {
     pub low: Point,
     pub high: Point,
@@ -25,7 +25,7 @@ impl fmt::Display for Rect {
 
 /// A 2D circle with a center point and radius.
 #[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Circle {
     pub center: Point,
     pub radius: f64,
@@ -52,7 +52,7 @@ impl fmt::Display for Circle {
 
 /// A 2D path: an ordered sequence of points, open or closed.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Path {
     pub closed: bool,
     pub points: Box<[Point]>,
@@ -83,7 +83,7 @@ impl fmt::Display for Path {
 
 /// A 2D polygon: an implicitly-closed ordered sequence of points.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Polygon {
     pub points: Box<[Point]>,
 }

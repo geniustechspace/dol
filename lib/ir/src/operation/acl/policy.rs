@@ -7,7 +7,7 @@ use crate::target::{Symbol, Target};
 
 /// What DML/DQL kinds the policy applies to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum PolicyScope {
     /// Policy applies to read operations (SELECT, Query).
     Read,
@@ -43,7 +43,7 @@ pub enum PolicyScope {
 /// assert_eq!(op.kind(), dol_ir::OpKind::Policy);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PolicyOp {
     /// `Create` / `Drop` / `Alter`.
     pub verb: StructuralVerb,

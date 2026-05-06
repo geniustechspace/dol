@@ -211,8 +211,8 @@ fn rect_round_trip() {
 
 #[test]
 fn circle_round_trip() {
-    let v = dol_core::geo::Circle::try_new(dol_core::Point::try_new(0.0, 0.0).unwrap(), 5.0)
-        .unwrap();
+    let v =
+        dol_core::geo::Circle::try_new(dol_core::Point::try_new(0.0, 0.0).unwrap(), 5.0).unwrap();
     assert_eq!(v, rt(&v));
 }
 
@@ -240,22 +240,31 @@ fn span_table_encode_postcard_parity() {
     let mut budget = Budget::new(Limits::host());
     let our_bytes = encode_to_vec(&table, &mut budget).expect("Encode SpanTable");
     let postcard_bytes = postcard::to_allocvec(&table).expect("postcard SpanTable");
-    assert_eq!(our_bytes, postcard_bytes, "SpanTable bytes must match postcard");
+    assert_eq!(
+        our_bytes, postcard_bytes,
+        "SpanTable bytes must match postcard"
+    );
 }
 
 // ─── Path and Polygon (postcard-compatible) ───────────────────────────────────
 
 #[test]
 fn path_encode_postcard_parity() {
-    let open = dol_core::geo::Path::new(false, vec![
-        dol_core::Point::try_new(0.0, 0.0).unwrap(),
-        dol_core::Point::try_new(1.0, 2.0).unwrap(),
-    ]);
-    let closed = dol_core::geo::Path::new(true, vec![
-        dol_core::Point::try_new(0.0, 0.0).unwrap(),
-        dol_core::Point::try_new(2.0, 0.0).unwrap(),
-        dol_core::Point::try_new(1.0, 1.0).unwrap(),
-    ]);
+    let open = dol_core::geo::Path::new(
+        false,
+        vec![
+            dol_core::Point::try_new(0.0, 0.0).unwrap(),
+            dol_core::Point::try_new(1.0, 2.0).unwrap(),
+        ],
+    );
+    let closed = dol_core::geo::Path::new(
+        true,
+        vec![
+            dol_core::Point::try_new(0.0, 0.0).unwrap(),
+            dol_core::Point::try_new(2.0, 0.0).unwrap(),
+            dol_core::Point::try_new(1.0, 1.0).unwrap(),
+        ],
+    );
     assert_eq!(open, rt(&open));
     assert_eq!(closed, rt(&closed));
 }
@@ -295,8 +304,12 @@ mod custom_rt {
     #[test]
     fn data_type_primitives() {
         for v in [
-            DataType::Null, DataType::Bool, DataType::Int32, DataType::Float64,
-            DataType::Json, DataType::Uuid,
+            DataType::Null,
+            DataType::Bool,
+            DataType::Int32,
+            DataType::Float64,
+            DataType::Json,
+            DataType::Uuid,
             DataType::Array(Box::new(DataType::Int32)),
             DataType::Struct(vec![dol_core::StructField::new("x", DataType::Bool, true)]),
         ] {
@@ -307,7 +320,9 @@ mod custom_rt {
     #[test]
     fn value_scalars() {
         for v in [
-            Value::Null, Value::Bool(true), Value::Int32(99),
+            Value::Null,
+            Value::Bool(true),
+            Value::Int32(99),
             Value::String(Box::from("hi")),
             Value::Uuid([1u8; 16]),
         ] {
@@ -323,7 +338,10 @@ mod custom_rt {
         };
         assert_eq!(r, self_rt(&r));
 
-        let r2 = ValueRange { start: Bound::Unbounded, end: Bound::Unbounded };
+        let r2 = ValueRange {
+            start: Bound::Unbounded,
+            end: Bound::Unbounded,
+        };
         assert_eq!(r2, self_rt(&r2));
     }
 

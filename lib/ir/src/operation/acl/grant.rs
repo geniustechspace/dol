@@ -36,7 +36,7 @@ use crate::target::{Symbol, Target};
 /// assert_eq!(op.kind(), dol_ir::OpKind::Grant);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Grant {
     /// Privileges being granted (e.g. `Select`, `Insert`).
     pub privileges: SmallVec<[Privilege; 2]>,

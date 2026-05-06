@@ -19,7 +19,16 @@
 //!
 //! See `justfile` for higher-level recipes that wrap these.
 
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing, clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::arithmetic_side_effects
+    )
+)]
 
 use std::process::{Command, ExitCode};
 
@@ -399,7 +408,10 @@ fn collect_rs(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
             // rather than `to_str()` so a non-UTF-8 directory name
             // (legal on Linux/macOS) still lets us match the filter
             // strings instead of silently skipping the directory.
-            let name = p.file_name().map(|s| s.to_string_lossy()).unwrap_or_default();
+            let name = p
+                .file_name()
+                .map(|s| s.to_string_lossy())
+                .unwrap_or_default();
             if matches!(name.as_ref(), "target" | "tests" | "benches" | "examples") {
                 continue;
             }
@@ -407,7 +419,10 @@ fn collect_rs(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
         } else if p.extension().and_then(|s| s.to_str()) == Some("rs") {
             // Also skip `tests.rs` and `*_tests.rs` modules — production
             // gate, not a test-code gate.
-            let name = p.file_name().map(|s| s.to_string_lossy()).unwrap_or_default();
+            let name = p
+                .file_name()
+                .map(|s| s.to_string_lossy())
+                .unwrap_or_default();
             if name == "tests.rs" || name.ends_with("_tests.rs") {
                 continue;
             }
@@ -506,10 +521,19 @@ mod budget_gate_tests {
 
     #[test]
     fn matches_pub_fn_walk_visit_decode_lower() {
-        assert_eq!(match_recursive_entry("pub fn walk_node(...)"), Some("walk_node"));
-        assert_eq!(match_recursive_entry("    pub fn visit_op<T>(...)"), Some("visit_op"));
+        assert_eq!(
+            match_recursive_entry("pub fn walk_node(...)"),
+            Some("walk_node")
+        );
+        assert_eq!(
+            match_recursive_entry("    pub fn visit_op<T>(...)"),
+            Some("visit_op")
+        );
         assert_eq!(match_recursive_entry("pub fn decode_x()"), Some("decode_x"));
-        assert_eq!(match_recursive_entry("pub fn lower_expr(...)"), Some("lower_expr"));
+        assert_eq!(
+            match_recursive_entry("pub fn lower_expr(...)"),
+            Some("lower_expr")
+        );
     }
 
     #[test]

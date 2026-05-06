@@ -66,7 +66,7 @@ pub use tx::{IsolationLevel, TxBegin, TxOp, TxOptions};
 /// assert_eq!(op.kind(), OpKind::Insert);
 /// ```
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum Operation {
     // ── structural / management — noun variants ───────────────────────────
     /// Entity-level structural change (create/drop/alter/rename a relation,

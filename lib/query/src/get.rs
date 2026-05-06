@@ -328,9 +328,7 @@ impl GetQuery {
         use dol_core::policy::{Budget, Limits};
         use dol_expr::expr::{ExprNode, JoinNode, JoinType as ArenaJoinType, QueryNode};
         use dol_expr::ids::NodeId;
-        use dol_expr::lower::{
-            lower_exprs, lower_expr_with_budget, lower_filters, lower_order_by,
-        };
+        use dol_expr::lower::{lower_expr_with_budget, lower_exprs, lower_filters, lower_order_by};
         use dol_ir::TargetKind;
         use dol_ir::operation::Query as OpQuery;
         use smallvec::SmallVec;
@@ -393,9 +391,9 @@ impl GetQuery {
                     // (left and right column references) emitted below.
                     // Keeps the worst-case `ON a=b AND c=d AND ...`
                     // chain bounded by the configured fuel cap.
-                    budget
-                        .tick(2)
-                        .map_err(|e| crate::BuildError::JoinOn(dol_expr::lower::LowerError::from(e)))?;
+                    budget.tick(2).map_err(|e| {
+                        crate::BuildError::JoinOn(dol_expr::lower::LowerError::from(e))
+                    })?;
                     let lid = {
                         let col = interner.intern(l);
                         let fid = arena.alloc_field(dol_expr::FieldNode {

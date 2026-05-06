@@ -27,7 +27,7 @@ use crate::target::Target;
 /// assert_eq!(op.kind(), dol_ir::OpKind::Query);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Query {
     /// Target to query.
     pub target: Target,

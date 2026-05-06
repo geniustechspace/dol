@@ -31,7 +31,7 @@ use crate::target::Target;
 /// assert_eq!(op.kind(), dol_ir::OpKind::Append);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Append {
     /// Target to append to (typically a stream topic).
     pub target: Target,

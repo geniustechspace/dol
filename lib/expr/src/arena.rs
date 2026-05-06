@@ -50,7 +50,7 @@ fn get_in<T, Tag: ?Sized>(vec: &[T], id: Id<Tag>) -> &T {
 /// | `Key("name")` | `col->>'name'`     | `.name`         |
 /// | `Index(0)`    | `col->>0`          | `[0]`           |
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub enum FieldStep {
     /// Named key access: `.key`, `->>'key'`, `["key"]`.
@@ -75,7 +75,7 @@ pub enum FieldStep {
 /// | `None`      | `"profile_json"` | `[Key("name")]`        | `profile_json->>'name'`     |
 /// | `Some("u")` | `"data"`         | `[Key("x"), Index(0)]` | `u.data->'x'->>0`           |
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct FieldNode {
     /// Optional container address (interned dotted path); `None` means an
     /// unanchored leaf reference at the current scope.
@@ -95,7 +95,7 @@ pub struct FieldNode {
 /// would otherwise push the variant to 32 bytes of *payload*, which
 /// combined with the discriminant word exceeds the target.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct FuncNode {
     pub name: StrId,
     pub args: SmallVec<[NodeId; 4]>,
@@ -106,7 +106,7 @@ pub struct FuncNode {
 /// The inline buffer of `SmallVec<[(StrId, NodeId); 4]>` is 4 × 8 = 32 bytes
 /// on its own — already over budget before the discriminant word is counted.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ObjLitNode(pub SmallVec<[(StrId, NodeId); 4]>);
 
 /// Payload for [`ExprNode::Window`], stored in `ExprArena::windows`.
@@ -118,7 +118,7 @@ pub struct ObjLitNode(pub SmallVec<[(StrId, NodeId); 4]>);
 /// preserves it so backends can render frames faithfully without
 /// round-trip loss.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct WindowNode {
     pub func: StrId,
     pub partition: SmallVec<[NodeId; 4]>,
@@ -136,7 +136,7 @@ pub struct WindowNode {
 /// `ELSE` branch, replacing the previous `NULL_NODE: NodeId = u32::MAX`
 /// sentinel.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct CaseNode {
     pub branches: SmallVec<[(NodeId, NodeId); 4]>,
     pub else_: Option<NodeId>,
@@ -147,7 +147,7 @@ pub struct CaseNode {
 /// `SmallVec<[NodeId; 8]>` has a 32-byte inline buffer, making the variant
 /// payload 36+ bytes — pooled to keep `ExprNode` ≤ 32 bytes.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct InListNode {
     pub expr: NodeId,
     pub list: SmallVec<[NodeId; 8]>,
@@ -156,7 +156,7 @@ pub struct InListNode {
 // ─── SpanTable ────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Span {
     pub start: u32,
     pub end: u32,
@@ -177,7 +177,7 @@ pub struct Span {
 /// linear scan; spans are sparse on real plans). Both the wire form and
 /// the public push/get signatures stay the same.
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct SpanTable {
     /// Spans, in insertion order.
     spans: Vec<Span>,
@@ -234,8 +234,12 @@ impl SpanTable {
         self.spans.is_empty()
     }
 
-    pub fn spans_slice(&self) -> &[Span] { &self.spans }
-    pub fn owners_slice(&self) -> &[NodeId] { &self.owners }
+    pub fn spans_slice(&self) -> &[Span] {
+        &self.spans
+    }
+    pub fn owners_slice(&self) -> &[NodeId] {
+        &self.owners
+    }
 }
 
 // ─── Capacity hints ──────────────────────────────────────────────────────────
@@ -293,7 +297,7 @@ impl Capacity {
 }
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ExprArena {
     nodes: Vec<ExprNode>,
     span_table: SpanTable,
@@ -545,18 +549,46 @@ impl ExprArena {
         get_in(&self.fields, id)
     }
 
-    pub fn nodes_slice(&self) -> &[ExprNode] { &self.nodes }
-    pub fn lits_slice(&self) -> &[Literal<'static>] { &self.lits }
-    pub fn funcs_slice(&self) -> &[FuncNode] { &self.funcs }
-    pub fn obj_lits_slice(&self) -> &[ObjLitNode] { &self.obj_lits }
-    pub fn windows_slice(&self) -> &[WindowNode] { &self.windows }
-    pub fn cases_slice(&self) -> &[CaseNode] { &self.cases }
-    pub fn in_lists_slice(&self) -> &[InListNode] { &self.in_lists }
-    pub fn queries_slice(&self) -> &[QueryNode] { &self.queries }
-    pub fn inserts_slice(&self) -> &[InsertNode] { &self.inserts }
-    pub fn updates_slice(&self) -> &[UpdateNode] { &self.updates }
-    pub fn deletes_slice(&self) -> &[DeleteNode] { &self.deletes }
-    pub fn upserts_slice(&self) -> &[UpsertNode] { &self.upserts }
-    pub fn fields_slice(&self) -> &[FieldNode] { &self.fields }
-    pub fn span_table_ref(&self) -> &SpanTable { &self.span_table }
+    pub fn nodes_slice(&self) -> &[ExprNode] {
+        &self.nodes
+    }
+    pub fn lits_slice(&self) -> &[Literal<'static>] {
+        &self.lits
+    }
+    pub fn funcs_slice(&self) -> &[FuncNode] {
+        &self.funcs
+    }
+    pub fn obj_lits_slice(&self) -> &[ObjLitNode] {
+        &self.obj_lits
+    }
+    pub fn windows_slice(&self) -> &[WindowNode] {
+        &self.windows
+    }
+    pub fn cases_slice(&self) -> &[CaseNode] {
+        &self.cases
+    }
+    pub fn in_lists_slice(&self) -> &[InListNode] {
+        &self.in_lists
+    }
+    pub fn queries_slice(&self) -> &[QueryNode] {
+        &self.queries
+    }
+    pub fn inserts_slice(&self) -> &[InsertNode] {
+        &self.inserts
+    }
+    pub fn updates_slice(&self) -> &[UpdateNode] {
+        &self.updates
+    }
+    pub fn deletes_slice(&self) -> &[DeleteNode] {
+        &self.deletes
+    }
+    pub fn upserts_slice(&self) -> &[UpsertNode] {
+        &self.upserts
+    }
+    pub fn fields_slice(&self) -> &[FieldNode] {
+        &self.fields
+    }
+    pub fn span_table_ref(&self) -> &SpanTable {
+        &self.span_table
+    }
 }

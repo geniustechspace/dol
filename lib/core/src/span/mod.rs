@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 /// Identifier for a source file in the [`SpanTable`].
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct FileId(pub u16);
 
 impl FileId {
@@ -28,7 +28,7 @@ impl FileId {
 /// This keeps the type 8 bytes and trivially `Copy`.
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Span(u64);
 
 impl Span {
@@ -103,7 +103,7 @@ impl Span {
 /// The table is grow-only and unsorted; callers either index in parallel with
 /// the AST node arena or look up by raw index. Spans default to [`Span::NONE`].
 #[derive(Debug, Default, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct SpanTable {
     spans: Vec<Span>,
 }

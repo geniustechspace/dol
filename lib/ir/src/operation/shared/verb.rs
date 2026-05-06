@@ -13,7 +13,7 @@
 
 /// The verb applied by a structural / governance operation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum StructuralVerb {
     /// Create the object if it does not exist.
     Create,

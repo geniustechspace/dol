@@ -24,7 +24,7 @@ use crate::schema_ref::SchemaRef;
 /// interner that interned it.
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Symbol(pub dol_expr::ids::StrId);
 
 impl Default for Symbol {
@@ -110,7 +110,7 @@ impl From<Symbol> for dol_expr::ids::StrId {
 /// `path` covers nested document paths, S3 key segments, file-tree segments,
 /// and topic partitions.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Locator {
     /// Optional containing namespace (schema, bucket, vhost, …).
     pub namespace: Option<Symbol>,
@@ -159,7 +159,7 @@ impl Locator {
 /// [`Operation`](crate::operation::Operation). Some verbs are only meaningful
 /// on certain kinds — capability checks pair `(OpKind, TargetKind)`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum TargetKind {
     /// Tabular relation (SQL table, dataframe).
     Relation,
@@ -188,7 +188,7 @@ pub enum TargetKind {
 /// ignored. `dol-check` downgrades schema-dependent diagnostics to warnings
 /// when it sees `Opaque`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum SchemaBinding {
     /// Schema is declared and resolvable through the program's catalog.
     Declared(SchemaRef),
@@ -219,7 +219,7 @@ pub enum SchemaBinding {
 /// assert_eq!(t.kind, TargetKind::Relation);
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Target {
     /// What family of object this target refers to.
     pub kind: TargetKind,

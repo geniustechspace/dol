@@ -31,7 +31,7 @@ use crate::target::{Symbol, Target};
 /// assert_eq!(op.kind(), dol_ir::OpKind::Mask);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct MaskOp {
     /// `Create` / `Drop` / `Alter`.
     pub verb: StructuralVerb,

@@ -18,7 +18,7 @@ use super::StructField;
 /// in the schema (e.g., a user-defined SQL type, an Avro named type, a Protobuf
 /// message). Resolution happens at the schema layer.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub enum DataType {
     // ── Primitive ──

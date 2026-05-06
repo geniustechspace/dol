@@ -24,7 +24,7 @@ use crate::numeric::Decimal;
 ///
 /// `size_of::<Literal<'static>>() == 32` on 64-bit targets.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub enum Literal<'a> {
     // ── Primitive ──

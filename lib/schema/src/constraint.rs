@@ -23,7 +23,7 @@ use alloc::vec::Vec;
 /// | `Reject`      | `RESTRICT`           | refuse mutation         | refuse deletion   |
 /// | `UseDefault`  | `SET DEFAULT`        | reset to schema default | reset to default  |
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum RefAction {
     /// Reject the mutation outright; the reference is treated as a hard
     /// invariant. Equivalent to `NO ACTION` in SQL.
@@ -44,7 +44,7 @@ pub enum RefAction {
 
 /// How a computed field is materialized.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum ComputedKind {
     /// Materialized on write — the value is stored alongside the record and
     /// recomputed only when its inputs change.
@@ -57,7 +57,7 @@ pub enum ComputedKind {
 /// An inline relation reference on a single field — the dependent side of a
 /// directed link to another entity.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct RelationRef {
     /// Target entity name.
     pub entity: Arc<str>,
@@ -91,7 +91,7 @@ impl RelationRef {
 /// An entity-level constraint (composite uniqueness, multi-field relation,
 /// invariant expression, composite identity).
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum EntityConstraint {
     /// Uniqueness constraint over one or more fields.
     Unique(Vec<Arc<str>>),

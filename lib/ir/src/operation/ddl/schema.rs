@@ -21,7 +21,7 @@ use crate::target::{Symbol, Target};
 /// `Reference` carries no body and is the canonical shape for `Drop`,
 /// `Rename`, and `Truncate`.
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum SchemaBody {
     /// Entity body referenced by catalog id.
     Entity {
@@ -43,7 +43,7 @@ pub enum SchemaBody {
 
 /// Type-body classification for `Schema { verb: Create, body: Type, .. }`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum TypeBody {
     /// Enumerated type (e.g. PostgreSQL `CREATE TYPE ... AS ENUM`).
     Enum,
@@ -83,7 +83,7 @@ pub enum TypeBody {
 /// assert_eq!(op.kind(), dol_ir::OpKind::Schema);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct SchemaOp {
     /// `Create` / `Drop` / `Alter` / `Rename` / `Truncate`.
     pub verb: StructuralVerb,

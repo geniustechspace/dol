@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Phase 2 — finalize v2 (single PR, no shims)
+
+This entry rounds out the v2 cut started in 0.2.0. No new package versions
+are bumped; this is an additive tightening of the contracts already
+documented under "0.2.0" below.
+
+#### Removed
+
+- **`serde::Deserialize` is gone from every in-memory IR/AST/expr/schema
+  type** (`Operation`, `Program`, `ExprArena`, `Interner`, `CompactName`,
+  `Id<Tag>`, `Field`, `DataType`, `Value`, `Literal`, every leaf in
+  `core::{datetime, geo, network, numeric, binary}`, every IR verb
+  payload). `Serialize` is retained for JSON debug output. v2 wire-in
+  goes through `dol-wire::Decode` exclusively.
+- **`dol_wire::program::decode_postcard` and `decode_json` deleted.**
+  Replaced by `dol_wire::program::decode` (drives `Decode` end-to-end
+  with `&mut Budget`). Generic serde-based `dol_wire::postcard::decode`
+  and `dol_wire::json::decode` shims also deleted.
+- **`dol_core::descriptor` deprecated alias removed** (`data_type` is the
+  canonical name).
+- **Per-crate `tests/serde_roundtrip.rs` deleted** — universal-`serde`
+  round-trip is no longer the v2 contract; replaced by the
+  `dol-wire`-internal `Encode`/`Decode` test corpus and a JSON-output
+  smoke test on the IR side.
+
+#### Added
+
+- **`dol_core::policy::Quota` + `QuotaCaps`.** Cross-traversal cumulative
+  resource quota (per-tenant / per-session) layered on top of `Budget`.
+  Includes `Quota::consume(&Budget) -> Result<(), BudgetError>`,
+  saturating-add accounting, and an `unbounded()` preset.
+- **`dol_core::raw` module.** Reserved `unsafe`-audit boundary for
+  future POD wire-cast types (`bytemuck` / `zerocopy`). Currently empty;
+  ships with a charter doc + `lib/core/src/raw/README.md` review
+  checklist. The workspace remains `forbid(unsafe_code)`.
+- **`Operation::Raw` placement decision documented.** Stays in `dol-ir`
+  behind the `raw` feature; rustdoc on `RawOp` now captures the
+  `RAW_PASSTHROUGH` capability-tag invariant and the rationale for not
+  splitting into `dol-backends-common`.
+
+#### Changed
+
+- **`.github/workflows/ci.yml`** — the per-crate "Serde round-trip
+  gate" is renamed to "Wire round-trip gate" and now runs the
+  `dol-wire` integration tests (`program_roundtrip`, `decode_robustness`,
+  `decode_core_roundtrip`).
+- Workspace docs and per-crate `lib.rs` feature tables updated to
+  describe the v2 invariant: `Serialize` is universal, `Deserialize` is
+  not.
+
+#### Deferred (separate follow-up PR)
+
+- Promotion of `clippy::indexing_slicing` and
+  `clippy::arithmetic_side_effects` from `warn` to `deny` (item 3 of the
+  Phase 2 plan). The workspace `Cargo.toml` already calls this out as a
+  per-call-site audit; tracking separately to keep the v2 cut atomic.
+
 ## [0.2.0] — 2026-05
 
 ### v2 cut — coordinated, core-first, no compatibility shims

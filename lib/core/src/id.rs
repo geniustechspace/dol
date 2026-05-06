@@ -178,15 +178,9 @@ impl<Tag: ?Sized> serde::Serialize for Id<Tag> {
     }
 }
 
-#[cfg(feature = "serde")]
-impl<'de, Tag: ?Sized> serde::Deserialize<'de> for Id<Tag> {
-    fn deserialize<D: serde::Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
-        let raw: u32 = serde::Deserialize::deserialize(de)?;
-        NonZeroU32::new(raw)
-            .map(Self::new)
-            .ok_or_else(|| <D::Error as serde::de::Error>::custom("Id<Tag>: zero is reserved"))
-    }
-}
+// `Deserialize` is intentionally NOT implemented for `Id<Tag>` in v2.
+// Wire-in goes through `dol_wire::Decode`, which validates the
+// `NonZeroU32` invariant. `Serialize` is kept for JSON dumps.
 
 #[cfg(test)]
 mod tests {
@@ -258,11 +252,8 @@ mod tests {
         assert_eq!(s, "42");
     }
 
-    #[cfg(feature = "serde")]
-    #[test]
-    fn deserializes_from_bare_u32_and_rejects_zero() {
-        let id: FooId = serde_json::from_str("42").unwrap();
-        assert_eq!(id.get(), 42);
-        assert!(serde_json::from_str::<FooId>("0").is_err());
-    }
+    // The previous `deserializes_from_bare_u32_and_rejects_zero` test
+    // was removed in 0.2.0 along with the `Deserialize` impl: v2 wire-in
+    // for `Id<Tag>` goes through `dol_wire::Decode`, which performs the
+    // `NonZeroU32` validation at the budget-threaded decode boundary.
 }

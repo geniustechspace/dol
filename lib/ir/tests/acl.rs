@@ -6,6 +6,14 @@
 //! - report the correct capability tags via `required_capabilities()`,
 //! - construct cleanly through `From<Payload> for Operation`.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects
+)]
+
 use dol_ir::operation::{
     AuditEvent, AuditOp, AuditSink, Grant, MaskOp, PolicyOp, PolicyScope, QuotaKind, QuotaOp,
     Revoke, StructuralVerb,

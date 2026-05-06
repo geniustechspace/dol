@@ -15,7 +15,7 @@ use crate::target::Symbol;
 /// tracks the wire-format revision of the extension's payload, allowing
 /// crates to evolve the body without changing the identifier.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ExtensionId {
     /// Interned extension name.
     pub name: Symbol,
@@ -36,7 +36,7 @@ impl ExtensionId {
 /// Higher-level crates attach custom verbs via `Extension` rather than
 /// extending the closed `Operation` enum.
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct OperationExtension {
     /// Stable identifier for this extension type.
     pub id: ExtensionId,

@@ -26,7 +26,7 @@ use crate::schema_catalog::SchemaCatalog;
 /// assert_eq!(program.operations.len(), 1);
 /// ```
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Program {
     /// Operation sequence.
     pub operations: alloc::vec::Vec<Operation>,
@@ -216,9 +216,9 @@ impl core::fmt::Display for ExtendError {
                  other.arena={other_arena}, other.interner={other_interner}); id \
                  remapping is not yet implemented"
             ),
-            Self::CatalogConflict => f.write_str(
-                "Program::extend: both programs carry a populated schema_catalog",
-            ),
+            Self::CatalogConflict => {
+                f.write_str("Program::extend: both programs carry a populated schema_catalog")
+            }
         }
     }
 }

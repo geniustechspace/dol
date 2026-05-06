@@ -2,7 +2,7 @@
 //!
 //! These are not random fuzz runs; they're a corpus of pathological byte
 //! patterns that any decoder reachable from untrusted input — wire frames,
-//! postcard programs, interner JSON — has to handle without panicking.
+//! postcard programs — has to handle without panicking.
 //! The contract verified here:
 //!
 //! * **No panics** for any input shape (zero-length, single-byte,
@@ -12,12 +12,24 @@
 //! * **Future major** versions are rejected even when minor agrees,
 //!   and **future minor** is rejected because we can't know what new
 //!   fields it added.
-//! * **Truncated** payloads after a valid header surface as
-//!   `Codec(_)` rather than panicking inside postcard / serde.
-//! * The `Id<Tag>` deserialiser rejects zero (the niche reserved
-//!   value), surfacing as a serde error rather than UB.
+//! * **Truncated** payloads after a valid header surface as a clean
+//!   `DecodeError` from the budget-threaded [`dol_wire::Decode`] path,
+//!   not a panic inside postcard.
+//!
+//! v2 invariant: decode goes through [`dol_wire::Decode`] only;
+//! `serde::Deserialize` is gone from the in-memory IR. The previous
+//! `Id<Tag>` "zero rejection" test no longer applies because there is
+//! no `Deserialize` impl to test — the equivalent invariant is
+//! exercised by `dol_wire::decode_ir`'s `Decode` impl tests.
 
-#![cfg(all(feature = "postcard", feature = "json"))]
+#![cfg(feature = "postcard")]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects
+)]
 
 use dol_wire::{
     CURRENT_VERSION, WireError, WireHeader, WireSchemaVersion, frame, program, unframe,
@@ -68,10 +80,12 @@ fn unframe_rejects_future_minor() {
 fn unframe_arbitrary_bytes_never_panic() {
     // Walk a deterministic LCG over 1 KiB of input lengths and bytes.
     // No external `proptest` / `arbitrary` dependency — keeps the suite
-    // hermetic on the workspace's pinned 1.94 toolchain.
+    // hermetic on the workspace's pinned toolchain.
     let mut state: u64 = 0x9E37_79B9_7F4A_7C15;
     for _ in 0..512 {
-        state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let len = ((state >> 32) as usize) % 64;
         let mut buf = Vec::with_capacity(len);
         for i in 0..len {
@@ -84,14 +98,16 @@ fn unframe_arbitrary_bytes_never_panic() {
     }
 }
 
-// ─── Postcard `Program` ──────────────────────────────────────────────────────
+// ─── Postcard `Program` (Decode-based wire-in) ───────────────────────────────
 
 #[test]
-fn decode_postcard_truncated_body_returns_codec_error() {
+fn decode_truncated_body_returns_clean_error() {
+    use dol_core::policy::{Budget, Limits};
     use dol_expr::ExprArena;
     use dol_expr::Interner;
     use dol_ir::operation::{Insert, InsertSource};
     use dol_ir::{Locator, Program, Symbol, Target, TargetKind};
+    use dol_wire::encoder::encode_to_vec;
 
     // A real, encodable program — anything tiny will do.
     let mut interner = Interner::new();
@@ -104,68 +120,24 @@ fn decode_postcard_truncated_body_returns_codec_error() {
     .into();
     let program = Program::new(op, ExprArena::new(), interner);
 
-    let bytes = program::encode_postcard(&program).expect("encode");
+    let mut budget = Budget::new(Limits::host());
+    let bytes = encode_to_vec(&program, &mut budget).expect("encode");
     // Truncate progressively: every prefix of the body must surface a
-    // codec error, never a panic.
-    for cut in 8..bytes.len() {
+    // clean `DecodeError`, never a panic. (The test running to
+    // completion is what proves no panic.)
+    for cut in 0..bytes.len() {
         let prefix = &bytes[..cut];
-        match program::decode_postcard(prefix) {
-            // Could legitimately succeed if the cut lands at a serde
-            // boundary — but the cases we *care* about are the ones
-            // that surface as a clean error.
-            Ok(_) | Err(WireError::Codec(_)) => (),
-            Err(other) => panic!("cut at {cut}: unexpected error {other:?}"),
-        }
+        let _ = program::decode(prefix);
     }
 }
 
 #[test]
-fn decode_postcard_garbage_after_valid_header_does_not_panic() {
+fn decode_garbage_after_valid_header_does_not_panic() {
     // Build a wire-shaped buffer with the canonical header but a
-    // postcard-illegal body. `decode_postcard` must surface a
-    // `Codec(_)`, never panic.
+    // postcard-illegal body. `program::decode` must surface a clean
+    // `DecodeError`, never panic.
     let mut bytes = frame(&[]);
     bytes.extend_from_slice(&[0xff; 64]);
-    let res: Result<dol_ir::Program, _> = program::decode_postcard(&bytes);
-    assert!(matches!(res, Err(WireError::Codec(_))));
-}
-
-// ─── Interner JSON ───────────────────────────────────────────────────────────
-
-#[test]
-fn interner_json_decode_rejects_garbage_without_panicking() {
-    let inputs = [
-        "",                       // empty
-        "[",                      // truncated array
-        "[\"\\uD800\"]",         // unpaired surrogate
-        "{\"unexpected\": true}", // wrong shape
-        "[1, 2, 3]",              // wrong element type
-    ];
-    for input in inputs {
-        let res: Result<dol_expr::Interner, _> = serde_json::from_str(input);
-        assert!(
-            res.is_err(),
-            "interner JSON should reject {input:?} but accepted: {:?}",
-            res.ok()
-        );
-    }
-}
-
-// ─── Id<Tag> niche guard ─────────────────────────────────────────────────────
-
-#[test]
-fn id_tag_deserializer_rejects_zero() {
-    use dol_expr::ids::{NodeId, StrId};
-
-    // `Id<Tag>` is a `NonZeroU32` newtype — zero is the niche-reserved
-    // value and must never decode successfully, otherwise downstream
-    // `Option<Id<Tag>>` would alias `Some(<undefined>)` with `None`.
-    let res: Result<NodeId, _> = serde_json::from_str("0");
-    assert!(res.is_err(), "NodeId::deserialize(0) should fail");
-    let res: Result<StrId, _> = serde_json::from_str("0");
-    assert!(res.is_err(), "StrId::deserialize(0) should fail");
-
-    // Sanity: positive values still decode.
-    let id: NodeId = serde_json::from_str("42").unwrap();
-    assert_eq!(id.get(), 42);
+    let res = program::decode(&bytes);
+    assert!(res.is_err(), "garbage body must fail to decode");
 }

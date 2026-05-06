@@ -207,11 +207,8 @@ fn rect_round_trip() {
 
 #[test]
 fn circle_round_trip() {
-    let v = dol_core::geo::Circle::try_new(
-        dol_core::Point::try_new(5.0, 5.0).unwrap(),
-        2.5,
-    )
-    .unwrap();
+    let v =
+        dol_core::geo::Circle::try_new(dol_core::Point::try_new(5.0, 5.0).unwrap(), 2.5).unwrap();
     assert_eq!(v, rt(&v));
 }
 
@@ -225,7 +222,10 @@ fn invalid_date_is_rejected() {
     let mut reader = Reader::new(&bytes);
     let mut budget = Budget::new(Limits::host());
     let r = dol_core::Date::decode(&mut reader, &mut budget);
-    assert!(r.is_err(), "Date::decode must reject invalid calendar fields");
+    assert!(
+        r.is_err(),
+        "Date::decode must reject invalid calendar fields"
+    );
 }
 
 #[test]
@@ -273,8 +273,7 @@ fn span_table_round_trip() {
         let bytes = postcard::to_allocvec(&empty).expect("postcard encode SpanTable");
         let mut reader = Reader::new(&bytes);
         let mut budget = Budget::new(Limits::host());
-        dol_core::span::SpanTable::decode(&mut reader, &mut budget)
-            .expect("decode empty SpanTable")
+        dol_core::span::SpanTable::decode(&mut reader, &mut budget).expect("decode empty SpanTable")
     };
     assert_eq!(decoded.len(), 0);
 
@@ -286,8 +285,8 @@ fn span_table_round_trip() {
     let bytes = postcard::to_allocvec(&table).expect("postcard encode SpanTable");
     let mut reader = Reader::new(&bytes);
     let mut budget = Budget::new(Limits::host());
-    let decoded = dol_core::span::SpanTable::decode(&mut reader, &mut budget)
-        .expect("decode SpanTable");
+    let decoded =
+        dol_core::span::SpanTable::decode(&mut reader, &mut budget).expect("decode SpanTable");
     assert!(reader.is_exhausted());
     assert_eq!(decoded.len(), 3);
     assert!(decoded.get(0).is_none());
@@ -301,15 +300,21 @@ fn span_table_round_trip() {
 
 #[test]
 fn path_round_trip() {
-    let open = dol_core::geo::Path::new(false, vec![
-        dol_core::Point::try_new(0.0, 0.0).unwrap(),
-        dol_core::Point::try_new(1.0, 1.0).unwrap(),
-    ]);
-    let closed = dol_core::geo::Path::new(true, vec![
-        dol_core::Point::try_new(0.0, 0.0).unwrap(),
-        dol_core::Point::try_new(2.0, 0.0).unwrap(),
-        dol_core::Point::try_new(1.0, 1.0).unwrap(),
-    ]);
+    let open = dol_core::geo::Path::new(
+        false,
+        vec![
+            dol_core::Point::try_new(0.0, 0.0).unwrap(),
+            dol_core::Point::try_new(1.0, 1.0).unwrap(),
+        ],
+    );
+    let closed = dol_core::geo::Path::new(
+        true,
+        vec![
+            dol_core::Point::try_new(0.0, 0.0).unwrap(),
+            dol_core::Point::try_new(2.0, 0.0).unwrap(),
+            dol_core::Point::try_new(1.0, 1.0).unwrap(),
+        ],
+    );
     assert_eq!(open, rt(&open));
     assert_eq!(closed, rt(&closed));
 }
@@ -394,11 +399,23 @@ mod data_type_roundtrip {
     #[test]
     fn primitives_round_trip() {
         for v in [
-            DataType::Null, DataType::Bool,
-            DataType::Int8, DataType::Int16, DataType::Int32, DataType::Int64, DataType::Int128,
-            DataType::UInt8, DataType::UInt16, DataType::UInt32, DataType::UInt64, DataType::UInt128,
-            DataType::Float32, DataType::Float64,
-            DataType::Json, DataType::Xml, DataType::Uuid,
+            DataType::Null,
+            DataType::Bool,
+            DataType::Int8,
+            DataType::Int16,
+            DataType::Int32,
+            DataType::Int64,
+            DataType::Int128,
+            DataType::UInt8,
+            DataType::UInt16,
+            DataType::UInt32,
+            DataType::UInt64,
+            DataType::UInt128,
+            DataType::Float32,
+            DataType::Float64,
+            DataType::Json,
+            DataType::Xml,
+            DataType::Uuid,
         ] {
             assert_eq!(v, rt_dt(&v));
         }
@@ -407,11 +424,26 @@ mod data_type_roundtrip {
     #[test]
     fn string_with_options_round_trip() {
         let cases = [
-            DataType::String { max_len: None, fixed: false },
-            DataType::String { max_len: Some(255), fixed: true },
-            DataType::Bytes { max_len: None, fixed: false },
-            DataType::Bytes { max_len: Some(1024), fixed: false },
-            DataType::BitString { max_len: Some(8), fixed: true },
+            DataType::String {
+                max_len: None,
+                fixed: false,
+            },
+            DataType::String {
+                max_len: Some(255),
+                fixed: true,
+            },
+            DataType::Bytes {
+                max_len: None,
+                fixed: false,
+            },
+            DataType::Bytes {
+                max_len: Some(1024),
+                fixed: false,
+            },
+            DataType::BitString {
+                max_len: Some(8),
+                fixed: true,
+            },
         ];
         for v in &cases {
             assert_eq!(v, &rt_dt(v));
@@ -422,9 +454,14 @@ mod data_type_roundtrip {
     fn composite_round_trip() {
         let dt = DataType::Array(Box::new(DataType::Int32));
         assert_eq!(dt, rt_dt(&dt));
-        let dt = DataType::Set(Box::new(DataType::String { max_len: None, fixed: false }));
+        let dt = DataType::Set(Box::new(DataType::String {
+            max_len: None,
+            fixed: false,
+        }));
         assert_eq!(dt, rt_dt(&dt));
-        let dt = DataType::Map { value: Box::new(DataType::Bool) };
+        let dt = DataType::Map {
+            value: Box::new(DataType::Bool),
+        };
         assert_eq!(dt, rt_dt(&dt));
         let dt = DataType::Tuple(vec![DataType::Int32, DataType::Bool]);
         assert_eq!(dt, rt_dt(&dt));
@@ -434,15 +471,18 @@ mod data_type_roundtrip {
     fn struct_and_enum_round_trip() {
         let dt = DataType::Struct(vec![
             dol_core::StructField::new("id", DataType::Int64, false),
-            dol_core::StructField::new("name", DataType::String { max_len: Some(100), fixed: false }, true),
+            dol_core::StructField::new(
+                "name",
+                DataType::String {
+                    max_len: Some(100),
+                    fixed: false,
+                },
+                true,
+            ),
         ]);
         assert_eq!(dt, rt_dt(&dt));
 
-        let dt = DataType::Enum(vec![
-            Box::from("Foo"),
-            Box::from("Bar"),
-            Box::from("Baz"),
-        ]);
+        let dt = DataType::Enum(vec![Box::from("Foo"), Box::from("Bar"), Box::from("Baz")]);
         assert_eq!(dt, rt_dt(&dt));
     }
 
@@ -460,9 +500,15 @@ mod data_type_roundtrip {
     #[cfg(feature = "numeric")]
     #[test]
     fn decimal_type_round_trip() {
-        let dt = DataType::Decimal { precision: Some(10), scale: Some(2) };
+        let dt = DataType::Decimal {
+            precision: Some(10),
+            scale: Some(2),
+        };
         assert_eq!(dt, rt_dt(&dt));
-        let dt = DataType::Decimal { precision: None, scale: None };
+        let dt = DataType::Decimal {
+            precision: None,
+            scale: None,
+        };
         assert_eq!(dt, rt_dt(&dt));
     }
 
@@ -470,8 +516,13 @@ mod data_type_roundtrip {
     #[test]
     fn geo_types_round_trip() {
         for v in [
-            DataType::Point, DataType::Line, DataType::LineSegment,
-            DataType::Rect, DataType::Circle, DataType::Path, DataType::Polygon,
+            DataType::Point,
+            DataType::Line,
+            DataType::LineSegment,
+            DataType::Rect,
+            DataType::Circle,
+            DataType::Path,
+            DataType::Polygon,
         ] {
             assert_eq!(v, rt_dt(&v));
         }
@@ -567,7 +618,7 @@ mod value_roundtrip {
         assert_eq!(arr, rt_val(&arr));
 
         let map = Value::Map(Box::from(
-            [(Box::from("key"), Value::Bool(true))].as_slice()
+            [(Box::from("key"), Value::Bool(true))].as_slice(),
         ));
         assert_eq!(map, rt_val(&map));
 
@@ -580,7 +631,10 @@ mod value_roundtrip {
 
     #[test]
     fn extension_value_round_trip() {
-        let ext = Value::Extension(Box::new((Box::from("myvec"), Box::from([1u8, 2, 3].as_slice()))));
+        let ext = Value::Extension(Box::new((
+            Box::from("myvec"),
+            Box::from([1u8, 2, 3].as_slice()),
+        )));
         assert_eq!(ext, rt_val(&ext));
     }
 
@@ -598,9 +652,10 @@ mod value_roundtrip {
     fn geo_values_round_trip() {
         let v = Value::Point(dol_core::Point::try_new(1.0, 2.0).unwrap());
         assert_eq!(v, rt_val(&v));
-        let v = Value::Path(Box::new(dol_core::geo::Path::new(false, vec![
-            dol_core::Point::try_new(0.0, 0.0).unwrap(),
-        ])));
+        let v = Value::Path(Box::new(dol_core::geo::Path::new(
+            false,
+            vec![dol_core::Point::try_new(0.0, 0.0).unwrap()],
+        )));
         assert_eq!(v, rt_val(&v));
     }
 }
@@ -666,9 +721,7 @@ mod literal_roundtrip {
     #[test]
     fn composite_literals_round_trip() {
         use std::borrow::Cow;
-        let arr = Literal::Array(Box::from(
-            [Literal::Int32(1), Literal::Int32(2)].as_slice(),
-        ));
+        let arr = Literal::Array(Box::from([Literal::Int32(1), Literal::Int32(2)].as_slice()));
         assert_eq!(arr, rt_lit(&arr));
 
         let map = Literal::Map(Box::from(

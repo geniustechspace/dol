@@ -6,7 +6,7 @@ pub const MAGIC: [u8; 4] = *b"DOL\0";
 /// Major.minor schema version. Additive changes bump `minor`; renames or
 /// removals bump `major` and require a migration shim in this crate.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct WireSchemaVersion {
     /// Breaking changes.
     pub major: u16,

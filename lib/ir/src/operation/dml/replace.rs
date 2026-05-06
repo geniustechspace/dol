@@ -10,7 +10,7 @@ use crate::target::Target;
 /// Body of a `Replace`. The variants mirror [`InsertSource`](super::insert::InsertSource)
 /// but `Replace` semantics are *full overwrite*.
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum ReplaceBody {
     /// Arena expression producing the replacement document/row.
     FromExpr(NodeId),
@@ -45,7 +45,7 @@ pub enum ReplaceBody {
 /// assert_eq!(op.kind(), dol_ir::OpKind::Replace);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Replace {
     /// Target to replace.
     pub target: Target,

@@ -17,11 +17,20 @@
 //! | feature | default | effect                                                                  |
 //! | ------- | :-----: | ----------------------------------------------------------------------- |
 //! | `std`   |         | Forwards `std` to `dol-core`. Disable for `no_std + alloc` (default).  |
-//! | `serde` |    ✓    | `Serialize` / `Deserialize` for every schema type.                      |
+//! | `serde` |    ✓    | `Serialize` for every schema type. v2 wire-in goes through `dol-wire::Decode`. |
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing, clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::arithmetic_side_effects
+    )
+)]
 
 extern crate alloc;
 
@@ -59,7 +68,7 @@ use constraint::EntityConstraint as Constraint;
 /// ]);
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Entity {
     pub name: Arc<str>,
     pub namespace: Option<Arc<str>>,

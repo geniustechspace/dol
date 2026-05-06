@@ -103,8 +103,7 @@ mod datetime_impls {
     impl Decode for dol_core::Offset {
         fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
             let seconds = budget.descend(|b| i32::decode(reader, b))??;
-            Self::try_from_seconds(seconds)
-                .map_err(|_| DecodeError::Custom("Offset: out of range"))
+            Self::try_from_seconds(seconds).map_err(|_| DecodeError::Custom("Offset: out of range"))
         }
     }
 
@@ -154,8 +153,7 @@ mod geo_impls {
             let x = budget.descend(|b| f64::decode(reader, b))??;
             let y = budget.descend(|b| f64::decode(reader, b))??;
             // `try_new` rejects NaN / ±∞; do the same for wire input.
-            Self::try_new(x, y)
-                .map_err(|_| DecodeError::Custom("Point: non-finite coordinate"))
+            Self::try_new(x, y).map_err(|_| DecodeError::Custom("Point: non-finite coordinate"))
         }
     }
 
@@ -164,8 +162,7 @@ mod geo_impls {
             let a = budget.descend(|b| f64::decode(reader, b))??;
             let b = budget.descend(|bg| f64::decode(reader, bg))??;
             let c = budget.descend(|b| f64::decode(reader, b))??;
-            Self::try_new(a, b, c)
-                .map_err(|_| DecodeError::Custom("Line: non-finite coefficient"))
+            Self::try_new(a, b, c).map_err(|_| DecodeError::Custom("Line: non-finite coefficient"))
         }
     }
 
@@ -446,7 +443,9 @@ mod data_type_impls {
                 }
                 DT_MAP => {
                     let value = budget.descend(|b| DataType::decode(reader, b))??;
-                    Ok(DataType::Map { value: Box::new(value) })
+                    Ok(DataType::Map {
+                        value: Box::new(value),
+                    })
                 }
                 DT_RANGE => {
                     let inner = budget.descend(|b| DataType::decode(reader, b))??;
@@ -471,8 +470,7 @@ mod data_type_impls {
                 }
                 DT_EXTENSION => {
                     let name = budget.descend(|b| Box::<str>::decode(reader, b))??;
-                    let params =
-                        budget.descend(|b| Vec::<DataType>::decode(reader, b))??;
+                    let params = budget.descend(|b| Vec::<DataType>::decode(reader, b))??;
                     Ok(DataType::Extension { name, params })
                 }
                 #[cfg(feature = "numeric")]
@@ -741,8 +739,7 @@ mod value_impls {
                     Ok(Value::Struct(pairs))
                 }
                 V_RANGE => {
-                    let range =
-                        budget.descend(|b| dol_core::ValueRange::decode(reader, b))??;
+                    let range = budget.descend(|b| dol_core::ValueRange::decode(reader, b))??;
                     Ok(Value::Range(Box::new(range)))
                 }
                 V_EXTENSION => {
@@ -782,8 +779,7 @@ mod value_impls {
                 }
                 #[cfg(feature = "datetime")]
                 V_TIMESTAMPTZ => {
-                    let ts =
-                        budget.descend(|b| dol_core::TimestampTz::decode(reader, b))??;
+                    let ts = budget.descend(|b| dol_core::TimestampTz::decode(reader, b))??;
                     Ok(Value::TimestampTz(Box::new(ts)))
                 }
                 #[cfg(feature = "datetime")]
@@ -803,8 +799,7 @@ mod value_impls {
                 }
                 #[cfg(feature = "geo")]
                 V_SEGMENT => {
-                    let s =
-                        budget.descend(|b| dol_core::geo::Segment::decode(reader, b))??;
+                    let s = budget.descend(|b| dol_core::geo::Segment::decode(reader, b))??;
                     Ok(Value::Segment(Box::new(s)))
                 }
                 #[cfg(feature = "geo")]
@@ -814,20 +809,17 @@ mod value_impls {
                 }
                 #[cfg(feature = "geo")]
                 V_CIRCLE => {
-                    let c =
-                        budget.descend(|b| dol_core::geo::Circle::decode(reader, b))??;
+                    let c = budget.descend(|b| dol_core::geo::Circle::decode(reader, b))??;
                     Ok(Value::Circle(Box::new(c)))
                 }
                 #[cfg(feature = "geo")]
                 V_PATH => {
-                    let path =
-                        budget.descend(|b| dol_core::geo::Path::decode(reader, b))??;
+                    let path = budget.descend(|b| dol_core::geo::Path::decode(reader, b))??;
                     Ok(Value::Path(Box::new(path)))
                 }
                 #[cfg(feature = "geo")]
                 V_POLYGON => {
-                    let poly =
-                        budget.descend(|b| dol_core::geo::Polygon::decode(reader, b))??;
+                    let poly = budget.descend(|b| dol_core::geo::Polygon::decode(reader, b))??;
                     Ok(Value::Polygon(Box::new(poly)))
                 }
                 _ => Err(DecodeError::InvalidVariant {
@@ -1039,8 +1031,7 @@ mod literal_impls {
                     Ok(Literal::Struct(pairs))
                 }
                 L_RANGE => {
-                    let r = budget
-                        .descend(|b| LiteralRange::<'static>::decode(reader, b))??;
+                    let r = budget.descend(|b| LiteralRange::<'static>::decode(reader, b))??;
                     Ok(Literal::Range(Box::new(r)))
                 }
                 L_EXTENSION => {
@@ -1080,8 +1071,7 @@ mod literal_impls {
                 }
                 #[cfg(feature = "datetime")]
                 L_TIMESTAMPTZ => {
-                    let ts =
-                        budget.descend(|b| dol_core::TimestampTz::decode(reader, b))??;
+                    let ts = budget.descend(|b| dol_core::TimestampTz::decode(reader, b))??;
                     Ok(Literal::TimestampTz(Box::new(ts)))
                 }
                 #[cfg(feature = "datetime")]
@@ -1101,8 +1091,7 @@ mod literal_impls {
                 }
                 #[cfg(feature = "geo")]
                 L_SEGMENT => {
-                    let s =
-                        budget.descend(|b| dol_core::geo::Segment::decode(reader, b))??;
+                    let s = budget.descend(|b| dol_core::geo::Segment::decode(reader, b))??;
                     Ok(Literal::Segment(Box::new(s)))
                 }
                 #[cfg(feature = "geo")]
@@ -1112,20 +1101,17 @@ mod literal_impls {
                 }
                 #[cfg(feature = "geo")]
                 L_CIRCLE => {
-                    let c =
-                        budget.descend(|b| dol_core::geo::Circle::decode(reader, b))??;
+                    let c = budget.descend(|b| dol_core::geo::Circle::decode(reader, b))??;
                     Ok(Literal::Circle(Box::new(c)))
                 }
                 #[cfg(feature = "geo")]
                 L_PATH => {
-                    let path =
-                        budget.descend(|b| dol_core::geo::Path::decode(reader, b))??;
+                    let path = budget.descend(|b| dol_core::geo::Path::decode(reader, b))??;
                     Ok(Literal::Path(Box::new(path)))
                 }
                 #[cfg(feature = "geo")]
                 L_POLYGON => {
-                    let poly =
-                        budget.descend(|b| dol_core::geo::Polygon::decode(reader, b))??;
+                    let poly = budget.descend(|b| dol_core::geo::Polygon::decode(reader, b))??;
                     Ok(Literal::Polygon(Box::new(poly)))
                 }
                 _ => Err(DecodeError::InvalidVariant {

@@ -4,6 +4,7 @@ extern crate alloc;
 
 use dol_core::policy::Budget;
 use dol_expr::ids::NodeId;
+use dol_ir::Program;
 use dol_ir::operation::acl::{
     AuditEvent, AuditOp, AuditSink, Grant, MaskOp, PolicyOp, PolicyScope, QuotaKind, QuotaOp,
     Revoke,
@@ -23,7 +24,6 @@ use dol_ir::privilege::Privilege;
 use dol_ir::schema_catalog::{CatalogEntry, SchemaCatalog, TypeEntry};
 use dol_ir::schema_ref::{CatalogId, SchemaId, SchemaRef};
 use dol_ir::target::{Locator, SchemaBinding, Symbol, Target, TargetKind};
-use dol_ir::Program;
 use dol_schema::constraint::{ComputedKind, EntityConstraint, RefAction, RelationRef};
 use dol_schema::{Entity, Field};
 
@@ -174,7 +174,10 @@ impl Encode for TypeBody {
 impl Encode for SchemaBody {
     fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
         match self {
-            SchemaBody::Entity { schema, if_not_exists } => {
+            SchemaBody::Entity {
+                schema,
+                if_not_exists,
+            } => {
                 w.write_varint_u32(0)?;
                 b.descend(|b| schema.encode(w, b))??;
                 b.descend(|b| if_not_exists.encode(w, b))??;
@@ -825,7 +828,12 @@ impl Encode for EntityConstraint {
                 w.write_varint_u32(0)?;
                 b.descend(|b| encode_slice(fields.as_slice(), w, b))??;
             }
-            EntityConstraint::Relation { fields, ref_entity, ref_fields, on_delete } => {
+            EntityConstraint::Relation {
+                fields,
+                ref_entity,
+                ref_fields,
+                on_delete,
+            } => {
                 w.write_varint_u32(1)?;
                 b.descend(|b| encode_slice(fields.as_slice(), w, b))??;
                 b.descend(|b| ref_entity.encode(w, b))??;

@@ -5,7 +5,7 @@ use crate::target::{Symbol, Target};
 
 /// What facet of usage is constrained.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum QuotaKind {
     /// Maximum bytes stored.
     Storage,
@@ -42,7 +42,7 @@ pub enum QuotaKind {
 /// assert_eq!(op.kind(), dol_ir::OpKind::Quota);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct QuotaOp {
     /// `Create` / `Drop` / `Alter`.
     pub verb: StructuralVerb,

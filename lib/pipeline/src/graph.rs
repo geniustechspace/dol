@@ -7,7 +7,7 @@ use crate::node::Node;
 /// Index of a node within a [`Graph`].
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct NodeIdx(pub u32);
 
 /// A directed pipeline graph.
@@ -18,7 +18,7 @@ pub struct NodeIdx(pub u32);
 /// detected by `dol-check` rather than refused at the data-structure layer
 /// (so partially-built graphs can be inspected).
 #[derive(Debug, Clone, Default, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Graph {
     /// Nodes in topological-friendly insertion order.
     pub nodes: alloc::vec::Vec<Node>,

@@ -55,7 +55,7 @@ macro_rules! impl_payload {
     ($payload:ident, $inner:path, $field:ident, $sym_const:ident, $doc:expr) => {
         #[doc = $doc]
         #[derive(Clone, Debug, PartialEq)]
-        #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+        #[cfg_attr(feature = "serde", derive(serde::Serialize))]
         pub struct $payload {
             /// Wrapped extension body.
             pub $field: $inner,
@@ -85,16 +85,17 @@ macro_rules! impl_payload {
             }
 
             fn decode(bytes: &[u8]) -> Result<Self, &'static str> {
-                #[cfg(feature = "serde")]
-                {
-                    postcard::from_bytes(bytes)
-                        .map_err(|_| concat!(stringify!($payload), " decode failed"))
-                }
-                #[cfg(not(feature = "serde"))]
-                {
-                    let _ = bytes;
-                    Err("dol-stream serde feature not enabled")
-                }
+                // v2: in-memory IR/AST types (including extension
+                // payloads) no longer implement `serde::Deserialize`.
+                // The replacement is a budget-threaded
+                // `dol-wire::Decode` impl, which has not yet landed for
+                // these payloads. Until it does, decode is explicitly
+                // unsupported.
+                let _ = bytes;
+                Err(concat!(
+                    stringify!($payload),
+                    " decode: v2 wire-in via dol-wire::Decode not yet implemented"
+                ))
             }
         }
 

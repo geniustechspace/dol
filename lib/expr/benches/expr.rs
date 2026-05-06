@@ -12,6 +12,13 @@
 //!    a regression is visible alongside the gate.
 
 #![cfg(feature = "serde")]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects
+)]
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use dol_expr::Interner;
@@ -62,7 +69,6 @@ fn intern_json_round_trip(c: &mut Criterion) {
     for n in 0..256 {
         original.intern(&format!("ident_{n}"));
     }
-    let json = serde_json::to_string(&original).unwrap();
 
     c.bench_function("interner/json_serialize_256", |b| {
         b.iter(|| {
@@ -71,12 +77,10 @@ fn intern_json_round_trip(c: &mut Criterion) {
         });
     });
 
-    c.bench_function("interner/json_deserialize_256", |b| {
-        b.iter(|| {
-            let i: Interner = serde_json::from_str(&json).unwrap();
-            std::hint::black_box(i)
-        });
-    });
+    // The JSON-deserialise bench was removed in 0.2.0 along with the
+    // `Deserialize` impl on `Interner`: v2 wire-in goes through
+    // `dol-wire::Decode` exclusively. The corresponding decode-throughput
+    // bench lives in `dol-wire`.
 }
 
 /// Lower an `AND`-chain of growing depth. This exercises both the
@@ -169,8 +173,7 @@ fn traverse_arena(c: &mut Criterion) {
             // cannot constant-fold away.
             let mut count = 0u32;
             for i in 0..arena.len() {
-                let id = dol_expr::ids::NodeId::from_index(i)
-                    .expect("arena index fits in NodeId");
+                let id = dol_expr::ids::NodeId::from_index(i).expect("arena index fits in NodeId");
                 if matches!(arena.get(id), ExprNode::BinOp { .. }) {
                     count += 1;
                 }

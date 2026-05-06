@@ -6,8 +6,17 @@
 //!
 //! - dispatch (`Operation::kind()` / `category()`) is correct,
 //! - `required_capabilities()` agrees with the documented mapping,
-//! - the operation round-trips through serde JSON when the `serde` feature
-//!   is enabled.
+//! - the operation `Serialize`s to a non-empty JSON payload when the
+//!   `serde` feature is enabled (v2: in-memory IR types are
+//!   `Serialize`-only; wire round-trip is via `dol-wire::Decode`).
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects
+)]
 
 use dol_expr::ids::NodeId;
 use dol_ir::operation::{
@@ -321,13 +330,13 @@ fn acl_audit_create_emits_audit_kind() {
 
 #[cfg(feature = "serde")]
 #[test]
-fn serde_round_trip_for_acl_and_governance() {
+fn serialize_acl_and_governance() {
     use dol_ir::operation::{
         AuditEvent, AuditOp, AuditSink, Grant, MaskOp, PolicyOp, PolicyScope, QuotaKind, QuotaOp,
         Revoke, StructuralVerb,
     };
     use dol_ir::privilege::Privilege;
-    use serde_json::{from_str, to_string};
+    use serde_json::to_string;
     use smallvec::smallvec;
 
     let ops: Vec<Operation> = vec![
@@ -386,15 +395,13 @@ fn serde_round_trip_for_acl_and_governance() {
         }
         .into(),
     ];
+    // v2: in-memory IR types are `Serialize`-only (no `Deserialize`).
+    // Round-trip is exercised at the wire layer via `dol-wire::Decode`;
+    // here we just verify that every ACL / governance operation
+    // produces a non-empty JSON payload without panicking.
     for op in &ops {
         let s = to_string(op).expect("encode");
-        let back: Operation = from_str(&s).expect("decode");
-        assert_eq!(
-            op.kind(),
-            back.kind(),
-            "kind mismatch round-tripping {op:?}"
-        );
-        assert_eq!(op, &back, "value mismatch round-tripping {op:?}");
+        assert!(!s.is_empty(), "empty serialisation for {op:?}");
     }
 }
 
@@ -413,12 +420,12 @@ fn operation_is_send_sync_static() {
     assert_send_sync_static::<Operation>();
 }
 
-// ── Serde round-trips ─────────────────────────────────────────────────────
+// ── Serialize-only output checks ──────────────────────────────────────────
 
 #[cfg(feature = "serde")]
 #[test]
-fn serde_round_trip_for_each_category() {
-    use serde_json::{from_str, to_string};
+fn serialize_each_category() {
+    use serde_json::to_string;
 
     let ops: Vec<Operation> = vec![
         SchemaOp::create_entity(t(TargetKind::Relation), SchemaRef::default(), false).into(),
@@ -446,14 +453,10 @@ fn serde_round_trip_for_each_category() {
         }
         .into(),
     ];
+    // v2: `Operation` is `Serialize`-only. Wire round-trip is via
+    // `dol-wire::Decode`; here we just check JSON output integrity.
     for op in &ops {
         let s = to_string(op).expect("encode");
-        let back: Operation = from_str(&s).expect("decode");
-        assert_eq!(op.kind(), back.kind());
-        assert_eq!(op.category(), back.category());
-        assert_eq!(
-            op.primary_target().map(|t| &t.kind),
-            back.primary_target().map(|t| &t.kind)
-        );
+        assert!(!s.is_empty(), "empty serialisation for {op:?}");
     }
 }

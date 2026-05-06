@@ -10,7 +10,7 @@
 /// Used by capability tags and diagnostics that only need to distinguish
 /// "this is a write" from "this is a read" or "this is access-control".
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[allow(clippy::upper_case_acronyms)]
 pub enum Category {
     /// Structural / management (`Schema`, `Field`, `Index`, `Lookup`).
@@ -33,7 +33,7 @@ pub enum Category {
 ///
 /// One variant per outer enum variant. Cheap to copy; cheap to match.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum OpKind {
     /// `Operation::Schema` — entity-level structural change.
     Schema,

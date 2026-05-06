@@ -43,7 +43,7 @@ use crate::target::Symbol;
 /// [`RAW_PASSTHROUGH`](crate::capabilities::CapabilityTag::RAW_PASSTHROUGH)
 /// capability requirement.
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct RawOp {
     /// Optional dialect tag (`postgres`, `mongo`, `redis`, …).
     pub dialect: Option<Symbol>,

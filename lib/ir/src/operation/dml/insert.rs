@@ -10,7 +10,7 @@ use crate::target::{Symbol, Target};
 
 /// Where the inserted payload comes from.
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum InsertSource {
     /// Tabular insert body — `NodeId` points to an arena
     /// [`ExprNode::Insert`](dol_expr::expr::ExprNode::Insert) carrying
@@ -52,7 +52,7 @@ pub enum InsertSource {
 /// assert_eq!(op.kind(), dol_ir::OpKind::Insert);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Insert {
     /// Target to insert into.
     pub target: Target,

@@ -42,7 +42,7 @@ const fn fnv1a_32(bytes: &[u8]) -> u32 {
 
 /// Typed pipeline payload — a [`Graph`] embedded in an `Operation::Extension`.
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PipelinePayload {
     /// The wrapped pipeline graph.
     pub graph: Graph,
@@ -74,15 +74,14 @@ impl ExtensionPayload for PipelinePayload {
     }
 
     fn decode(bytes: &[u8]) -> Result<Self, &'static str> {
-        #[cfg(feature = "serde")]
-        {
-            postcard::from_bytes(bytes).map_err(|_| "PipelinePayload decode failed")
-        }
-        #[cfg(not(feature = "serde"))]
-        {
-            let _ = bytes;
-            Err("dol-pipeline serde feature not enabled")
-        }
+        // v2: in-memory IR/AST types (including this payload) no longer
+        // implement `serde::Deserialize`. The replacement is a
+        // budget-threaded `dol-wire::Decode` impl, which has not yet
+        // landed for `PipelinePayload`. Until it does, decode is
+        // explicitly unsupported (callers must construct the payload
+        // from its typed fields and use `from_payload` to encode).
+        let _ = bytes;
+        Err("PipelinePayload decode: v2 wire-in via dol-wire::Decode not yet implemented")
     }
 }
 

@@ -22,7 +22,7 @@ use super::compact_name::CompactName;
 /// let r = PathExpr::one("profile").push("address");
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PathExpr {
     pub segments: SmallVec<[CompactName; 3]>,
 }

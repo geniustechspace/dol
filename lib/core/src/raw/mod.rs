@@ -36,4 +36,3 @@
 //! the wire layer grows; when the first such type lands the surrounding
 //! crate's lint level is downgraded from `forbid` to `deny` and this
 //! module gets a scoped `#![allow(unsafe_code)]`.
-

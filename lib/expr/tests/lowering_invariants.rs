@@ -6,6 +6,14 @@
 //! in `dol-ir` and downstream backends, by isolating regressions to the
 //! specific lowering rule that fired.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects
+)]
+
 use dol_expr::lower::lower_expr;
 use dol_expr::tree::{field, int, namespace, param, string};
 use dol_expr::{ExprArena, ExprNode, Interner};

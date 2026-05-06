@@ -3,7 +3,7 @@ use core::fmt;
 
 /// An infinite 2D line defined by `ax + by + c = 0`.
 #[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Line {
     pub a: f64,
     pub b: f64,
@@ -31,7 +31,7 @@ impl fmt::Display for Line {
 
 /// A finite 2D line segment defined by two endpoints.
 #[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Segment {
     pub start: Point,
     pub end: Point,

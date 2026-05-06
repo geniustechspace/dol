@@ -10,7 +10,7 @@ use core::fmt;
 /// Scale is bounded to [`Decimal::MAX_SCALE`] (38), matching the maximum
 /// precision of SQL `NUMERIC` and most fixed-point decimal standards.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Decimal {
     pub unscaled: i128,
     pub scale: u32,

@@ -7,7 +7,7 @@ use super::order::OrderByExpr;
 
 /// Window frame bound for ROWS/RANGE BETWEEN.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum FrameBound {
     UnboundedPreceding,
     Preceding(u32),
@@ -18,7 +18,7 @@ pub enum FrameBound {
 
 /// A window frame specification: `ROWS/RANGE BETWEEN start AND end`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct WindowFrame {
     pub kind: FrameKind,
     pub start: FrameBound,
@@ -27,7 +27,7 @@ pub struct WindowFrame {
 
 /// Frame kind for window specifications.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum FrameKind {
     Rows,
     Range,

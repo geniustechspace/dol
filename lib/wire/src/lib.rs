@@ -19,17 +19,27 @@
 //! crate exposes typed helpers in [`mod@program`] that target
 //! [`dol_ir::Program`] directly:
 //!
-//! - [`program::encode_postcard`] / [`program::decode_postcard`]
-//! - [`program::encode_json`] / [`program::decode_json`]
+//! - [`program::encode_postcard`] — postcard encode with wire envelope.
+//! - [`program::encode_json`] — JSON encode with wire envelope.
+//! - [`program::decode`] — validating, budget-threaded postcard decode
+//!   (drives [`Decode`] internally; no `serde::Deserialize` involvement).
 //! - [`program::content_hash`] — canonical BLAKE3 of the postcard body.
 //!
-//! The lower-level, payload-agnostic helpers in
-//! [`mod@postcard`] and [`mod@json`] remain available for callers that
-//! want to encode their own `Serialize` payloads behind the same envelope.
+//! v2 invariant: only encode helpers are `serde::Serialize`-based.
+//! Decode is exclusively [`Decode`]-based.
 
 #![forbid(unsafe_code)]
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing, clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::arithmetic_side_effects
+    )
+)]
 #![warn(missing_docs)]
 
 extern crate alloc;
@@ -44,10 +54,10 @@ pub mod encoder;
 pub use encoder::{Encode, EncodeError, Writer, encode_to_vec};
 
 mod decode_core;
-mod encode_core;
 mod decode_expr;
-mod encode_expr;
 mod decode_ir;
+mod encode_core;
+mod encode_expr;
 mod encode_ir;
 
 #[cfg(feature = "hash")]

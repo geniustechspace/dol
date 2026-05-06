@@ -52,7 +52,7 @@
 //! | feature    | default | effect                                                                                                |
 //! | ---------- | :-----: | ----------------------------------------------------------------------------------------------------- |
 //! | `std`      |   ✓     | Enables wall-clock factory helpers (implies `datetime`).                                              |
-//! | `serde`    |   ✓     | `Serialize` / `Deserialize` for every public type, including [`Span`] and [`Diagnostic`].             |
+//! | `serde`    |   ✓     | `Serialize` for every public type, including [`Span`] and [`Diagnostic`]. v2 wire-in goes through [`dol_wire::Decode`] — no `Deserialize` impls. |
 //! | `geo`      |   ✓     | The `geo` module + `Value`/`Literal`/`DataType`/`TypeError` variants for geometric types.             |
 //! | `network`  |   ✓     | The `network` module + `Inet`/`MacAddr` variants on `Value`/`Literal`/`DataType`.                     |
 //! | `datetime` |   ✓     | The `datetime` module + `Date`/`Time`/`DateTime`/`TimestampTz`/`Interval` variants.                   |
@@ -71,7 +71,16 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing, clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::arithmetic_side_effects
+    )
+)]
 #![warn(missing_docs)]
 // TODO(docs): chip away at the missing-docs allowlist below. Each entry
 // represents a module whose public API surface still needs rustdoc coverage.

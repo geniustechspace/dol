@@ -3,7 +3,7 @@ use core::fmt;
 
 /// Naive datetime: date + time, no timezone.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct DateTime {
     pub date: Date,
     pub time: Time,

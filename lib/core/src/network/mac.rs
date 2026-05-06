@@ -74,7 +74,7 @@ impl core::error::Error for ParseMacAddrError {}
 /// [0, 26, 43, 60, 77, 94, 111, 128]
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
 pub enum MacAddr {
     Eui48([u8; 6]),
@@ -236,8 +236,8 @@ impl TryFrom<alloc::boxed::Box<str>> for MacAddr {
 
 #[cfg(test)]
 mod tests {
-    use crate::alloc::string::ToString;
     use super::{MacAddr, ParseMacAddrError};
+    use crate::alloc::string::ToString;
 
     #[test]
     fn display_eui48() {

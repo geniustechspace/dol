@@ -14,14 +14,23 @@
 //! | feature | default | effect                                                                          |
 //! | ------- | :-----: | ------------------------------------------------------------------------------- |
 //! | `std`   |         | Forwards `std` to `dol-core`. Disable for `no_std + alloc` targets (default).  |
-//! | `serde` |         | `Serialize` / `Deserialize` for every AST/arena type and `Interner`.            |
+//! | `serde` |         | `Serialize` for every AST/arena type and `Interner`. v2 wire-in goes through `dol-wire::Decode`. |
 //!
 //! Building with the default feature set already produces a `no_std + alloc`
 //! library suitable for embedded targets.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing, clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::arithmetic_side_effects
+    )
+)]
 #![warn(missing_docs)]
 
 extern crate alloc;

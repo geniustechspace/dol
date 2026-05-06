@@ -3,7 +3,7 @@ use core::fmt;
 
 /// A fixed UTC offset in whole seconds. Valid range: `−86_399..=86_399`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Offset(i32);
 
 impl Offset {
@@ -41,7 +41,7 @@ impl fmt::Display for Offset {
 
 /// Datetime with a fixed UTC offset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TimestampTz {
     pub datetime: DateTime,
     pub offset: Offset,

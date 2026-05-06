@@ -11,7 +11,7 @@ use core::fmt;
 /// binary protocol flags. The byte buffer always satisfies
 /// `bytes.len() == len.div_ceil(8)`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct BitString {
     /// Bit count.
     pub len: u32,

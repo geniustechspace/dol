@@ -416,7 +416,10 @@ where
     A::Item: Encode,
 {
     fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
-        let len: u32 = self.len().try_into().map_err(|_| EncodeError::LengthOverflow)?;
+        let len: u32 = self
+            .len()
+            .try_into()
+            .map_err(|_| EncodeError::LengthOverflow)?;
         w.write_varint_u32(len)?;
         for item in self.as_slice() {
             b.descend(|b| item.encode(w, b))??;
@@ -454,7 +457,10 @@ pub fn encode_slice<T: Encode>(
     w: &mut Writer<'_>,
     b: &mut Budget,
 ) -> Result<(), EncodeError> {
-    let len: u32 = slice.len().try_into().map_err(|_| EncodeError::LengthOverflow)?;
+    let len: u32 = slice
+        .len()
+        .try_into()
+        .map_err(|_| EncodeError::LengthOverflow)?;
     w.write_varint_u32(len)?;
     for item in slice {
         b.descend(|b| item.encode(w, b))??;
@@ -534,10 +540,7 @@ mod tests {
 
         let mut r = Reader::new(&bytes);
         let mut b2 = fuzz_budget();
-        let dec_label = b2
-            .descend(|b| String::decode(&mut r, b))
-            .unwrap()
-            .unwrap();
+        let dec_label = b2.descend(|b| String::decode(&mut r, b)).unwrap().unwrap();
         let dec_count = b2
             .descend(|b| Option::<u32>::decode(&mut r, b))
             .unwrap()

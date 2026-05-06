@@ -8,6 +8,7 @@ use alloc::vec::Vec;
 
 use dol_core::policy::Budget;
 use dol_expr::ids::NodeId;
+use dol_ir::Program;
 use dol_ir::operation::acl::{
     AuditEvent, AuditOp, AuditSink, Grant, MaskOp, PolicyOp, PolicyScope, QuotaKind, QuotaOp,
     Revoke,
@@ -27,7 +28,6 @@ use dol_ir::privilege::Privilege;
 use dol_ir::schema_catalog::{CatalogEntry, SchemaCatalog, TypeEntry};
 use dol_ir::schema_ref::{CatalogId, SchemaId, SchemaRef};
 use dol_ir::target::{Locator, SchemaBinding, Symbol, Target, TargetKind};
-use dol_ir::Program;
 use dol_schema::constraint::{ComputedKind, EntityConstraint, RefAction, RelationRef};
 use dol_schema::{Entity, Field};
 
@@ -71,7 +71,11 @@ impl Decode for Locator {
         let namespace = budget.descend(|b| Option::<Symbol>::decode(reader, b))??;
         let name = budget.descend(|b| Symbol::decode(reader, b))??;
         let path = budget.descend(|b| smallvec::SmallVec::<[Symbol; 2]>::decode(reader, b))??;
-        Ok(Locator { namespace, name, path })
+        Ok(Locator {
+            namespace,
+            name,
+            path,
+        })
     }
 }
 
@@ -92,7 +96,10 @@ impl Decode for TargetKind {
                 let sym = budget.descend(|b| Symbol::decode(reader, b))??;
                 Ok(TargetKind::Custom(sym))
             }
-            seen => Err(DecodeError::InvalidVariant { type_name: "TargetKind", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "TargetKind",
+                seen,
+            }),
         }
     }
 }
@@ -108,7 +115,10 @@ impl Decode for SchemaBinding {
             }
             1 => Ok(SchemaBinding::Inferred),
             2 => Ok(SchemaBinding::Opaque),
-            seen => Err(DecodeError::InvalidVariant { type_name: "SchemaBinding", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "SchemaBinding",
+                seen,
+            }),
         }
     }
 }
@@ -121,7 +131,12 @@ impl Decode for Target {
         let locator = budget.descend(|b| Locator::decode(reader, b))??;
         let alias = budget.descend(|b| Option::<Symbol>::decode(reader, b))??;
         let schema = budget.descend(|b| SchemaBinding::decode(reader, b))??;
-        Ok(Target { kind, locator, alias, schema })
+        Ok(Target {
+            kind,
+            locator,
+            alias,
+            schema,
+        })
     }
 }
 
@@ -142,7 +157,10 @@ impl Decode for Privilege {
                 let sym = budget.descend(|b| Symbol::decode(reader, b))??;
                 Ok(Privilege::Custom(sym))
             }
-            seen => Err(DecodeError::InvalidVariant { type_name: "Privilege", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "Privilege",
+                seen,
+            }),
         }
     }
 }
@@ -157,7 +175,10 @@ impl Decode for StructuralVerb {
             2 => Ok(StructuralVerb::Alter),
             3 => Ok(StructuralVerb::Rename),
             4 => Ok(StructuralVerb::Truncate),
-            seen => Err(DecodeError::InvalidVariant { type_name: "StructuralVerb", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "StructuralVerb",
+                seen,
+            }),
         }
     }
 }
@@ -171,7 +192,10 @@ impl Decode for TypeBody {
             1 => Ok(TypeBody::Composite),
             2 => Ok(TypeBody::Distinct),
             3 => Ok(TypeBody::Other),
-            seen => Err(DecodeError::InvalidVariant { type_name: "TypeBody", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "TypeBody",
+                seen,
+            }),
         }
     }
 }
@@ -184,7 +208,10 @@ impl Decode for SchemaBody {
             0 => {
                 let schema = budget.descend(|b| SchemaRef::decode(reader, b))??;
                 let if_not_exists = budget.descend(|b| bool::decode(reader, b))??;
-                Ok(SchemaBody::Entity { schema, if_not_exists })
+                Ok(SchemaBody::Entity {
+                    schema,
+                    if_not_exists,
+                })
             }
             1 => {
                 let schema = budget.descend(|b| SchemaRef::decode(reader, b))??;
@@ -192,7 +219,10 @@ impl Decode for SchemaBody {
                 Ok(SchemaBody::Type { schema, body })
             }
             2 => Ok(SchemaBody::Reference),
-            seen => Err(DecodeError::InvalidVariant { type_name: "SchemaBody", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "SchemaBody",
+                seen,
+            }),
         }
     }
 }
@@ -205,7 +235,12 @@ impl Decode for SchemaOp {
         let target = budget.descend(|b| Target::decode(reader, b))??;
         let body = budget.descend(|b| SchemaBody::decode(reader, b))??;
         let new_name = budget.descend(|b| Option::<Symbol>::decode(reader, b))??;
-        Ok(SchemaOp { verb, target, body, new_name })
+        Ok(SchemaOp {
+            verb,
+            target,
+            body,
+            new_name,
+        })
     }
 }
 
@@ -219,7 +254,10 @@ impl Decode for RefAction {
             2 => Ok(RefAction::Detach),
             3 => Ok(RefAction::Reject),
             4 => Ok(RefAction::UseDefault),
-            seen => Err(DecodeError::InvalidVariant { type_name: "RefAction", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "RefAction",
+                seen,
+            }),
         }
     }
 }
@@ -232,7 +270,12 @@ impl Decode for RelationRef {
         let field = budget.descend(|b| Arc::<str>::decode(reader, b))??;
         let on_delete = budget.descend(|b| RefAction::decode(reader, b))??;
         let on_update = budget.descend(|b| RefAction::decode(reader, b))??;
-        Ok(RelationRef { entity, field, on_delete, on_update })
+        Ok(RelationRef {
+            entity,
+            field,
+            on_delete,
+            on_update,
+        })
     }
 }
 
@@ -243,7 +286,10 @@ impl Decode for ComputedKind {
         match reader.read_varint_u32()? {
             0 => Ok(ComputedKind::Materialized),
             1 => Ok(ComputedKind::OnDemand),
-            seen => Err(DecodeError::InvalidVariant { type_name: "ComputedKind", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "ComputedKind",
+                seen,
+            }),
         }
     }
 }
@@ -260,14 +306,26 @@ impl Decode for FieldDef {
         let references = budget.descend(|b| Option::<RelationRef>::decode(reader, b))??;
         let default_expr = budget.descend(|b| Option::<NodeId>::decode(reader, b))??;
         let check_expr = budget.descend(|b| Option::<NodeId>::decode(reader, b))??;
-        let generated = budget.descend(|b| Option::<(ComputedKind, NodeId)>::decode(reader, b))??;
+        let generated =
+            budget.descend(|b| Option::<(ComputedKind, NodeId)>::decode(reader, b))??;
         let lookup = budget.descend(|b| bool::decode(reader, b))??;
         let auto_assign = budget.descend(|b| bool::decode(reader, b))??;
         let collation = budget.descend(|b| Option::<Symbol>::decode(reader, b))??;
         let comment = budget.descend(|b| Option::<Symbol>::decode(reader, b))??;
         Ok(FieldDef {
-            name, data_type, identity, nullable, unique, references, default_expr, check_expr,
-            generated, lookup, auto_assign, collation, comment,
+            name,
+            data_type,
+            identity,
+            nullable,
+            unique,
+            references,
+            default_expr,
+            check_expr,
+            generated,
+            lookup,
+            auto_assign,
+            collation,
+            comment,
         })
     }
 }
@@ -281,7 +339,13 @@ impl Decode for FieldOp {
         let field = budget.descend(|b| Symbol::decode(reader, b))??;
         let def = budget.descend(|b| Option::<FieldDef>::decode(reader, b))??;
         let new_name = budget.descend(|b| Option::<Symbol>::decode(reader, b))??;
-        Ok(FieldOp { verb, target, field, def, new_name })
+        Ok(FieldOp {
+            verb,
+            target,
+            field,
+            def,
+            new_name,
+        })
     }
 }
 
@@ -292,7 +356,10 @@ impl Decode for IndexDirection {
         match reader.read_varint_u32()? {
             0 => Ok(IndexDirection::Ascending),
             1 => Ok(IndexDirection::Descending),
-            seen => Err(DecodeError::InvalidVariant { type_name: "IndexDirection", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "IndexDirection",
+                seen,
+            }),
         }
     }
 }
@@ -312,7 +379,10 @@ impl Decode for IndexKey {
                 let direction = budget.descend(|b| IndexDirection::decode(reader, b))??;
                 Ok(IndexKey::Expression { node, direction })
             }
-            seen => Err(DecodeError::InvalidVariant { type_name: "IndexKey", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "IndexKey",
+                seen,
+            }),
         }
     }
 }
@@ -332,7 +402,10 @@ impl Decode for IndexMethod {
                 let sym = budget.descend(|b| Symbol::decode(reader, b))??;
                 Ok(IndexMethod::Custom(sym))
             }
-            seen => Err(DecodeError::InvalidVariant { type_name: "IndexMethod", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "IndexMethod",
+                seen,
+            }),
         }
     }
 }
@@ -349,7 +422,16 @@ impl Decode for IndexOp {
         let unique = budget.descend(|b| bool::decode(reader, b))??;
         let predicate = budget.descend(|b| Option::<NodeId>::decode(reader, b))??;
         let if_not_exists = budget.descend(|b| bool::decode(reader, b))??;
-        Ok(IndexOp { verb, target, name, method, keys, unique, predicate, if_not_exists })
+        Ok(IndexOp {
+            verb,
+            target,
+            name,
+            method,
+            keys,
+            unique,
+            predicate,
+            if_not_exists,
+        })
     }
 }
 
@@ -365,7 +447,10 @@ impl Decode for LookupMethod {
                 let sym = budget.descend(|b| Symbol::decode(reader, b))??;
                 Ok(LookupMethod::Custom(sym))
             }
-            seen => Err(DecodeError::InvalidVariant { type_name: "LookupMethod", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "LookupMethod",
+                seen,
+            }),
         }
     }
 }
@@ -381,7 +466,15 @@ impl Decode for LookupOp {
         let fields = budget.descend(|b| smallvec::SmallVec::<[Symbol; 2]>::decode(reader, b))??;
         let unique = budget.descend(|b| bool::decode(reader, b))??;
         let if_not_exists = budget.descend(|b| bool::decode(reader, b))??;
-        Ok(LookupOp { verb, target, name, method, fields, unique, if_not_exists })
+        Ok(LookupOp {
+            verb,
+            target,
+            name,
+            method,
+            fields,
+            unique,
+            if_not_exists,
+        })
     }
 }
 
@@ -393,7 +486,10 @@ impl Decode for PolicyScope {
             0 => Ok(PolicyScope::Read),
             1 => Ok(PolicyScope::Write),
             2 => Ok(PolicyScope::All),
-            seen => Err(DecodeError::InvalidVariant { type_name: "PolicyScope", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "PolicyScope",
+                seen,
+            }),
         }
     }
 }
@@ -408,7 +504,14 @@ impl Decode for PolicyOp {
         let scope = budget.descend(|b| PolicyScope::decode(reader, b))??;
         let using_expr = budget.descend(|b| Option::<NodeId>::decode(reader, b))??;
         let check_expr = budget.descend(|b| Option::<NodeId>::decode(reader, b))??;
-        Ok(PolicyOp { verb, target, name, scope, using_expr, check_expr })
+        Ok(PolicyOp {
+            verb,
+            target,
+            name,
+            scope,
+            using_expr,
+            check_expr,
+        })
     }
 }
 
@@ -421,7 +524,13 @@ impl Decode for MaskOp {
         let name = budget.descend(|b| Symbol::decode(reader, b))??;
         let fields = budget.descend(|b| smallvec::SmallVec::<[Symbol; 2]>::decode(reader, b))??;
         let mask_expr = budget.descend(|b| Option::<NodeId>::decode(reader, b))??;
-        Ok(MaskOp { verb, target, name, fields, mask_expr })
+        Ok(MaskOp {
+            verb,
+            target,
+            name,
+            fields,
+            mask_expr,
+        })
     }
 }
 
@@ -434,7 +543,10 @@ impl Decode for QuotaKind {
             1 => Ok(QuotaKind::Count),
             2 => Ok(QuotaKind::Rate),
             3 => Ok(QuotaKind::Concurrency),
-            seen => Err(DecodeError::InvalidVariant { type_name: "QuotaKind", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "QuotaKind",
+                seen,
+            }),
         }
     }
 }
@@ -449,7 +561,14 @@ impl Decode for QuotaOp {
         let kind = budget.descend(|b| QuotaKind::decode(reader, b))??;
         let limit = budget.descend(|b| u64::decode(reader, b))??;
         let role = budget.descend(|b| Option::<Symbol>::decode(reader, b))??;
-        Ok(QuotaOp { verb, target, name, kind, limit, role })
+        Ok(QuotaOp {
+            verb,
+            target,
+            name,
+            kind,
+            limit,
+            role,
+        })
     }
 }
 
@@ -463,7 +582,10 @@ impl Decode for AuditEvent {
             2 => Ok(AuditEvent::SchemaChange),
             3 => Ok(AuditEvent::AccessControl),
             4 => Ok(AuditEvent::All),
-            seen => Err(DecodeError::InvalidVariant { type_name: "AuditEvent", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "AuditEvent",
+                seen,
+            }),
         }
     }
 }
@@ -478,7 +600,10 @@ impl Decode for AuditSink {
                 let sym = budget.descend(|b| Symbol::decode(reader, b))??;
                 Ok(AuditSink::Named(sym))
             }
-            seen => Err(DecodeError::InvalidVariant { type_name: "AuditSink", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "AuditSink",
+                seen,
+            }),
         }
     }
 }
@@ -492,7 +617,13 @@ impl Decode for AuditOp {
         let name = budget.descend(|b| Symbol::decode(reader, b))??;
         let event = budget.descend(|b| AuditEvent::decode(reader, b))??;
         let sink = budget.descend(|b| AuditSink::decode(reader, b))??;
-        Ok(AuditOp { verb, target, name, event, sink })
+        Ok(AuditOp {
+            verb,
+            target,
+            name,
+            event,
+            sink,
+        })
     }
 }
 
@@ -500,21 +631,33 @@ impl Decode for AuditOp {
 
 impl Decode for Grant {
     fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
-        let privileges = budget.descend(|b| smallvec::SmallVec::<[Privilege; 2]>::decode(reader, b))??;
+        let privileges =
+            budget.descend(|b| smallvec::SmallVec::<[Privilege; 2]>::decode(reader, b))??;
         let target = budget.descend(|b| Target::decode(reader, b))??;
         let roles = budget.descend(|b| smallvec::SmallVec::<[Symbol; 1]>::decode(reader, b))??;
         let with_grant_option = budget.descend(|b| bool::decode(reader, b))??;
-        Ok(Grant { privileges, target, roles, with_grant_option })
+        Ok(Grant {
+            privileges,
+            target,
+            roles,
+            with_grant_option,
+        })
     }
 }
 
 impl Decode for Revoke {
     fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
-        let privileges = budget.descend(|b| smallvec::SmallVec::<[Privilege; 2]>::decode(reader, b))??;
+        let privileges =
+            budget.descend(|b| smallvec::SmallVec::<[Privilege; 2]>::decode(reader, b))??;
         let target = budget.descend(|b| Target::decode(reader, b))??;
         let roles = budget.descend(|b| smallvec::SmallVec::<[Symbol; 1]>::decode(reader, b))??;
         let cascade = budget.descend(|b| bool::decode(reader, b))??;
-        Ok(Revoke { privileges, target, roles, cascade })
+        Ok(Revoke {
+            privileges,
+            target,
+            roles,
+            cascade,
+        })
     }
 }
 
@@ -540,7 +683,10 @@ impl Decode for InsertSource {
                 let id = budget.descend(|b| NodeId::decode(reader, b))??;
                 Ok(InsertSource::FromExpr(id))
             }
-            seen => Err(DecodeError::InvalidVariant { type_name: "InsertSource", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "InsertSource",
+                seen,
+            }),
         }
     }
 }
@@ -552,7 +698,11 @@ impl Decode for Insert {
         let target = budget.descend(|b| Target::decode(reader, b))??;
         let source = budget.descend(|b| InsertSource::decode(reader, b))??;
         let returning = budget.descend(|b| Option::<NodeId>::decode(reader, b))??;
-        Ok(Insert { target, source, returning })
+        Ok(Insert {
+            target,
+            source,
+            returning,
+        })
     }
 }
 
@@ -580,7 +730,10 @@ impl Decode for ReplaceBody {
                 let sym = budget.descend(|b| Symbol::decode(reader, b))??;
                 Ok(ReplaceBody::FromPath(sym))
             }
-            seen => Err(DecodeError::InvalidVariant { type_name: "ReplaceBody", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "ReplaceBody",
+                seen,
+            }),
         }
     }
 }
@@ -590,7 +743,11 @@ impl Decode for Replace {
         let target = budget.descend(|b| Target::decode(reader, b))??;
         let body = budget.descend(|b| ReplaceBody::decode(reader, b))??;
         let filter = budget.descend(|b| Option::<NodeId>::decode(reader, b))??;
-        Ok(Replace { target, body, filter })
+        Ok(Replace {
+            target,
+            body,
+            filter,
+        })
     }
 }
 
@@ -615,7 +772,11 @@ impl Decode for Append {
         let target = budget.descend(|b| Target::decode(reader, b))??;
         let source = budget.descend(|b| InsertSource::decode(reader, b))??;
         let partition_key = budget.descend(|b| Option::<NodeId>::decode(reader, b))??;
-        Ok(Append { target, source, partition_key })
+        Ok(Append {
+            target,
+            source,
+            partition_key,
+        })
     }
 }
 
@@ -633,7 +794,10 @@ impl Decode for Probe {
     fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
         let target = budget.descend(|b| Target::decode(reader, b))??;
         let include_metadata = budget.descend(|b| bool::decode(reader, b))??;
-        Ok(Probe { target, include_metadata })
+        Ok(Probe {
+            target,
+            include_metadata,
+        })
     }
 }
 
@@ -645,7 +809,10 @@ impl Decode for DescribeFacet {
             2 => Ok(DescribeFacet::Indexes),
             3 => Ok(DescribeFacet::Acl),
             4 => Ok(DescribeFacet::Stats),
-            seen => Err(DecodeError::InvalidVariant { type_name: "DescribeFacet", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "DescribeFacet",
+                seen,
+            }),
         }
     }
 }
@@ -668,7 +835,10 @@ impl Decode for IsolationLevel {
             2 => Ok(IsolationLevel::RepeatableRead),
             3 => Ok(IsolationLevel::Snapshot),
             4 => Ok(IsolationLevel::Serializable),
-            seen => Err(DecodeError::InvalidVariant { type_name: "IsolationLevel", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "IsolationLevel",
+                seen,
+            }),
         }
     }
 }
@@ -678,7 +848,11 @@ impl Decode for TxOptions {
         let isolation = budget.descend(|b| Option::<IsolationLevel>::decode(reader, b))??;
         let read_only = budget.descend(|b| bool::decode(reader, b))??;
         let label = budget.descend(|b| Option::<Symbol>::decode(reader, b))??;
-        Ok(TxOptions { isolation, read_only, label })
+        Ok(TxOptions {
+            isolation,
+            read_only,
+            label,
+        })
     }
 }
 
@@ -715,7 +889,10 @@ impl Decode for TxOp {
                 let opts = budget.descend(|b| TxOptions::decode(reader, b))??;
                 Ok(TxOp::Atomic { ops, opts })
             }
-            seen => Err(DecodeError::InvalidVariant { type_name: "TxOp", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "TxOp",
+                seen,
+            }),
         }
     }
 }
@@ -829,10 +1006,14 @@ impl Decode for Operation {
             }
             #[cfg(feature = "raw")]
             21 => {
-                let op = budget.descend(|b| dol_ir::operation::meta::RawOp::decode(reader, b))??;
+                let op =
+                    budget.descend(|b| dol_ir::operation::meta::RawOp::decode(reader, b))??;
                 Ok(Operation::Raw(Box::new(op)))
             }
-            seen => Err(DecodeError::InvalidVariant { type_name: "Operation", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "Operation",
+                seen,
+            }),
         }
     }
 }
@@ -845,7 +1026,11 @@ impl Decode for dol_ir::operation::meta::RawOp {
         let dialect = budget.descend(|b| Option::<Symbol>::decode(reader, b))??;
         let body = budget.descend(|b| String::decode(reader, b))??;
         let params = budget.descend(|b| smallvec::SmallVec::<[NodeId; 4]>::decode(reader, b))??;
-        Ok(dol_ir::operation::meta::RawOp { dialect, body, params })
+        Ok(dol_ir::operation::meta::RawOp {
+            dialect,
+            body,
+            params,
+        })
     }
 }
 
@@ -863,7 +1048,12 @@ impl Decode for EntityConstraint {
                 let ref_entity = budget.descend(|b| Arc::<str>::decode(reader, b))??;
                 let ref_fields = budget.descend(|b| Vec::<Arc<str>>::decode(reader, b))??;
                 let on_delete = budget.descend(|b| RefAction::decode(reader, b))??;
-                Ok(EntityConstraint::Relation { fields, ref_entity, ref_fields, on_delete })
+                Ok(EntityConstraint::Relation {
+                    fields,
+                    ref_entity,
+                    ref_fields,
+                    on_delete,
+                })
             }
             2 => {
                 let expr = budget.descend(|b| Arc::<str>::decode(reader, b))??;
@@ -873,7 +1063,10 @@ impl Decode for EntityConstraint {
                 let fields = budget.descend(|b| Vec::<Arc<str>>::decode(reader, b))??;
                 Ok(EntityConstraint::Identity(fields))
             }
-            seen => Err(DecodeError::InvalidVariant { type_name: "EntityConstraint", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "EntityConstraint",
+                seen,
+            }),
         }
     }
 }
@@ -891,12 +1084,25 @@ impl Decode for Field {
         let check = budget.descend(|b| Option::<Arc<str>>::decode(reader, b))??;
         let comment = budget.descend(|b| Option::<Arc<str>>::decode(reader, b))??;
         let collation = budget.descend(|b| Option::<Arc<str>>::decode(reader, b))??;
-        let generated = budget.descend(|b| Option::<(ComputedKind, Arc<str>)>::decode(reader, b))??;
+        let generated =
+            budget.descend(|b| Option::<(ComputedKind, Arc<str>)>::decode(reader, b))??;
         let lookup = budget.descend(|b| bool::decode(reader, b))??;
         let auto_assign = budget.descend(|b| bool::decode(reader, b))??;
         Ok(Field {
-            name, data_type, identity, nullable, has_default, default_expr, unique, references,
-            check, comment, collation, generated, lookup, auto_assign,
+            name,
+            data_type,
+            identity,
+            nullable,
+            has_default,
+            default_expr,
+            unique,
+            references,
+            check,
+            comment,
+            collation,
+            generated,
+            lookup,
+            auto_assign,
         })
     }
 }
@@ -907,7 +1113,12 @@ impl Decode for Entity {
         let namespace = budget.descend(|b| Option::<Arc<str>>::decode(reader, b))??;
         let fields = budget.descend(|b| Vec::<Field>::decode(reader, b))??;
         let constraints = budget.descend(|b| Vec::<EntityConstraint>::decode(reader, b))??;
-        Ok(Entity { name, namespace, fields, constraints })
+        Ok(Entity {
+            name,
+            namespace,
+            fields,
+            constraints,
+        })
     }
 }
 
@@ -917,8 +1128,13 @@ impl Decode for TypeEntry {
     fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
         let name = budget.descend(|b| Symbol::decode(reader, b))??;
         let kind = budget.descend(|b| TypeBody::decode(reader, b))??;
-        let members = budget.descend(|b| smallvec::SmallVec::<[Symbol; 4]>::decode(reader, b))??;
-        Ok(TypeEntry { name, kind, members })
+        let members =
+            budget.descend(|b| smallvec::SmallVec::<[Symbol; 4]>::decode(reader, b))??;
+        Ok(TypeEntry {
+            name,
+            kind,
+            members,
+        })
     }
 }
 
@@ -938,7 +1154,10 @@ impl Decode for CatalogEntry {
                 let payload = budget.descend(|b| Vec::<u8>::decode(reader, b))??;
                 Ok(CatalogEntry::Extension { kind, payload })
             }
-            seen => Err(DecodeError::InvalidVariant { type_name: "CatalogEntry", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "CatalogEntry",
+                seen,
+            }),
         }
     }
 }
@@ -963,6 +1182,11 @@ impl Decode for Program {
         let arena = budget.descend(|b| dol_expr::ExprArena::decode(reader, b))??;
         let interner = budget.descend(|b| dol_expr::Interner::decode(reader, b))??;
         let schema_catalog = budget.descend(|b| Option::<SchemaCatalog>::decode(reader, b))??;
-        Ok(Program { operations, arena, interner, schema_catalog })
+        Ok(Program {
+            operations,
+            arena,
+            interner,
+            schema_catalog,
+        })
     }
 }

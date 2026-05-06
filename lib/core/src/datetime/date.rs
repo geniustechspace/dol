@@ -4,7 +4,7 @@ use core::fmt;
 /// A calendar date (no time, no timezone). Proleptic Gregorian; negative years
 /// are BCE.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Date {
     pub year: i32,
     /// `1–12`

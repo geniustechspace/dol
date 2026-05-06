@@ -117,17 +117,17 @@ jobs:
       - name: Budget-gate (recursive entry points)
         run: cargo run -p xtask -- budget-gate
 
-      # Dedicated gate: every public IR / schema / value type must
-      # serde-round-trip. Failing this gate is a regression on universal
-      # serde — see the project restructuring plan.
-      - name: Serde round-trip gate
+      # v2 invariant gate: every public IR / schema / value type must
+      # round-trip through the budget-threaded `dol-wire::Decode` path.
+      # `serde::Deserialize` is intentionally absent from in-memory IR/AST
+      # types in 0.2.0; wire-in is exclusively `Decode`-based. The wire
+      # crate's own integration tests (`program_roundtrip.rs`,
+      # `decode_robustness.rs`, `decode_core_roundtrip.rs`) cover the
+      # full surface — running them under `--all-features` exercises
+      # every public Encode/Decode pair.
+      - name: Wire round-trip gate
         run: |
-          cargo test --all-features -p dol-core     --test serde_roundtrip
-          cargo test --all-features -p dol-expr     --test serde_roundtrip
-          cargo test --all-features -p dol-schema   --test serde_roundtrip
-          cargo test --all-features -p dol-ir       --test serde_roundtrip
-          cargo test --all-features -p dol-pipeline --test serde_roundtrip
-          cargo test --all-features -p dol-stream   --test serde_roundtrip
+          cargo test --all-features -p dol-wire --tests
           cargo test --all-features -p dol-wire     --test program_roundtrip
 
   test-features:

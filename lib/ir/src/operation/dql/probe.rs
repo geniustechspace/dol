@@ -24,7 +24,7 @@ use crate::target::Target;
 /// assert_eq!(op.kind(), dol_ir::OpKind::Probe);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Probe {
     /// Target to probe.
     pub target: Target,

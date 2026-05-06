@@ -174,7 +174,6 @@ mod geo_impls {
     }
 }
 
-
 // ─── Span and SpanTable (always-on, postcard-compatible) ─────────────────────
 
 impl Encode for dol_core::Span {
@@ -249,7 +248,10 @@ mod geo_compound_impls {
         w: &mut Writer<'_>,
         b: &mut Budget,
     ) -> Result<(), EncodeError> {
-        let len: u32 = pts.len().try_into().map_err(|_| EncodeError::LengthOverflow)?;
+        let len: u32 = pts
+            .len()
+            .try_into()
+            .map_err(|_| EncodeError::LengthOverflow)?;
         w.write_varint_u32(len)?;
         for p in pts.iter() {
             b.descend(|b| p.encode(w, b))??;
@@ -589,7 +591,10 @@ mod value_impls {
         w: &mut Writer<'_>,
         b: &mut Budget,
     ) -> Result<(), EncodeError> {
-        let len: u32 = slice.len().try_into().map_err(|_| EncodeError::LengthOverflow)?;
+        let len: u32 = slice
+            .len()
+            .try_into()
+            .map_err(|_| EncodeError::LengthOverflow)?;
         w.write_varint_u32(len)?;
         for item in slice.iter() {
             b.descend(|b| item.encode(w, b))??;
@@ -603,7 +608,10 @@ mod value_impls {
         w: &mut Writer<'_>,
         b: &mut Budget,
     ) -> Result<(), EncodeError> {
-        let len: u32 = slice.len().try_into().map_err(|_| EncodeError::LengthOverflow)?;
+        let len: u32 = slice
+            .len()
+            .try_into()
+            .map_err(|_| EncodeError::LengthOverflow)?;
         w.write_varint_u32(len)?;
         for (k, v) in slice.iter() {
             b.descend(|b| k.encode(w, b))??;

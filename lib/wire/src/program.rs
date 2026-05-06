@@ -1,17 +1,14 @@
 //! Typed [`dol_ir::Program`] codecs.
 //!
-//! These helpers wrap the underlying postcard / JSON helpers in
-//! [`crate::postcard`] and [`crate::json`] and target [`dol_ir::Program`]
-//! directly, so callers don't need to keep the body type parameter in sync
-//! with the rest of the IR.
+//! These helpers wrap the underlying postcard helper in [`crate::postcard`]
+//! and the validating-decode helper [`crate::decoder::Decode`] for
+//! [`dol_ir::Program`] directly.
 //!
-//! All of these helpers re-use the canonical [`crate::WireHeader`], so
-//! payloads emitted here are byte-compatible with anything decoded by
-//! [`crate::postcard::decode`] or [`crate::json::decode`] when the body
-//! type is `dol_ir::Program`.
-//!
-//! Both the postcard and JSON helpers are gated behind the matching feature
-//! flag (`postcard`, `json`) and the universal `serde` plumbing.
+//! v2 invariant: encode goes through `serde::Serialize` (postcard / JSON),
+//! but **decode goes through [`crate::Decode`] only**. Generic
+//! `decode_postcard<T: Deserialize>` / `decode_json<T: Deserialize>`
+//! helpers were removed in 0.2.0; callers that need to wire-in a
+//! `Program` use [`decode`] below, which threads `&mut Budget` end-to-end.
 
 #[cfg(feature = "json")]
 use alloc::string::String;
@@ -27,28 +24,10 @@ pub fn encode_postcard(program: &Program) -> Result<Vec<u8>, WireError> {
     crate::postcard::encode(program)
 }
 
-/// Decode a postcard-encoded [`Program`].
-// budget-gate: opt-out: legacy serde-based wire-in path. Slated for
-// retirement in the Phase 3 cut-over (`dol_wire::decoder::Decode` for
-// `Program` is the budget-aware replacement).
-#[cfg(feature = "postcard")]
-pub fn decode_postcard(bytes: &[u8]) -> Result<Program, WireError> {
-    crate::postcard::decode(bytes)
-}
-
 /// JSON-encode a [`Program`] with the canonical wire envelope (string form).
 #[cfg(feature = "json")]
 pub fn encode_json(program: &Program) -> Result<String, WireError> {
     crate::json::encode(program)
-}
-
-/// Decode a JSON-encoded [`Program`].
-// budget-gate: opt-out: legacy serde-based wire-in path. Slated for
-// retirement in the Phase 3 cut-over (the budget-aware replacement
-// drives `dol_wire::decoder::Decode` from a JSON-shape source).
-#[cfg(feature = "json")]
-pub fn decode_json(s: &str) -> Result<Program, WireError> {
-    crate::json::decode(s)
 }
 
 /// BLAKE3 content hash over the canonical postcard body of a [`Program`].
@@ -62,6 +41,10 @@ pub fn content_hash(program: &Program) -> Result<crate::hash::Digest, WireError>
 
 /// Decode a [`Program`] from raw postcard bytes using the budget-aware
 /// [`crate::decoder::Decode`] path (no serde dependency).
+// budget-gate: opt-out: this is the public entry point that *constructs*
+// the `Budget`; downstream calls to `Program::decode` thread it. The
+// gate's pattern matcher only sees the surface signature, hence the
+// opt-out.
 #[cfg(feature = "postcard")]
 pub fn decode(bytes: &[u8]) -> Result<Program, crate::decoder::DecodeError> {
     use crate::decoder::Decode;
@@ -70,5 +53,3 @@ pub fn decode(bytes: &[u8]) -> Result<Program, crate::decoder::DecodeError> {
     let mut budget = dol_core::policy::Budget::new(Limits::default());
     Program::decode(&mut reader, &mut budget)
 }
-
-

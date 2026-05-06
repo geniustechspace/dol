@@ -3,7 +3,10 @@
 extern crate alloc;
 
 use dol_core::policy::Budget;
-use dol_expr::arena::{CaseNode, ExprArena, FieldNode, FieldStep, FuncNode, InListNode, ObjLitNode, Span, SpanTable, WindowNode};
+use dol_expr::arena::{
+    CaseNode, ExprArena, FieldNode, FieldStep, FuncNode, InListNode, ObjLitNode, Span, SpanTable,
+    WindowNode,
+};
 use dol_expr::expr::{
     BinOp, ConflictClause, DeleteNode, ExprNode, InsertNode, JoinNode, JoinType, LockHint, Order,
     QueryNode, UnaryOp, UpdateNode, UpsertNode,
@@ -393,7 +396,11 @@ impl Encode for ExprNode {
                 w.write_varint_u32(8)?;
                 b.descend(|b| id.encode(w, b))??;
             }
-            ExprNode::Agg { func, expr, distinct } => {
+            ExprNode::Agg {
+                func,
+                expr,
+                distinct,
+            } => {
                 w.write_varint_u32(9)?;
                 b.descend(|b| func.encode(w, b))??;
                 b.descend(|b| expr.encode(w, b))??;
@@ -471,7 +478,10 @@ impl Encode for ExprNode {
 impl Encode for Interner {
     fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
         let strings = self.sorted_strings();
-        let len: u32 = strings.len().try_into().map_err(|_| EncodeError::LengthOverflow)?;
+        let len: u32 = strings
+            .len()
+            .try_into()
+            .map_err(|_| EncodeError::LengthOverflow)?;
         w.write_varint_u32(len)?;
         for s in &strings {
             b.descend(|b| s.encode(w, b))??;

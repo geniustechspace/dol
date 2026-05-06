@@ -5,7 +5,10 @@ extern crate alloc;
 use alloc::vec::Vec;
 
 use dol_core::policy::Budget;
-use dol_expr::arena::{CaseNode, ExprArena, FieldNode, FieldStep, FuncNode, InListNode, ObjLitNode, Span, SpanTable, WindowNode};
+use dol_expr::arena::{
+    CaseNode, ExprArena, FieldNode, FieldStep, FuncNode, InListNode, ObjLitNode, Span, SpanTable,
+    WindowNode,
+};
 use dol_expr::expr::{
     BinOp, ConflictClause, DeleteNode, ExprNode, InsertNode, JoinNode, JoinType, LockHint, Order,
     QueryNode, UnaryOp, UpdateNode, UpsertNode,
@@ -26,9 +29,14 @@ use crate::decoder::{Decode, DecodeError, Reader};
 impl Decode for FieldStep {
     fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
         match reader.read_varint_u32()? {
-            0 => Ok(FieldStep::Key(budget.descend(|b| StrId::decode(reader, b))??)),
+            0 => Ok(FieldStep::Key(
+                budget.descend(|b| StrId::decode(reader, b))??,
+            )),
             1 => Ok(FieldStep::Index(reader.read_varint_u32()?)),
-            seen => Err(DecodeError::InvalidVariant { type_name: "FieldStep", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "FieldStep",
+                seen,
+            }),
         }
     }
 }
@@ -39,8 +47,13 @@ impl Decode for FieldNode {
     fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
         let namespace = budget.descend(|b| Option::<StrId>::decode(reader, b))??;
         let name = budget.descend(|b| StrId::decode(reader, b))??;
-        let steps = budget.descend(|b| smallvec::SmallVec::<[FieldStep; 4]>::decode(reader, b))??;
-        Ok(FieldNode { namespace, name, steps })
+        let steps =
+            budget.descend(|b| smallvec::SmallVec::<[FieldStep; 4]>::decode(reader, b))??;
+        Ok(FieldNode {
+            namespace,
+            name,
+            steps,
+        })
     }
 }
 
@@ -58,7 +71,8 @@ impl Decode for FuncNode {
 
 impl Decode for ObjLitNode {
     fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
-        let inner = budget.descend(|b| smallvec::SmallVec::<[(StrId, NodeId); 4]>::decode(reader, b))??;
+        let inner =
+            budget.descend(|b| smallvec::SmallVec::<[(StrId, NodeId); 4]>::decode(reader, b))??;
         Ok(ObjLitNode(inner))
     }
 }
@@ -70,7 +84,10 @@ impl Decode for Order {
         match reader.read_varint_u32()? {
             0 => Ok(Order::Asc),
             1 => Ok(Order::Desc),
-            seen => Err(DecodeError::InvalidVariant { type_name: "Order", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "Order",
+                seen,
+            }),
         }
     }
 }
@@ -84,7 +101,10 @@ impl Decode for LockHint {
             1 => Ok(LockHint::ForShare),
             2 => Ok(LockHint::SkipLocked),
             3 => Ok(LockHint::NoWait),
-            seen => Err(DecodeError::InvalidVariant { type_name: "LockHint", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "LockHint",
+                seen,
+            }),
         }
     }
 }
@@ -99,7 +119,10 @@ impl Decode for FrameBound {
             2 => Ok(FrameBound::CurrentRow),
             3 => Ok(FrameBound::Following(reader.read_varint_u32()?)),
             4 => Ok(FrameBound::UnboundedFollowing),
-            seen => Err(DecodeError::InvalidVariant { type_name: "FrameBound", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "FrameBound",
+                seen,
+            }),
         }
     }
 }
@@ -111,7 +134,10 @@ impl Decode for FrameKind {
         match reader.read_varint_u32()? {
             0 => Ok(FrameKind::Rows),
             1 => Ok(FrameKind::Range),
-            seen => Err(DecodeError::InvalidVariant { type_name: "FrameKind", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "FrameKind",
+                seen,
+            }),
         }
     }
 }
@@ -132,10 +158,17 @@ impl Decode for WindowFrame {
 impl Decode for WindowNode {
     fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
         let func = budget.descend(|b| StrId::decode(reader, b))??;
-        let partition = budget.descend(|b| smallvec::SmallVec::<[NodeId; 4]>::decode(reader, b))??;
-        let order = budget.descend(|b| smallvec::SmallVec::<[(NodeId, Order); 2]>::decode(reader, b))??;
+        let partition =
+            budget.descend(|b| smallvec::SmallVec::<[NodeId; 4]>::decode(reader, b))??;
+        let order =
+            budget.descend(|b| smallvec::SmallVec::<[(NodeId, Order); 2]>::decode(reader, b))??;
         let frame = budget.descend(|b| Option::<WindowFrame>::decode(reader, b))??;
-        Ok(WindowNode { func, partition, order, frame })
+        Ok(WindowNode {
+            func,
+            partition,
+            order,
+            frame,
+        })
     }
 }
 
@@ -143,7 +176,8 @@ impl Decode for WindowNode {
 
 impl Decode for CaseNode {
     fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
-        let branches = budget.descend(|b| smallvec::SmallVec::<[(NodeId, NodeId); 4]>::decode(reader, b))??;
+        let branches = budget
+            .descend(|b| smallvec::SmallVec::<[(NodeId, NodeId); 4]>::decode(reader, b))??;
         let else_ = budget.descend(|b| Option::<NodeId>::decode(reader, b))??;
         Ok(CaseNode { branches, else_ })
     }
@@ -191,7 +225,10 @@ impl Decode for JoinType {
             2 => Ok(JoinType::Right),
             3 => Ok(JoinType::Full),
             4 => Ok(JoinType::Cross),
-            seen => Err(DecodeError::InvalidVariant { type_name: "JoinType", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "JoinType",
+                seen,
+            }),
         }
     }
 }
@@ -204,7 +241,12 @@ impl Decode for JoinNode {
         let alias = budget.descend(|b| Option::<StrId>::decode(reader, b))??;
         let join_type = budget.descend(|b| JoinType::decode(reader, b))??;
         let on = budget.descend(|b| Option::<NodeId>::decode(reader, b))??;
-        Ok(JoinNode { source, alias, join_type, on })
+        Ok(JoinNode {
+            source,
+            alias,
+            join_type,
+            on,
+        })
     }
 }
 
@@ -214,16 +256,32 @@ impl Decode for QueryNode {
     fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
         let from = budget.descend(|b| StrId::decode(reader, b))??;
         let alias = budget.descend(|b| Option::<StrId>::decode(reader, b))??;
-        let joins = budget.descend(|b| smallvec::SmallVec::<[JoinNode; 2]>::decode(reader, b))??;
+        let joins =
+            budget.descend(|b| smallvec::SmallVec::<[JoinNode; 2]>::decode(reader, b))??;
         let filter = budget.descend(|b| Option::<NodeId>::decode(reader, b))??;
-        let columns = budget.descend(|b| smallvec::SmallVec::<[NodeId; 8]>::decode(reader, b))??;
-        let group_by = budget.descend(|b| smallvec::SmallVec::<[NodeId; 4]>::decode(reader, b))??;
+        let columns =
+            budget.descend(|b| smallvec::SmallVec::<[NodeId; 8]>::decode(reader, b))??;
+        let group_by =
+            budget.descend(|b| smallvec::SmallVec::<[NodeId; 4]>::decode(reader, b))??;
         let having = budget.descend(|b| Option::<NodeId>::decode(reader, b))??;
-        let order_by = budget.descend(|b| smallvec::SmallVec::<[(NodeId, Order); 4]>::decode(reader, b))??;
+        let order_by =
+            budget.descend(|b| smallvec::SmallVec::<[(NodeId, Order); 4]>::decode(reader, b))??;
         let limit = budget.descend(|b| Option::<u64>::decode(reader, b))??;
         let offset = budget.descend(|b| Option::<u64>::decode(reader, b))??;
         let lock = budget.descend(|b| Option::<LockHint>::decode(reader, b))??;
-        Ok(QueryNode { from, alias, joins, filter, columns, group_by, having, order_by, limit, offset, lock })
+        Ok(QueryNode {
+            from,
+            alias,
+            joins,
+            filter,
+            columns,
+            group_by,
+            having,
+            order_by,
+            limit,
+            offset,
+            lock,
+        })
     }
 }
 
@@ -234,10 +292,14 @@ impl Decode for ConflictClause {
         match reader.read_varint_u32()? {
             0 => Ok(ConflictClause::DoNothing),
             1 => {
-                let assignments = budget.descend(|b| smallvec::SmallVec::<[(StrId, NodeId); 4]>::decode(reader, b))??;
+                let assignments = budget
+                    .descend(|b| smallvec::SmallVec::<[(StrId, NodeId); 4]>::decode(reader, b))??;
                 Ok(ConflictClause::DoUpdate { assignments })
             }
-            seen => Err(DecodeError::InvalidVariant { type_name: "ConflictClause", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "ConflictClause",
+                seen,
+            }),
         }
     }
 }
@@ -249,9 +311,16 @@ impl Decode for InsertNode {
         let target = budget.descend(|b| StrId::decode(reader, b))??;
         let columns = budget.descend(|b| smallvec::SmallVec::<[StrId; 8]>::decode(reader, b))??;
         let values = budget.descend(|b| smallvec::SmallVec::<[NodeId; 8]>::decode(reader, b))??;
-        let returning = budget.descend(|b| smallvec::SmallVec::<[NodeId; 4]>::decode(reader, b))??;
+        let returning =
+            budget.descend(|b| smallvec::SmallVec::<[NodeId; 4]>::decode(reader, b))??;
         let conflict = budget.descend(|b| Option::<ConflictClause>::decode(reader, b))??;
-        Ok(InsertNode { target, columns, values, returning, conflict })
+        Ok(InsertNode {
+            target,
+            columns,
+            values,
+            returning,
+            conflict,
+        })
     }
 }
 
@@ -263,8 +332,15 @@ impl Decode for UpdateNode {
         let columns = budget.descend(|b| smallvec::SmallVec::<[StrId; 8]>::decode(reader, b))??;
         let values = budget.descend(|b| smallvec::SmallVec::<[NodeId; 8]>::decode(reader, b))??;
         let filter = budget.descend(|b| Option::<NodeId>::decode(reader, b))??;
-        let returning = budget.descend(|b| smallvec::SmallVec::<[NodeId; 4]>::decode(reader, b))??;
-        Ok(UpdateNode { target, columns, values, filter, returning })
+        let returning =
+            budget.descend(|b| smallvec::SmallVec::<[NodeId; 4]>::decode(reader, b))??;
+        Ok(UpdateNode {
+            target,
+            columns,
+            values,
+            filter,
+            returning,
+        })
     }
 }
 
@@ -274,8 +350,13 @@ impl Decode for DeleteNode {
     fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
         let target = budget.descend(|b| StrId::decode(reader, b))??;
         let filter = budget.descend(|b| Option::<NodeId>::decode(reader, b))??;
-        let returning = budget.descend(|b| smallvec::SmallVec::<[NodeId; 4]>::decode(reader, b))??;
-        Ok(DeleteNode { target, filter, returning })
+        let returning =
+            budget.descend(|b| smallvec::SmallVec::<[NodeId; 4]>::decode(reader, b))??;
+        Ok(DeleteNode {
+            target,
+            filter,
+            returning,
+        })
     }
 }
 
@@ -286,9 +367,16 @@ impl Decode for UpsertNode {
         let target = budget.descend(|b| StrId::decode(reader, b))??;
         let columns = budget.descend(|b| smallvec::SmallVec::<[StrId; 8]>::decode(reader, b))??;
         let values = budget.descend(|b| smallvec::SmallVec::<[NodeId; 8]>::decode(reader, b))??;
-        let returning = budget.descend(|b| smallvec::SmallVec::<[NodeId; 4]>::decode(reader, b))??;
+        let returning =
+            budget.descend(|b| smallvec::SmallVec::<[NodeId; 4]>::decode(reader, b))??;
         let conflict = budget.descend(|b| Option::<ConflictClause>::decode(reader, b))??;
-        Ok(UpsertNode { target, columns, values, returning, conflict })
+        Ok(UpsertNode {
+            target,
+            columns,
+            values,
+            returning,
+            conflict,
+        })
     }
 }
 
@@ -321,7 +409,10 @@ impl Decode for BinOp {
             21 => Ok(BinOp::Concat),
             22 => Ok(BinOp::Arrow),
             23 => Ok(BinOp::LongArrow),
-            seen => Err(DecodeError::InvalidVariant { type_name: "BinOp", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "BinOp",
+                seen,
+            }),
         }
     }
 }
@@ -338,7 +429,10 @@ impl Decode for UnaryOp {
             4 => Ok(UnaryOp::IsNotNull),
             5 => Ok(UnaryOp::IsTrue),
             6 => Ok(UnaryOp::IsFalse),
-            seen => Err(DecodeError::InvalidVariant { type_name: "UnaryOp", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "UnaryOp",
+                seen,
+            }),
         }
     }
 }
@@ -366,7 +460,8 @@ impl Decode for ExprNode {
                 Ok(ExprNode::ObjectLit(id))
             }
             5 => {
-                let v = budget.descend(|b| smallvec::SmallVec::<[NodeId; 4]>::decode(reader, b))??;
+                let v =
+                    budget.descend(|b| smallvec::SmallVec::<[NodeId; 4]>::decode(reader, b))??;
                 Ok(ExprNode::ArrayLit(v))
             }
             6 => {
@@ -388,7 +483,11 @@ impl Decode for ExprNode {
                 let func = budget.descend(|b| StrId::decode(reader, b))??;
                 let expr = budget.descend(|b| NodeId::decode(reader, b))??;
                 let distinct = budget.descend(|b| bool::decode(reader, b))??;
-                Ok(ExprNode::Agg { func, expr, distinct })
+                Ok(ExprNode::Agg {
+                    func,
+                    expr,
+                    distinct,
+                })
             }
             10 => {
                 let id = budget.descend(|b| WindowId::decode(reader, b))??;
@@ -451,7 +550,10 @@ impl Decode for ExprNode {
                 let id = budget.descend(|b| UpsertId::decode(reader, b))??;
                 Ok(ExprNode::Upsert(id))
             }
-            seen => Err(DecodeError::InvalidVariant { type_name: "ExprNode", seen }),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "ExprNode",
+                seen,
+            }),
         }
     }
 }
@@ -491,7 +593,11 @@ impl Decode for ExprArena {
         // Access via attach_span which calls push(owner, span).
         // We need to iterate over the decoded table's entries.
         // Since we have spans_slice and owners_slice, do it manually:
-        for (owner, span) in span_table.owners_slice().iter().zip(span_table.spans_slice().iter()) {
+        for (owner, span) in span_table
+            .owners_slice()
+            .iter()
+            .zip(span_table.spans_slice().iter())
+        {
             arena.attach_span(*owner, span.clone());
         }
 
