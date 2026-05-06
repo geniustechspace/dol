@@ -98,6 +98,7 @@ impl SchemaCatalog {
         self.entries.is_empty()
     }
 
+    /// Borrow the entries as a contiguous slice.
     pub fn entries_slice(&self) -> &[CatalogEntry] {
         &self.entries
     }

@@ -11,10 +11,6 @@ use dol_expr::expr::{
     BinOp, ConflictClause, DeleteNode, ExprNode, InsertNode, JoinNode, JoinType, LockHint, Order,
     QueryNode, UnaryOp, UpdateNode, UpsertNode,
 };
-use dol_expr::ids::{
-    CaseId, DeleteId, FieldId, FuncId, InListId, InsertId, LiteralId, NodeId, ObjLitId, QueryId,
-    UpdateId, UpsertId, WindowId,
-};
 use dol_expr::interner::Interner;
 use dol_expr::tree::window::{FrameBound, FrameKind, WindowFrame};
 

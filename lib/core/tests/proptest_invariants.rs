@@ -84,6 +84,7 @@ fn ip_strategy() -> impl Strategy<Value = IpAddr> {
     ]
 }
 
+#[allow(dead_code)] // Retained for upcoming Value-level proptests; see docs/v2_plan.md §57.
 fn primitive_value_strategy() -> impl Strategy<Value = Value> {
     // Float values are excluded: JSON does not preserve full f64 precision
     // and proptest will eventually find a value where text round-tripping

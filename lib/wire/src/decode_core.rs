@@ -644,6 +644,7 @@ mod value_impls {
     }
 
     // Helper: decode a boxed slice of (Box<str>, Value) pairs.
+    #[allow(clippy::type_complexity)]
     fn decode_kv_slice(
         reader: &mut Reader<'_>,
         budget: &mut Budget,
@@ -921,6 +922,7 @@ mod literal_impls {
     }
 
     // Helper: decode boxed (Box<str>, Literal) key-value pairs.
+    #[allow(clippy::type_complexity)]
     fn decode_kv_slice(
         reader: &mut Reader<'_>,
         budget: &mut Budget,

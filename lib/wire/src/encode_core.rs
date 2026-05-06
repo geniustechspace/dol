@@ -25,7 +25,6 @@
 //!   discriminant scheme as `Value`.
 
 use alloc::boxed::Box;
-use alloc::vec::Vec;
 
 use dol_core::policy::Budget;
 

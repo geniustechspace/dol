@@ -40,6 +40,7 @@ pub mod program;
 pub mod program_ref;
 pub mod schema_catalog;
 pub mod schema_ref;
+pub mod store;
 pub mod target;
 
 /// Schema constraint types — re-exported from `dol-schema`, the canonical home.
@@ -56,4 +57,5 @@ pub use program::{ExtendError, Program};
 pub use program_ref::ProgramRef;
 pub use schema_catalog::{CatalogEntry, SchemaCatalog, TypeEntry};
 pub use schema_ref::{CatalogId, SchemaId, SchemaRef};
+pub use store::{Catalog, KvError, KvStore};
 pub use target::{Locator, SchemaBinding, Symbol, Target, TargetKind};

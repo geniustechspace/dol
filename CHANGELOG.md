@@ -34,6 +34,40 @@ documented under "0.2.0" below.
 
 #### Added
 
+- **`dol_ir::store::{KvStore, Catalog, KvError}`** — backend trait
+  surface per `docs/v2_plan.md` §71-72. Both traits thread
+  `&mut Budget`, return `Result<…, KvError<E>>` with `Budget`,
+  `NotFound`, and `Backend(E)` variants, and stay `no_std + alloc`-clean.
+  `KvStore::Value: AsRef<[u8]>` lets MCU backends return stack arrays
+  and host backends return `Vec<u8>` with no impedance mismatch.
+  `Catalog` persists a [`SchemaCatalog`] atomically — concrete impls
+  layer wire-encode + signature verification on top of a `KvStore`.
+- **`dol_wire::signed::{Signed, SignedError}`** — `Signed<T>` envelope
+  per `docs/v2_plan.md` §56. Wraps any `[u8]` payload in
+  `WireHeader || payload_len || payload || sig_len || sig` and signs
+  over the header + length-prefixed payload, so flipping the version
+  field invalidates the signature. Generic over the workspace's
+  existing `dol_core::sign::{Signer, Verifier}` traits — algorithm-
+  agnostic; Ed25519 on hosts, HMAC-SHA-256 on MCUs.
+  `Signed::open` is zero-allocation; `Signed::seal` allocates exactly
+  once.
+- **`dol_expr::packed::{PackedNode, PackedOp, walk_iter}`** — 16-byte
+  `bytemuck::Pod` node representation per `docs/v2_plan.md` §35. Lives
+  alongside the existing variant `ExprNode` as scaffolding for the
+  cut-over: backends can begin consuming the packed shape and the
+  iterative work-stack walker is exercised by tests well before any
+  production graph depends on it. `walk_iter` is the canonical
+  pre-order traversal — driven by an explicit stack on `Vec<NodeId>`
+  and `Budget::tick(1)` per visit, so depth-attack DOS becomes
+  impossible by construction. `child_node_ids()` is the seam for
+  opcode-specific recursion.
+- **`.github/workflows/nightly-sanitizers.yml`** — daily Miri
+  (`-Zmiri-strict-provenance -Zmiri-symbolic-alignment-check`) and
+  AddressSanitizer jobs over `dol-core`, `dol-expr`, and `dol-wire`,
+  per `docs/v2_plan.md` §78. Runs at 04:17 UTC nightly,
+  `workflow_dispatch`-able, and opt-in on PRs via the
+  `nightly-sanitizers` label so the default review loop stays fast.
+
 - **`dol_check::sarif::to_sarif`** — SARIF v2.1.0 emitter for
   `dol-check` diagnostics, per `docs/v2_plan.md` §68 (*"`check` runs
   every validator in one pass and emits SARIF (good DX in IDEs)"*).

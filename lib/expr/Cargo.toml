@@ -22,6 +22,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 dol-core  = { path = "../core", default-features = false }
 hashbrown = { workspace = true }
 smallvec  = { workspace = true }
+bytemuck  = { workspace = true }
 serde     = { workspace = true, optional = true }
 
 [features]

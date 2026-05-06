@@ -60,6 +60,9 @@ mod encode_core;
 mod encode_expr;
 mod encode_ir;
 
+pub mod signed;
+pub use signed::{Signed, SignedError};
+
 #[cfg(feature = "hash")]
 pub mod hash;
 #[cfg(feature = "json")]

@@ -44,6 +44,7 @@ pub mod ids;
 pub mod interner;
 #[allow(missing_docs)] // tracking: docs follow-up
 pub mod lower;
+pub mod packed;
 pub mod prelude;
 #[allow(missing_docs)] // tracking: docs follow-up
 pub mod session;
