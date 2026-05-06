@@ -40,6 +40,8 @@
 
 extern crate alloc;
 
+pub mod sarif;
+
 use dol_core::diag::Diagnostic;
 use dol_ir::{CapabilityCheck, CapabilitySet, CapabilityTag, OpKind, Operation, Program};
 

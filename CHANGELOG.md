@@ -34,6 +34,17 @@ documented under "0.2.0" below.
 
 #### Added
 
+- **`dol_check::sarif::to_sarif`** — SARIF v2.1.0 emitter for
+  `dol-check` diagnostics, per `docs/v2_plan.md` §68 (*"`check` runs
+  every validator in one pass and emits SARIF (good DX in IDEs)"*).
+  Hand-written JSON (no `serde_json` dependency, `no_std + alloc`-clean)
+  that maps each `Diagnostic` to a SARIF `result`: `ruleId` is the
+  canonical `DOLNNNN` form of the `ErrorCode`, `level` is
+  `error`/`warning`/`note` (`Severity::Lint` folds into `warning`,
+  matching how clippy is rendered), and physical locations carry the
+  span's byte offset/length under the synthetic `dol-file://{file_id}`
+  URI scheme. Output is consumable by VS Code (SARIF Viewer
+  extension), GitHub Code Scanning, IntelliJ, and Azure DevOps.
 - **`xtask ci` super-task** — local mirror of
   `.github/workflows/ci.yml` per `docs/v2_plan.md` §78
   (*"`xtask ci` runs the exact same gates locally as in CI"*). Runs
