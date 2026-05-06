@@ -34,6 +34,21 @@ documented under "0.2.0" below.
 
 #### Added
 
+- **`dol_core::diag::ErrorCode` (`u16`, `repr(transparent)`).** Replaces
+  the placeholder `Code(&'static str)` with the layered scheme
+  `layer * 1000 + serial` documented in `docs/v2_plan.md` §22. The type
+  itself is `no_std + no_alloc` (`Copy`, 2 B), and `Display` writes the
+  canonical `DOL{NNNN:04}` form straight into a `core::fmt::Formatter`
+  without allocating. Helpers: `as_u16`, `layer`, `serial`. The 23
+  built-in codes keep their identifiers and serial numbers (`DOL0001`
+  → `ErrorCode(1)`, `DOL5001` → `ErrorCode(5001)`, …); only the wire-
+  level type changes. Per the v2 "no compatibility shims" rule the old
+  `Code` type is deleted, not aliased.
+- **`defmt` cargo feature on `dol-core`** (per `docs/v2_plan.md` §32).
+  Off by default; opting in adds `defmt::Format` impls on `ErrorCode`,
+  `Span`, and `FileId` for embedded-friendly logging on Cortex-M /
+  RISC-V targets. ~10× smaller log code than `core::fmt::Display`. New
+  workspace dependency `defmt = "0.3"` (vendor-neutral, `no_std`).
 - **`dol_core::hash` chokepoint module** (gated by the new `hash` cargo
   feature, off by default to preserve the minimal `no_std + alloc`
   shape). Newtype `Hasher` wrapping `blake3::Hasher`, plus `Digest32`

@@ -4,21 +4,21 @@
 //! `dol-schema`, …) emits [`Diagnostic`] values rather than panicking.
 //!
 //! A diagnostic is:
-//! - a stable [`Code`] (so external tooling can pin behaviour),
+//! - a stable [`ErrorCode`] (so external tooling can pin behaviour),
 //! - a [`Severity`],
 //! - a primary [`crate::span::Span`],
 //! - a short human message,
 //! - zero or more secondary [`Label`]s, [`Note`]s, and [`FixIt`] hints.
 //!
 //! The catalogue of built-in codes lives in [`code`]. Downstream code may
-//! mint its own codes by passing a `&'static str`.
+//! mint its own codes by calling [`ErrorCode`] directly.
 
 use crate::span::Span;
 use smallvec::SmallVec;
 
 pub mod code;
 
-pub use code::Code;
+pub use code::ErrorCode;
 
 /// Diagnostic severity.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -65,8 +65,8 @@ pub struct FixIt {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Diagnostic {
-    /// Stable diagnostic code (e.g. `"DOL0042"`).
-    pub code: Code,
+    /// Stable diagnostic code (e.g. `DOL0042`).
+    pub code: ErrorCode,
     /// Severity level.
     pub severity: Severity,
     /// Primary span for the diagnostic.
@@ -83,29 +83,29 @@ pub struct Diagnostic {
 
 impl Diagnostic {
     /// Build a new error diagnostic.
-    pub fn error(code: Code, span: Span, message: impl Into<alloc::string::String>) -> Self {
+    pub fn error(code: ErrorCode, span: Span, message: impl Into<alloc::string::String>) -> Self {
         Self::new(Severity::Error, code, span, message)
     }
 
     /// Build a new warning diagnostic.
-    pub fn warning(code: Code, span: Span, message: impl Into<alloc::string::String>) -> Self {
+    pub fn warning(code: ErrorCode, span: Span, message: impl Into<alloc::string::String>) -> Self {
         Self::new(Severity::Warning, code, span, message)
     }
 
     /// Build a new lint diagnostic.
-    pub fn lint(code: Code, span: Span, message: impl Into<alloc::string::String>) -> Self {
+    pub fn lint(code: ErrorCode, span: Span, message: impl Into<alloc::string::String>) -> Self {
         Self::new(Severity::Lint, code, span, message)
     }
 
     /// Build a new note diagnostic.
-    pub fn note(code: Code, span: Span, message: impl Into<alloc::string::String>) -> Self {
+    pub fn note(code: ErrorCode, span: Span, message: impl Into<alloc::string::String>) -> Self {
         Self::new(Severity::Note, code, span, message)
     }
 
     /// Construct with explicit severity.
     pub fn new(
         severity: Severity,
-        code: Code,
+        code: ErrorCode,
         span: Span,
         message: impl Into<alloc::string::String>,
     ) -> Self {

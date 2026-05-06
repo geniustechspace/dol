@@ -30,7 +30,7 @@
 //!
 //! ```ignore
 //! use dol_core::{Value, Literal, DataType, TypeError, Span, FileId,
-//!                Diagnostic, Severity, Code, Id, Limits, Budget};
+//!                Diagnostic, Severity, ErrorCode, Id, Limits, Budget};
 //! ```
 //!
 //! Sub-namespaces remain accessible for items not promoted to the root:
@@ -148,7 +148,7 @@ pub use literal::{Literal, LiteralRange};
 pub use value::{Value, ValueRange};
 
 // span / diag flat re-exports — the headline boundary items.
-pub use diag::{Code, Diagnostic, Severity};
+pub use diag::{Diagnostic, ErrorCode, Severity};
 pub use span::{FileId, Span};
 
 // policy / id flat re-exports — the load-bearing foundation primitives

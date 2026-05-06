@@ -88,6 +88,12 @@ postcard     = { version = "1", default-features = false, features = ["alloc"] }
 # ── Hashing ──────────────────────────────────────────────────────────────────
 blake3       = { version = "1", default-features = false }
 
+# ── Embedded logging ─────────────────────────────────────────────────────────
+# `defmt` is `core`-friendly (no `alloc`) and gives ~10× smaller log code on
+# Cortex-M than `core::fmt::Display` formatters. Pinned to the latest 0.3
+# minor; v2 only emits `defmt::Format` impls under the `defmt` feature.
+defmt        = { version = "0.3", default-features = false }
+
 # ── Internal crates ──────────────────────────────────────────────────────────
 # `dol-core` carries `default-features = false` at the workspace level so
 # every consumer that says `dol-core = { workspace = true }` inherits the

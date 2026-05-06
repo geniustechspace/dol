@@ -101,6 +101,30 @@ impl Span {
     }
 }
 
+#[cfg(feature = "defmt")]
+impl defmt::Format for FileId {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        defmt::write!(fmt, "FileId({=u16})", self.0);
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for Span {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        if self.is_none() {
+            defmt::write!(fmt, "Span(NONE)");
+        } else {
+            defmt::write!(
+                fmt,
+                "Span(file={=u16}, start={=u32}, len={=u32})",
+                self.file().0,
+                self.start(),
+                self.length()
+            );
+        }
+    }
+}
+
 /// Side table mapping AST/IR node indices to [`Span`]s.
 ///
 /// The table is grow-only and unsorted; callers either index in parallel with
