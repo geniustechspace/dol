@@ -917,6 +917,16 @@ impl Encode for SchemaCatalog {
 
 // ─── Program ─────────────────────────────────────────────────────────────────
 
+#[cfg(feature = "raw")]
+impl Encode for dol_ir::operation::meta::RawOp {
+    fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
+        b.descend(|b| self.dialect.encode(w, b))??;
+        b.descend(|b| self.body.encode(w, b))??;
+        b.descend(|b| encode_slice(self.params.as_slice(), w, b))??;
+        Ok(())
+    }
+}
+
 impl Encode for Program {
     fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
         b.descend(|b| encode_slice(self.operations.as_slice(), w, b))??;

@@ -827,8 +827,25 @@ impl Decode for Operation {
                 let op = budget.descend(|b| OperationExtension::decode(reader, b))??;
                 Ok(Operation::Extension(Box::new(op)))
             }
+            #[cfg(feature = "raw")]
+            21 => {
+                let op = budget.descend(|b| dol_ir::operation::meta::RawOp::decode(reader, b))??;
+                Ok(Operation::Raw(Box::new(op)))
+            }
             seen => Err(DecodeError::InvalidVariant { type_name: "Operation", seen }),
         }
+    }
+}
+
+// ─── RawOp ───────────────────────────────────────────────────────────────────
+
+#[cfg(feature = "raw")]
+impl Decode for dol_ir::operation::meta::RawOp {
+    fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
+        let dialect = budget.descend(|b| Option::<Symbol>::decode(reader, b))??;
+        let body = budget.descend(|b| String::decode(reader, b))??;
+        let params = budget.descend(|b| smallvec::SmallVec::<[NodeId; 4]>::decode(reader, b))??;
+        Ok(dol_ir::operation::meta::RawOp { dialect, body, params })
     }
 }
 

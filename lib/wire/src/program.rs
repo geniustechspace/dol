@@ -64,6 +64,7 @@ pub fn content_hash(program: &Program) -> Result<crate::hash::Digest, WireError>
 /// [`crate::decoder::Decode`] path (no serde dependency).
 #[cfg(feature = "postcard")]
 pub fn decode(bytes: &[u8]) -> Result<Program, crate::decoder::DecodeError> {
+    use crate::decoder::Decode;
     use dol_core::policy::Limits;
     let mut reader = crate::decoder::Reader::new(bytes);
     let mut budget = dol_core::policy::Budget::new(Limits::default());

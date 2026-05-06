@@ -8,7 +8,7 @@ use super::Value;
 
 /// A range bound-pair for [`Value`].
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ValueRange {
     pub start: Bound<Box<Value>>,
     pub end: Bound<Box<Value>>,

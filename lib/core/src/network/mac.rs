@@ -236,6 +236,7 @@ impl TryFrom<alloc::boxed::Box<str>> for MacAddr {
 
 #[cfg(test)]
 mod tests {
+    use crate::alloc::string::ToString;
     use super::{MacAddr, ParseMacAddrError};
 
     #[test]
