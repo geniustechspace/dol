@@ -72,6 +72,30 @@ impl Span {
     pub const fn is_none(self) -> bool {
         self.0 == 0
     }
+
+    /// Reconstruct a [`Span`] from its packed `u64` representation.
+    ///
+    /// This is the inverse of [`Span::to_raw_u64`] and exists so that
+    /// codecs (e.g. [`dol-wire`](https://docs.rs/dol-wire)) can rebuild a
+    /// `Span` from bytes without going through the field-decomposed
+    /// constructor. Any 64-bit value is accepted; the `(start, length)`
+    /// halves are masked to 24 bits on read by [`Span::start`] and
+    /// [`Span::length`], so an arbitrary `u64` is at worst ill-formed,
+    /// never undefined.
+    #[inline]
+    pub const fn from_raw_u64(raw: u64) -> Self {
+        Self(raw)
+    }
+
+    /// Return the packed `u64` representation of this [`Span`].
+    ///
+    /// Pairs with [`Span::from_raw_u64`]. The returned bits encode
+    /// `file` (low 16 bits), `start` (next 24 bits), and `length`
+    /// (top 24 bits) per the layout documented on [`Span`].
+    #[inline]
+    pub const fn to_raw_u64(self) -> u64 {
+        self.0
+    }
 }
 
 /// Side table mapping AST/IR node indices to [`Span`]s.
@@ -152,5 +176,20 @@ mod tests {
         let i = t.push(Span::new(FileId(0), 0, 10));
         assert_eq!(t.get(i).length(), 10);
         assert!(t.get(999).is_none());
+    }
+
+    #[test]
+    fn span_raw_u64_round_trip() {
+        // Every accessor must be preserved across `to_raw_u64` /
+        // `from_raw_u64` so that wire codecs can round-trip a Span
+        // through its packed byte form.
+        let s = Span::new(FileId(42), 1234, 5678);
+        let raw = s.to_raw_u64();
+        let back = Span::from_raw_u64(raw);
+        assert_eq!(back.file(), FileId(42));
+        assert_eq!(back.start(), 1234);
+        assert_eq!(back.length(), 5678);
+        // NONE sentinel preserved.
+        assert!(Span::from_raw_u64(Span::NONE.to_raw_u64()).is_none());
     }
 }

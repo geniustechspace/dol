@@ -17,6 +17,13 @@
     feature = "numeric",
     feature = "geo"
 ))]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects
+)]
 
 use dol_core::policy::{Budget, Limits};
 use dol_wire::decoder::{Decode, Reader};

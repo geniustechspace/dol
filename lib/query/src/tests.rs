@@ -1,6 +1,8 @@
 //! Integration tests for `dol-query` builders against the
 //! [`Operation`](dol_ir::Operation) IR.
 
+use alloc::{boxed::Box, format, string::String, vec};
+
 use super::*;
 use dol_expr::expr::ExprNode;
 use dol_schema::{DataType, Field};

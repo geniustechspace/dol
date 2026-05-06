@@ -19,6 +19,7 @@ serde_json = { workspace = true }
 
 [features]
 default = []
+std = ["dol-core/std", "dol-expr/std", "dol-schema/std", "dol-ir/std"]
 sql = []
 serde = [
     "dep:serde",

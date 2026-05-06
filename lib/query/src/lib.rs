@@ -37,8 +37,11 @@
 //! ```
 
 #![forbid(unsafe_code)]
+#![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing, clippy::arithmetic_side_effects))]
 #![warn(missing_docs)]
+
+extern crate alloc;
 
 pub mod control;
 pub mod ddl;
@@ -69,6 +72,10 @@ pub use update::UpdateQuery;
 pub use upsert::UpsertQuery;
 
 use dol_schema::Entity;
+
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
 // ---------------------------------------------------------------------------
 // Query — the universal entry point

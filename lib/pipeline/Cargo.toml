@@ -21,6 +21,7 @@ serde_json = { workspace = true }
 
 [features]
 default = []
+std     = ["dol-core/std", "dol-expr/std", "dol-schema/std", "dol-ir/std"]
 serde   = [
     "dep:serde",
     "dep:postcard",

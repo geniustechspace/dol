@@ -6,6 +6,12 @@
 //! SQL backends may render it as `ON CONFLICT`, document stores as a unique
 //! filter, KV stores as an `IF NOT EXISTS` precondition, etc.
 
+use alloc::{
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
+
 use dol_expr::tree::Expr;
 
 // ===========================================================================

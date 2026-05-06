@@ -27,8 +27,6 @@
 //!   field; reconstructing from raw bits needs a `Span::from_raw` accessor
 //!   that doesn't exist yet.
 
-extern crate alloc;
-
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 

@@ -28,8 +28,11 @@
 //! want to encode their own `Serialize` payloads behind the same envelope.
 
 #![forbid(unsafe_code)]
+#![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing, clippy::arithmetic_side_effects))]
 #![warn(missing_docs)]
+
+extern crate alloc;
 
 mod header;
 pub use header::{CURRENT_VERSION, WireHeader, WireSchemaVersion};
@@ -37,7 +40,11 @@ pub use header::{CURRENT_VERSION, WireHeader, WireSchemaVersion};
 pub mod decoder;
 pub use decoder::{Decode, DecodeError, Reader};
 
+pub mod encoder;
+pub use encoder::{Encode, EncodeError, Writer, encode_to_vec};
+
 mod decode_core;
+mod encode_core;
 
 #[cfg(feature = "hash")]
 pub mod hash;
@@ -104,5 +111,3 @@ pub fn unframe(bytes: &[u8]) -> Result<&[u8], WireError> {
     let _ = WireHeader::from_bytes(header_buf)?;
     Ok(&bytes[8..])
 }
-
-extern crate alloc;

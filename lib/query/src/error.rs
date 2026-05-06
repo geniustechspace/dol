@@ -58,4 +58,5 @@ impl fmt::Display for BuildError {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for BuildError {}

@@ -1,5 +1,11 @@
 //! UPDATE query builder for `dol-query`.
 
+use alloc::{
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
+
 use dol_expr::tree::{Expr, field_dyn};
 
 // ===========================================================================

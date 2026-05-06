@@ -21,7 +21,7 @@ blake3     = { workspace = true, optional = true }
 
 [features]
 default     = []
-std         = []
+std         = ["dol-core/std", "dol-expr/std", "dol-schema/std", "dol-ir/std"]
 # Universal serde plumbing on every payload type.
 serde       = [
     "dep:serde",

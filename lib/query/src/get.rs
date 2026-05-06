@@ -3,6 +3,12 @@
 //! Mirrors `dol-builder::GetBuilder` but works with owned name/namespace
 //! instead of requiring a static `&Entity` reference.
 
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
+
 use crate::JoinKind;
 #[cfg(feature = "sql")]
 use dol_expr::expr::LockHint;
