@@ -10,7 +10,7 @@ use core::fmt;
 /// Scale is bounded to [`Decimal::MAX_SCALE`] (38), matching the maximum
 /// precision of SQL `NUMERIC` and most fixed-point decimal standards.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Decimal {
     pub unscaled: i128,
     pub scale: u32,
@@ -33,6 +33,10 @@ impl Decimal {
 }
 
 impl fmt::Display for Decimal {
+    // `scale <= MAX_SCALE = 38` (try_new invariant), so `scale + 1` fits in
+    // `usize`; the `len() - scale` branch is guarded by the `len() <= scale`
+    // pad above so the subtraction never underflows.
+    #[allow(clippy::arithmetic_side_effects)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.scale == 0 {
             return write!(f, "{}", self.unscaled);

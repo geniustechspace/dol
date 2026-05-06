@@ -8,7 +8,7 @@ use super::super::compact_name::CompactName;
 
 /// Classification of a DOL binary operator.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub enum OpCategory {
     /// Comparison operators: `=`, `!=`, `<`, `>`, `<=`, `>=`.
@@ -31,7 +31,7 @@ pub enum OpCategory {
 
 /// A rich operator definition: name + kind.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct OpDef {
     name: CompactName,
     kind: OpCategory,

@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 /// Identifier for a source file in the [`SpanTable`].
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct FileId(pub u16);
 
 impl FileId {
@@ -28,7 +28,7 @@ impl FileId {
 /// This keeps the type 8 bytes and trivially `Copy`.
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Span(u64);
 
 impl Span {
@@ -63,6 +63,9 @@ impl Span {
 
     /// Byte offset one past the end of the span.
     #[inline]
+    // `start()` and `length()` are both 24-bit (`& 0x00FF_FFFF`); their sum
+    // fits in 25 bits and cannot overflow `u32`.
+    #[allow(clippy::arithmetic_side_effects)]
     pub const fn end(self) -> u32 {
         self.start() + self.length()
     }
@@ -72,6 +75,54 @@ impl Span {
     pub const fn is_none(self) -> bool {
         self.0 == 0
     }
+
+    /// Reconstruct a [`Span`] from its packed `u64` representation.
+    ///
+    /// This is the inverse of [`Span::to_raw_u64`] and exists so that
+    /// codecs (e.g. [`dol-wire`](https://docs.rs/dol-wire)) can rebuild a
+    /// `Span` from bytes without going through the field-decomposed
+    /// constructor. Any 64-bit value is accepted; the `(start, length)`
+    /// halves are masked to 24 bits on read by [`Span::start`] and
+    /// [`Span::length`], so an arbitrary `u64` is at worst ill-formed,
+    /// never undefined.
+    #[inline]
+    pub const fn from_raw_u64(raw: u64) -> Self {
+        Self(raw)
+    }
+
+    /// Return the packed `u64` representation of this [`Span`].
+    ///
+    /// Pairs with [`Span::from_raw_u64`]. The returned bits encode
+    /// `file` (low 16 bits), `start` (next 24 bits), and `length`
+    /// (top 24 bits) per the layout documented on [`Span`].
+    #[inline]
+    pub const fn to_raw_u64(self) -> u64 {
+        self.0
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for FileId {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        defmt::write!(fmt, "FileId({=u16})", self.0);
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for Span {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        if self.is_none() {
+            defmt::write!(fmt, "Span(NONE)");
+        } else {
+            defmt::write!(
+                fmt,
+                "Span(file={=u16}, start={=u32}, len={=u32})",
+                self.file().0,
+                self.start(),
+                self.length()
+            );
+        }
+    }
 }
 
 /// Side table mapping AST/IR node indices to [`Span`]s.
@@ -79,7 +130,7 @@ impl Span {
 /// The table is grow-only and unsorted; callers either index in parallel with
 /// the AST node arena or look up by raw index. Spans default to [`Span::NONE`].
 #[derive(Debug, Default, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct SpanTable {
     spans: Vec<Span>,
 }
@@ -152,5 +203,20 @@ mod tests {
         let i = t.push(Span::new(FileId(0), 0, 10));
         assert_eq!(t.get(i).length(), 10);
         assert!(t.get(999).is_none());
+    }
+
+    #[test]
+    fn span_raw_u64_round_trip() {
+        // Every accessor must be preserved across `to_raw_u64` /
+        // `from_raw_u64` so that wire codecs can round-trip a Span
+        // through its packed byte form.
+        let s = Span::new(FileId(42), 1234, 5678);
+        let raw = s.to_raw_u64();
+        let back = Span::from_raw_u64(raw);
+        assert_eq!(back.file(), FileId(42));
+        assert_eq!(back.start(), 1234);
+        assert_eq!(back.length(), 5678);
+        // NONE sentinel preserved.
+        assert!(Span::from_raw_u64(Span::NONE.to_raw_u64()).is_none());
     }
 }

@@ -21,9 +21,9 @@ use crate::target::{Symbol, Target};
 /// // Mask the "ssn" column for non-admins
 /// let op: Operation = MaskOp {
 ///     verb: StructuralVerb::Create,
-///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
-///     name: Symbol::new(1),
-///     fields: smallvec::smallvec![Symbol::new(2)],
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(0))),
+///     name: Symbol::from_hash(1),
+///     fields: smallvec::smallvec![Symbol::from_hash(2)],
 ///     mask_expr: None, // Would be set to arena NodeId for real mask
 /// }
 /// .into();
@@ -31,7 +31,7 @@ use crate::target::{Symbol, Target};
 /// assert_eq!(op.kind(), dol_ir::OpKind::Mask);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct MaskOp {
     /// `Create` / `Drop` / `Alter`.
     pub verb: StructuralVerb,

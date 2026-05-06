@@ -32,10 +32,10 @@ use crate::target::{Symbol, Target};
 /// // ALTER TABLE users ADD COLUMN email TEXT NOT NULL
 /// let op: Operation = FieldOp {
 ///     verb: StructuralVerb::Create,
-///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
-///     field: Symbol::new(1),
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(0))),
+///     field: Symbol::from_hash(1),
 ///     def: Some(FieldDef {
-///         name: Symbol::new(1),
+///         name: Symbol::from_hash(1),
 ///         data_type: DataType::unbounded_string(),
 ///         identity: false,
 ///         nullable: false,
@@ -55,7 +55,7 @@ use crate::target::{Symbol, Target};
 /// assert_eq!(op.kind(), dol_ir::OpKind::Field);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct FieldOp {
     /// `Create` (add column) / `Drop` / `Alter` / `Rename`.
     pub verb: StructuralVerb,
@@ -77,7 +77,7 @@ pub struct FieldOp {
 /// expressions all live in the program's [`dol_expr::ExprArena`] and are
 /// referenced by id.
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct FieldDef {
     /// Field / column name.
     pub name: Symbol,

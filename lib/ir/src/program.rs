@@ -17,7 +17,7 @@ use crate::schema_catalog::SchemaCatalog;
 /// use dol_ir::Program;
 ///
 /// let insert = Insert {
-///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(0))),
 ///     source: InsertSource::Bindings,
 ///     returning: None,
 /// };
@@ -26,7 +26,7 @@ use crate::schema_catalog::SchemaCatalog;
 /// assert_eq!(program.operations.len(), 1);
 /// ```
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Program {
     /// Operation sequence.
     pub operations: alloc::vec::Vec<Operation>,
@@ -88,7 +88,7 @@ impl Program {
     /// `tx_commit()` into a single program, replacing the previous pattern
     /// of three independent [`Program`]s with three independent arenas.
     ///
-    /// # Preconditions
+    /// # Preconditions (returned as [`ExtendError`] on violation)
     ///
     /// At least one side must be **arena/interner-empty** — i.e. its
     /// `arena.len() == 0` and `interner.len() == 0`. This covers every
@@ -109,13 +109,11 @@ impl Program {
     ///
     /// [`SchemaCatalog`]: crate::SchemaCatalog
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics with a clear diagnostic if:
-    /// - both sides carry arena nodes or interned strings, or
-    /// - both sides carry a populated `schema_catalog`.
-    ///
-    /// Both are design-time errors.
+    /// Returns [`ExtendError::ArenaConflict`] if both sides carry arena
+    /// nodes or interned strings, and [`ExtendError::CatalogConflict`] if
+    /// both sides carry a populated `schema_catalog`.
     ///
     /// # Examples
     ///
@@ -130,7 +128,7 @@ impl Program {
     /// let commit = Program::from_operation(Operation::Tx(Box::new(TxOp::Commit)));
     /// let dml = Program::from_operation(
     ///     Insert {
-    ///         target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
+    ///         target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(0))),
     ///         source: InsertSource::Bindings,
     ///         returning: None,
     ///     }
@@ -138,24 +136,19 @@ impl Program {
     /// );
     ///
     /// let mut prog = begin;
-    /// prog.extend(dml).extend(commit);
+    /// prog.extend(dml).expect("control + DML compose").extend(commit).expect("control compose");
     /// assert_eq!(prog.operations.len(), 3);
     /// ```
-    pub fn extend(&mut self, other: Program) -> &mut Self {
+    pub fn extend(&mut self, other: Program) -> Result<&mut Self, ExtendError> {
         let self_empty = self.arena.is_empty() && self.interner.is_empty();
         let other_empty = other.arena.is_empty() && other.interner.is_empty();
         if !self_empty && !other_empty {
-            panic!(
-                "Program::extend: both programs carry arena nodes or interned \
-                 strings (self.arena={}, self.interner={}, other.arena={}, \
-                 other.interner={}); id remapping is not yet implemented. \
-                 Use TxOp::Atomic (dol_query::control::tx_atomic) to compose \
-                 DML payloads.",
-                self.arena.len(),
-                self.interner.len(),
-                other.arena.len(),
-                other.interner.len(),
-            );
+            return Err(ExtendError::ArenaConflict {
+                self_arena: self.arena.len(),
+                self_interner: self.interner.len(),
+                other_arena: other.arena.len(),
+                other_interner: other.interner.len(),
+            });
         }
         let Program {
             mut operations,
@@ -169,20 +162,69 @@ impl Program {
             self.interner = interner;
         }
         if self.schema_catalog.is_some() && schema_catalog.is_some() {
-            panic!(
-                "Program::extend: both programs carry a populated \
-                 schema_catalog; merging two catalogs would require \
-                 entry-level conflict resolution that is out of scope for \
-                 this composition primitive."
-            );
+            return Err(ExtendError::CatalogConflict);
         }
         if self.schema_catalog.is_none() {
             self.schema_catalog = schema_catalog;
         }
         self.operations.append(&mut operations);
-        self
+        Ok(self)
     }
 }
+
+/// Reasons [`Program::extend`] may reject a composition.
+///
+/// Both variants reflect a structural shape mismatch between the two
+/// programs being composed; callers should validate program shape (e.g.
+/// "control-only" vs "DML") at construction time and treat any
+/// [`ExtendError`] as a programming bug.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ExtendError {
+    /// Both programs carry arena nodes or interned strings; id remapping
+    /// is not yet implemented. Use [`crate::operation::TxOp::Atomic`]
+    /// (composed via `dol_query::control::tx_atomic`) for combining DML
+    /// payloads.
+    ArenaConflict {
+        /// `self.arena.len()` at the time of the failed call.
+        self_arena: usize,
+        /// `self.interner.len()` at the time of the failed call.
+        self_interner: usize,
+        /// `other.arena.len()` at the time of the failed call.
+        other_arena: usize,
+        /// `other.interner.len()` at the time of the failed call.
+        other_interner: usize,
+    },
+    /// Both programs carry a populated `schema_catalog`; merging two
+    /// catalogs would require entry-level conflict resolution that is out
+    /// of scope for this composition primitive.
+    CatalogConflict,
+}
+
+impl core::fmt::Display for ExtendError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::ArenaConflict {
+                self_arena,
+                self_interner,
+                other_arena,
+                other_interner,
+            } => write!(
+                f,
+                "Program::extend: both programs carry arena nodes or interned \
+                 strings (self.arena={self_arena}, self.interner={self_interner}, \
+                 other.arena={other_arena}, other.interner={other_interner}); id \
+                 remapping is not yet implemented"
+            ),
+            Self::CatalogConflict => {
+                f.write_str("Program::extend: both programs carry a populated schema_catalog")
+            }
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for ExtendError {}
 
 impl From<(Operation, dol_expr::ExprArena, dol_expr::Interner)> for Program {
     fn from((op, arena, interner): (Operation, dol_expr::ExprArena, dol_expr::Interner)) -> Self {

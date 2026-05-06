@@ -10,7 +10,7 @@ use smallvec::SmallVec;
 
 /// A single column in a row.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ColumnSchema {
     /// Column name as it appears downstream.
     pub name: alloc::string::String,
@@ -22,7 +22,7 @@ pub struct ColumnSchema {
 
 /// Ordered structural schema of a row.
 #[derive(Debug, Clone, Default, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct RowSchema {
     /// Columns in left-to-right order.
     pub columns: SmallVec<[ColumnSchema; 8]>,

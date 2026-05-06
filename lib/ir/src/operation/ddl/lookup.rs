@@ -12,7 +12,7 @@ use crate::target::{Symbol, Target};
 
 /// Lookup method.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum LookupMethod {
     /// Hash-based lookup for O(1) equality checks.
     Hash,
@@ -39,10 +39,10 @@ pub enum LookupMethod {
 /// // Create a hash lookup on the "users" collection
 /// let op: Operation = LookupOp {
 ///     verb: StructuralVerb::Create,
-///     target: Target::new(TargetKind::Document, Locator::new(Symbol::new(0))),
-///     name: Symbol::new(1),
+///     target: Target::new(TargetKind::Document, Locator::new(Symbol::from_hash(0))),
+///     name: Symbol::from_hash(1),
 ///     method: LookupMethod::Hash,
-///     fields: smallvec::smallvec![Symbol::new(2)],
+///     fields: smallvec::smallvec![Symbol::from_hash(2)],
 ///     unique: true,
 ///     if_not_exists: false,
 /// }
@@ -51,7 +51,7 @@ pub enum LookupMethod {
 /// assert_eq!(op.kind(), dol_ir::OpKind::Lookup);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct LookupOp {
     /// `Create` / `Drop` / `Alter` / `Rename`.
     pub verb: StructuralVerb,

@@ -26,7 +26,7 @@ pub use dol_core::DataType;
 /// - `generated_stored(expr)` / `generated_virtual(expr)` — computed fields
 /// - `auto_assign()` — marks the field as auto-assigned by the store
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Field {
     pub name: Arc<str>,
     pub data_type: DataType,

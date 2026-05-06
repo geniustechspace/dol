@@ -4,6 +4,10 @@
 //! points) exists, is callable on a representative `Program`, and follows
 //! the documented append-only contract on the diagnostic list.
 
+// Standalone test binary: production lints don't apply to assertion bodies
+// that index into known-good fixtures.
+#![allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
+
 use dol_check::{capability_check, check_all, check_all_for, lint, schema_check, type_check};
 use dol_core::diag::Diagnostic;
 use dol_ir::operation::{OperationExtension, SchemaOp};

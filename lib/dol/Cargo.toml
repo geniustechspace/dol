@@ -25,6 +25,21 @@ dol-query    = { workspace = true, optional = true }
 [features]
 default = []
 
+# Forwards `std` to every active sub-crate so umbrella consumers can opt
+# into the `std::error::Error` impls (and any other std-gated surface)
+# uniformly. Disable for `no_std + alloc` targets — every dol-* crate
+# below is `no_std + alloc`-clean.
+std = [
+    "dol-core/std",
+    "dol-expr?/std",
+    "dol-schema?/std",
+    "dol-ir?/std",
+    "dol-pipeline?/std",
+    "dol-stream?/std",
+    "dol-wire?/std",
+    "dol-query?/std",
+]
+
 # ── Individual layers ────────────────────────────────────────────────────────
 expr     = ["dep:dol-expr"]
 schema   = ["dep:dol-schema", "expr"]
@@ -85,3 +100,6 @@ serde    = [
     "dol-check?/serde",
     "dol-query?/serde",
 ]
+
+[lints]
+workspace = true

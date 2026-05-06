@@ -26,7 +26,8 @@ size_of::<ExprNode>() == 32
 | `serde` |         | `Serialize` / `Deserialize` for every AST/arena type and `Interner` |
 
 `Interner` has a hand-rolled deterministic codec that round-trips through its
-canonical `Vec<Arc<str>>` form, so postcard / JSON output is stable.
+canonical sequence-of-strings form, so postcard / JSON output is stable
+regardless of the in-memory storage.
 
 ## Example
 

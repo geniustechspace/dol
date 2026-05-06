@@ -37,7 +37,8 @@ DOL employs the following security practices:
 - **`cargo-deny`** — Checks for known vulnerable dependencies on every PR.
 - **`cargo-audit`** — Weekly dependency vulnerability scanning.
 - **Trivy** — Repository-wide vulnerability scanning with SARIF reporting.
-- **`#![deny(unsafe_code)]`** — Unsafe Rust is forbidden in all crates.
+- **`#![forbid(unsafe_code)]`** — Unsafe Rust is forbidden in every crate
+  root, blocking even per-module overrides.
 - **No network I/O** — DOL is a pure query/schema language with no runtime
   execution, minimizing attack surface.
 

@@ -32,10 +32,47 @@ members  = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.85"
 publish = false
+
+# ── Workspace-wide lints ─────────────────────────────────────────────────────
+#
+# v2 invariants enforced from the workspace level so every crate inherits them
+# uniformly (each crate root opts in via `[lints] workspace = true`).
+#
+#   * `unsafe_code = "forbid"` is already declared per-crate; reasserted here
+#     so a future crate added without the per-crate attribute still fails
+#     closed.
+#   * The five clippy lints below are workspace-wide `deny`s in v2. Tests carry
+#     the `#![cfg_attr(test, allow(...))]` exemption at every crate root and
+#     standalone test binaries (`tests/*.rs`) use `#![allow(...)]`. Production
+#     call-sites that genuinely cannot panic/overflow (calendar arithmetic,
+#     hashing inner loops, `Vec` capacity hints, post-length-check slice
+#     indexing) carry function-level or block-level `#[allow]` attributes with
+#     a one-line prose justification.
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+# v2 invariant: zero panic-paths in production code. Tests carry the
+# `#![cfg_attr(test, allow(...))]` exemption at every crate root, so these
+# `deny` levels apply only to non-test compilation. Documented invariant
+# panics (e.g. `Interner::intern`'s collision panic, `Symbol::from_hash`'s
+# unreachable arm, the arena overflow guards) carry per-fn `#[allow]`
+# attributes with a prose justification.
+unwrap_used             = "deny"
+expect_used             = "deny"
+panic                   = "deny"
+# Phase 2 deny-flip: every production call-site has been audited. Sites that
+# legitimately cannot panic/overflow (calendar arithmetic, hashing inner
+# loops, post-length-check slice indexing, `Vec` capacity hints) carry a
+# scoped `#[allow]` with a one-line prose justification at the call-site;
+# everything else has been rewritten to `.get(...).ok_or(...)?` /
+# `checked_*().ok_or(...)?` against the function's existing error type.
+indexing_slicing        = "deny"
+arithmetic_side_effects = "deny"
 
 [workspace.dependencies]
 # ── Collections / utility ────────────────────────────────────────────────────
@@ -51,8 +88,20 @@ postcard     = { version = "1", default-features = false, features = ["alloc"] }
 # ── Hashing ──────────────────────────────────────────────────────────────────
 blake3       = { version = "1", default-features = false }
 
+# ── Embedded logging ─────────────────────────────────────────────────────────
+# `defmt` is `core`-friendly (no `alloc`) and gives ~10× smaller log code on
+# Cortex-M than `core::fmt::Display` formatters. Pinned to the latest 0.3
+# minor; v2 only emits `defmt::Format` impls under the `defmt` feature.
+defmt        = { version = "0.3", default-features = false }
+
 # ── Internal crates ──────────────────────────────────────────────────────────
-dol-core     = { path = "lib/core" }
+# `dol-core` carries `default-features = false` at the workspace level so
+# every consumer that says `dol-core = { workspace = true }` inherits the
+# minimal `no_std + alloc` shape. Crates that need `serde`, `std`, `geo`,
+# `network`, `datetime`, or `numeric` from `dol-core` must forward those
+# explicitly through their own feature flags. This locks v2's "no_std + alloc
+# is default; std is opt-in" invariant in at the workspace edge.
+dol-core     = { path = "lib/core", default-features = false }
 dol-expr     = { path = "lib/expr" }
 dol-schema   = { path = "lib/schema" }
 dol-ir       = { path = "lib/ir" }

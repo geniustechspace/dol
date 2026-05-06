@@ -22,7 +22,7 @@ use crate::target::Target;
 ///
 /// // Append to kafka://events.users topic
 /// let op: Operation = Append {
-///     target: Target::new(TargetKind::StreamTopic, Locator::new(Symbol::new(0))),
+///     target: Target::new(TargetKind::StreamTopic, Locator::new(Symbol::from_hash(0))),
 ///     source: InsertSource::Bindings,
 ///     partition_key: None,
 /// }
@@ -31,7 +31,7 @@ use crate::target::Target;
 /// assert_eq!(op.kind(), dol_ir::OpKind::Append);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Append {
     /// Target to append to (typically a stream topic).
     pub target: Target,

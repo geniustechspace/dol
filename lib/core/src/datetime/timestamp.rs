@@ -3,7 +3,7 @@ use core::fmt;
 
 /// A fixed UTC offset in whole seconds. Valid range: `−86_399..=86_399`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Offset(i32);
 
 impl Offset {
@@ -16,6 +16,9 @@ impl Offset {
         Ok(Self(s))
     }
 
+    // sign in {-1, 0, 1}, h in 0..=23, m in 0..=59 by valid callers; the
+    // worst-case `1 * (23*3600 + 59*60)` is 86_340, well within i32.
+    #[allow(clippy::arithmetic_side_effects)]
     pub const fn try_from_hm(sign: i8, h: u8, m: u8) -> Result<Self, TypeError> {
         Self::try_from_seconds((sign as i32) * ((h as i32) * 3600 + (m as i32) * 60))
     }
@@ -41,7 +44,7 @@ impl fmt::Display for Offset {
 
 /// Datetime with a fixed UTC offset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TimestampTz {
     pub datetime: DateTime,
     pub offset: Offset,

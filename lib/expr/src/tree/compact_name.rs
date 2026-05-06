@@ -80,10 +80,7 @@ impl serde::Serialize for CompactName {
     }
 }
 
-#[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for CompactName {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = <String as serde::Deserialize>::deserialize(deserializer)?;
-        Ok(Self::Owned(s.into_boxed_str()))
-    }
-}
+// `Deserialize` is intentionally NOT implemented for `CompactName` in v2.
+// Wire-in goes through `dol_wire::Decode`, which decodes into the
+// `Owned` arm with a budget-checked length. `Serialize` is kept for
+// JSON dumps.

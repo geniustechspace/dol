@@ -16,7 +16,7 @@ use crate::target::Target;
 ///
 /// // HEAD s3://artifacts/build.log
 /// let op: Operation = Probe {
-///     target: Target::new(TargetKind::Blob, Locator::new(Symbol::new(0))),
+///     target: Target::new(TargetKind::Blob, Locator::new(Symbol::from_hash(0))),
 ///     include_metadata: true,
 /// }
 /// .into();
@@ -24,7 +24,7 @@ use crate::target::Target;
 /// assert_eq!(op.kind(), dol_ir::OpKind::Probe);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Probe {
     /// Target to probe.
     pub target: Target,

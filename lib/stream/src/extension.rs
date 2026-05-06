@@ -33,13 +33,16 @@ pub const IOT_SAMPLE_NAME: &str = "dol.stream/iot.sample";
 pub const EXTENSION_VERSION: u32 = 1;
 
 /// Stable [`Symbol`] identifying [`WindowPayload`] on the wire.
-pub const WINDOW_SYMBOL: Symbol = Symbol::new(fnv1a_32(WINDOW_NAME.as_bytes()));
+pub const WINDOW_SYMBOL: Symbol = Symbol::from_hash(fnv1a_32(WINDOW_NAME.as_bytes()));
 /// Stable [`Symbol`] identifying [`TimeSeriesPayload`] on the wire.
-pub const TIMESERIES_SYMBOL: Symbol = Symbol::new(fnv1a_32(TIMESERIES_NAME.as_bytes()));
+pub const TIMESERIES_SYMBOL: Symbol = Symbol::from_hash(fnv1a_32(TIMESERIES_NAME.as_bytes()));
 /// Stable [`Symbol`] identifying [`SamplePayload`] on the wire.
-pub const IOT_SAMPLE_SYMBOL: Symbol = Symbol::new(fnv1a_32(IOT_SAMPLE_NAME.as_bytes()));
+pub const IOT_SAMPLE_SYMBOL: Symbol = Symbol::from_hash(fnv1a_32(IOT_SAMPLE_NAME.as_bytes()));
 
 /// `const`-eval FNV-1a 32-bit hash. Stable; matches the spec basis/prime.
+// `i < bytes.len()` bounds the indexing; `bytes.len() <= isize::MAX` so
+// `i += 1` cannot overflow `usize`.
+#[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
 const fn fnv1a_32(bytes: &[u8]) -> u32 {
     let mut hash: u32 = 0x811c9dc5;
     let mut i = 0;
@@ -55,7 +58,7 @@ macro_rules! impl_payload {
     ($payload:ident, $inner:path, $field:ident, $sym_const:ident, $doc:expr) => {
         #[doc = $doc]
         #[derive(Clone, Debug, PartialEq)]
-        #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+        #[cfg_attr(feature = "serde", derive(serde::Serialize))]
         pub struct $payload {
             /// Wrapped extension body.
             pub $field: $inner,
@@ -71,10 +74,12 @@ macro_rules! impl_payload {
                 {
                     // Encoding failures here would indicate a structural
                     // bug in the payload type (postcard handles all owned
-                    // trees we use). Fail loudly rather than silently
-                    // emitting an empty payload that decodes to defaults.
-                    postcard::to_allocvec(self)
-                        .expect(concat!(stringify!($payload), " encode failed"))
+                    // trees we use). v2 forbids `panic!` in production
+                    // code, so on error we emit the single-byte sentinel
+                    // `0xFF` — an invalid postcard varint discriminant
+                    // that the matching `decode` rejects with a clean
+                    // codec error.
+                    postcard::to_allocvec(self).unwrap_or_else(|_| alloc::vec![0xFFu8])
                 }
                 #[cfg(not(feature = "serde"))]
                 {
@@ -83,16 +88,17 @@ macro_rules! impl_payload {
             }
 
             fn decode(bytes: &[u8]) -> Result<Self, &'static str> {
-                #[cfg(feature = "serde")]
-                {
-                    postcard::from_bytes(bytes)
-                        .map_err(|_| concat!(stringify!($payload), " decode failed"))
-                }
-                #[cfg(not(feature = "serde"))]
-                {
-                    let _ = bytes;
-                    Err("dol-stream serde feature not enabled")
-                }
+                // v2: in-memory IR/AST types (including extension
+                // payloads) no longer implement `serde::Deserialize`.
+                // The replacement is a budget-threaded
+                // `dol-wire::Decode` impl, which has not yet landed for
+                // these payloads. Until it does, decode is explicitly
+                // unsupported.
+                let _ = bytes;
+                Err(concat!(
+                    stringify!($payload),
+                    " decode: v2 wire-in via dol-wire::Decode not yet implemented"
+                ))
             }
         }
 

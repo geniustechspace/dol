@@ -6,7 +6,7 @@ use crate::ids::{
 };
 
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub enum BinOp {
     Eq,
@@ -36,7 +36,7 @@ pub enum BinOp {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub enum UnaryOp {
     Neg,
@@ -52,7 +52,7 @@ pub enum UnaryOp {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub enum Order {
     Asc,
@@ -60,7 +60,7 @@ pub enum Order {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub enum LockHint {
     ForUpdate,
@@ -70,7 +70,7 @@ pub enum LockHint {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub enum ConflictClause {
     DoNothing,
@@ -80,16 +80,19 @@ pub enum ConflictClause {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct JoinNode {
     pub source: StrId,
     pub alias: Option<StrId>,
     pub join_type: JoinType,
-    pub on: NodeId,
+    /// The `ON` condition. `None` for `CROSS JOIN` and other joins
+    /// without a predicate (replaces the previous
+    /// `NULL_NODE = u32::MAX` sentinel).
+    pub on: Option<NodeId>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub enum JoinType {
     Inner,
@@ -100,15 +103,15 @@ pub enum JoinType {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct QueryNode {
     pub from: StrId,
     pub alias: Option<StrId>,
     pub joins: SmallVec<[JoinNode; 2]>,
-    pub filter: NodeId,
+    pub filter: Option<NodeId>,
     pub columns: SmallVec<[NodeId; 8]>,
     pub group_by: SmallVec<[NodeId; 4]>,
-    pub having: NodeId,
+    pub having: Option<NodeId>,
     pub order_by: SmallVec<[(NodeId, Order); 4]>,
     pub limit: Option<u64>,
     pub offset: Option<u64>,
@@ -116,7 +119,7 @@ pub struct QueryNode {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct InsertNode {
     pub target: StrId,
     pub columns: SmallVec<[StrId; 8]>,
@@ -126,25 +129,25 @@ pub struct InsertNode {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct UpdateNode {
     pub target: StrId,
     pub columns: SmallVec<[StrId; 8]>,
     pub values: SmallVec<[NodeId; 8]>,
-    pub filter: NodeId,
+    pub filter: Option<NodeId>,
     pub returning: SmallVec<[NodeId; 4]>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct DeleteNode {
     pub target: StrId,
-    pub filter: NodeId,
+    pub filter: Option<NodeId>,
     pub returning: SmallVec<[NodeId; 4]>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct UpsertNode {
     pub target: StrId,
     pub columns: SmallVec<[StrId; 8]>,
@@ -154,7 +157,7 @@ pub struct UpsertNode {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub enum ExprNode {
     /// Static container address, up to (but not including) the leaf column.
@@ -255,6 +258,15 @@ pub enum ExprNode {
     /// this variant holds only the pool index.
     Upsert(UpsertId),
 }
+
+// Compile-time guarantee: `ExprNode` ≤ 32 bytes. Bumps from new variants
+// land here as a build error rather than a `xtask size` regression.
+const _: () = {
+    assert!(
+        core::mem::size_of::<ExprNode>() <= 32,
+        "ExprNode exceeds the 32-byte budget — pool the new payload via ExprArena",
+    );
+};
 
 #[cfg(test)]
 mod size_tests {

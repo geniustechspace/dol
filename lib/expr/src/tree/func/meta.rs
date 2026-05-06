@@ -10,7 +10,7 @@ use super::super::compact_name::CompactName;
 
 /// Describes the expected argument count for a function.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum Arity {
     /// Exactly `n` arguments required.
     Exact(u8),
@@ -52,7 +52,7 @@ impl fmt::Display for ArityError {
 
 /// Classification of a DOL function.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub enum FuncKind {
     /// A scalar function (e.g. `LOWER`, `ABS`, `ROUND`).
@@ -65,7 +65,7 @@ pub enum FuncKind {
 
 /// A rich function definition: name + arity + kind.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct FuncDef {
     name: CompactName,
     arity: Arity,

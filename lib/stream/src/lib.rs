@@ -15,8 +15,21 @@
 //! typed payloads in [`extension`] (`WindowPayload`, `TimeSeriesPayload`,
 //! `SamplePayload`) and are validated by `dol-check`.
 
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
+#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::arithmetic_side_effects
+    )
+)]
 #![warn(missing_docs)]
+
+extern crate alloc;
 
 pub mod extension;
 pub mod iot;

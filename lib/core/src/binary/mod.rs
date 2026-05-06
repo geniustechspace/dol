@@ -11,7 +11,7 @@ use core::fmt;
 /// binary protocol flags. The byte buffer always satisfies
 /// `bytes.len() == len.div_ceil(8)`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct BitString {
     /// Bit count.
     pub len: u32,
@@ -47,6 +47,9 @@ impl BitString {
 }
 
 impl fmt::Display for BitString {
+    // `i / 8` is bounded by `bytes.len() == len.div_ceil(8)` (try_new
+    // invariant), and `7 - (i % 8)` is in 0..=7.
+    #[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("b'")?;
         for i in 0..self.len {

@@ -7,7 +7,7 @@ use crate::schema::RowSchema;
 
 /// A node in the dataflow graph.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum Node {
     /// Reads rows into the graph.
     Source(Source),
@@ -19,7 +19,7 @@ pub enum Node {
 
 /// Where rows enter the graph.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum Source {
     /// Read from a named entity (table, collection, …).
     Entity {
@@ -55,7 +55,7 @@ pub enum Source {
 
 /// In-graph row transformation.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum Transform {
     /// Predicate filter expressed as a `dol-expr` node id.
     Filter {
@@ -142,7 +142,7 @@ pub enum Transform {
 
 /// Inner / outer / cross join.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum JoinKind {
     /// Inner join.
     Inner,
@@ -158,7 +158,7 @@ pub enum JoinKind {
 
 /// Where rows leave the graph.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum Sink {
     /// Append rows to an entity.
     Entity {

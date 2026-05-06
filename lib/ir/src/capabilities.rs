@@ -17,7 +17,7 @@ use core::ops::{BitAnd, BitOr, BitXor, Not};
 /// Use [`BackendCapabilities::contains`] to test for presence.
 #[repr(transparent)]
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct BackendCapabilities(
     /// Raw 64-bit bitmask of enabled capabilities.
     pub u64,
@@ -188,7 +188,7 @@ extern crate alloc;
 /// constants can be defined at compile time; user-minted tags carry an
 /// owned `String`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct CapabilityTag(
     /// Inner string: borrowed for built-ins, owned for extensions.
     alloc::borrow::Cow<'static, str>,
@@ -283,7 +283,7 @@ impl core::fmt::Display for CapabilityTag {
 /// extension-specific tags) and is used for diagnostics and cross-crate
 /// communication.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct CapabilitySet {
     /// List of tags in insertion order; duplicates are rejected.
     tags: Vec<CapabilityTag>,
@@ -355,7 +355,7 @@ impl FromIterator<CapabilityTag> for CapabilitySet {
 /// Used to render uniform diagnostics like
 /// *"backend `pg` does not support `Append` on `TargetKind::StreamTopic`"*.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct CapabilityCheck {
     /// The operation kind being checked.
     pub op: crate::operation::OpKind,
@@ -480,7 +480,7 @@ mod v2_tests {
     #[test]
     fn append_on_stream_topic_requires_append_and_stream_tags() {
         let op: Operation = crate::operation::Append {
-            target: Target::new(TargetKind::StreamTopic, Locator::new(Symbol::new(0))),
+            target: Target::new(TargetKind::StreamTopic, Locator::new(Symbol::from_hash(0))),
             source: InsertSource::Bindings,
             partition_key: None,
         }
@@ -493,7 +493,7 @@ mod v2_tests {
     #[test]
     fn plain_insert_has_no_required_tags() {
         let op: Operation = Insert {
-            target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0)))
+            target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(0)))
                 .with_schema(crate::target::SchemaBinding::Inferred),
             source: InsertSource::Bindings,
             returning: None,

@@ -12,16 +12,16 @@ dol-ir     = { workspace = true }
 dol-schema = { workspace = true }
 dol-core   = { workspace = true }
 dol-expr   = { workspace = true }
+smallvec   = { workspace = true }
 
 # Codec-specific (all optional)
 serde      = { workspace = true, optional = true }
 postcard   = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
-blake3     = { workspace = true, optional = true }
 
 [features]
 default     = []
-std         = []
+std         = ["dol-core/std", "dol-expr/std", "dol-schema/std", "dol-ir/std"]
 # Universal serde plumbing on every payload type.
 serde       = [
     "dep:serde",
@@ -34,12 +34,29 @@ serde       = [
 postcard    = ["serde", "std", "dep:postcard"]
 # Human-readable codec (debugging / interop).
 json        = ["serde", "std", "dep:serde_json"]
-# Content hashing of canonical wire bytes via BLAKE3.
-hash        = ["std", "dep:blake3"]
+# Content hashing of canonical wire bytes — routed through the
+# `dol_core::hash` chokepoint (the only crate allowed to depend on
+# `blake3` directly).
+hash        = ["std", "dol-core/hash"]
+# Pass-through gates that surface dol-core's optional type families to
+# this crate. Required for the matching `Decode` impls
+# (`Date`, `Time`, …, `Decimal`, `BitString`, geo / network leaves) to
+# compile and round-trip against `postcard::to_allocvec`.
+datetime    = ["dol-core/datetime"]
+numeric     = ["dol-core/numeric"]
+geo         = ["dol-core/geo"]
+network     = ["dol-core/network"]
+# Pass-through gate for `dol-ir`'s escape-hatch `Operation::Raw` variant.
+raw         = ["dol-ir/raw"]
 # Convenience: pull in everything.
-full        = ["postcard", "json", "hash"]
+full        = ["postcard", "json", "hash", "datetime", "numeric", "geo", "network", "raw"]
 
 [dev-dependencies]
 serde_json = { workspace = true }
 dol-expr   = { workspace = true, features = ["serde"] }
+dol-core   = { workspace = true, features = ["serde", "datetime", "numeric", "geo", "network"] }
+postcard   = { workspace = true }
 smallvec   = { workspace = true }
+
+[lints]
+workspace = true

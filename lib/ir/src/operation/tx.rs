@@ -8,7 +8,7 @@ use crate::target::Symbol;
 /// Isolation levels that backends can honour. Backends that do not support
 /// a level should diagnose via the capability layer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum IsolationLevel {
     /// Minimal isolation; uncommitted changes from other transactions visible.
     ReadUncommitted,
@@ -24,7 +24,7 @@ pub enum IsolationLevel {
 
 /// Options shared by `TxBegin` and `TxOp::Atomic`.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TxOptions {
     /// Requested isolation level, if any.
     pub isolation: Option<IsolationLevel>,
@@ -36,7 +36,7 @@ pub struct TxOptions {
 
 /// `Begin` payload.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TxBegin {
     /// Transaction options (isolation, read-only, label).
     pub opts: TxOptions,
@@ -65,7 +65,7 @@ pub struct TxBegin {
 /// assert_eq!(op.kind(), dol_ir::OpKind::Tx);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum TxOp {
     /// Start a new transaction.
     Begin(TxBegin),

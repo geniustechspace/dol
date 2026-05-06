@@ -1,5 +1,11 @@
 //! INSERT query builder for `dol-query`.
 
+use alloc::{
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
+
 // ===========================================================================
 // InsertQuery
 // ===========================================================================
@@ -8,7 +14,7 @@
 ///
 /// Construct via [`Query::from(...).insert()`](crate::Query::insert).
 #[derive(Debug, Clone)]
-#[must_use = "builders do nothing until .build() is called"]
+#[must_use = "builders do nothing until .try_build() is called"]
 pub struct InsertQuery {
     name: String,
     namespace: Option<String>,
@@ -59,6 +65,10 @@ impl InsertQuery {
     }
 
     /// Total bind-parameter count for this INSERT.
+    // Both factors are bounded by user-input column-/row-counts; on a
+    // 64-bit `usize`, exceeding `usize::MAX` would require a query with
+    // >2^64 columns × rows, which is not representable in any caller.
+    #[allow(clippy::arithmetic_side_effects)]
     pub fn param_count(&self) -> usize {
         let field_count = if self.fields.is_empty() {
             self.field_names.as_ref().map_or(0, |n| n.len())
@@ -71,7 +81,12 @@ impl InsertQuery {
     /// Build the arena-based IR as a [`dol_ir::Program`] containing a
     /// single [`dol_ir::Operation::Insert`] referencing an arena
     /// [`ExprNode::Insert`](dol_expr::expr::ExprNode::Insert).
-    pub fn build(self) -> dol_ir::Program {
+    ///
+    /// Infallible in current shape (the builder only allocates `Param`
+    /// placeholders), but returns `Result` for API consistency with the
+    /// other builders. Will gain real failure modes once user-supplied
+    /// VALUES expressions are supported.
+    pub fn try_build(self) -> Result<dol_ir::Program, crate::BuildError> {
         use dol_expr::expr::{ExprNode, InsertNode};
         use dol_ir::TargetKind;
         use dol_ir::operation::{Insert, InsertSource};
@@ -89,17 +104,20 @@ impl InsertQuery {
             &self.name,
             &self.namespace,
         ));
-        let columns: smallvec::SmallVec<[u32; 8]> =
+        let columns: smallvec::SmallVec<[dol_expr::ids::StrId; 8]> =
             fields.iter().map(|f| interner.intern(f)).collect();
 
         // Generate one Param node per field per row.
-        let mut values = smallvec::SmallVec::new();
+        let mut values: smallvec::SmallVec<[dol_expr::ids::NodeId; 8]> = smallvec::SmallVec::new();
+        // `row_count * fields.len()` is bounded by the same constraints as
+        // `param_count`; not representable as overflow on 64-bit `usize`.
+        #[allow(clippy::arithmetic_side_effects)]
         for _ in 0..(self.row_count * fields.len()) {
             values.push(arena.alloc(ExprNode::Param));
         }
 
         // Returning columns as field-reference expressions.
-        let returning: smallvec::SmallVec<[u32; 4]> = self
+        let returning: smallvec::SmallVec<[dol_expr::ids::NodeId; 4]> = self
             .returning
             .iter()
             .map(|r| {
@@ -135,6 +153,6 @@ impl InsertQuery {
             returning: None,
         }
         .into();
-        dol_ir::Program::new(op, arena, interner)
+        Ok(dol_ir::Program::new(op, arena, interner))
     }
 }

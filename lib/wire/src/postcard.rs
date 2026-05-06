@@ -2,8 +2,11 @@
 //!
 //! These helpers wrap the core [`postcard`] crate with the DOL [`crate::WireHeader`]
 //! envelope. They operate on any `serde::Serialize` payload; downstream callers
-//! pick the payload type (a [`dol_ir::Program`] once `dol-ir` is fully
-//! serde-able, or a domain-specific subset in the meantime).
+//! pick the payload type.
+//!
+//! Only a `Serialize`-side `encode` is exposed: v2 wire-in goes through
+//! [`crate::Decode`] exclusively (see [`crate::program::decode`] for the
+//! `Program`-typed entry point).
 //!
 //! Encoded layout:
 //!
@@ -16,6 +19,10 @@ use alloc::vec::Vec;
 use crate::{WireError, WireHeader};
 
 /// Encode `payload` to postcard bytes and prepend a [`WireHeader`].
+// `Vec` capacity hint; cannot exceed `isize::MAX` so the addition is
+// effectively bounded — saturation at `usize::MAX` would still be a valid
+// (oversized) hint.
+#[allow(clippy::arithmetic_side_effects)]
 pub fn encode<T: serde::Serialize>(payload: &T) -> Result<Vec<u8>, WireError> {
     let header = WireHeader::current().to_bytes();
     let body =
@@ -24,12 +31,6 @@ pub fn encode<T: serde::Serialize>(payload: &T) -> Result<Vec<u8>, WireError> {
     out.extend_from_slice(&header);
     out.extend_from_slice(&body);
     Ok(out)
-}
-
-/// Verify the [`WireHeader`] and decode the postcard body into `T`.
-pub fn decode<'de, T: serde::Deserialize<'de>>(bytes: &'de [u8]) -> Result<T, WireError> {
-    let body = crate::unframe(bytes)?;
-    ::postcard::from_bytes::<T>(body).map_err(|e| WireError::Codec(alloc::format!("{e}")))
 }
 
 extern crate alloc;

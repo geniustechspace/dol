@@ -1,0 +1,104 @@
+name: Nightly Sanitizers
+
+# Per `docs/v2_plan.md` §78: nightly-only jobs that run miri (UB
+# detection) and AddressSanitizer (heap / stack memory bugs) over the
+# critical decode + arena paths. These never gate PRs — flakiness in
+# nightly toolchains would block all work — but produce a daily report.
+on:
+  schedule:
+    # 04:17 UTC daily, off-peak for libfuzzer infra.
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+  pull_request:
+    # Allow developers to opt a PR in by adding the `nightly-sanitizers`
+    # label; otherwise it does not run on PRs to keep the default loop
+    # fast.
+    types: [labeled]
+    branches: [main, dev]
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  miri:
+    name: Miri (UB detection)
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'nightly-sanitizers')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      # Miri reads its config from `MIRIFLAGS`; `-Zmiri-strict-provenance`
+      # catches `usize → ptr` round-trips that would silently UB on
+      # stable. `-Zmiri-symbolic-alignment-check` validates `bytemuck`
+      # casts in `lib/expr/src/packed.rs`.
+      MIRIFLAGS: "-Zmiri-strict-provenance -Zmiri-symbolic-alignment-check"
+      # Override the workflow-level `-D warnings` (nightly emits lints
+      # that aren't actionable on this channel).
+      RUSTFLAGS: ""
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust nightly + miri
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly
+          components: miri
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: miri
+
+      - name: Miri setup
+        run: cargo +nightly miri setup
+
+      # Targeted: `dol-core` (`policy`, `id`, `storage`), `dol-expr`
+      # (`packed`, `interner`, iterative walkers), and `dol-wire`
+      # (`Decode`, `Signed`) are the layers most likely to hide UB.
+      - name: Miri test dol-core
+        run: cargo +nightly miri test -p dol-core --lib
+
+      - name: Miri test dol-expr
+        run: cargo +nightly miri test -p dol-expr --lib
+
+      - name: Miri test dol-wire (no codecs)
+        run: cargo +nightly miri test -p dol-wire --lib
+
+  asan:
+    name: AddressSanitizer
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'nightly-sanitizers')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      # `-Zsanitizer=address` requires nightly + a target with a libsan
+      # build. `RUSTDOCFLAGS` mirrors `RUSTFLAGS` so doctests are
+      # instrumented too.
+      RUSTFLAGS: "-Zsanitizer=address"
+      RUSTDOCFLAGS: "-Zsanitizer=address"
+      ASAN_OPTIONS: "detect_leaks=1:detect_stack_use_after_return=1:strict_init_order=1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly
+          components: rust-src
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: asan
+
+      # `-Zbuild-std` rebuilds `std` and `alloc` with ASAN
+      # instrumentation; without it the runtime panics on the first
+      # heap allocation done from un-instrumented `std` code.
+      - name: ASAN test workspace
+        run: |
+          cargo +nightly test \
+            -Zbuild-std \
+            --target x86_64-unknown-linux-gnu \
+            --workspace \
+            --exclude xtask

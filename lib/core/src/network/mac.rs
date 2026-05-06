@@ -74,7 +74,7 @@ impl core::error::Error for ParseMacAddrError {}
 /// [0, 26, 43, 60, 77, 94, 111, 128]
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
 pub enum MacAddr {
     Eui48([u8; 6]),
@@ -196,8 +196,13 @@ impl FromStr for MacAddr {
             if count == bytes.len() {
                 return Err(ParseMacAddrError::invalid());
             }
-            bytes[count] = parse_hex_byte(part).ok_or_else(ParseMacAddrError::invalid)?;
-            count += 1;
+            // `count < bytes.len()` is enforced by the guard above; the
+            // increment cannot overflow because it is capped at 8.
+            #[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
+            {
+                bytes[count] = parse_hex_byte(part).ok_or_else(ParseMacAddrError::invalid)?;
+                count += 1;
+            }
         }
 
         match count {
@@ -237,6 +242,7 @@ impl TryFrom<alloc::boxed::Box<str>> for MacAddr {
 #[cfg(test)]
 mod tests {
     use super::{MacAddr, ParseMacAddrError};
+    use crate::alloc::string::ToString;
 
     #[test]
     fn display_eui48() {

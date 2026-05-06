@@ -1,6 +1,6 @@
 # `dol-core`
 
-The foundation crate for the DOL stack. Bundles three independently coherent
+The foundation crate for the DOL stack. Bundles four independently coherent
 pieces that every higher `dol-*` crate builds on:
 
 - **Source spans** (`span` namespace) — compact `(file, start, length)`
@@ -8,6 +8,11 @@ pieces that every higher `dol-*` crate builds on:
 - **Structured diagnostics** (`diag` namespace) — code-driven error reports
   with labels, notes, and fix-its. Validators emit `Diagnostic`s rather than
   panicking.
+- **Foundation primitives** (`policy`, `id`, `storage` namespaces) —
+  `Limits` / `Budget` for bounded recursive traversals, `Id<Tag>` for
+  niche-optimised typed arena handles (`Option<Id<T>>` is 4 bytes), and
+  `Storage<T>` to abstract arena backends across `Vec` / `heapless` /
+  `ArrayVec`.
 - **The DOL value/type system** — the universal logical type vocabulary:
   `Value`, `Literal`, `DataType`, plus the validated primitives (`Decimal`,
   `Date`, `Time`, `Interval`, `IpAddr`, `MacAddr`, `BitString`, `geo::Point`,
@@ -23,7 +28,7 @@ The most-used items are re-exported flat at the crate root:
 
 ```rust
 use dol_core::{Value, Literal, DataType, TypeError, Span, FileId,
-               Diagnostic, Severity, Code};
+               Diagnostic, Severity, Code, Id, Limits, Budget};
 ```
 
 Sub-namespaces remain accessible for less-frequently used items:
@@ -31,6 +36,8 @@ Sub-namespaces remain accessible for less-frequently used items:
 ```rust
 use dol_core::span::SpanTable;
 use dol_core::diag::{Label, Note, FixIt};
+use dol_core::policy::BudgetError;
+use dol_core::storage::Storage;
 use dol_core::datetime::{Date, Time, DateTime, Interval, Offset, TimestampTz};
 use dol_core::geo::{Point, Line, Polygon, Rect, Circle, Path, Segment};
 use dol_core::network::{IpAddr, MacAddr};

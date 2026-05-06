@@ -1,6 +1,8 @@
 //! Integration tests for `dol-query` builders against the
 //! [`Operation`](dol_ir::Operation) IR.
 
+use alloc::{boxed::Box, format, string::String, vec};
+
 use super::*;
 use dol_expr::expr::ExprNode;
 use dol_schema::{DataType, Field};
@@ -168,7 +170,8 @@ fn namespace_propagates_to_get_ir() {
         .namespace("users")
         .get()
         .fields(&["id"])
-        .build();
+        .try_build()
+        .expect("test fixture: builder must succeed");
     let q = unwrap_query(&p);
     assert_eq!(p.interner.get(q.from), "api.v1.users");
     assert_eq!(target_name(&p), "api.v1.users");
@@ -180,7 +183,8 @@ fn namespace_propagates_to_insert_ir() {
         .namespace("users")
         .insert()
         .fields(&["id", "email"])
-        .build();
+        .try_build()
+        .expect("test fixture: builder must succeed");
     let ins = unwrap_insert(&p);
     assert_eq!(p.interner.get(ins.target), "api.users");
     assert_eq!(target_name(&p), "api.users");
@@ -192,7 +196,8 @@ fn namespace_propagates_to_update_ir() {
         .namespace("users")
         .update()
         .set("email")
-        .build();
+        .try_build()
+        .expect("test fixture: builder must succeed");
     let upd = unwrap_update(&p);
     assert_eq!(p.interner.get(upd.target), "api.users");
 }
@@ -203,7 +208,8 @@ fn namespace_propagates_to_delete_ir() {
         .namespace("users")
         .delete()
         .filter(dol_expr::tree::field("id").eq(dol_expr::tree::param()))
-        .build();
+        .try_build()
+        .expect("test fixture: builder must succeed");
     let del = unwrap_delete(&p);
     assert_eq!(p.interner.get(del.target), "api.users");
 }
@@ -216,7 +222,8 @@ fn namespace_propagates_to_upsert_ir() {
         .fields(&["id", "email"])
         .match_on(&["id"])
         .then_skip()
-        .build();
+        .try_build()
+        .expect("test fixture: builder must succeed");
     let ups = unwrap_upsert(&p);
     assert_eq!(p.interner.get(ups.target), "api.users");
 }
@@ -226,7 +233,10 @@ fn namespace_propagates_to_upsert_ir() {
 #[test]
 fn get_from_entity_defaults() {
     let users = users_entity();
-    let p = Query::from(&users).get().build();
+    let p = Query::from(&users)
+        .get()
+        .try_build()
+        .expect("test fixture: builder must succeed");
     let q = unwrap_query(&p);
     assert_eq!(p.interner.get(q.from), "users");
     assert_eq!(q.columns.len(), 3);
@@ -238,9 +248,10 @@ fn get_from_entity_filter() {
     let p = Query::from(&users)
         .get()
         .filter(dol_expr::tree::field("id").eq(dol_expr::tree::param()))
-        .build();
+        .try_build()
+        .expect("test fixture: builder must succeed");
     let q = unwrap_query(&p);
-    assert_ne!(q.filter, dol_expr::NULL_NODE);
+    assert!(q.filter.is_some());
 }
 
 // ── GetQuery from string ────────────────────────────────────────
@@ -251,16 +262,21 @@ fn get_from_string_columns() {
         .get()
         .fields(&["id", "email"])
         .filter(dol_expr::tree::field("id").eq(dol_expr::tree::param()))
-        .build();
+        .try_build()
+        .expect("test fixture: builder must succeed");
     let q = unwrap_query(&p);
     assert_eq!(p.interner.get(q.from), "users");
     assert_eq!(q.columns.len(), 2);
-    assert_ne!(q.filter, dol_expr::NULL_NODE);
+    assert!(q.filter.is_some());
 }
 
 #[test]
 fn get_from_namespaced_string() {
-    let p = Query::from("identity.users").get().fields(&["id"]).build();
+    let p = Query::from("identity.users")
+        .get()
+        .fields(&["id"])
+        .try_build()
+        .expect("test fixture: builder must succeed");
     let q = unwrap_query(&p);
     assert_eq!(p.interner.get(q.from), "identity.users");
 }
@@ -270,7 +286,10 @@ fn get_from_namespaced_string() {
 #[test]
 fn insert_from_entity_defaults() {
     let users = users_entity();
-    let p = Query::from(&users).insert().build();
+    let p = Query::from(&users)
+        .insert()
+        .try_build()
+        .expect("test fixture: builder must succeed");
     let ins = unwrap_insert(&p);
     assert_eq!(p.interner.get(ins.target), "users");
     assert_eq!(ins.columns.len(), 3);
@@ -283,7 +302,8 @@ fn insert_from_string_columns() {
         .fields(&["id", "email"])
         .rows(2)
         .returning_all()
-        .build();
+        .try_build()
+        .expect("test fixture: builder must succeed");
     let ins = unwrap_insert(&p);
     assert_eq!(p.interner.get(ins.target), "users");
     assert_eq!(ins.columns.len(), 2);
@@ -300,12 +320,13 @@ fn update_from_string() {
         .set("email")
         .filter(dol_expr::tree::field("id").eq(dol_expr::tree::param()))
         .returning_all()
-        .build();
+        .try_build()
+        .expect("test fixture: builder must succeed");
     let upd = unwrap_update(&p);
     assert_eq!(p.interner.get(upd.target), "users");
     assert_eq!(upd.columns.len(), 1);
     assert_eq!(upd.values.len(), 1);
-    assert_ne!(upd.filter, dol_expr::NULL_NODE);
+    assert!(upd.filter.is_some());
     assert_eq!(upd.returning.len(), 1);
 }
 
@@ -317,10 +338,11 @@ fn delete_from_string() {
         .delete()
         .filter(dol_expr::tree::field("id").eq(dol_expr::tree::param()))
         .returning_all()
-        .build();
+        .try_build()
+        .expect("test fixture: builder must succeed");
     let del = unwrap_delete(&p);
     assert_eq!(p.interner.get(del.target), "users");
-    assert_ne!(del.filter, dol_expr::NULL_NODE);
+    assert!(del.filter.is_some());
     assert_eq!(del.returning.len(), 1);
 }
 
@@ -333,7 +355,8 @@ fn upsert_from_string() {
         .fields(&["id", "email", "name"])
         .match_on(&["id"])
         .then_patch(&["email", "name"])
-        .build();
+        .try_build()
+        .expect("test fixture: builder must succeed");
     let ups = unwrap_upsert(&p);
     assert_eq!(p.interner.get(ups.target), "users");
     assert_eq!(ups.columns.len(), 3);
@@ -352,7 +375,8 @@ fn upsert_do_nothing() {
         .fields(&["id", "email"])
         .match_on(&["id"])
         .then_skip()
-        .build();
+        .try_build()
+        .expect("test fixture: builder must succeed");
     let ups = unwrap_upsert(&p);
     assert!(matches!(
         ups.conflict,
@@ -364,14 +388,22 @@ fn upsert_do_nothing() {
 
 #[test]
 fn get_emits_query_operation() {
-    let p = Query::from("users").get().fields(&["id"]).build();
+    let p = Query::from("users")
+        .get()
+        .fields(&["id"])
+        .try_build()
+        .expect("test fixture: builder must succeed");
     assert_eq!(p.operations[0].kind(), dol_ir::OpKind::Query);
     assert_eq!(p.operations[0].category(), dol_ir::Category::DQL);
 }
 
 #[test]
 fn insert_emits_insert_operation() {
-    let p = Query::from("users").insert().fields(&["id"]).build();
+    let p = Query::from("users")
+        .insert()
+        .fields(&["id"])
+        .try_build()
+        .expect("test fixture: builder must succeed");
     assert_eq!(p.operations[0].kind(), dol_ir::OpKind::Insert);
     assert_eq!(p.operations[0].category(), dol_ir::Category::DML);
 }
@@ -383,7 +415,8 @@ fn upsert_emits_upsert_operation_and_merge_capability() {
         .fields(&["id"])
         .match_on(&["id"])
         .then_skip()
-        .build();
+        .try_build()
+        .expect("test fixture: builder must succeed");
     assert_eq!(p.operations[0].kind(), dol_ir::OpKind::Upsert);
     assert!(
         p.operations[0]

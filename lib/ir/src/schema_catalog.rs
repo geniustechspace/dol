@@ -18,7 +18,7 @@ extern crate alloc;
 
 /// One entry in a [`SchemaCatalog`].
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum CatalogEntry {
     /// Entity body (relation / document / KV / blob bucket).
     Entity(dol_schema::Entity),
@@ -40,7 +40,7 @@ pub enum CatalogEntry {
 /// surrounding program's [`Interner`](dol_expr::Interner). The four-element
 /// inline buffer for `members` keeps the common case (small enums) in-line.
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TypeEntry {
     /// Interned type name.
     pub name: Symbol,
@@ -55,7 +55,7 @@ pub struct TypeEntry {
 ///
 /// The catalog is a flat indexed table; lookups are `O(1)` by [`SchemaId`].
 #[derive(Clone, Debug, Default, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct SchemaCatalog {
     /// Identifier of this catalog. Default is [`CatalogId::SELF`].
     pub id: CatalogId,
@@ -98,6 +98,11 @@ impl SchemaCatalog {
         self.entries.is_empty()
     }
 
+    /// Borrow the entries as a contiguous slice.
+    pub fn entries_slice(&self) -> &[CatalogEntry] {
+        &self.entries
+    }
+
     /// Iterate over `(SchemaId, &CatalogEntry)`.
     pub fn iter(&self) -> impl Iterator<Item = (SchemaId, &CatalogEntry)> {
         self.entries
@@ -115,9 +120,9 @@ mod tests {
     fn insert_and_get() {
         let mut cat = SchemaCatalog::new();
         let id = cat.insert(CatalogEntry::Type(TypeEntry {
-            name: Symbol::new(0),
+            name: Symbol::from_hash(0),
             kind: crate::operation::TypeBody::Enum,
-            members: smallvec::smallvec![Symbol::new(1), Symbol::new(2)],
+            members: smallvec::smallvec![Symbol::from_hash(1), Symbol::from_hash(2)],
         }));
         assert_eq!(cat.len(), 1);
         assert!(matches!(cat.get(id), Some(CatalogEntry::Type(_))));

@@ -4,32 +4,32 @@
 //!
 //! 1. Validated constructors are exhaustive: every shape that should be
 //!    rejected actually is.
-//! 2. Round-trip stability: every primitive value survives serde encoding
-//!    and decoding.
-//! 3. `DataType::accepts` is consistent: a value built from a constructor
+//! 2. `DataType::accepts` is consistent: a value built from a constructor
 //!    that succeeded conforms to the matching type descriptor.
+//!
+//! Round-trip stability is exercised separately by `dol-wire`'s
+//! `Encode`/`Decode` test suite — `dol-core` itself no longer asserts
+//! serde round-trip in v2 (`Deserialize` is gone from in-memory types).
 
 #![cfg(all(
-    feature = "serde",
     feature = "datetime",
     feature = "geo",
     feature = "network",
     feature = "numeric"
 ))]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects
+)]
 
 use dol_core::{
     DataType, Date, Decimal, IpAddr, Literal, MacAddr, Time, TypeError, Value,
     datetime::{from_hms_nano, from_ymd},
 };
 use proptest::prelude::*;
-
-fn round_trip<T>(value: &T) -> T
-where
-    T: serde::Serialize + serde::de::DeserializeOwned,
-{
-    let json = serde_json::to_string(value).unwrap();
-    serde_json::from_str(&json).unwrap()
-}
 
 // ─── Constructor exhaustiveness ──────────────────────────────────────────────
 
@@ -84,6 +84,7 @@ fn ip_strategy() -> impl Strategy<Value = IpAddr> {
     ]
 }
 
+#[allow(dead_code)] // Retained for upcoming Value-level proptests; see docs/v2_plan.md §57.
 fn primitive_value_strategy() -> impl Strategy<Value = Value> {
     // Float values are excluded: JSON does not preserve full f64 precision
     // and proptest will eventually find a value where text round-tripping
@@ -103,18 +104,14 @@ fn primitive_value_strategy() -> impl Strategy<Value = Value> {
 
 proptest! {
     #[test]
-    fn primitive_value_round_trips(v in primitive_value_strategy()) {
-        prop_assert_eq!(v.clone(), round_trip(&v));
-    }
-
-    #[test]
-    fn ip_round_trips(ip in ip_strategy()) {
-        prop_assert_eq!(ip, round_trip(&ip));
+    fn ip_strategy_constructs_valid_ips(ip in ip_strategy()) {
+        // Smoke check: the strategy yields a constructible IpAddr.
+        let _ = format!("{ip:?}");
     }
 }
 
 #[test]
-fn datatype_primitive_round_trips() {
+fn datatype_primitive_constructors_succeed() {
     for dt in [
         DataType::Null,
         DataType::Bool,
@@ -130,7 +127,9 @@ fn datatype_primitive_round_trips() {
         DataType::Xml,
         DataType::Date,
     ] {
-        assert_eq!(dt.clone(), round_trip(&dt));
+        // No-op smoke test: ensures every primitive variant is publicly
+        // constructible without `Deserialize`.
+        let _ = dt.clone();
     }
 }
 

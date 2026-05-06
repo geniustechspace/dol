@@ -3,17 +3,21 @@
 //! The hash is computed over the **body** (excluding the [`crate::WireHeader`])
 //! so a payload retains the same identity even if a future header version
 //! is prepended for transport.
-
-use alloc::string::String;
+//!
+//! All hashing is delegated to the [`dol_core::hash`] chokepoint — the
+//! only crate in the workspace allowed to depend on `blake3` directly.
 
 extern crate alloc;
 
-/// 32-byte BLAKE3 digest.
-pub type Digest = [u8; 32];
+use alloc::string::String;
+
+/// 32-byte BLAKE3 digest, re-exported from [`dol_core::hash`].
+pub type Digest = ::dol_core::hash::Digest256;
 
 /// Hash an arbitrary byte body.
+#[must_use]
 pub fn hash_bytes(body: &[u8]) -> Digest {
-    *::blake3::hash(body).as_bytes()
+    ::dol_core::hash::hash256(body)
 }
 
 /// Hash a postcard-encoded payload directly.
@@ -27,23 +31,9 @@ pub fn content_hash<T: serde::Serialize>(payload: &T) -> Result<Digest, crate::W
 }
 
 /// Hex-encode a [`Digest`] as a 64-character lowercase string.
+#[must_use]
 pub fn hex(digest: &Digest) -> String {
-    let mut out = String::with_capacity(64);
-    for byte in digest {
-        let hi = byte >> 4;
-        let lo = byte & 0xF;
-        out.push(nibble(hi));
-        out.push(nibble(lo));
-    }
-    out
-}
-
-fn nibble(n: u8) -> char {
-    match n {
-        0..=9 => (b'0' + n) as char,
-        10..=15 => (b'a' + n - 10) as char,
-        _ => unreachable!(),
-    }
+    ::dol_core::hash::hex256(digest)
 }
 
 #[cfg(test)]

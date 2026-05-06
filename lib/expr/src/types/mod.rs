@@ -16,4 +16,4 @@ pub use dol_core::geo;
 pub use dol_core::network;
 #[cfg(feature = "numeric")]
 pub use dol_core::numeric;
-pub use dol_core::{binary, descriptor, error, value};
+pub use dol_core::{binary, data_type, error, value};

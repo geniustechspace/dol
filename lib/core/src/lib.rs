@@ -1,12 +1,18 @@
 //! # `dol-core` — foundation for the DOL stack
 //!
-//! `dol-core` bundles three independently coherent pieces that every other
+//! `dol-core` bundles four independently coherent pieces that every other
 //! `dol-*` crate builds on:
 //!
 //! - **Source spans** ([`span`]) — compact `(file, start, length)` triples
 //!   used by every diagnostic and AST node table.
 //! - **Diagnostics** ([`diag`]) — structured, code-driven error reports with
 //!   labels, notes, and fix-its. Used in lieu of panics by every validator.
+//! - **Foundation primitives** ([`policy`], [`id`], [`storage`]) — [`Limits`]
+//!   and [`Budget`] for bounded recursive traversals, [`Id`] for typed
+//!   niche-optimised arena handles (`Option<Id<T>>` is 4 bytes), and the
+//!   [`storage::Storage`] trait that lets future arenas swap their backing
+//!   container between `Vec` (default) and bounded embedded alternatives
+//!   (`heapless::Vec`, `arrayvec::ArrayVec`).
 //! - **The DOL value/type system** — the universal logical type vocabulary:
 //!   [`Value`], [`Literal`], [`DataType`], plus the validated primitives
 //!   (`Decimal`, `Date`, `Time`, `Interval`, `IpAddr`, `MacAddr`, `BitString`,
@@ -24,7 +30,7 @@
 //!
 //! ```ignore
 //! use dol_core::{Value, Literal, DataType, TypeError, Span, FileId,
-//!                Diagnostic, Severity, Code};
+//!                Diagnostic, Severity, ErrorCode, Id, Limits, Budget};
 //! ```
 //!
 //! Sub-namespaces remain accessible for items not promoted to the root:
@@ -32,6 +38,8 @@
 //! ```ignore
 //! use dol_core::span::SpanTable;
 //! use dol_core::diag::{Label, Note, FixIt};
+//! use dol_core::policy::BudgetError;
+//! use dol_core::storage::Storage;
 //! use dol_core::datetime::{Date, Time, DateTime, Interval, Offset, TimestampTz};
 //! use dol_core::geo::{Point, Line, Polygon, Rect, Circle, Path, Segment};
 //! use dol_core::network::{IpAddr, MacAddr};
@@ -44,7 +52,7 @@
 //! | feature    | default | effect                                                                                                |
 //! | ---------- | :-----: | ----------------------------------------------------------------------------------------------------- |
 //! | `std`      |   ✓     | Enables wall-clock factory helpers (implies `datetime`).                                              |
-//! | `serde`    |   ✓     | `Serialize` / `Deserialize` for every public type, including [`Span`] and [`Diagnostic`].             |
+//! | `serde`    |   ✓     | `Serialize` for every public type, including [`Span`] and [`Diagnostic`]. v2 wire-in goes through `dol_wire::Decode` — no `Deserialize` impls. |
 //! | `geo`      |   ✓     | The `geo` module + `Value`/`Literal`/`DataType`/`TypeError` variants for geometric types.             |
 //! | `network`  |   ✓     | The `network` module + `Inet`/`MacAddr` variants on `Value`/`Literal`/`DataType`.                     |
 //! | `datetime` |   ✓     | The `datetime` module + `Date`/`Time`/`DateTime`/`TimestampTz`/`Interval` variants.                   |
@@ -62,7 +70,17 @@
 //! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::arithmetic_side_effects
+    )
+)]
 #![warn(missing_docs)]
 // TODO(docs): chip away at the missing-docs allowlist below. Each entry
 // represents a module whose public API surface still needs rustdoc coverage.
@@ -74,7 +92,14 @@ extern crate alloc;
 // ─── Namespaced infrastructure ───────────────────────────────────────────────
 
 pub mod diag;
+#[cfg(feature = "hash")]
+pub mod hash;
+pub mod id;
+pub mod policy;
+pub mod raw;
+pub mod signing;
 pub mod span;
+pub mod storage;
 
 // ─── Type system sub-namespaces ──────────────────────────────────────────────
 
@@ -103,10 +128,6 @@ pub mod prelude;
 #[allow(missing_docs)] // tracking: docs follow-up
 pub mod value;
 
-/// Compatibility re-export — the old `descriptor` module has moved to [`data_type`].
-#[doc(hidden)]
-pub use data_type as descriptor;
-
 // ─── Flat top-level re-exports — the 5–10 most-used items ────────────────────
 
 pub use error::TypeError;
@@ -127,5 +148,10 @@ pub use literal::{Literal, LiteralRange};
 pub use value::{Value, ValueRange};
 
 // span / diag flat re-exports — the headline boundary items.
-pub use diag::{Code, Diagnostic, Severity};
+pub use diag::{Diagnostic, ErrorCode, Severity};
 pub use span::{FileId, Span};
+
+// policy / id flat re-exports — the load-bearing foundation primitives
+// every recursive or arena-bearing path threads.
+pub use id::Id;
+pub use policy::{Budget, BudgetError, Limits};

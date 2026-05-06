@@ -45,7 +45,7 @@ use super::window::WindowFrame;
 /// let expr = field("profile").get("address").get("city");
 /// ```
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub enum Expr<'a> {
     // ── References ──────────────────────────────────────────────────────────

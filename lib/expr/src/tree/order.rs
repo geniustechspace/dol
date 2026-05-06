@@ -4,7 +4,7 @@ use super::Expr;
 
 /// Sort direction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum Direction {
     Asc,
     Desc,
@@ -12,7 +12,7 @@ pub enum Direction {
 
 /// NULLS positioning in ORDER BY.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum NullsPosition {
     First,
     Last,
@@ -20,7 +20,7 @@ pub enum NullsPosition {
 
 /// An ORDER BY element using `Expr`.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct OrderByExpr<'a> {
     pub expr: Expr<'a>,
     pub direction: Direction,

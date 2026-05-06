@@ -14,11 +14,9 @@ dol-core   = { workspace = true }
 smallvec   = { workspace = true }
 serde      = { workspace = true, optional = true }
 
-[dev-dependencies]
-serde_json = { workspace = true }
-
 [features]
 default = []
+std = ["dol-core/std", "dol-expr/std", "dol-schema/std", "dol-ir/std"]
 sql = []
 serde = [
     "dep:serde",
@@ -27,3 +25,6 @@ serde = [
     "dol-core/serde",
     "dol-expr/serde",
 ]
+
+[lints]
+workspace = true

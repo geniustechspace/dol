@@ -1,6 +1,8 @@
 //! Access-control + transaction helpers — emit [`Operation`]s for
 //! `Grant`, `Revoke`, `Policy`, `Tx`.
 
+use alloc::{boxed::Box, vec::Vec};
+
 use dol_expr::{ExprArena, Interner};
 use dol_ir::operation::{
     Grant, IsolationLevel, PolicyOp, PolicyScope, Revoke, StructuralVerb, TxBegin, TxOp, TxOptions,

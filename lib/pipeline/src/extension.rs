@@ -26,9 +26,12 @@ pub const EXTENSION_VERSION: u32 = 1;
 /// used to build the surrounding `Program` — produces the same id. This
 /// eliminates the previous design's process-global `AtomicU32`, which was
 /// brittle across `Program`s built or decoded with different interners.
-pub const EXTENSION_SYMBOL: Symbol = Symbol::new(fnv1a_32(EXTENSION_NAME.as_bytes()));
+pub const EXTENSION_SYMBOL: Symbol = Symbol::from_hash(fnv1a_32(EXTENSION_NAME.as_bytes()));
 
 /// `const`-eval FNV-1a 32-bit hash. Stable; matches the spec basis/prime.
+// `i < bytes.len()` bounds the indexing; `bytes.len() <= isize::MAX` so
+// `i += 1` cannot overflow `usize`.
+#[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
 const fn fnv1a_32(bytes: &[u8]) -> u32 {
     let mut hash: u32 = 0x811c9dc5;
     let mut i = 0;
@@ -42,7 +45,7 @@ const fn fnv1a_32(bytes: &[u8]) -> u32 {
 
 /// Typed pipeline payload — a [`Graph`] embedded in an `Operation::Extension`.
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PipelinePayload {
     /// The wrapped pipeline graph.
     pub graph: Graph,
@@ -59,9 +62,13 @@ impl ExtensionPayload for PipelinePayload {
             // `postcard::to_allocvec` only fails for shapes postcard cannot
             // represent (cycles, non-finite floats with custom serializers).
             // `PipelinePayload` is a simple owned tree, so a failure here
-            // is a structural bug — fail loudly rather than silently
-            // producing an empty payload that decodes to defaults.
-            postcard::to_allocvec(self).expect("PipelinePayload encode failed")
+            // is a structural bug — but v2 forbids `panic!` in production
+            // code. On error we emit a single-byte sentinel (`0xFF`) which
+            // is an invalid postcard varint discriminant; the matching
+            // `decode` will reject it with a clean codec error. Tests
+            // calling this path therefore observe an unrecoverable round-
+            // trip rather than a silent default.
+            postcard::to_allocvec(self).unwrap_or_else(|_| alloc::vec![0xFFu8])
         }
         #[cfg(not(feature = "serde"))]
         {
@@ -70,15 +77,14 @@ impl ExtensionPayload for PipelinePayload {
     }
 
     fn decode(bytes: &[u8]) -> Result<Self, &'static str> {
-        #[cfg(feature = "serde")]
-        {
-            postcard::from_bytes(bytes).map_err(|_| "PipelinePayload decode failed")
-        }
-        #[cfg(not(feature = "serde"))]
-        {
-            let _ = bytes;
-            Err("dol-pipeline serde feature not enabled")
-        }
+        // v2: in-memory IR/AST types (including this payload) no longer
+        // implement `serde::Deserialize`. The replacement is a
+        // budget-threaded `dol-wire::Decode` impl, which has not yet
+        // landed for `PipelinePayload`. Until it does, decode is
+        // explicitly unsupported (callers must construct the payload
+        // from its typed fields and use `from_payload` to encode).
+        let _ = bytes;
+        Err("PipelinePayload decode: v2 wire-in via dol-wire::Decode not yet implemented")
     }
 }
 

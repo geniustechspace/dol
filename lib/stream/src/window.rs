@@ -4,7 +4,7 @@ use dol_expr::ids::NodeId;
 
 /// Streaming window specification.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum WindowSpec {
     /// Non-overlapping fixed-duration windows.
     Tumbling {
@@ -38,7 +38,7 @@ pub enum WindowSpec {
 
 /// Watermark policy for late-data tolerance.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Watermark {
     /// Time column the watermark advances on.
     pub time: NodeId,
@@ -50,7 +50,7 @@ pub struct Watermark {
 
 /// When window results are emitted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum Trigger {
     /// Fire once when the watermark passes the window's end.
     AfterWatermark,

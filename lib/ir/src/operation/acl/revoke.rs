@@ -26,15 +26,15 @@ use crate::target::{Symbol, Target};
 /// // REVOKE INSERT ON users FROM app_role
 /// let op: Operation = Revoke {
 ///     privileges: smallvec![Privilege::Insert],
-///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
-///     roles: smallvec![Symbol::new(1)],
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(0))),
+///     roles: smallvec![Symbol::from_hash(1)],
 ///     cascade: false,
 /// }
 /// .into();
 /// assert_eq!(op.kind(), dol_ir::OpKind::Revoke);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Revoke {
     /// Privileges being revoked.
     pub privileges: SmallVec<[Privilege; 2]>,

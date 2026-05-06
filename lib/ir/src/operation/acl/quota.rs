@@ -5,7 +5,7 @@ use crate::target::{Symbol, Target};
 
 /// What facet of usage is constrained.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum QuotaKind {
     /// Maximum bytes stored.
     Storage,
@@ -31,8 +31,8 @@ pub enum QuotaKind {
 /// // Limit the "uploads" blob bucket to 10GB
 /// let op: Operation = QuotaOp {
 ///     verb: StructuralVerb::Create,
-///     target: Target::new(TargetKind::Blob, Locator::new(Symbol::new(0))),
-///     name: Symbol::new(1),
+///     target: Target::new(TargetKind::Blob, Locator::new(Symbol::from_hash(0))),
+///     name: Symbol::from_hash(1),
 ///     kind: QuotaKind::Storage,
 ///     limit: 10 * 1024 * 1024 * 1024, // 10GB in bytes
 ///     role: None,
@@ -42,7 +42,7 @@ pub enum QuotaKind {
 /// assert_eq!(op.kind(), dol_ir::OpKind::Quota);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct QuotaOp {
     /// `Create` / `Drop` / `Alter`.
     pub verb: StructuralVerb,

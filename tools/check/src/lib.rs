@@ -25,10 +25,22 @@
 //! Diagnostics from [`capability_check`] use the structured
 //! [`CapabilityCheck`] key so message text is uniform across backends.
 
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::arithmetic_side_effects
+    )
+)]
 #![warn(missing_docs)]
 
 extern crate alloc;
+
+pub mod sarif;
 
 use dol_core::diag::Diagnostic;
 use dol_ir::{CapabilityCheck, CapabilitySet, CapabilityTag, OpKind, Operation, Program};

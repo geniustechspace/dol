@@ -7,11 +7,10 @@ description = "DOL schema language — Entity, Field, DataType, and constraints.
 readme = "README.md"
 
 [dependencies]
-dol-core = { workspace = true }
+# Hand-rolled (not `workspace = true`) so we can opt out of `dol-core`'s
+# default features and stay `no_std + alloc`-clean for embedded targets.
+dol-core = { path = "../core", default-features = false }
 serde    = { workspace = true, optional = true }
-
-[dev-dependencies]
-serde_json = { workspace = true }
 
 [features]
 # `serde` is on by default: schema definitions are almost always serialized
@@ -22,3 +21,6 @@ serde = ["dep:serde", "dol-core/serde"]
 # `std`-aware build. The crate is `no_std + alloc` clean by default; this
 # feature only forwards `std` to `dol-core` for parity with `dol-expr`.
 std = ["dol-core/std"]
+
+[lints]
+workspace = true

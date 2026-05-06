@@ -7,7 +7,7 @@ use core::fmt;
 ///
 /// 16 bytes — fits directly as a `Value` variant payload without boxing.
 #[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Point {
     pub x: f64,
     pub y: f64,

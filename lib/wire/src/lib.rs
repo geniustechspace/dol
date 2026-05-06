@@ -19,19 +19,49 @@
 //! crate exposes typed helpers in [`mod@program`] that target
 //! [`dol_ir::Program`] directly:
 //!
-//! - [`program::encode_postcard`] / [`program::decode_postcard`]
-//! - [`program::encode_json`] / [`program::decode_json`]
+//! - [`program::encode_postcard`] — postcard encode with wire envelope.
+//! - [`program::encode_json`] — JSON encode with wire envelope.
+//! - [`program::decode`] — validating, budget-threaded postcard decode
+//!   (drives [`Decode`] internally; no `serde::Deserialize` involvement).
 //! - [`program::content_hash`] — canonical BLAKE3 of the postcard body.
 //!
-//! The lower-level, payload-agnostic helpers in
-//! [`mod@postcard`] and [`mod@json`] remain available for callers that
-//! want to encode their own `Serialize` payloads behind the same envelope.
+//! v2 invariant: only encode helpers are `serde::Serialize`-based.
+//! Decode is exclusively [`Decode`]-based.
 
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
+#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::arithmetic_side_effects
+    )
+)]
 #![warn(missing_docs)]
+
+extern crate alloc;
 
 mod header;
 pub use header::{CURRENT_VERSION, WireHeader, WireSchemaVersion};
+
+pub mod decoder;
+pub use decoder::{Decode, DecodeError, Reader};
+
+pub mod encoder;
+pub use encoder::{Encode, EncodeError, Writer, encode_to_vec};
+
+mod decode_core;
+mod decode_expr;
+mod decode_ir;
+mod encode_core;
+mod encode_expr;
+mod encode_ir;
+
+pub mod signed;
+pub use signed::{Signed, SignedError};
 
 #[cfg(feature = "hash")]
 pub mod hash;
@@ -81,6 +111,9 @@ impl std::error::Error for WireError {}
 /// encoded (postcard / json / …).
 pub fn frame(body: &[u8]) -> alloc::vec::Vec<u8> {
     let header = WireHeader::current().to_bytes();
+    // `Vec` capacity hint; both terms are slice lengths bounded by
+    // `isize::MAX`, the sum cannot overflow on a 64-bit platform.
+    #[allow(clippy::arithmetic_side_effects)]
     let mut out = alloc::vec::Vec::with_capacity(header.len() + body.len());
     out.extend_from_slice(&header);
     out.extend_from_slice(body);
@@ -94,9 +127,12 @@ pub fn unframe(bytes: &[u8]) -> Result<&[u8], WireError> {
         return Err(WireError::BadMagic);
     }
     let mut header_buf = [0u8; 8];
-    header_buf.copy_from_slice(&bytes[..8]);
-    let _ = WireHeader::from_bytes(header_buf)?;
-    Ok(&bytes[8..])
+    // `bytes.len() >= 8` was checked above, so slicing `..8` and `8..` is
+    // safe.
+    #[allow(clippy::indexing_slicing)]
+    {
+        header_buf.copy_from_slice(&bytes[..8]);
+        let _ = WireHeader::from_bytes(header_buf)?;
+        Ok(&bytes[8..])
+    }
 }
-
-extern crate alloc;

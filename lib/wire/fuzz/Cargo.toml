@@ -1,0 +1,48 @@
+# Standalone fuzz crate for `dol-wire` (per `docs/v2_plan.md` §57, §78).
+#
+# This crate is **not** a member of the parent workspace — `cargo-fuzz`
+# requires a separate workspace + nightly toolchain. To run locally:
+#
+#   cargo install cargo-fuzz       # one-time
+#   cd lib/wire/fuzz
+#   cargo +nightly fuzz run unframe          -- -max_total_time=60
+#   cargo +nightly fuzz run decode_program   -- -max_total_time=60
+#
+# CI runs both targets as a 60-second smoke gate on the nightly toolchain.
+
+[package]
+name        = "dol-wire-fuzz"
+version     = "0.0.0"
+edition     = "2024"
+publish     = false
+authors     = ["DOL contributors"]
+description = "Fuzz harnesses for the `dol-wire` decoders."
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+# Empty — `cargo-fuzz` requires a fresh workspace root.
+
+[dependencies]
+libfuzzer-sys = "0.4"
+dol-wire      = { path = "..", features = ["postcard", "json", "hash"] }
+
+[[bin]]
+name              = "unframe"
+path              = "fuzz_targets/unframe.rs"
+test              = false
+doc               = false
+bench             = false
+doctest           = false
+
+[[bin]]
+name              = "decode_program"
+path              = "fuzz_targets/decode_program.rs"
+test              = false
+doc               = false
+bench             = false
+doctest           = false
+
+[profile.release]
+debug = 1

@@ -146,7 +146,7 @@ impl BackendError {
 impl core::fmt::Display for BackendError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let d = self.diagnostic();
-        write!(f, "[{}] {}", d.code.as_str(), d.message)
+        write!(f, "[{}] {}", d.code, d.message)
     }
 }
 

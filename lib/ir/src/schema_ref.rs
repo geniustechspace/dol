@@ -16,7 +16,7 @@
 /// catalog.
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct CatalogId(
     /// Raw catalog index.
     pub u32,
@@ -49,7 +49,7 @@ impl From<u32> for CatalogId {
 /// Schema identifier within a catalog.
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct SchemaId(
     /// Raw schema index within the catalog.
     pub u32,
@@ -83,7 +83,7 @@ impl From<u32> for SchemaId {
 /// the catalog rather than being inlined into every
 /// [`Operation`](crate::operation::Operation) payload.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct SchemaRef {
     /// Which catalog this schema belongs to.
     pub catalog: CatalogId,

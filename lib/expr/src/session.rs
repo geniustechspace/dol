@@ -1,33 +1,60 @@
 use smallvec::SmallVec;
 
+use dol_core::policy::{Budget, Limits};
+
 use crate::arena::{ExprArena, FieldNode, FieldStep};
 use crate::expr::ExprNode;
 use crate::ids::{NodeId, StrId};
 use crate::interner::Interner;
+use crate::lower::{LowerError, lower_expr_with_budget};
+use crate::tree::Expr;
 
+/// Pre-interned ids for high-frequency function/operator names.
 pub struct WellKnownNames {
-    pub and: u32,
-    pub or: u32,
-    pub not: u32,
-    pub count: u32,
-    pub sum: u32,
-    pub avg: u32,
-    pub min: u32,
-    pub max: u32,
+    pub and: StrId,
+    pub or: StrId,
+    pub not: StrId,
+    pub count: StrId,
+    pub sum: StrId,
+    pub avg: StrId,
+    pub min: StrId,
+    pub max: StrId,
 }
 
+/// A long-lived expression-builder context.
+///
+/// Holds the arena, interner, and a [`Budget`] that accumulates node
+/// charges across every [`BuildSession::lower`] call so a single session
+/// can enforce a quota across the whole build pipeline rather than per
+/// `lower()` invocation.
 pub struct BuildSession {
     pub interner: Interner,
     pub arena: ExprArena,
     pub wkn: WellKnownNames,
-    fuel: u32,
-    depth: u32,
+    /// Caps applied on every `lower()` call. Mutate via
+    /// [`BuildSession::set_limits`].
+    limits: Limits,
+    /// Long-lived budget seeded from `limits`; node charges accumulate
+    /// across calls. Reset on `reset()` and re-seeded by `set_limits`.
+    budget: Budget,
 }
 
-const DEFAULT_FUEL: u32 = 100_000;
-const DEFAULT_DEPTH: u32 = 512;
+/// Default limits for a freshly-built session: generous enough for any
+/// realistic interactive workload, tight enough to refuse a runaway
+/// query before it OOMs the host.
+const DEFAULT_LIMITS: Limits = Limits {
+    max_nodes: 100_000,
+    max_depth: 512,
+    // Bytes / string-bytes are not yet charged from `lower`; surface
+    // sensible defaults so `BuildSession::set_limits(_)` callers can
+    // tighten them when sub-systems start charging.
+    max_bytes: 64 * 1024 * 1024,
+    max_str_bytes: 1024 * 1024,
+};
 
 impl BuildSession {
+    /// Build a session with the default [`Limits`] and the well-known
+    /// operator-name strings pre-interned.
     pub fn new() -> Self {
         let mut interner = Interner::new();
         let wkn = WellKnownNames {
@@ -44,23 +71,55 @@ impl BuildSession {
             interner,
             arena: ExprArena::new(),
             wkn,
-            fuel: DEFAULT_FUEL,
-            depth: DEFAULT_DEPTH,
+            limits: DEFAULT_LIMITS,
+            budget: Budget::new(DEFAULT_LIMITS),
         }
     }
 
+    /// Reset the arena and interner, and re-seed the budget from the
+    /// current limits.
     pub fn reset(&mut self) {
         self.interner.reset();
         self.arena = ExprArena::new();
-        self.fuel = DEFAULT_FUEL;
-        self.depth = DEFAULT_DEPTH;
+        self.budget = Budget::new(self.limits);
     }
 
-    pub fn remaining_fuel(&self) -> u32 {
-        self.fuel
+    /// Borrow the active limits.
+    #[inline]
+    pub fn limits(&self) -> &Limits {
+        &self.limits
     }
-    pub fn max_depth(&self) -> u32 {
-        self.depth
+
+    /// Borrow the live budget — useful for inspecting how many nodes
+    /// have been charged so far.
+    #[inline]
+    pub fn budget(&self) -> &Budget {
+        &self.budget
+    }
+
+    /// Replace the active [`Limits`] and re-seed the budget so the new
+    /// caps take effect on the next [`BuildSession::lower`] call.
+    ///
+    /// Re-seeding clears any accumulated node count; if you need to
+    /// preserve usage, snapshot `budget()` first.
+    pub fn set_limits(&mut self, limits: Limits) {
+        self.limits = limits;
+        self.budget = Budget::new(limits);
+    }
+
+    /// Lower a tree expression into this session's arena, returning the
+    /// root [`NodeId`].
+    ///
+    /// Unlike the free [`crate::lower::lower_expr`] function, this entry
+    /// point honours the session's [`Limits`] and accumulates node
+    /// charges across calls. Once a budget is exhausted, the partial
+    /// work already pushed into the arena is left in place (lowering is
+    /// not transactional — callers that need rollback should snapshot
+    /// or clone the arena first).
+    // budget-gate: opt-out: budget is threaded via `&mut self.budget`,
+    // not as an explicit parameter.
+    pub fn lower(&mut self, expr: &Expr<'_>) -> Result<NodeId, LowerError> {
+        lower_expr_with_budget(expr, &mut self.arena, &mut self.interner, &mut self.budget)
     }
 
     // ── Field / Namespace helpers ─────────────────────────────────────────────

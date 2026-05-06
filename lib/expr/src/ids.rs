@@ -1,40 +1,105 @@
 //! Typed identifier newtypes used throughout the expression IR.
 //!
-//! Each `*Id` is a 32-bit index into a specific arena pool — never a raw
-//! pointer or borrowed reference. Tagging IDs by purpose prevents accidental
-//! cross-pool aliasing while preserving the cache-friendly representation.
+//! Each id is `dol_core::id::Id<…Tag>`, a 32-bit handle backed by
+//! [`core::num::NonZeroU32`] so `Option<…Id>` is exactly four bytes
+//! (niche-optimised). Tagging the ids by purpose prevents accidental
+//! cross-pool aliasing (`NodeId` vs `FieldId`) at the type level while
+//! preserving the cache-friendly representation.
+//!
+//! There is **no** `NULL_NODE` sentinel; "missing" ids are encoded as
+//! `Option<…Id>`, which costs the same four bytes thanks to the niche.
 
-/// Index into ExprArena::nodes — never a pointer.
-pub type NodeId = u32;
-/// Index into Interner::strings — never a &str in AST nodes.
-pub type StrId = u32;
-/// Index into `TypeArena::types` — never a `Box<DataType>`.
-pub type TypeId = u32;
-/// Index into SpanTable::spans — kept separate from hot data.
-pub type SpanId = u32;
-/// Index into ExprArena::lits — identifies a pooled Literal<'static>.
-pub type LiteralId = u32;
-/// Index into ExprArena::funcs — identifies a pooled FuncNode.
-pub type FuncId = u32;
-/// Index into ExprArena::obj_lits — identifies a pooled ObjLitNode.
-pub type ObjLitId = u32;
-/// Index into ExprArena::windows — identifies a pooled WindowNode.
-pub type WindowId = u32;
-/// Index into ExprArena::cases — identifies a pooled CaseNode.
-pub type CaseId = u32;
-/// Index into ExprArena::in_lists — identifies a pooled InListNode.
-pub type InListId = u32;
-/// Index into ExprArena::queries — identifies a pooled QueryNode.
-pub type QueryId = u32;
-/// Index into ExprArena::inserts — identifies a pooled InsertNode.
-pub type InsertId = u32;
-/// Index into ExprArena::updates — identifies a pooled UpdateNode.
-pub type UpdateId = u32;
-/// Index into ExprArena::deletes — identifies a pooled DeleteNode.
-pub type DeleteId = u32;
-/// Index into ExprArena::upserts — identifies a pooled UpsertNode.
-pub type UpsertId = u32;
-/// Index into ExprArena::fields — identifies a pooled FieldNode.
-pub type FieldId = u32;
-/// Sentinel for "no node" — use instead of `Option<NodeId>` where size matters.
-pub const NULL_NODE: NodeId = u32::MAX;
+pub use dol_core::id::Id;
+
+/// Tag for `ExprArena::nodes` ids. Phantom marker; never instantiated.
+pub enum NodeTag {}
+/// Index into `ExprArena::nodes`.
+pub type NodeId = Id<NodeTag>;
+
+/// Tag for [`crate::Interner`] string ids. Phantom marker.
+pub enum StrTag {}
+/// Content-addressed id for an interned string (leading 32 bits of
+/// BLAKE3, stored one-based to fit the `NonZeroU32` niche).
+pub type StrId = Id<StrTag>;
+
+/// Tag for `TypeArena::types` ids. Phantom marker.
+pub enum TypeTag {}
+/// Index into `TypeArena::types`.
+pub type TypeId = Id<TypeTag>;
+
+/// Tag for `SpanTable::spans` ids. Phantom marker.
+pub enum SpanTag {}
+/// Index into `SpanTable::spans`.
+pub type SpanId = Id<SpanTag>;
+
+/// Tag for `ExprArena::lits` ids. Phantom marker.
+pub enum LiteralTag {}
+/// Index into `ExprArena::lits` — identifies a pooled
+/// [`crate::types::Literal<'static>`].
+pub type LiteralId = Id<LiteralTag>;
+
+/// Tag for `ExprArena::funcs` ids. Phantom marker.
+pub enum FuncTag {}
+/// Index into `ExprArena::funcs` — identifies a pooled
+/// [`crate::FuncNode`].
+pub type FuncId = Id<FuncTag>;
+
+/// Tag for `ExprArena::obj_lits` ids. Phantom marker.
+pub enum ObjLitTag {}
+/// Index into `ExprArena::obj_lits` — identifies a pooled
+/// [`crate::ObjLitNode`].
+pub type ObjLitId = Id<ObjLitTag>;
+
+/// Tag for `ExprArena::windows` ids. Phantom marker.
+pub enum WindowTag {}
+/// Index into `ExprArena::windows` — identifies a pooled
+/// [`crate::WindowNode`].
+pub type WindowId = Id<WindowTag>;
+
+/// Tag for `ExprArena::cases` ids. Phantom marker.
+pub enum CaseTag {}
+/// Index into `ExprArena::cases` — identifies a pooled
+/// [`crate::CaseNode`].
+pub type CaseId = Id<CaseTag>;
+
+/// Tag for `ExprArena::in_lists` ids. Phantom marker.
+pub enum InListTag {}
+/// Index into `ExprArena::in_lists` — identifies a pooled
+/// [`crate::InListNode`].
+pub type InListId = Id<InListTag>;
+
+/// Tag for `ExprArena::queries` ids. Phantom marker.
+pub enum QueryTag {}
+/// Index into `ExprArena::queries` — identifies a pooled
+/// [`crate::QueryNode`].
+pub type QueryId = Id<QueryTag>;
+
+/// Tag for `ExprArena::inserts` ids. Phantom marker.
+pub enum InsertTag {}
+/// Index into `ExprArena::inserts` — identifies a pooled
+/// [`crate::InsertNode`].
+pub type InsertId = Id<InsertTag>;
+
+/// Tag for `ExprArena::updates` ids. Phantom marker.
+pub enum UpdateTag {}
+/// Index into `ExprArena::updates` — identifies a pooled
+/// [`crate::UpdateNode`].
+pub type UpdateId = Id<UpdateTag>;
+
+/// Tag for `ExprArena::deletes` ids. Phantom marker.
+pub enum DeleteTag {}
+/// Index into `ExprArena::deletes` — identifies a pooled
+/// [`crate::DeleteNode`].
+pub type DeleteId = Id<DeleteTag>;
+
+/// Tag for `ExprArena::upserts` ids. Phantom marker.
+pub enum UpsertTag {}
+/// Index into `ExprArena::upserts` — identifies a pooled
+/// [`crate::UpsertNode`].
+pub type UpsertId = Id<UpsertTag>;
+
+/// Tag for `ExprArena::fields` ids. Phantom marker.
+pub enum FieldTag {}
+/// Index into `ExprArena::fields` — identifies a pooled
+/// [`crate::FieldNode`].
+pub type FieldId = Id<FieldTag>;

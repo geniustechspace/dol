@@ -5,7 +5,7 @@ use core::fmt;
 /// A time of day (no date, no timezone). Nanosecond precision.
 /// Second may be `60` for leap seconds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Time {
     pub hour: u8,
     pub minute: u8,

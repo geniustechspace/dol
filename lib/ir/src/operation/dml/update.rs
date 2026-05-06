@@ -23,15 +23,15 @@ use crate::target::Target;
 ///
 /// // UPDATE users SET name = 'Alice' WHERE id = 1
 /// let op: Operation = Update {
-///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
-///     node: 0, // Would be a real arena NodeId
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(0))),
+///     node: dol_expr::ids::NodeId::from_u32(1).unwrap(), // Real arena ids are non-zero
 /// }
 /// .into();
 ///
 /// assert_eq!(op.kind(), dol_ir::OpKind::Update);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Update {
     /// Target to update.
     pub target: Target,

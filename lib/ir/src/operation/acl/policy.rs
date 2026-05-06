@@ -7,7 +7,7 @@ use crate::target::{Symbol, Target};
 
 /// What DML/DQL kinds the policy applies to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum PolicyScope {
     /// Policy applies to read operations (SELECT, Query).
     Read,
@@ -32,8 +32,8 @@ pub enum PolicyScope {
 /// // CREATE POLICY users_rls ON users FOR ALL USING (tenant_id = current_tenant())
 /// let op: Operation = PolicyOp {
 ///     verb: StructuralVerb::Create,
-///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
-///     name: Symbol::new(1),
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(0))),
+///     name: Symbol::from_hash(1),
 ///     scope: PolicyScope::All,
 ///     using_expr: None, // Would be set to arena NodeId for real policy
 ///     check_expr: None,
@@ -43,7 +43,7 @@ pub enum PolicyScope {
 /// assert_eq!(op.kind(), dol_ir::OpKind::Policy);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PolicyOp {
     /// `Create` / `Drop` / `Alter`.
     pub verb: StructuralVerb,

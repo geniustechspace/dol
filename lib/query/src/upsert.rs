@@ -6,6 +6,12 @@
 //! SQL backends may render it as `ON CONFLICT`, document stores as a unique
 //! filter, KV stores as an `IF NOT EXISTS` precondition, etc.
 
+use alloc::{
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
+
 use dol_expr::tree::Expr;
 
 // ===========================================================================
@@ -16,7 +22,7 @@ use dol_expr::tree::Expr;
 ///
 /// Construct via [`Query::from(...).upsert()`](crate::Query::upsert).
 #[derive(Debug, Clone)]
-#[must_use = "builders do nothing until .build() is called"]
+#[must_use = "builders do nothing until .try_build() is called"]
 pub struct UpsertQuery {
     name: String,
     namespace: Option<String>,
@@ -113,7 +119,11 @@ impl UpsertQuery {
     /// Build the arena-based IR as a [`dol_ir::Program`] containing a
     /// single [`dol_ir::Operation::Upsert`] referencing an arena
     /// [`ExprNode::Upsert`](dol_expr::expr::ExprNode::Upsert).
-    pub fn build(self) -> dol_ir::Program {
+    ///
+    /// Infallible in current shape (the builder only emits `Param`
+    /// placeholders and structural `EXCLUDED.col` field references), but
+    /// returns `Result` for API consistency with the other builders.
+    pub fn try_build(self) -> Result<dol_ir::Program, crate::BuildError> {
         use dol_expr::expr::{ConflictClause, ExprNode, UpsertNode};
         use dol_ir::TargetKind;
         use dol_ir::operation::Upsert;
@@ -131,16 +141,16 @@ impl UpsertQuery {
             &self.name,
             &self.namespace,
         ));
-        let columns: smallvec::SmallVec<[u32; 8]> =
+        let columns: smallvec::SmallVec<[dol_expr::ids::StrId; 8]> =
             fields.iter().map(|f| interner.intern(f)).collect();
 
         // One Param per field.
-        let values: smallvec::SmallVec<[u32; 8]> = fields
+        let values: smallvec::SmallVec<[dol_expr::ids::NodeId; 8]> = fields
             .iter()
             .map(|_| arena.alloc(ExprNode::Param))
             .collect();
 
-        let returning: smallvec::SmallVec<[u32; 4]> = self
+        let returning: smallvec::SmallVec<[dol_expr::ids::NodeId; 4]> = self
             .returning
             .iter()
             .map(|r| {
@@ -157,7 +167,9 @@ impl UpsertQuery {
         let conflict = if self.then_skip_flag {
             Some(ConflictClause::DoNothing)
         } else if !self.update_fields.is_empty() {
-            let assignments: smallvec::SmallVec<[(u32, u32); 4]> = self
+            let assignments: smallvec::SmallVec<
+                [(dol_expr::ids::StrId, dol_expr::ids::NodeId); 4],
+            > = self
                 .update_fields
                 .iter()
                 .map(|col| {
@@ -196,6 +208,6 @@ impl UpsertQuery {
             self.namespace.as_deref(),
         );
         let op: dol_ir::Operation = Upsert { target, node: body }.into();
-        dol_ir::Program::new(op, arena, interner)
+        Ok(dol_ir::Program::new(op, arena, interner))
     }
 }

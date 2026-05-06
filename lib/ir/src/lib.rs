@@ -16,7 +16,17 @@
 //! convenience.
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::arithmetic_side_effects
+    )
+)]
 #![warn(missing_docs)]
 
 extern crate alloc;
@@ -30,6 +40,7 @@ pub mod program;
 pub mod program_ref;
 pub mod schema_catalog;
 pub mod schema_ref;
+pub mod store;
 pub mod target;
 
 /// Schema constraint types — re-exported from `dol-schema`, the canonical home.
@@ -42,8 +53,9 @@ pub use capabilities::{BackendCapabilities, CapabilityCheck, CapabilitySet, Capa
 pub use constraint::{ComputedKind, EntityConstraint, RefAction, RelationRef};
 pub use operation::{Category, OpKind, Operation};
 pub use privilege::Privilege;
-pub use program::Program;
+pub use program::{ExtendError, Program};
 pub use program_ref::ProgramRef;
 pub use schema_catalog::{CatalogEntry, SchemaCatalog, TypeEntry};
 pub use schema_ref::{CatalogId, SchemaId, SchemaRef};
+pub use store::{Catalog, KvError, KvStore};
 pub use target::{Locator, SchemaBinding, Symbol, Target, TargetKind};

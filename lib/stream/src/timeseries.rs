@@ -4,7 +4,7 @@ use dol_expr::ids::NodeId;
 
 /// Calendar / wall-clock time unit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum TimeUnit {
     /// Milliseconds.
     Millisecond,
@@ -26,7 +26,7 @@ pub enum TimeUnit {
 
 /// A time-series operator referenced from a pipeline transform.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum TimeSeriesOp {
     /// Bucket rows by `(time / size unit) * size`.
     TimeBucket {

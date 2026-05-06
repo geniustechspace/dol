@@ -9,7 +9,7 @@ use crate::value::fmt_bound;
 
 /// A range bound-pair for [`Literal`].
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct LiteralRange<'a> {
     pub start: Bound<Box<Literal<'a>>>,
     pub end: Bound<Box<Literal<'a>>>,

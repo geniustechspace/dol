@@ -106,6 +106,10 @@ pub fn interval_nanos(nanos: i64) -> Value {
 ///
 /// Algorithm by Howard Hinnant (public domain).
 #[cfg(feature = "std")]
+// Hinnant's civil-from-days algorithm; intermediates are bounded by the
+// input range (Unix-epoch days fits comfortably in i64). All arithmetic
+// is provably non-overflowing for any `z` representable as i64.
+#[allow(clippy::arithmetic_side_effects)]
 fn days_to_ymd(z: i64) -> (i32, u8, u8) {
     let z = z + 719_468;
     let era: i64 = if z >= 0 { z } else { z - 146_096 } / 146_097;
@@ -122,18 +126,25 @@ fn days_to_ymd(z: i64) -> (i32, u8, u8) {
 
 #[cfg(feature = "std")]
 fn utc_date_parts() -> (i32, u8, u8) {
+    // A clock before the Unix epoch is a host-environment fault, not a
+    // logic error; fall back to the epoch (1970-01-01) instead of
+    // panicking. Production callers that need to detect a broken clock
+    // should validate `SystemTime::now()` themselves before calling the
+    // factory helpers.
     let duration = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .expect("system clock is before the Unix epoch");
+        .unwrap_or_default();
     let days = (duration.as_secs() / 86_400) as i64;
     days_to_ymd(days)
 }
 
 #[cfg(feature = "std")]
 fn utc_datetime_parts() -> (i32, u8, u8, u8, u8, u8, u32) {
+    // Same fallback contract as `utc_date_parts`: a pre-epoch system
+    // clock yields the epoch's parts rather than a panic.
     let duration = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .expect("system clock is before the Unix epoch");
+        .unwrap_or_default();
     let total_secs = duration.as_secs() as i64;
     let nanosecond = duration.subsec_nanos();
     let secs_of_day = (total_secs % 86_400) as u32;

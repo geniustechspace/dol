@@ -7,7 +7,7 @@ use dol_core::DataType;
 
 /// A device that produces samples.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Sensor {
     /// Stable sensor identifier.
     pub id: alloc::string::String,
@@ -21,7 +21,7 @@ pub struct Sensor {
 
 /// A device that accepts commands.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Actuator {
     /// Stable actuator identifier.
     pub id: alloc::string::String,
@@ -31,7 +31,7 @@ pub struct Actuator {
 
 /// A single sensor reading.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Sample {
     /// Producing sensor id.
     pub sensor_id: alloc::string::String,
@@ -43,7 +43,7 @@ pub struct Sample {
 
 /// MQTT-style quality of service.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum QoS {
     /// Fire-and-forget.
     AtMostOnce,
@@ -55,7 +55,7 @@ pub enum QoS {
 
 /// Retention / compaction policy for time-series storage.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct RetentionPolicy {
     /// Maximum age before rows become eligible for compaction.
     pub keep_for_ms: u64,
@@ -65,7 +65,7 @@ pub struct RetentionPolicy {
 
 /// Edge-device store-and-forward intent.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct StoreAndForward {
     /// Maximum buffered bytes before back-pressure kicks in.
     pub buffer_bytes: u64,
@@ -77,7 +77,7 @@ pub struct StoreAndForward {
 
 /// On-the-wire payload codec hint. Implementation lives in connectors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum PayloadCodec {
     /// `dol-wire`'s postcard form.
     Postcard,

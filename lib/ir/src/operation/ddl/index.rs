@@ -8,7 +8,7 @@ use crate::target::{Symbol, Target};
 
 /// Sort direction for an index column.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum IndexDirection {
     /// Sort values in ascending order (smallest first).
     Ascending,
@@ -18,7 +18,7 @@ pub enum IndexDirection {
 
 /// One column / expression in an index key.
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum IndexKey {
     /// Plain field key.
     Field {
@@ -39,7 +39,7 @@ pub enum IndexKey {
 /// Method / kind of an index. This is open-ended via `Custom` so backends
 /// can carry their own tags without a closed enum extension.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum IndexMethod {
     /// B-tree index (default for most SQL databases).
     BTree,
@@ -73,11 +73,11 @@ pub enum IndexMethod {
 /// // CREATE INDEX idx_users_email ON users (email ASC)
 /// let op: Operation = IndexOp {
 ///     verb: StructuralVerb::Create,
-///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::new(0))),
-///     name: Symbol::new(1),
+///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(0))),
+///     name: Symbol::from_hash(1),
 ///     method: IndexMethod::BTree,
 ///     keys: smallvec::smallvec![IndexKey::Field {
-///         name: Symbol::new(2),
+///         name: Symbol::from_hash(2),
 ///         direction: IndexDirection::Ascending,
 ///     }],
 ///     unique: false,
@@ -89,7 +89,7 @@ pub enum IndexMethod {
 /// assert_eq!(op.kind(), dol_ir::OpKind::Index);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct IndexOp {
     /// `Create` / `Drop` / `Alter` / `Rename`.
     pub verb: StructuralVerb,

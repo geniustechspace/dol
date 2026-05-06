@@ -6,10 +6,19 @@
 //!
 //! - dispatch (`Operation::kind()` / `category()`) is correct,
 //! - `required_capabilities()` agrees with the documented mapping,
-//! - the operation round-trips through serde JSON when the `serde` feature
-//!   is enabled.
+//! - the operation `Serialize`s to a non-empty JSON payload when the
+//!   `serde` feature is enabled (v2: in-memory IR types are
+//!   `Serialize`-only; wire round-trip is via `dol-wire::Decode`).
 
-use dol_expr::ids::NULL_NODE;
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects
+)]
+
+use dol_expr::ids::NodeId;
 use dol_ir::operation::{
     Append, Delete, Describe, DescribeFacet, Insert, InsertSource, Probe, Query, Replace,
     ReplaceBody, SchemaOp, Update, Upsert,
@@ -21,6 +30,14 @@ use dol_ir::{
 
 fn t(kind: TargetKind) -> Target {
     Target::new(kind, Locator::new(Symbol::default()))
+}
+
+/// Placeholder [`NodeId`] for IR fixtures that don't bind a real arena
+/// node — the previous code used `NULL_NODE = u32::MAX` here. Any
+/// non-zero id works since these tests inspect the operation envelope,
+/// not the arena.
+fn placeholder_node() -> NodeId {
+    NodeId::from_u32(1).expect("non-zero")
 }
 
 fn assert_basic(op: &Operation, kind: OpKind, cat: Category) {
@@ -117,7 +134,7 @@ fn dml_replace_filetree_emits_replace_and_filetree_tags() {
 fn dml_update_filetree_for_rename() {
     let op: Operation = Update {
         target: t(TargetKind::FileTree),
-        node: NULL_NODE,
+        node: placeholder_node(),
     }
     .into();
     assert_basic(&op, OpKind::Update, Category::DML);
@@ -127,7 +144,7 @@ fn dml_update_filetree_for_rename() {
 fn dml_delete_kv() {
     let op: Operation = Delete {
         target: t(TargetKind::KeyValue),
-        node: NULL_NODE,
+        node: placeholder_node(),
     }
     .into();
     assert_basic(&op, OpKind::Delete, Category::DML);
@@ -137,7 +154,7 @@ fn dml_delete_kv() {
 fn dml_upsert_emits_merge_tag() {
     let op: Operation = Upsert {
         target: t(TargetKind::Relation),
-        node: NULL_NODE,
+        node: placeholder_node(),
     }
     .into();
     assert_basic(&op, OpKind::Upsert, Category::DML);
@@ -225,7 +242,7 @@ fn acl_grant_select_on_relation() {
     let op: Operation = Grant {
         privileges: smallvec![Privilege::Select],
         target: t(TargetKind::Relation),
-        roles: smallvec![Symbol::new(0)],
+        roles: smallvec![Symbol::from_hash(0)],
         with_grant_option: false,
     }
     .into();
@@ -239,9 +256,9 @@ fn acl_revoke_custom_privilege_uses_symbol() {
     use smallvec::smallvec;
 
     let op: Operation = Revoke {
-        privileges: smallvec![Privilege::Custom(Symbol::new(7))],
+        privileges: smallvec![Privilege::Custom(Symbol::from_hash(7))],
         target: t(TargetKind::Relation),
-        roles: smallvec![Symbol::new(0)],
+        roles: smallvec![Symbol::from_hash(0)],
         cascade: false,
     }
     .into();
@@ -255,7 +272,7 @@ fn acl_policy_create_emits_policy_kind() {
     let op: Operation = PolicyOp {
         verb: StructuralVerb::Create,
         target: t(TargetKind::Relation),
-        name: Symbol::new(1),
+        name: Symbol::from_hash(1),
         scope: PolicyScope::Read,
         using_expr: None,
         check_expr: None,
@@ -272,8 +289,8 @@ fn acl_mask_create_emits_mask_kind() {
     let op: Operation = MaskOp {
         verb: StructuralVerb::Create,
         target: t(TargetKind::Relation),
-        name: Symbol::new(1),
-        fields: smallvec![Symbol::new(2)],
+        name: Symbol::from_hash(1),
+        fields: smallvec![Symbol::from_hash(2)],
         mask_expr: None,
     }
     .into();
@@ -287,7 +304,7 @@ fn acl_quota_create_emits_quota_kind() {
     let op: Operation = QuotaOp {
         verb: StructuralVerb::Create,
         target: t(TargetKind::Relation),
-        name: Symbol::new(1),
+        name: Symbol::from_hash(1),
         kind: QuotaKind::Rate,
         limit: 1_000,
         role: None,
@@ -303,7 +320,7 @@ fn acl_audit_create_emits_audit_kind() {
     let op: Operation = AuditOp {
         verb: StructuralVerb::Create,
         target: t(TargetKind::Relation),
-        name: Symbol::new(1),
+        name: Symbol::from_hash(1),
         event: AuditEvent::Write,
         sink: AuditSink::Default,
     }
@@ -313,34 +330,34 @@ fn acl_audit_create_emits_audit_kind() {
 
 #[cfg(feature = "serde")]
 #[test]
-fn serde_round_trip_for_acl_and_governance() {
+fn serialize_acl_and_governance() {
     use dol_ir::operation::{
         AuditEvent, AuditOp, AuditSink, Grant, MaskOp, PolicyOp, PolicyScope, QuotaKind, QuotaOp,
         Revoke, StructuralVerb,
     };
     use dol_ir::privilege::Privilege;
-    use serde_json::{from_str, to_string};
+    use serde_json::to_string;
     use smallvec::smallvec;
 
     let ops: Vec<Operation> = vec![
         Grant {
             privileges: smallvec![Privilege::Select, Privilege::Insert],
             target: t(TargetKind::Relation),
-            roles: smallvec![Symbol::new(0)],
+            roles: smallvec![Symbol::from_hash(0)],
             with_grant_option: false,
         }
         .into(),
         Revoke {
-            privileges: smallvec![Privilege::Custom(Symbol::new(7))],
+            privileges: smallvec![Privilege::Custom(Symbol::from_hash(7))],
             target: t(TargetKind::Relation),
-            roles: smallvec![Symbol::new(0)],
+            roles: smallvec![Symbol::from_hash(0)],
             cascade: false,
         }
         .into(),
         PolicyOp {
             verb: StructuralVerb::Create,
             target: t(TargetKind::Relation),
-            name: Symbol::new(1),
+            name: Symbol::from_hash(1),
             scope: PolicyScope::Read,
             using_expr: None,
             check_expr: None,
@@ -349,15 +366,15 @@ fn serde_round_trip_for_acl_and_governance() {
         MaskOp {
             verb: StructuralVerb::Create,
             target: t(TargetKind::Relation),
-            name: Symbol::new(1),
-            fields: smallvec![Symbol::new(2)],
+            name: Symbol::from_hash(1),
+            fields: smallvec![Symbol::from_hash(2)],
             mask_expr: None,
         }
         .into(),
         QuotaOp {
             verb: StructuralVerb::Create,
             target: t(TargetKind::Relation),
-            name: Symbol::new(1),
+            name: Symbol::from_hash(1),
             kind: QuotaKind::Rate,
             limit: 100,
             role: None,
@@ -366,7 +383,7 @@ fn serde_round_trip_for_acl_and_governance() {
         AuditOp {
             verb: StructuralVerb::Create,
             target: t(TargetKind::Relation),
-            name: Symbol::new(1),
+            name: Symbol::from_hash(1),
             event: AuditEvent::Write,
             sink: AuditSink::Default,
         }
@@ -378,15 +395,13 @@ fn serde_round_trip_for_acl_and_governance() {
         }
         .into(),
     ];
+    // v2: in-memory IR types are `Serialize`-only (no `Deserialize`).
+    // Round-trip is exercised at the wire layer via `dol-wire::Decode`;
+    // here we just verify that every ACL / governance operation
+    // produces a non-empty JSON payload without panicking.
     for op in &ops {
         let s = to_string(op).expect("encode");
-        let back: Operation = from_str(&s).expect("decode");
-        assert_eq!(
-            op.kind(),
-            back.kind(),
-            "kind mismatch round-tripping {op:?}"
-        );
-        assert_eq!(op, &back, "value mismatch round-tripping {op:?}");
+        assert!(!s.is_empty(), "empty serialisation for {op:?}");
     }
 }
 
@@ -405,12 +420,12 @@ fn operation_is_send_sync_static() {
     assert_send_sync_static::<Operation>();
 }
 
-// ── Serde round-trips ─────────────────────────────────────────────────────
+// ── Serialize-only output checks ──────────────────────────────────────────
 
 #[cfg(feature = "serde")]
 #[test]
-fn serde_round_trip_for_each_category() {
-    use serde_json::{from_str, to_string};
+fn serialize_each_category() {
+    use serde_json::to_string;
 
     let ops: Vec<Operation> = vec![
         SchemaOp::create_entity(t(TargetKind::Relation), SchemaRef::default(), false).into(),
@@ -438,14 +453,10 @@ fn serde_round_trip_for_each_category() {
         }
         .into(),
     ];
+    // v2: `Operation` is `Serialize`-only. Wire round-trip is via
+    // `dol-wire::Decode`; here we just check JSON output integrity.
     for op in &ops {
         let s = to_string(op).expect("encode");
-        let back: Operation = from_str(&s).expect("decode");
-        assert_eq!(op.kind(), back.kind());
-        assert_eq!(op.category(), back.category());
-        assert_eq!(
-            op.primary_target().map(|t| &t.kind),
-            back.primary_target().map(|t| &t.kind)
-        );
+        assert!(!s.is_empty(), "empty serialisation for {op:?}");
     }
 }

@@ -1,0 +1,419 @@
+//! Round-trip parity tests for `dol_wire::encoder::Encode` against the
+//! existing postcard `Serialize` derivations on `dol-core` leaf types.
+//!
+//! Every test follows the same shape:
+//!
+//! 1. Encode a representative value via `encode_to_vec(&v, &mut budget)`.
+//! 2. Encode the same value via `postcard::to_allocvec(&v)`.
+//! 3. Assert the two byte streams are identical (postcard parity).
+//! 4. Decode the first byte stream via `T::decode` and assert structural
+//!    equality with the original (self round-trip via the v2 traits alone).
+//!
+//! When this test passes, `Encode` is byte-for-byte interchangeable with
+//! the legacy `encode_postcard<T: Serialize>` shim, which is the
+//! prerequisite for retiring the shim in a follow-up PR.
+
+#![cfg(all(
+    feature = "postcard",
+    feature = "datetime",
+    feature = "numeric",
+    feature = "geo"
+))]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects
+)]
+
+use dol_core::policy::{Budget, Limits};
+use dol_wire::decoder::{Decode, Reader};
+use dol_wire::encoder::{Encode, encode_to_vec};
+
+/// Encode `value` via `Encode`, assert its bytes match
+/// `postcard::to_allocvec(&value)`, then decode them back via `Decode`
+/// and return the round-tripped value for structural comparison.
+fn rt<T>(value: &T) -> T
+where
+    T: serde::Serialize + Encode + Decode + core::fmt::Debug,
+{
+    let mut enc_budget = Budget::new(Limits::host());
+    let our_bytes = encode_to_vec(value, &mut enc_budget).expect("Encode succeeds");
+    let postcard_bytes = postcard::to_allocvec(value).expect("postcard encode");
+    assert_eq!(
+        our_bytes, postcard_bytes,
+        "Encode bytes must equal postcard bytes for {value:?}"
+    );
+
+    let mut reader = Reader::new(&our_bytes);
+    let mut dec_budget = Budget::new(Limits::host());
+    let decoded = T::decode(&mut reader, &mut dec_budget)
+        .unwrap_or_else(|e| panic!("decode of {value:?} failed: {e}"));
+    assert!(
+        reader.is_exhausted(),
+        "trailing bytes after decoding {value:?}: {} bytes left",
+        reader.remaining(),
+    );
+    decoded
+}
+
+// ─── Always-on leaves ───────────────────────────────────────────────────────
+
+#[test]
+fn bit_string_round_trip() {
+    let cases = [
+        dol_core::BitString::zeroes(0),
+        dol_core::BitString::zeroes(1),
+        dol_core::BitString::zeroes(8),
+        dol_core::BitString::zeroes(17),
+        dol_core::BitString::try_new(12, vec![0b1010_0101, 0b1100_0000].into_boxed_slice())
+            .expect("valid bit string"),
+    ];
+    for v in &cases {
+        assert_eq!(v, &rt(v));
+    }
+}
+
+#[test]
+fn file_id_round_trip() {
+    for v in [
+        dol_core::FileId(0),
+        dol_core::FileId(1),
+        dol_core::FileId(0xFFFE),
+        dol_core::FileId::NONE,
+    ] {
+        assert_eq!(v, rt(&v));
+    }
+}
+
+// ─── Datetime leaves ────────────────────────────────────────────────────────
+
+#[test]
+fn date_round_trip() {
+    let cases = [
+        dol_core::Date::try_new(1970, 1, 1).unwrap(),
+        dol_core::Date::try_new(2026, 5, 6).unwrap(),
+        dol_core::Date::try_new(-4713, 11, 24).unwrap(),
+    ];
+    for v in &cases {
+        assert_eq!(*v, rt(v));
+    }
+}
+
+#[test]
+fn time_round_trip() {
+    let cases = [
+        dol_core::Time::try_new(0, 0, 0, 0).unwrap(),
+        dol_core::Time::try_new(12, 34, 56, 789_000_000).unwrap(),
+        dol_core::Time::try_new(23, 59, 59, 999_999_999).unwrap(),
+    ];
+    for v in &cases {
+        assert_eq!(*v, rt(v));
+    }
+}
+
+#[test]
+fn datetime_round_trip() {
+    let v = dol_core::DateTime::new(
+        dol_core::Date::try_new(2026, 5, 6).unwrap(),
+        dol_core::Time::try_new(1, 2, 3, 456_789).unwrap(),
+    );
+    assert_eq!(v, rt(&v));
+}
+
+#[test]
+fn offset_round_trip() {
+    for secs in [0, 3600, -3600, 19_800, -39_600] {
+        let v = dol_core::Offset::try_from_seconds(secs).unwrap();
+        assert_eq!(v, rt(&v));
+    }
+}
+
+#[test]
+fn timestamp_tz_round_trip() {
+    let v = dol_core::TimestampTz::new(
+        dol_core::DateTime::new(
+            dol_core::Date::try_new(2026, 5, 6).unwrap(),
+            dol_core::Time::try_new(7, 8, 9, 10).unwrap(),
+        ),
+        dol_core::Offset::try_from_seconds(-18_000).unwrap(),
+    );
+    assert_eq!(v, rt(&v));
+}
+
+#[test]
+fn interval_round_trip() {
+    let cases = [
+        dol_core::Interval::new(0, 0, 0),
+        dol_core::Interval::new(13, -7, 1_234_567_890),
+        dol_core::Interval::new(-100, 365, -42),
+    ];
+    for v in &cases {
+        assert_eq!(*v, rt(v));
+    }
+}
+
+// ─── Numeric leaves ─────────────────────────────────────────────────────────
+
+#[test]
+fn decimal_round_trip() {
+    let cases = [
+        dol_core::Decimal::try_new(0, 0).unwrap(),
+        dol_core::Decimal::try_new(12345, 2).unwrap(),
+        dol_core::Decimal::try_new(-12345, 2).unwrap(),
+        dol_core::Decimal::try_new(i128::MAX, 0).unwrap(),
+        dol_core::Decimal::try_new(i128::MIN, 0).unwrap(),
+        dol_core::Decimal::try_new(1, dol_core::Decimal::MAX_SCALE).unwrap(),
+    ];
+    for v in &cases {
+        assert_eq!(*v, rt(v));
+    }
+}
+
+// ─── Geo leaves ─────────────────────────────────────────────────────────────
+
+#[test]
+fn point_round_trip() {
+    let cases = [
+        dol_core::Point::try_new(0.0, 0.0).unwrap(),
+        dol_core::Point::try_new(-3.5, 4.5).unwrap(),
+        dol_core::Point::try_new(f64::MIN, f64::MAX).unwrap(),
+    ];
+    for v in &cases {
+        assert_eq!(*v, rt(v));
+    }
+}
+
+#[test]
+fn line_round_trip() {
+    let v = dol_core::geo::Line::try_new(1.0, -2.0, 3.0).unwrap();
+    assert_eq!(v, rt(&v));
+}
+
+#[test]
+fn segment_round_trip() {
+    let v = dol_core::geo::Segment::new(
+        dol_core::Point::try_new(0.0, 1.0).unwrap(),
+        dol_core::Point::try_new(2.0, 3.0).unwrap(),
+    );
+    assert_eq!(v, rt(&v));
+}
+
+#[test]
+fn rect_round_trip() {
+    let v = dol_core::geo::Rect::new(
+        dol_core::Point::try_new(-1.0, -1.0).unwrap(),
+        dol_core::Point::try_new(1.0, 1.0).unwrap(),
+    );
+    assert_eq!(v, rt(&v));
+}
+
+#[test]
+fn circle_round_trip() {
+    let v =
+        dol_core::geo::Circle::try_new(dol_core::Point::try_new(0.0, 0.0).unwrap(), 5.0).unwrap();
+    assert_eq!(v, rt(&v));
+}
+
+// ─── Span and SpanTable (always-on, postcard-compatible) ─────────────────────
+
+#[test]
+fn span_encode_postcard_parity() {
+    for v in [
+        dol_core::Span::NONE,
+        dol_core::Span::new(dol_core::FileId(0), 0, 0),
+        dol_core::Span::new(dol_core::FileId(7), 100, 25),
+        dol_core::Span::new(dol_core::FileId(0xFFFE), 0x00FF_FFFF, 0x00FF_FFFF),
+    ] {
+        assert_eq!(v, rt(&v));
+    }
+}
+
+#[test]
+fn span_table_encode_postcard_parity() {
+    // Build a SpanTable, use postcard parity helper via a manual encode/decode cycle.
+    let mut table = dol_core::span::SpanTable::new();
+    table.push(dol_core::Span::NONE);
+    table.push(dol_core::Span::new(dol_core::FileId(1), 10, 20));
+
+    let mut budget = Budget::new(Limits::host());
+    let our_bytes = encode_to_vec(&table, &mut budget).expect("Encode SpanTable");
+    let postcard_bytes = postcard::to_allocvec(&table).expect("postcard SpanTable");
+    assert_eq!(
+        our_bytes, postcard_bytes,
+        "SpanTable bytes must match postcard"
+    );
+}
+
+// ─── Path and Polygon (postcard-compatible) ───────────────────────────────────
+
+#[test]
+fn path_encode_postcard_parity() {
+    let open = dol_core::geo::Path::new(
+        false,
+        vec![
+            dol_core::Point::try_new(0.0, 0.0).unwrap(),
+            dol_core::Point::try_new(1.0, 2.0).unwrap(),
+        ],
+    );
+    let closed = dol_core::geo::Path::new(
+        true,
+        vec![
+            dol_core::Point::try_new(0.0, 0.0).unwrap(),
+            dol_core::Point::try_new(2.0, 0.0).unwrap(),
+            dol_core::Point::try_new(1.0, 1.0).unwrap(),
+        ],
+    );
+    assert_eq!(open, rt(&open));
+    assert_eq!(closed, rt(&closed));
+}
+
+#[test]
+fn polygon_encode_postcard_parity() {
+    let poly = dol_core::geo::Polygon::new(vec![
+        dol_core::Point::try_new(0.0, 0.0).unwrap(),
+        dol_core::Point::try_new(1.0, 0.0).unwrap(),
+        dol_core::Point::try_new(0.5, 1.0).unwrap(),
+    ]);
+    assert_eq!(poly, rt(&poly));
+}
+
+// ─── DataType and Value self-roundtrip (custom discriminants) ─────────────────
+
+// Self-roundtrip only — these types use our stable discriminants, not postcard.
+mod custom_rt {
+    use super::*;
+    use core::ops::Bound;
+    use dol_core::{DataType, Value, ValueRange};
+
+    fn self_rt<T>(value: &T) -> T
+    where
+        T: dol_wire::Encode + dol_wire::Decode + core::fmt::Debug + PartialEq,
+    {
+        let mut budget = Budget::new(Limits::host());
+        let bytes = encode_to_vec(value, &mut budget).expect("Encode");
+        let mut dec_budget = Budget::new(Limits::host());
+        let mut reader = dol_wire::decoder::Reader::new(&bytes);
+        let decoded = T::decode(&mut reader, &mut dec_budget)
+            .unwrap_or_else(|e| panic!("decode of {value:?} failed: {e}"));
+        assert!(reader.is_exhausted());
+        decoded
+    }
+
+    #[test]
+    fn data_type_primitives() {
+        for v in [
+            DataType::Null,
+            DataType::Bool,
+            DataType::Int32,
+            DataType::Float64,
+            DataType::Json,
+            DataType::Uuid,
+            DataType::Array(Box::new(DataType::Int32)),
+            DataType::Struct(vec![dol_core::StructField::new("x", DataType::Bool, true)]),
+        ] {
+            assert_eq!(v, self_rt(&v));
+        }
+    }
+
+    #[test]
+    fn value_scalars() {
+        for v in [
+            Value::Null,
+            Value::Bool(true),
+            Value::Int32(99),
+            Value::String(Box::from("hi")),
+            Value::Uuid([1u8; 16]),
+        ] {
+            assert_eq!(v, self_rt(&v));
+        }
+    }
+
+    #[test]
+    fn value_range() {
+        let r = ValueRange {
+            start: Bound::Included(Box::new(Value::Int32(0))),
+            end: Bound::Excluded(Box::new(Value::Int32(10))),
+        };
+        assert_eq!(r, self_rt(&r));
+
+        let r2 = ValueRange {
+            start: Bound::Unbounded,
+            end: Bound::Unbounded,
+        };
+        assert_eq!(r2, self_rt(&r2));
+    }
+
+    #[cfg(feature = "network")]
+    #[test]
+    fn network_values() {
+        let v = Value::Inet(dol_core::IpAddr::v4(127, 0, 0, 1));
+        assert_eq!(v, self_rt(&v));
+        let v = Value::MacAddr(dol_core::MacAddr::eui64([0xBB; 8]));
+        assert_eq!(v, self_rt(&v));
+    }
+}
+
+// ─── Literal and LiteralRange self-roundtrip ──────────────────────────────────
+
+mod literal_rt {
+    use super::*;
+    use core::ops::Bound;
+    use dol_core::literal::{Literal, LiteralRange};
+
+    fn self_rt_lit(value: &Literal<'static>) -> Literal<'static> {
+        let mut budget = Budget::new(Limits::host());
+        let bytes = encode_to_vec(value, &mut budget).expect("Encode Literal");
+        let mut dec_budget = Budget::new(Limits::host());
+        let mut reader = dol_wire::decoder::Reader::new(&bytes);
+        let decoded = Literal::decode(&mut reader, &mut dec_budget)
+            .unwrap_or_else(|e| panic!("decode of {value:?} failed: {e}"));
+        assert!(reader.is_exhausted());
+        decoded
+    }
+
+    #[test]
+    fn scalars() {
+        for v in [
+            Literal::Null,
+            Literal::Bool(false),
+            Literal::Int32(-99),
+            Literal::UInt64(u64::MAX),
+            Literal::Float32(0.5_f32),
+            Literal::Uuid([2u8; 16]),
+        ] {
+            assert_eq!(v, self_rt_lit(&v));
+        }
+    }
+
+    #[test]
+    fn string_owned() {
+        use std::borrow::Cow;
+        let v = Literal::String(Cow::Owned("owned".into()));
+        assert_eq!(v, self_rt_lit(&v));
+    }
+
+    #[test]
+    fn range() {
+        let r = Literal::Range(Box::new(LiteralRange {
+            start: Bound::Included(Box::new(Literal::Int32(0))),
+            end: Bound::Excluded(Box::new(Literal::Int32(5))),
+        }));
+        assert_eq!(r, self_rt_lit(&r));
+    }
+
+    #[test]
+    fn range_unbounded() {
+        let r: LiteralRange<'static> = LiteralRange::unbounded();
+        let mut budget = Budget::new(Limits::host());
+        let bytes = encode_to_vec(&r, &mut budget).expect("Encode LiteralRange");
+        let mut dec_budget = Budget::new(Limits::host());
+        let mut reader = dol_wire::decoder::Reader::new(&bytes);
+        let decoded =
+            LiteralRange::decode(&mut reader, &mut dec_budget).expect("Decode LiteralRange");
+        assert_eq!(decoded.start, Bound::Unbounded);
+        assert_eq!(decoded.end, Bound::Unbounded);
+        assert!(reader.is_exhausted());
+    }
+}

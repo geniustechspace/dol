@@ -6,7 +6,7 @@ use super::DataType;
 
 /// A named, typed field inside a [`DataType::Struct`].
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub struct StructField {
     pub name: Box<str>,

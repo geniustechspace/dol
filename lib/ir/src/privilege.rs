@@ -11,7 +11,7 @@ use crate::target::Symbol;
 
 /// Privilege types that can be granted or revoked.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum Privilege {
     /// Read rows / objects from the target.
     Select,

@@ -19,7 +19,7 @@ pub use crate::network::{IpAddr, MacAddr};
 pub use crate::numeric::Decimal;
 pub use crate::value::{Value, ValueRange};
 
-// NOTE: `Span` / `FileId` / `Diagnostic` / `Code` / `Severity` are *not*
+// NOTE: `Span` / `FileId` / `Diagnostic` / `ErrorCode` / `Severity` are *not*
 // glob-exported through the prelude — `dol-expr` has its own arena-internal
 // `Span` type, and downstream code that wants the diagnostic surface should
 // reach for it explicitly via `dol_core::{Span, Diagnostic, …}` or

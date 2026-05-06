@@ -23,3 +23,6 @@ serde   = [
     "dol-schema/serde",
     "dol-ir/serde",
 ]
+
+[lints]
+workspace = true

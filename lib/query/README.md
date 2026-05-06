@@ -20,7 +20,7 @@ at runtime and no static schema definition exists.
 - `.upsert()` — DML upsert (with conflict resolution)
 
 Each verb returns a builder that exposes the relevant predicates,
-projections, joins, and limits, and terminates with `.build() -> Program`.
+projections, joins, and limits, and terminates with `.try_build() -> Result<Program, BuildError>`.
 
 ## Features
 

@@ -33,10 +33,9 @@ fn filetree_target(interner: &mut Interner, path: &str) -> IrTarget {
         .filter(|s| !s.is_empty())
         .map(|seg| intern_symbol(interner, seg))
         .collect();
-    let (name, path_segs) = if let Some(last) = segments.last().copied() {
-        let head: smallvec::SmallVec<[dol_ir::Symbol; 2]> =
-            segments[..segments.len() - 1].iter().copied().collect();
-        (last, head)
+    let (name, path_segs) = if let Some((last, head)) = segments.split_last() {
+        let head: smallvec::SmallVec<[dol_ir::Symbol; 2]> = head.iter().copied().collect();
+        (*last, head)
     } else {
         (intern_symbol(interner, ""), smallvec![])
     };

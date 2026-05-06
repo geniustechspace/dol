@@ -7,7 +7,7 @@ use core::fmt;
 /// This matches the PostgreSQL `INTERVAL`, ISO 8601 duration, and RFC 5545
 /// DURATION representations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Interval {
     pub months: i32,
     pub days: i32,

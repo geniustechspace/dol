@@ -17,10 +17,20 @@
 //! | feature | default | effect                                                                  |
 //! | ------- | :-----: | ----------------------------------------------------------------------- |
 //! | `std`   |         | Forwards `std` to `dol-core`. Disable for `no_std + alloc` (default).  |
-//! | `serde` |    ✓    | `Serialize` / `Deserialize` for every schema type.                      |
+//! | `serde` |    ✓    | `Serialize` for every schema type. v2 wire-in goes through `dol-wire::Decode`. |
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::arithmetic_side_effects
+    )
+)]
 
 extern crate alloc;
 
@@ -58,7 +68,7 @@ use constraint::EntityConstraint as Constraint;
 /// ]);
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Entity {
     pub name: Arc<str>,
     pub namespace: Option<Arc<str>>,
@@ -94,25 +104,13 @@ impl Entity {
         }
     }
 
-    /// Look up a field by name. Panics if not found.
-    ///
-    /// **Design-time error contract:** the field name is part of the schema
-    /// definition; a missing field reflects a programmer mistake, not a
-    /// runtime input. Use [`Entity::try_field`] when handling
-    /// runtime-supplied names.
-    #[track_caller]
-    #[deprecated(
-        since = "0.1.0",
-        note = "use `try_field(name).expect(...)` or `try_field(name)?` and handle the `Option` explicitly; this panicking convenience will be removed in a future release"
-    )]
-    pub fn field(&self, name: &str) -> &Field {
-        self.fields
-            .iter()
-            .find(|f| &*f.name == name)
-            .unwrap_or_else(|| panic!("field '{}' not found in entity '{}'", name, self.name))
-    }
-
     /// Look up a field by name, returning `None` if not found.
+    ///
+    /// The pre-0.2.0 panicking convenience `Entity::field` has been
+    /// removed (v2 invariant: no `panic!` in production code, no
+    /// deprecation aliases). Callers that previously wrote
+    /// `entity.field(name)` should write `entity.try_field(name).expect(...)`
+    /// at the call-site or propagate the `Option` explicitly.
     pub fn try_field(&self, name: &str) -> Option<&Field> {
         self.fields.iter().find(|f| &*f.name == name)
     }

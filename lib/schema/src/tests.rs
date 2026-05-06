@@ -94,19 +94,13 @@ fn qualified_name_with_namespace() {
 // ── 5 & 6. Entity::field ─────────────────────────────────────────────
 
 #[test]
-#[allow(deprecated)] // exercising the deprecated panicking accessor
 fn field_lookup_success() {
     let m = basic_model();
-    let f = m.field("email");
+    let f = m
+        .try_field("email")
+        .expect("email field defined in basic_model");
     assert_eq!(&*f.name, "email");
     assert!(f.nullable);
-}
-
-#[test]
-#[should_panic(expected = "field 'missing' not found in entity 'users'")]
-#[allow(deprecated)] // exercising the deprecated panicking accessor
-fn field_lookup_panic_on_missing() {
-    basic_model().field("missing");
 }
 
 // ── 7. Entity::try_field ─────────────────────────────────────────────
