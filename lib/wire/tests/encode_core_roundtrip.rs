@@ -215,3 +215,124 @@ fn circle_round_trip() {
         .unwrap();
     assert_eq!(v, rt(&v));
 }
+
+// ─── Span and SpanTable (always-on, postcard-compatible) ─────────────────────
+
+#[test]
+fn span_encode_postcard_parity() {
+    for v in [
+        dol_core::Span::NONE,
+        dol_core::Span::new(dol_core::FileId(0), 0, 0),
+        dol_core::Span::new(dol_core::FileId(7), 100, 25),
+        dol_core::Span::new(dol_core::FileId(0xFFFE), 0x00FF_FFFF, 0x00FF_FFFF),
+    ] {
+        assert_eq!(v, rt(&v));
+    }
+}
+
+#[test]
+fn span_table_encode_postcard_parity() {
+    // Build a SpanTable, use postcard parity helper via a manual encode/decode cycle.
+    let mut table = dol_core::span::SpanTable::new();
+    table.push(dol_core::Span::NONE);
+    table.push(dol_core::Span::new(dol_core::FileId(1), 10, 20));
+
+    let mut budget = Budget::new(Limits::host());
+    let our_bytes = encode_to_vec(&table, &mut budget).expect("Encode SpanTable");
+    let postcard_bytes = postcard::to_allocvec(&table).expect("postcard SpanTable");
+    assert_eq!(our_bytes, postcard_bytes, "SpanTable bytes must match postcard");
+}
+
+// ─── Path and Polygon (postcard-compatible) ───────────────────────────────────
+
+#[test]
+fn path_encode_postcard_parity() {
+    let open = dol_core::geo::Path::new(false, vec![
+        dol_core::Point::try_new(0.0, 0.0).unwrap(),
+        dol_core::Point::try_new(1.0, 2.0).unwrap(),
+    ]);
+    let closed = dol_core::geo::Path::new(true, vec![
+        dol_core::Point::try_new(0.0, 0.0).unwrap(),
+        dol_core::Point::try_new(2.0, 0.0).unwrap(),
+        dol_core::Point::try_new(1.0, 1.0).unwrap(),
+    ]);
+    assert_eq!(open, rt(&open));
+    assert_eq!(closed, rt(&closed));
+}
+
+#[test]
+fn polygon_encode_postcard_parity() {
+    let poly = dol_core::geo::Polygon::new(vec![
+        dol_core::Point::try_new(0.0, 0.0).unwrap(),
+        dol_core::Point::try_new(1.0, 0.0).unwrap(),
+        dol_core::Point::try_new(0.5, 1.0).unwrap(),
+    ]);
+    assert_eq!(poly, rt(&poly));
+}
+
+// ─── DataType and Value self-roundtrip (custom discriminants) ─────────────────
+
+// Self-roundtrip only — these types use our stable discriminants, not postcard.
+mod custom_rt {
+    use super::*;
+    use core::ops::Bound;
+    use dol_core::{DataType, Value, ValueRange};
+
+    fn self_rt<T>(value: &T) -> T
+    where
+        T: dol_wire::Encode + dol_wire::Decode + core::fmt::Debug + PartialEq,
+    {
+        let mut budget = Budget::new(Limits::host());
+        let bytes = encode_to_vec(value, &mut budget).expect("Encode");
+        let mut dec_budget = Budget::new(Limits::host());
+        let mut reader = dol_wire::decoder::Reader::new(&bytes);
+        let decoded = T::decode(&mut reader, &mut dec_budget)
+            .unwrap_or_else(|e| panic!("decode of {value:?} failed: {e}"));
+        assert!(reader.is_exhausted());
+        decoded
+    }
+
+    #[test]
+    fn data_type_primitives() {
+        for v in [
+            DataType::Null, DataType::Bool, DataType::Int32, DataType::Float64,
+            DataType::Json, DataType::Uuid,
+            DataType::Array(Box::new(DataType::Int32)),
+            DataType::Struct(vec![dol_core::StructField::new("x", DataType::Bool, true)]),
+        ] {
+            assert_eq!(v, self_rt(&v));
+        }
+    }
+
+    #[test]
+    fn value_scalars() {
+        for v in [
+            Value::Null, Value::Bool(true), Value::Int32(99),
+            Value::String(Box::from("hi")),
+            Value::Uuid([1u8; 16]),
+        ] {
+            assert_eq!(v, self_rt(&v));
+        }
+    }
+
+    #[test]
+    fn value_range() {
+        let r = ValueRange {
+            start: Bound::Included(Box::new(Value::Int32(0))),
+            end: Bound::Excluded(Box::new(Value::Int32(10))),
+        };
+        assert_eq!(r, self_rt(&r));
+
+        let r2 = ValueRange { start: Bound::Unbounded, end: Bound::Unbounded };
+        assert_eq!(r2, self_rt(&r2));
+    }
+
+    #[cfg(feature = "network")]
+    #[test]
+    fn network_values() {
+        let v = Value::Inet(dol_core::IpAddr::v4(127, 0, 0, 1));
+        assert_eq!(v, self_rt(&v));
+        let v = Value::MacAddr(dol_core::MacAddr::eui64([0xBB; 8]));
+        assert_eq!(v, self_rt(&v));
+    }
+}
