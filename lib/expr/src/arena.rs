@@ -233,6 +233,9 @@ impl SpanTable {
     pub fn is_empty(&self) -> bool {
         self.spans.is_empty()
     }
+
+    pub fn spans_slice(&self) -> &[Span] { &self.spans }
+    pub fn owners_slice(&self) -> &[NodeId] { &self.owners }
 }
 
 // ─── Capacity hints ──────────────────────────────────────────────────────────
@@ -541,4 +544,19 @@ impl ExprArena {
     pub fn get_field(&self, id: FieldId) -> &FieldNode {
         get_in(&self.fields, id)
     }
+
+    pub fn nodes_slice(&self) -> &[ExprNode] { &self.nodes }
+    pub fn lits_slice(&self) -> &[Literal<'static>] { &self.lits }
+    pub fn funcs_slice(&self) -> &[FuncNode] { &self.funcs }
+    pub fn obj_lits_slice(&self) -> &[ObjLitNode] { &self.obj_lits }
+    pub fn windows_slice(&self) -> &[WindowNode] { &self.windows }
+    pub fn cases_slice(&self) -> &[CaseNode] { &self.cases }
+    pub fn in_lists_slice(&self) -> &[InListNode] { &self.in_lists }
+    pub fn queries_slice(&self) -> &[QueryNode] { &self.queries }
+    pub fn inserts_slice(&self) -> &[InsertNode] { &self.inserts }
+    pub fn updates_slice(&self) -> &[UpdateNode] { &self.updates }
+    pub fn deletes_slice(&self) -> &[DeleteNode] { &self.deletes }
+    pub fn upserts_slice(&self) -> &[UpsertNode] { &self.upserts }
+    pub fn fields_slice(&self) -> &[FieldNode] { &self.fields }
+    pub fn span_table_ref(&self) -> &SpanTable { &self.span_table }
 }

@@ -177,6 +177,21 @@ impl Interner {
             * (core::mem::size_of::<StrId>() + core::mem::size_of::<(u32, u32)>());
         bytes_cap + slots_cap
     }
+
+    #[allow(clippy::expect_used)]
+    pub fn sorted_strings(&self) -> alloc::vec::Vec<&str> {
+        let mut entries: alloc::vec::Vec<(StrId, &str)> = self
+            .slots
+            .iter()
+            .map(|(&id, &(off, len))| {
+                let raw = &self.bytes[off as usize..off as usize + len as usize];
+                let s = core::str::from_utf8(raw).expect("interner stores only valid UTF-8");
+                (id, s)
+            })
+            .collect();
+        entries.sort_unstable_by_key(|&(id, _)| id.get());
+        entries.into_iter().map(|(_, s)| s).collect()
+    }
 }
 
 /// Compute the content-addressed [`StrId`] for an arbitrary byte slice.
@@ -217,9 +232,6 @@ const fn fnv1a_32(bytes: &[u8]) -> u32 {
 
 #[cfg(feature = "serde")]
 impl serde::Serialize for Interner {
-    // Lint exemption: same internal-invariant carve-out as `get_opt` —
-    // the `from_utf8(...).expect(...)` documents that every slice in
-    // `bytes` was sourced from a `&str` in `intern`.
     #[allow(clippy::expect_used)]
     fn serialize<S: serde::Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
         // Serialise as a flat `Vec<String>` in canonical (sorted-by-id)

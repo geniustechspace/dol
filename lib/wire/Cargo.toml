@@ -12,6 +12,7 @@ dol-ir     = { workspace = true }
 dol-schema = { workspace = true }
 dol-core   = { workspace = true }
 dol-expr   = { workspace = true }
+smallvec   = { workspace = true }
 
 # Codec-specific (all optional)
 serde      = { workspace = true, optional = true }

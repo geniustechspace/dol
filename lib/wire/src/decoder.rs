@@ -449,6 +449,46 @@ impl<T: Decode> Decode for Vec<T> {
     }
 }
 
+impl<A: smallvec::Array> Decode for smallvec::SmallVec<A>
+where
+    A::Item: Decode,
+{
+    fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
+        let len = reader.read_varint_u32()? as usize;
+        if len > 1 << 20 {
+            return Err(DecodeError::LengthOverflow);
+        }
+        let mut out = smallvec::SmallVec::new();
+        for _ in 0..len {
+            let item = budget.descend(|b| A::Item::decode(reader, b))??;
+            out.push(item);
+        }
+        Ok(out)
+    }
+}
+
+impl<Tag: ?Sized> Decode for dol_core::id::Id<Tag> {
+    fn decode(reader: &mut Reader<'_>, _b: &mut Budget) -> Result<Self, DecodeError> {
+        let v = reader.read_varint_u32()?;
+        dol_core::id::Id::from_u32(v).ok_or(DecodeError::Custom("Id cannot be zero"))
+    }
+}
+
+impl Decode for alloc::sync::Arc<str> {
+    fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
+        let s = String::decode(reader, budget)?;
+        Ok(alloc::sync::Arc::from(s.as_str()))
+    }
+}
+
+impl<A: Decode, B: Decode> Decode for (A, B) {
+    fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
+        let a = budget.descend(|b| A::decode(reader, b))??;
+        let b = budget.descend(|b| B::decode(reader, b))??;
+        Ok((a, b))
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

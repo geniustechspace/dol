@@ -45,6 +45,10 @@ pub use encoder::{Encode, EncodeError, Writer, encode_to_vec};
 
 mod decode_core;
 mod encode_core;
+mod decode_expr;
+mod encode_expr;
+mod decode_ir;
+mod encode_ir;
 
 #[cfg(feature = "hash")]
 pub mod hash;

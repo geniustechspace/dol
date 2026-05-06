@@ -411,6 +411,40 @@ impl<T: Encode> Encode for Vec<T> {
     }
 }
 
+impl<A: smallvec::Array> Encode for smallvec::SmallVec<A>
+where
+    A::Item: Encode,
+{
+    fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
+        let len: u32 = self.len().try_into().map_err(|_| EncodeError::LengthOverflow)?;
+        w.write_varint_u32(len)?;
+        for item in self.as_slice() {
+            b.descend(|b| item.encode(w, b))??;
+        }
+        Ok(())
+    }
+}
+
+impl<Tag: ?Sized> Encode for dol_core::id::Id<Tag> {
+    fn encode(&self, w: &mut Writer<'_>, _b: &mut Budget) -> Result<(), EncodeError> {
+        w.write_varint_u32(self.get())
+    }
+}
+
+impl Encode for alloc::sync::Arc<str> {
+    fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
+        <str as Encode>::encode(self.as_ref(), w, b)
+    }
+}
+
+impl<A: Encode, B: Encode> Encode for (A, B) {
+    fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
+        b.descend(|b| self.0.encode(w, b))??;
+        b.descend(|b| self.1.encode(w, b))??;
+        Ok(())
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

@@ -60,4 +60,14 @@ pub fn content_hash(program: &Program) -> Result<crate::hash::Digest, WireError>
     crate::hash::content_hash(program)
 }
 
-extern crate alloc;
+/// Decode a [`Program`] from raw postcard bytes using the budget-aware
+/// [`crate::decoder::Decode`] path (no serde dependency).
+#[cfg(feature = "postcard")]
+pub fn decode(bytes: &[u8]) -> Result<Program, crate::decoder::DecodeError> {
+    use dol_core::policy::Limits;
+    let mut reader = crate::decoder::Reader::new(bytes);
+    let mut budget = dol_core::policy::Budget::new(Limits::default());
+    Program::decode(&mut reader, &mut budget)
+}
+
+

@@ -98,6 +98,8 @@ impl SchemaCatalog {
         self.entries.is_empty()
     }
 
+    pub fn entries_slice(&self) -> &[CatalogEntry] { &self.entries }
+
     /// Iterate over `(SchemaId, &CatalogEntry)`.
     pub fn iter(&self) -> impl Iterator<Item = (SchemaId, &CatalogEntry)> {
         self.entries
