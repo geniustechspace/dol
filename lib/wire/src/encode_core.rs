@@ -140,7 +140,7 @@ mod geo_impls {
     impl Encode for dol_core::geo::Line {
         fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
             b.descend(|b| self.a.encode(w, b))??;
-            b.descend(|bg| self.b.encode(w, bg))??;
+            b.descend(|b| self.b.encode(w, b))??;
             b.descend(|b| self.c.encode(w, b))??;
             Ok(())
         }
