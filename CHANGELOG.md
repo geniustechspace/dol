@@ -34,6 +34,16 @@ documented under "0.2.0" below.
 
 #### Added
 
+- **`lib/wire/fuzz/` — `cargo-fuzz` harnesses for every `dol-wire`
+  decoder.** Per `docs/v2_plan.md` §57 (*"Fuzz targets in
+  `lib/wire/fuzz/` for every decoder, run in CI nightly"*) and §78.
+  Two targets ship in this PR: `unframe` (envelope parser) and
+  `decode_program` (full `Decode`-driven `Program` decode). Each
+  target is a standalone crate (own `[workspace]`), so it does not
+  perturb the parent workspace; cargo-fuzz requires the nightly
+  toolchain. The CI `fuzz-smoke` job runs each target for 60 seconds
+  on every PR; crashes upload as artifacts. Adding a new target is
+  documented in `lib/wire/fuzz/README.md`.
 - **`dol_core::diag::ErrorCode` (`u16`, `repr(transparent)`).** Replaces
   the placeholder `Code(&'static str)` with the layered scheme
   `layer * 1000 + serial` documented in `docs/v2_plan.md` §22. The type
