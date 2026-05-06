@@ -80,14 +80,14 @@ impl InsertQuery {
 
     /// Build the arena-based IR as a [`dol_ir::Program`] containing a
     /// single [`dol_ir::Operation::Insert`] referencing an arena
-    /// [`ExprNode::Insert`](dol_expr::expr::ExprNode::Insert).
+    /// `ExprNode` of opcode [`dol_expr::expr::ExprOp::Insert`].
     ///
     /// Infallible in current shape (the builder only allocates `Param`
     /// placeholders), but returns `Result` for API consistency with the
     /// other builders. Will gain real failure modes once user-supplied
     /// VALUES expressions are supported.
     pub fn try_build(self) -> Result<dol_ir::Program, crate::BuildError> {
-        use dol_expr::expr::{ExprNode, InsertNode};
+        use dol_expr::expr::InsertNode;
         use dol_ir::TargetKind;
         use dol_ir::operation::{Insert, InsertSource};
 
@@ -113,7 +113,7 @@ impl InsertQuery {
         // `param_count`; not representable as overflow on 64-bit `usize`.
         #[allow(clippy::arithmetic_side_effects)]
         for _ in 0..(self.row_count * fields.len()) {
-            values.push(arena.alloc(ExprNode::Param));
+            values.push(arena.alloc_param());
         }
 
         // Returning columns as field-reference expressions.
@@ -127,7 +127,7 @@ impl InsertQuery {
                     name: col,
                     steps: smallvec::SmallVec::new(),
                 });
-                arena.alloc(ExprNode::Field(fid))
+                arena.alloc_field_ref(fid)
             })
             .collect();
 
@@ -139,7 +139,7 @@ impl InsertQuery {
             conflict: None,
         };
         let iid = arena.alloc_insert(inode);
-        let body = arena.alloc(ExprNode::Insert(iid));
+        let body = arena.alloc_insert_ref(iid);
 
         let target = crate::target::target_from_parts(
             &mut interner,

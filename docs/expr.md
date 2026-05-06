@@ -10,17 +10,20 @@ no new vocabulary at the expression level.
 | Crate         | Role                                                                                                                                |
 |---------------|-------------------------------------------------------------------------------------------------------------------------------------|
 | `dol-core`   | The single source of truth for every type and value in DOL: `DataType`, `Value`, `Literal`, and the supporting primitive types.    |
-| `dol-expr`    | The expression engine — two representations (`tree::Expr<'a>` and the arena-based `ExprNode`), the lowering bridge between them, and the canonical AST node structs. |
+| `dol-expr`    | The expression engine — the user-facing `tree::Expr<'a>` builder DSL, the 16-byte packed `ExprNode` arena IR it lowers to, and the canonical side-pool node structs. |
 
 Both crates compile in `no_std + alloc` mode (default) and on
 `thumbv7em-none-eabihf` for embedded use.
 
-## Two expression representations
+## Two layers
 
-DOL deliberately maintains two parallel expression representations that
-each optimize for a different audience.
+`dol-expr` exposes one expression *representation* (the packed
+`ExprNode`) wrapped in two convenient *layers*: a recursive
+`tree::Expr<'a>` builder DSL for ergonomic construction and a
+flat `ExprArena` of `ExprNode`s for backend rendering. Lowering
+flows in one direction — tree → arena.
 
-### `tree::Expr<'a>` — the user-facing tree
+### `tree::Expr<'a>` — the user-facing builder
 
 `tree::Expr<'a>` is a recursive sum type with a fluent builder API. It is
 what end users compose when they write:
@@ -38,20 +41,30 @@ let e = field("user.id").eq(param());
   (`.eq()`, `.between()`, `.window()`), and dedicated builders for cases,
   windows, and order-by clauses.
 
-### `ExprNode` — the arena-based IR
+### `ExprNode` — the 16-byte packed arena IR
 
-`ExprNode` is a flat 32-byte sum type stored in an `ExprArena`:
+`ExprNode` is a `#[repr(C)]`, `bytemuck::Pod` POD struct stored in an
+`ExprArena`:
 
-* **`size_of::<ExprNode>() == 32`** is asserted in `xtask size` and in a
-  unit test inside `dol-expr`. Variants too large for inline storage spill
-  into typed side-pools (`ExprArena::fields`, `::funcs`, `::cases`,
-  `::windows`, `::queries`, `::inserts`, `::updates`, `::deletes`,
-  `::upserts`, `::in_lists`, `::obj_lits`).
+* **`size_of::<ExprNode>() == 16`** is asserted in `xtask size` and in
+  unit tests inside `dol-expr`. The layout is `op (u8) + flags (u8) +
+  aux (u16) + a (u32) + b (u32) + c (u32)`. Opcodes that need more
+  than three operand handles (Func args, Window order-by, Case branches,
+  array literals, …) spill into typed side pools on `ExprArena`
+  (`fields`, `funcs`, `cases`, `windows`, `queries`, `inserts`,
+  `updates`, `deletes`, `upserts`, `in_lists`, `obj_lits`,
+  `array_lits`).
 * **Indices, not pointers** — every cross-reference is a typed `*Id` (a
-  `u32`). This eliminates allocator pressure, makes the IR trivially
-  serializable, and keeps cache lines hot.
-* **Backend-friendly** — backends (SQL, REST, KV, …) traverse `ExprArena`
-  directly, never the tree.
+  `u32` `NonZeroU32`). This eliminates allocator pressure, makes the
+  IR trivially serializable, and keeps cache lines hot (≈2× the
+  density of the previous 32-byte variant enum).
+* **Typed accessors** — `node.as_bin()`, `node.as_field()`, … return
+  `Option<…>` so a malformed/unknown opcode surfaces cleanly. Backends
+  must use these helpers; reaching into raw `a`/`b`/`c` defeats the
+  centralised `BinOp::try_from_u16` / `UnaryOp::try_from_u16`
+  validation.
+* **Backend-friendly** — backends (SQL, REST, KV, …) traverse
+  `ExprArena` directly, never the tree.
 
 ## Lowering: tree → arena
 
@@ -134,7 +147,7 @@ distinctly-tagged ID type.
 
 * Serde round-trip is gated in CI for both crates
   (`{lib,tools}/*/tests/serde_roundtrip.rs`).
-* `xtask size` asserts `size_of::<ExprNode> == 32`,
+* `xtask size` asserts `size_of::<ExprNode> == 16`,
   `size_of::<Value> == 24`, and `size_of::<Literal<'static>> == 32`.
 * `xtask nostd` and the `cross-compile` CI job run
   `cargo check --no-default-features` for both crates, and additionally

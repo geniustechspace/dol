@@ -11,7 +11,7 @@ use crate::target::Target;
 /// `Update` operation.
 ///
 /// The SET assignments + WHERE filter + RETURNING projection live in an
-/// arena [`ExprNode::Update`](dol_expr::expr::ExprNode::Update) node
+/// arena `ExprNode` of opcode [`ExprOp::Update`](dol_expr::expr::ExprOp::Update) node
 /// referenced by [`Update::node`]. Backends pull `node` and walk the arena.
 ///
 /// # Examples
@@ -35,6 +35,6 @@ use crate::target::Target;
 pub struct Update {
     /// Target to update.
     pub target: Target,
-    /// Arena `NodeId` of the [`ExprNode::Update`](dol_expr::expr::ExprNode::Update) body.
+    /// Arena `NodeId` of the `ExprNode` of opcode [`ExprOp::Update`](dol_expr::expr::ExprOp::Update) body.
     pub node: NodeId,
 }

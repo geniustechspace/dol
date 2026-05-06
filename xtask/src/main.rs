@@ -134,7 +134,10 @@ fn size_report() -> bool {
     }
     budget!(dol_core::Value, 24);
     budget!(dol_core::Literal<'static>, 32);
-    budget!(dol_expr::ExprNode, 32);
+    // ExprNode is now a 16 B `bytemuck::Pod` (was a 32 B variant enum
+    // before the v2 packed cut). Side-pool ids on `ExprArena` carry
+    // anything that doesn't fit.
+    budget!(dol_expr::ExprNode, 16);
     // Boxing every heavy payload (DDL bodies, DML arena handles, governance
     // structs) keeps `Operation` comfortably under its 64-byte budget.
     budget!(dol_ir::Operation, 64);

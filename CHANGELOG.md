@@ -34,6 +34,63 @@ documented under "0.2.0" below.
 
 #### Added
 
+- **`dol_expr::ExprNode` is now the 16-byte `bytemuck::Pod` packed node**
+  (the previous variant enum is gone, completing the v2 cut-over per
+  `docs/v2_plan.md` §35). The user-visible identifier
+  `dol_expr::ExprNode` is preserved everywhere downstream — what
+  changed is the *layout*: an opcode (`u8`), a `flags` byte, a `u16`
+  `aux`, and three `u32` operand handles (`a`, `b`, `c`). The
+  scaffolding `dol_expr::packed::{PackedNode, PackedOp, walk_iter}`
+  module is gone; opcodes live on the new `dol_expr::ExprOp`
+  (re-exported from the crate root) and `walk_iter` is replaced by
+  `ExprNode::child_node_ids()` (yields the up-to-three child
+  `NodeId`s for any recursive opcode).
+  - **`ExprOp` discriminator** — covers all 26 shapes in a stable,
+    append-only byte tag space (≤ 256 today). Operator families
+    collapse onto shared opcodes: every binary operator is
+    `ExprOp::Bin` (with `BinOp::as_u16` in `aux`); every unary
+    operator is `ExprOp::Una` (with `UnaryOp::as_u16` in `aux`).
+  - **Typed constructors and `as_*` accessors** — `ExprNode::bin(op,
+    lhs, rhs)`, `ExprNode::field(id)`, …, mirrored by
+    `node.as_bin() -> Option<(BinOp, NodeId, NodeId)>`,
+    `node.as_field() -> Option<FieldId>`, … Backends never reach into
+    raw `a`/`b`/`c`. Mirrored on `ExprArena` as `alloc_bin`,
+    `alloc_una`, `alloc_field_ref`, `alloc_param`, …, so call sites
+    stay readable.
+  - **`BinOp::as_u16` / `BinOp::try_from_u16` and the same on
+    `UnaryOp`** — single canonical mapping for the wire format and
+    `aux` encoding; round-trip-tested for every variant so backends
+    can't silently drift.
+  - **`ArrayLitNode` + `ArrayLitId` side pool** — the only inline
+    payload on the previous enum (`ExprNode::ArrayLit(SmallVec<[NodeId;
+    4]>)`) moved out of the node into its own pool, accessed via
+    `ExprArena::{alloc_array_lit, get_array_lit}`. This is what makes
+    the 16-byte budget achievable.
+  - **Wire format for `ExprNode` is new** (varint opcode +
+    opcode-aware fields, byte-stable across hosts and dense for leaf
+    nodes; smaller than the previous variant-tag encoding for most
+    workloads). Because there are no external dependents this is fine,
+    but old wire bytes will not decode against the new build.
+  - **`xtask size` budget** — `ExprNode` now has a 16 B budget (down
+    from 32 B); the test corpus and the
+    `dol_expr::expr::size_tests::expr_node_is_16_bytes` unit test both
+    enforce it.
+  - **Iterative-traversal helpers** —
+    `ExprNode::child_node_ids()` yields the recursive children for
+    every opcode (Bin: a, b; Una: a; Agg: b; Cast: a; Alias: a;
+    InSub: a, b; Exists: a; IsNull: a; Between: a, b, c). Side-pool
+    referents (Field, Func, Case, Window, InList, ObjectLit,
+    ArrayLit, Query, Insert, Update, Delete, Upsert) yield empty
+    here — their traversal goes through the arena's pool tables.
+  - *Deferred to a follow-up PR (out of scope of this cut):* making
+    `ExprArena` generic over `dol_core::storage::Storage<ExprNode>`
+    (today the nodes pool is `Vec<ExprNode>`); making the side pools
+    `Storage`-generic; bulk POD wire encoding (`bytemuck::cast_slice`
+    of the nodes vector with byte-order handling); structural
+    hashing/dedup of `ExprNode`s; rewriting `lower_inner` as an
+    explicit work-stack post-order pass (today's recursion is bounded
+    by `Budget::descend` and the `max_depth` cap, so the
+    stack-overflow surface is already gated).
 - **`dol_ir::store::{KvStore, Catalog, KvError}`** — backend trait
   surface per `docs/v2_plan.md` §71-72. Both traits thread
   `&mut Budget`, return `Result<…, KvError<E>>` with `Budget`,
@@ -51,16 +108,11 @@ documented under "0.2.0" below.
   agnostic; Ed25519 on hosts, HMAC-SHA-256 on MCUs.
   `Signed::open` is zero-allocation; `Signed::seal` allocates exactly
   once.
-- **`dol_expr::packed::{PackedNode, PackedOp, walk_iter}`** — 16-byte
-  `bytemuck::Pod` node representation per `docs/v2_plan.md` §35. Lives
-  alongside the existing variant `ExprNode` as scaffolding for the
-  cut-over: backends can begin consuming the packed shape and the
-  iterative work-stack walker is exercised by tests well before any
-  production graph depends on it. `walk_iter` is the canonical
-  pre-order traversal — driven by an explicit stack on `Vec<NodeId>`
-  and `Budget::tick(1)` per visit, so depth-attack DOS becomes
-  impossible by construction. `child_node_ids()` is the seam for
-  opcode-specific recursion.
+- *(Superseded by the `ExprNode` packed cut above.)* The earlier
+  scaffolding `dol_expr::packed::{PackedNode, PackedOp, walk_iter}`
+  has been folded into and replaced by the new `ExprNode` / `ExprOp` /
+  `ExprNode::child_node_ids()` API; the `packed` module no longer
+  exists.
 - **`.github/workflows/nightly-sanitizers.yml`** — daily Miri
   (`-Zmiri-strict-provenance -Zmiri-symbolic-alignment-check`) and
   AddressSanitizer jobs over `dol-core`, `dol-expr`, and `dol-wire`,

@@ -315,8 +315,8 @@ impl GetQuery {
 
     /// Consume the builder and produce a [`dol_ir::Program`] holding a
     /// single [`dol_ir::Operation::Query`] that references an arena
-    /// [`ExprNode::Query`](dol_expr::expr::ExprNode::Query) carrying the
-    /// SELECT body.
+    /// `ExprNode` of opcode [`dol_expr::expr::ExprOp::Query`] carrying
+    /// the SELECT body.
     ///
     /// When no projections have been set and Entity field metadata is
     /// available, all entity fields are selected by default.
@@ -326,7 +326,7 @@ impl GetQuery {
     /// expressions exhausts the default budget.
     pub fn try_build(self) -> Result<dol_ir::Program, crate::BuildError> {
         use dol_core::policy::{Budget, Limits};
-        use dol_expr::expr::{ExprNode, JoinNode, JoinType as ArenaJoinType, QueryNode};
+        use dol_expr::expr::{JoinNode, JoinType as ArenaJoinType, QueryNode};
         use dol_expr::ids::NodeId;
         use dol_expr::lower::{lower_expr_with_budget, lower_exprs, lower_filters, lower_order_by};
         use dol_ir::TargetKind;
@@ -401,7 +401,7 @@ impl GetQuery {
                             name: col,
                             steps: SmallVec::new(),
                         });
-                        arena.alloc(ExprNode::Field(fid))
+                        arena.alloc_field_ref(fid)
                     };
                     let rid = {
                         let col = interner.intern(r);
@@ -410,13 +410,9 @@ impl GetQuery {
                             name: col,
                             steps: SmallVec::new(),
                         });
-                        arena.alloc(ExprNode::Field(fid))
+                        arena.alloc_field_ref(fid)
                     };
-                    cond_ids.push(arena.alloc(ExprNode::BinOp {
-                        op: dol_expr::expr::BinOp::Eq,
-                        lhs: lid,
-                        rhs: rid,
-                    }));
+                    cond_ids.push(arena.alloc_bin(dol_expr::expr::BinOp::Eq, lid, rid));
                 }
                 // `on_conditions.is_empty()` was checked above, so the
                 // loop ran at least once and `cond_ids` is non-empty.
@@ -424,11 +420,7 @@ impl GetQuery {
                 let mut result = cond_ids[0];
                 #[allow(clippy::indexing_slicing)]
                 for id in &cond_ids[1..] {
-                    result = arena.alloc(ExprNode::BinOp {
-                        op: dol_expr::expr::BinOp::And,
-                        lhs: result,
-                        rhs: *id,
-                    });
+                    result = arena.alloc_bin(dol_expr::expr::BinOp::And, result, *id);
                 }
                 Some(result)
             };
@@ -486,7 +478,7 @@ impl GetQuery {
         // Lower the QueryNode into the arena and reference it from
         // Operation::Query.
         let qid = arena.alloc_query(qnode);
-        let body = arena.alloc(ExprNode::Query(qid));
+        let body = arena.alloc_query_ref(qid);
 
         let target = crate::target::target_from_parts(
             &mut interner,

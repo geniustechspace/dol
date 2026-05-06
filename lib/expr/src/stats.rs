@@ -5,8 +5,9 @@
 //!
 //! 1. Benchmarks can print a single number per change ("the arena now uses
 //!    20% fewer bytes for this representative plan").
-//! 2. Future regressions (e.g. an enum variant inflating beyond the 32 B
-//!    budget for `ExprNode`, or the interner bloating after a refactor)
+//! 2. Future regressions (e.g. an opcode payload inflating beyond the
+//!    16 B budget for `ExprNode`, or the interner bloating after a
+//!    refactor)
 //!    are visible alongside throughput numbers, not just size assertions.
 //!
 //! Not part of any wire format; safe to evolve freely.

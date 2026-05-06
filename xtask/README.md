@@ -21,7 +21,7 @@ cargo run -p xtask -- <subcommand>
 ```text
 size_of::<dol_core::Value>()            ≤ 24
 size_of::<dol_core::Literal<'static>>() ≤ 32
-size_of::<dol_expr::ExprNode>()         ≤ 32
+size_of::<dol_expr::ExprNode>()         == 16
 size_of::<dol_ir::Statement>()          ≤ 64   (currently 24)
 ```
 
