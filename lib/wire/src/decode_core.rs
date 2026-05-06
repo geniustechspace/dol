@@ -6,7 +6,7 @@
 //! test asserts this against `postcard::to_allocvec(&value)` for the
 //! postcard-compatible types, and self-round-trips the rest.
 //!
-//! Coverage in v2 (0.2.0):
+//! Coverage in v2 (0.2.0) — **complete**:
 //!
 //! - **Always-on (postcard-compatible):** `BitString`, `FileId`, `Span`,
 //!   `SpanTable`.
@@ -24,12 +24,10 @@
 //!   with the active feature set, so we assign stable fixed discriminants
 //!   with gaps between feature ranges. See the discriminant constant tables
 //!   in each impl block for the stable assignment.
-//!
-//! Still deferred to a follow-up PR:
-//!
-//! - **`Literal<'a>` / `LiteralRange<'a>`:** lifetime on these types
-//!   requires more thought; `Decode` would produce `'static` copies but the
-//!   API surface needs design. Scheduled for PR C.
+//! - **Always-on (custom stable discriminants, produces `'static` copies):**
+//!   `Literal<'static>`, `LiteralRange<'static>`. Same discriminant gap
+//!   scheme as `Value`; string/bytes payloads are decoded into owned
+//!   (`Box<str>` / `Box<[u8]>`) giving the caller a `'static` value.
 
 use alloc::boxed::Box;
 use alloc::vec::Vec;
@@ -841,8 +839,300 @@ mod value_impls {
     }
 }
 
-// Silence "unused" warnings when the optional features aren't enabled.
+// ─── Literal<'static> and LiteralRange<'static> (stable custom discriminants)
+//
+// `Literal<'a>` contains `Cow<'a, str>` / `Cow<'a, [u8]>`. `Decode` always
+// produces `'static` values by decoding strings/bytes into owned allocations.
+//
+// Discriminants mirror the `Value` scheme exactly:
+//
+//   Always-on primitives  :  0-20
+//   Always-on composite   : 21-27
+//   numeric feature       : 30
+//   network feature       : 40-41
+//   datetime feature      : 50-54
+//   geo feature           : 60-66
+
 #[allow(dead_code)]
-fn _force_alloc_use() -> Vec<u8> {
-    Vec::new()
+mod literal_impls {
+    use alloc::borrow::Cow;
+
+    use super::*;
+    use dol_core::literal::{Literal, LiteralRange};
+
+    const L_NULL: u32 = 0;
+    const L_BOOL: u32 = 1;
+    const L_STRING: u32 = 2;
+    const L_JSON: u32 = 3;
+    const L_XML: u32 = 4;
+    const L_ENUM: u32 = 5;
+    const L_BYTES: u32 = 6;
+    const L_UUID: u32 = 7;
+    const L_BITSTRING: u32 = 8;
+    const L_INT8: u32 = 9;
+    const L_INT16: u32 = 10;
+    const L_INT32: u32 = 11;
+    const L_INT64: u32 = 12;
+    const L_INT128: u32 = 13;
+    const L_UINT8: u32 = 14;
+    const L_UINT16: u32 = 15;
+    const L_UINT32: u32 = 16;
+    const L_UINT64: u32 = 17;
+    const L_UINT128: u32 = 18;
+    const L_FLOAT32: u32 = 19;
+    const L_FLOAT64: u32 = 20;
+    const L_ARRAY: u32 = 21;
+    const L_SET: u32 = 22;
+    const L_TUPLE: u32 = 23;
+    const L_MAP: u32 = 24;
+    const L_STRUCT: u32 = 25;
+    const L_RANGE: u32 = 26;
+    const L_EXTENSION: u32 = 27;
+    #[cfg(feature = "numeric")]
+    const L_DECIMAL: u32 = 30;
+    #[cfg(feature = "network")]
+    const L_INET: u32 = 40;
+    #[cfg(feature = "network")]
+    const L_MACADDR: u32 = 41;
+    #[cfg(feature = "datetime")]
+    const L_DATE: u32 = 50;
+    #[cfg(feature = "datetime")]
+    const L_TIME: u32 = 51;
+    #[cfg(feature = "datetime")]
+    const L_DATETIME: u32 = 52;
+    #[cfg(feature = "datetime")]
+    const L_TIMESTAMPTZ: u32 = 53;
+    #[cfg(feature = "datetime")]
+    const L_INTERVAL: u32 = 54;
+    #[cfg(feature = "geo")]
+    const L_POINT: u32 = 60;
+    #[cfg(feature = "geo")]
+    const L_LINE: u32 = 61;
+    #[cfg(feature = "geo")]
+    const L_SEGMENT: u32 = 62;
+    #[cfg(feature = "geo")]
+    const L_RECT: u32 = 63;
+    #[cfg(feature = "geo")]
+    const L_CIRCLE: u32 = 64;
+    #[cfg(feature = "geo")]
+    const L_PATH: u32 = 65;
+    #[cfg(feature = "geo")]
+    const L_POLYGON: u32 = 66;
+
+    // Helper: decode a boxed slice of Literals.
+    fn decode_lit_slice(
+        reader: &mut Reader<'_>,
+        budget: &mut Budget,
+    ) -> Result<Box<[Literal<'static>]>, DecodeError> {
+        let v = Vec::<Literal<'static>>::decode(reader, budget)?;
+        Ok(v.into_boxed_slice())
+    }
+
+    // Helper: decode boxed (Box<str>, Literal) key-value pairs.
+    fn decode_kv_slice(
+        reader: &mut Reader<'_>,
+        budget: &mut Budget,
+    ) -> Result<Box<[(Cow<'static, str>, Literal<'static>)]>, DecodeError> {
+        let len = reader.read_varint_u32()? as usize;
+        if len > 1 << 20 {
+            return Err(DecodeError::LengthOverflow);
+        }
+        let mut out: Vec<(Cow<'static, str>, Literal<'static>)> = Vec::with_capacity(len.min(64));
+        for _ in 0..len {
+            let k = budget.descend(|b| Box::<str>::decode(reader, b))??;
+            let v = budget.descend(|b| Literal::decode(reader, b))??;
+            out.push((Cow::Owned(k.into_string()), v));
+        }
+        Ok(out.into_boxed_slice())
+    }
+
+    impl Decode for LiteralRange<'static> {
+        fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
+            let start = budget.descend(|b| decode_bound(reader, b))??;
+            let end = budget.descend(|b| decode_bound(reader, b))??;
+            Ok(LiteralRange { start, end })
+        }
+    }
+
+    fn decode_bound(
+        reader: &mut Reader<'_>,
+        budget: &mut Budget,
+    ) -> Result<core::ops::Bound<Box<Literal<'static>>>, DecodeError> {
+        match reader.read_u8()? {
+            0 => {
+                let v = budget.descend(|b| Literal::decode(reader, b))??;
+                Ok(core::ops::Bound::Included(Box::new(v)))
+            }
+            1 => {
+                let v = budget.descend(|b| Literal::decode(reader, b))??;
+                Ok(core::ops::Bound::Excluded(Box::new(v)))
+            }
+            2 => Ok(core::ops::Bound::Unbounded),
+            seen => Err(DecodeError::InvalidVariant {
+                type_name: "Bound<Literal>",
+                seen: seen as u32,
+            }),
+        }
+    }
+
+    impl Decode for Literal<'static> {
+        fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
+            let disc = reader.read_varint_u32()?;
+            match disc {
+                L_NULL => Ok(Literal::Null),
+                L_BOOL => Ok(Literal::Bool(bool::decode(reader, budget)?)),
+                L_STRING => {
+                    let s = budget.descend(|b| Box::<str>::decode(reader, b))??;
+                    Ok(Literal::String(Cow::Owned(s.into_string())))
+                }
+                L_JSON => {
+                    let s = budget.descend(|b| Box::<str>::decode(reader, b))??;
+                    Ok(Literal::Json(Cow::Owned(s.into_string())))
+                }
+                L_XML => {
+                    let s = budget.descend(|b| Box::<str>::decode(reader, b))??;
+                    Ok(Literal::Xml(Cow::Owned(s.into_string())))
+                }
+                L_ENUM => {
+                    let s = budget.descend(|b| Box::<str>::decode(reader, b))??;
+                    Ok(Literal::Enum(Cow::Owned(s.into_string())))
+                }
+                L_BYTES => {
+                    let b = budget.descend(|b| Box::<[u8]>::decode(reader, b))??;
+                    Ok(Literal::Bytes(Cow::Owned(b.into_vec())))
+                }
+                L_UUID => Ok(Literal::Uuid(reader.read_array::<16>()?)),
+                L_BITSTRING => {
+                    let bs = budget.descend(|b| dol_core::BitString::decode(reader, b))??;
+                    Ok(Literal::BitString(Box::new(bs)))
+                }
+                L_INT8 => Ok(Literal::Int8(i8::decode(reader, budget)?)),
+                L_INT16 => Ok(Literal::Int16(i16::decode(reader, budget)?)),
+                L_INT32 => Ok(Literal::Int32(i32::decode(reader, budget)?)),
+                L_INT64 => Ok(Literal::Int64(i64::decode(reader, budget)?)),
+                L_INT128 => Ok(Literal::Int128(i128::decode(reader, budget)?)),
+                L_UINT8 => Ok(Literal::UInt8(u8::decode(reader, budget)?)),
+                L_UINT16 => Ok(Literal::UInt16(u16::decode(reader, budget)?)),
+                L_UINT32 => Ok(Literal::UInt32(u32::decode(reader, budget)?)),
+                L_UINT64 => Ok(Literal::UInt64(u64::decode(reader, budget)?)),
+                L_UINT128 => Ok(Literal::UInt128(u128::decode(reader, budget)?)),
+                L_FLOAT32 => Ok(Literal::Float32(f32::decode(reader, budget)?)),
+                L_FLOAT64 => Ok(Literal::Float64(f64::decode(reader, budget)?)),
+                L_ARRAY => {
+                    let elems = budget.descend(|b| decode_lit_slice(reader, b))??;
+                    Ok(Literal::Array(elems))
+                }
+                L_SET => {
+                    let elems = budget.descend(|b| decode_lit_slice(reader, b))??;
+                    Ok(Literal::Set(elems))
+                }
+                L_TUPLE => {
+                    let elems = budget.descend(|b| decode_lit_slice(reader, b))??;
+                    Ok(Literal::Tuple(elems))
+                }
+                L_MAP => {
+                    let pairs = budget.descend(|b| decode_kv_slice(reader, b))??;
+                    Ok(Literal::Map(pairs))
+                }
+                L_STRUCT => {
+                    let pairs = budget.descend(|b| decode_kv_slice(reader, b))??;
+                    Ok(Literal::Struct(pairs))
+                }
+                L_RANGE => {
+                    let r = budget
+                        .descend(|b| LiteralRange::<'static>::decode(reader, b))??;
+                    Ok(Literal::Range(Box::new(r)))
+                }
+                L_EXTENSION => {
+                    let name = budget.descend(|b| Box::<str>::decode(reader, b))??;
+                    let data = budget.descend(|b| Box::<[u8]>::decode(reader, b))??;
+                    Ok(Literal::Extension(Box::new((name, data))))
+                }
+                #[cfg(feature = "numeric")]
+                L_DECIMAL => {
+                    let d = budget.descend(|b| dol_core::Decimal::decode(reader, b))??;
+                    Ok(Literal::Decimal(Box::new(d)))
+                }
+                #[cfg(feature = "network")]
+                L_INET => {
+                    let ip = budget.descend(|b| dol_core::IpAddr::decode(reader, b))??;
+                    Ok(Literal::Inet(ip))
+                }
+                #[cfg(feature = "network")]
+                L_MACADDR => {
+                    let mac = budget.descend(|b| dol_core::MacAddr::decode(reader, b))??;
+                    Ok(Literal::MacAddr(mac))
+                }
+                #[cfg(feature = "datetime")]
+                L_DATE => {
+                    let d = budget.descend(|b| dol_core::Date::decode(reader, b))??;
+                    Ok(Literal::Date(d))
+                }
+                #[cfg(feature = "datetime")]
+                L_TIME => {
+                    let t = budget.descend(|b| dol_core::Time::decode(reader, b))??;
+                    Ok(Literal::Time(t))
+                }
+                #[cfg(feature = "datetime")]
+                L_DATETIME => {
+                    let dt = budget.descend(|b| dol_core::DateTime::decode(reader, b))??;
+                    Ok(Literal::DateTime(dt))
+                }
+                #[cfg(feature = "datetime")]
+                L_TIMESTAMPTZ => {
+                    let ts =
+                        budget.descend(|b| dol_core::TimestampTz::decode(reader, b))??;
+                    Ok(Literal::TimestampTz(Box::new(ts)))
+                }
+                #[cfg(feature = "datetime")]
+                L_INTERVAL => {
+                    let iv = budget.descend(|b| dol_core::Interval::decode(reader, b))??;
+                    Ok(Literal::Interval(Box::new(iv)))
+                }
+                #[cfg(feature = "geo")]
+                L_POINT => {
+                    let p = budget.descend(|b| dol_core::Point::decode(reader, b))??;
+                    Ok(Literal::Point(p))
+                }
+                #[cfg(feature = "geo")]
+                L_LINE => {
+                    let l = budget.descend(|b| dol_core::geo::Line::decode(reader, b))??;
+                    Ok(Literal::Line(Box::new(l)))
+                }
+                #[cfg(feature = "geo")]
+                L_SEGMENT => {
+                    let s =
+                        budget.descend(|b| dol_core::geo::Segment::decode(reader, b))??;
+                    Ok(Literal::Segment(Box::new(s)))
+                }
+                #[cfg(feature = "geo")]
+                L_RECT => {
+                    let r = budget.descend(|b| dol_core::geo::Rect::decode(reader, b))??;
+                    Ok(Literal::Rect(Box::new(r)))
+                }
+                #[cfg(feature = "geo")]
+                L_CIRCLE => {
+                    let c =
+                        budget.descend(|b| dol_core::geo::Circle::decode(reader, b))??;
+                    Ok(Literal::Circle(Box::new(c)))
+                }
+                #[cfg(feature = "geo")]
+                L_PATH => {
+                    let path =
+                        budget.descend(|b| dol_core::geo::Path::decode(reader, b))??;
+                    Ok(Literal::Path(Box::new(path)))
+                }
+                #[cfg(feature = "geo")]
+                L_POLYGON => {
+                    let poly =
+                        budget.descend(|b| dol_core::geo::Polygon::decode(reader, b))??;
+                    Ok(Literal::Polygon(Box::new(poly)))
+                }
+                _ => Err(DecodeError::InvalidVariant {
+                    type_name: "Literal",
+                    seen: disc,
+                }),
+            }
+        }
+    }
 }

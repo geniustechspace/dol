@@ -5,7 +5,7 @@
 //! same type, unless noted otherwise, mirroring the
 //! [`Decode`](crate::decoder::Decode) impls in [`crate::decode_core`].
 //!
-//! Coverage in v2 (0.2.0):
+//! Coverage in v2 (0.2.0) — **complete**:
 //!
 //! - **Always-on (postcard-compatible):** `BitString`, `FileId`, `Span`,
 //!   `SpanTable`.
@@ -20,10 +20,9 @@
 //! - **Always-on (custom stable discriminants, NOT postcard-compatible):**
 //!   `DataType`, `StructField`, `Value`, `ValueRange`. See
 //!   [`crate::decode_core`] for the stable discriminant assignment.
-//!
-//! Still deferred to a follow-up PR:
-//!
-//! - **`Literal<'a>` / `LiteralRange<'a>`:** lifetime design; PR C.
+//! - **Always-on (custom stable discriminants, works for any lifetime):**
+//!   `Literal<'_>`, `LiteralRange<'_>`. Encode is generic over `'a`; same
+//!   discriminant scheme as `Value`.
 
 use alloc::boxed::Box;
 use alloc::vec::Vec;
@@ -175,11 +174,6 @@ mod geo_impls {
     }
 }
 
-// Silence "unused" warnings when the optional features aren't enabled.
-#[allow(dead_code)]
-fn _force_alloc_use() -> Vec<u8> {
-    Vec::new()
-}
 
 // ─── Span and SpanTable (always-on, postcard-compatible) ─────────────────────
 
@@ -856,6 +850,352 @@ mod value_impls {
                     Ok(())
                 }
                 _ => Err(EncodeError::Custom("Value: unknown variant")),
+            }
+        }
+    }
+}
+
+// ─── Literal<'_> and LiteralRange<'_> (stable custom discriminants) ───────────
+//
+// `Encode` is generic over `'a` — it works for both borrowed and owned
+// literals since it only reads the payload. Discriminants are identical to
+// the `Value` / `Decode` scheme in decode_core.rs.
+
+#[allow(dead_code)]
+mod literal_impls {
+    use alloc::borrow::Cow;
+
+    use super::*;
+    use dol_core::literal::{Literal, LiteralRange};
+
+    const L_NULL: u32 = 0;
+    const L_BOOL: u32 = 1;
+    const L_STRING: u32 = 2;
+    const L_JSON: u32 = 3;
+    const L_XML: u32 = 4;
+    const L_ENUM: u32 = 5;
+    const L_BYTES: u32 = 6;
+    const L_UUID: u32 = 7;
+    const L_BITSTRING: u32 = 8;
+    const L_INT8: u32 = 9;
+    const L_INT16: u32 = 10;
+    const L_INT32: u32 = 11;
+    const L_INT64: u32 = 12;
+    const L_INT128: u32 = 13;
+    const L_UINT8: u32 = 14;
+    const L_UINT16: u32 = 15;
+    const L_UINT32: u32 = 16;
+    const L_UINT64: u32 = 17;
+    const L_UINT128: u32 = 18;
+    const L_FLOAT32: u32 = 19;
+    const L_FLOAT64: u32 = 20;
+    const L_ARRAY: u32 = 21;
+    const L_SET: u32 = 22;
+    const L_TUPLE: u32 = 23;
+    const L_MAP: u32 = 24;
+    const L_STRUCT: u32 = 25;
+    const L_RANGE: u32 = 26;
+    const L_EXTENSION: u32 = 27;
+    #[cfg(feature = "numeric")]
+    const L_DECIMAL: u32 = 30;
+    #[cfg(feature = "network")]
+    const L_INET: u32 = 40;
+    #[cfg(feature = "network")]
+    const L_MACADDR: u32 = 41;
+    #[cfg(feature = "datetime")]
+    const L_DATE: u32 = 50;
+    #[cfg(feature = "datetime")]
+    const L_TIME: u32 = 51;
+    #[cfg(feature = "datetime")]
+    const L_DATETIME: u32 = 52;
+    #[cfg(feature = "datetime")]
+    const L_TIMESTAMPTZ: u32 = 53;
+    #[cfg(feature = "datetime")]
+    const L_INTERVAL: u32 = 54;
+    #[cfg(feature = "geo")]
+    const L_POINT: u32 = 60;
+    #[cfg(feature = "geo")]
+    const L_LINE: u32 = 61;
+    #[cfg(feature = "geo")]
+    const L_SEGMENT: u32 = 62;
+    #[cfg(feature = "geo")]
+    const L_RECT: u32 = 63;
+    #[cfg(feature = "geo")]
+    const L_CIRCLE: u32 = 64;
+    #[cfg(feature = "geo")]
+    const L_PATH: u32 = 65;
+    #[cfg(feature = "geo")]
+    const L_POLYGON: u32 = 66;
+
+    fn encode_lit_slice<'a>(
+        items: &[Literal<'a>],
+        w: &mut Writer<'_>,
+        b: &mut Budget,
+    ) -> Result<(), EncodeError> {
+        w.write_varint_u32(items.len() as u32)?;
+        for item in items {
+            b.descend(|b| item.encode(w, b))??;
+        }
+        Ok(())
+    }
+
+    fn encode_kv_slice<'a>(
+        pairs: &[(Cow<'a, str>, Literal<'a>)],
+        w: &mut Writer<'_>,
+        b: &mut Budget,
+    ) -> Result<(), EncodeError> {
+        w.write_varint_u32(pairs.len() as u32)?;
+        for (k, v) in pairs {
+            b.descend(|b| k.as_ref().encode(w, b))??;
+            b.descend(|b| v.encode(w, b))??;
+        }
+        Ok(())
+    }
+
+    fn encode_bound<'a>(
+        bound: &core::ops::Bound<Box<Literal<'a>>>,
+        w: &mut Writer<'_>,
+        b: &mut Budget,
+    ) -> Result<(), EncodeError> {
+        match bound {
+            core::ops::Bound::Included(v) => {
+                w.write_u8(0)?;
+                b.descend(|b| v.as_ref().encode(w, b))??;
+            }
+            core::ops::Bound::Excluded(v) => {
+                w.write_u8(1)?;
+                b.descend(|b| v.as_ref().encode(w, b))??;
+            }
+            core::ops::Bound::Unbounded => w.write_u8(2)?,
+        }
+        Ok(())
+    }
+
+    impl<'a> Encode for LiteralRange<'a> {
+        fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
+            b.descend(|b| encode_bound(&self.start, w, b))??;
+            b.descend(|b| encode_bound(&self.end, w, b))??;
+            Ok(())
+        }
+    }
+
+    impl<'a> Encode for Literal<'a> {
+        fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
+            match self {
+                Literal::Null => w.write_varint_u32(L_NULL),
+                Literal::Bool(v) => {
+                    w.write_varint_u32(L_BOOL)?;
+                    v.encode(w, b)
+                }
+                Literal::String(s) => {
+                    w.write_varint_u32(L_STRING)?;
+                    b.descend(|b| s.as_ref().encode(w, b))??;
+                    Ok(())
+                }
+                Literal::Json(s) => {
+                    w.write_varint_u32(L_JSON)?;
+                    b.descend(|b| s.as_ref().encode(w, b))??;
+                    Ok(())
+                }
+                Literal::Xml(s) => {
+                    w.write_varint_u32(L_XML)?;
+                    b.descend(|b| s.as_ref().encode(w, b))??;
+                    Ok(())
+                }
+                Literal::Enum(s) => {
+                    w.write_varint_u32(L_ENUM)?;
+                    b.descend(|b| s.as_ref().encode(w, b))??;
+                    Ok(())
+                }
+                Literal::Bytes(bs) => {
+                    w.write_varint_u32(L_BYTES)?;
+                    b.descend(|b| <[u8] as Encode>::encode(bs.as_ref(), w, b))??;
+                    Ok(())
+                }
+                Literal::Uuid(uuid) => {
+                    w.write_varint_u32(L_UUID)?;
+                    w.write_bytes(uuid)
+                }
+                Literal::BitString(bs) => {
+                    w.write_varint_u32(L_BITSTRING)?;
+                    b.descend(|b| bs.as_ref().encode(w, b))??;
+                    Ok(())
+                }
+                Literal::Int8(v) => {
+                    w.write_varint_u32(L_INT8)?;
+                    v.encode(w, b)
+                }
+                Literal::Int16(v) => {
+                    w.write_varint_u32(L_INT16)?;
+                    v.encode(w, b)
+                }
+                Literal::Int32(v) => {
+                    w.write_varint_u32(L_INT32)?;
+                    v.encode(w, b)
+                }
+                Literal::Int64(v) => {
+                    w.write_varint_u32(L_INT64)?;
+                    v.encode(w, b)
+                }
+                Literal::Int128(v) => {
+                    w.write_varint_u32(L_INT128)?;
+                    v.encode(w, b)
+                }
+                Literal::UInt8(v) => {
+                    w.write_varint_u32(L_UINT8)?;
+                    v.encode(w, b)
+                }
+                Literal::UInt16(v) => {
+                    w.write_varint_u32(L_UINT16)?;
+                    v.encode(w, b)
+                }
+                Literal::UInt32(v) => {
+                    w.write_varint_u32(L_UINT32)?;
+                    v.encode(w, b)
+                }
+                Literal::UInt64(v) => {
+                    w.write_varint_u32(L_UINT64)?;
+                    v.encode(w, b)
+                }
+                Literal::UInt128(v) => {
+                    w.write_varint_u32(L_UINT128)?;
+                    v.encode(w, b)
+                }
+                Literal::Float32(v) => {
+                    w.write_varint_u32(L_FLOAT32)?;
+                    v.encode(w, b)
+                }
+                Literal::Float64(v) => {
+                    w.write_varint_u32(L_FLOAT64)?;
+                    v.encode(w, b)
+                }
+                Literal::Array(elems) => {
+                    w.write_varint_u32(L_ARRAY)?;
+                    b.descend(|b| encode_lit_slice(elems, w, b))??;
+                    Ok(())
+                }
+                Literal::Set(elems) => {
+                    w.write_varint_u32(L_SET)?;
+                    b.descend(|b| encode_lit_slice(elems, w, b))??;
+                    Ok(())
+                }
+                Literal::Tuple(elems) => {
+                    w.write_varint_u32(L_TUPLE)?;
+                    b.descend(|b| encode_lit_slice(elems, w, b))??;
+                    Ok(())
+                }
+                Literal::Map(pairs) => {
+                    w.write_varint_u32(L_MAP)?;
+                    b.descend(|b| encode_kv_slice(pairs, w, b))??;
+                    Ok(())
+                }
+                Literal::Struct(pairs) => {
+                    w.write_varint_u32(L_STRUCT)?;
+                    b.descend(|b| encode_kv_slice(pairs, w, b))??;
+                    Ok(())
+                }
+                Literal::Range(range) => {
+                    w.write_varint_u32(L_RANGE)?;
+                    b.descend(|b| range.as_ref().encode(w, b))??;
+                    Ok(())
+                }
+                Literal::Extension(inner) => {
+                    w.write_varint_u32(L_EXTENSION)?;
+                    b.descend(|b| inner.0.encode(w, b))??;
+                    b.descend(|b| <[u8] as Encode>::encode(&inner.1, w, b))??;
+                    Ok(())
+                }
+                #[cfg(feature = "numeric")]
+                Literal::Decimal(d) => {
+                    w.write_varint_u32(L_DECIMAL)?;
+                    b.descend(|b| d.as_ref().encode(w, b))??;
+                    Ok(())
+                }
+                #[cfg(feature = "network")]
+                Literal::Inet(ip) => {
+                    w.write_varint_u32(L_INET)?;
+                    b.descend(|b| ip.encode(w, b))??;
+                    Ok(())
+                }
+                #[cfg(feature = "network")]
+                Literal::MacAddr(mac) => {
+                    w.write_varint_u32(L_MACADDR)?;
+                    b.descend(|b| mac.encode(w, b))??;
+                    Ok(())
+                }
+                #[cfg(feature = "datetime")]
+                Literal::Date(d) => {
+                    w.write_varint_u32(L_DATE)?;
+                    b.descend(|b| d.encode(w, b))??;
+                    Ok(())
+                }
+                #[cfg(feature = "datetime")]
+                Literal::Time(t) => {
+                    w.write_varint_u32(L_TIME)?;
+                    b.descend(|b| t.encode(w, b))??;
+                    Ok(())
+                }
+                #[cfg(feature = "datetime")]
+                Literal::DateTime(dt) => {
+                    w.write_varint_u32(L_DATETIME)?;
+                    b.descend(|b| dt.encode(w, b))??;
+                    Ok(())
+                }
+                #[cfg(feature = "datetime")]
+                Literal::TimestampTz(ts) => {
+                    w.write_varint_u32(L_TIMESTAMPTZ)?;
+                    b.descend(|b| ts.as_ref().encode(w, b))??;
+                    Ok(())
+                }
+                #[cfg(feature = "datetime")]
+                Literal::Interval(iv) => {
+                    w.write_varint_u32(L_INTERVAL)?;
+                    b.descend(|b| iv.as_ref().encode(w, b))??;
+                    Ok(())
+                }
+                #[cfg(feature = "geo")]
+                Literal::Point(p) => {
+                    w.write_varint_u32(L_POINT)?;
+                    b.descend(|b| p.encode(w, b))??;
+                    Ok(())
+                }
+                #[cfg(feature = "geo")]
+                Literal::Line(l) => {
+                    w.write_varint_u32(L_LINE)?;
+                    b.descend(|b| l.as_ref().encode(w, b))??;
+                    Ok(())
+                }
+                #[cfg(feature = "geo")]
+                Literal::Segment(s) => {
+                    w.write_varint_u32(L_SEGMENT)?;
+                    b.descend(|b| s.as_ref().encode(w, b))??;
+                    Ok(())
+                }
+                #[cfg(feature = "geo")]
+                Literal::Rect(r) => {
+                    w.write_varint_u32(L_RECT)?;
+                    b.descend(|b| r.as_ref().encode(w, b))??;
+                    Ok(())
+                }
+                #[cfg(feature = "geo")]
+                Literal::Circle(c) => {
+                    w.write_varint_u32(L_CIRCLE)?;
+                    b.descend(|b| c.as_ref().encode(w, b))??;
+                    Ok(())
+                }
+                #[cfg(feature = "geo")]
+                Literal::Path(path) => {
+                    w.write_varint_u32(L_PATH)?;
+                    b.descend(|b| path.as_ref().encode(w, b))??;
+                    Ok(())
+                }
+                #[cfg(feature = "geo")]
+                Literal::Polygon(poly) => {
+                    w.write_varint_u32(L_POLYGON)?;
+                    b.descend(|b| poly.as_ref().encode(w, b))??;
+                    Ok(())
+                }
+                _ => Err(EncodeError::Custom("Literal: unknown variant")),
             }
         }
     }

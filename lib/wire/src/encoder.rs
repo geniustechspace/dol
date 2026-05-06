@@ -411,32 +411,7 @@ impl<T: Encode> Encode for Vec<T> {
     }
 }
 
-// ─── Reference compound: architectural proof ────────────────────────────────
-
-/// Encode-side mirror of [`crate::decoder::DecodeWrap`]. Exists to exercise
-/// the trait shape from integration tests while the recursive enums are
-/// being filled in by follow-up PRs.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EncodeWrap {
-    /// String payload — exercises [`Encode for String`].
-    pub label: String,
-    /// Optional unsigned — exercises [`Encode for Option<u32>`].
-    pub count: Option<u32>,
-    /// Sequence — exercises [`Encode for Vec<T>`] plus budget descent.
-    pub flags: Vec<bool>,
-}
-
-impl Encode for EncodeWrap {
-    fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
-        // A struct encode walks fields in declaration order, charging one
-        // budget unit per descent so a deeply nested wrapper graph cannot
-        // exceed the configured recursion limit. Mirrors `DecodeWrap`.
-        b.descend(|b| self.label.encode(w, b))??;
-        b.descend(|b| self.count.encode(w, b))??;
-        b.descend(|b| self.flags.encode(w, b))??;
-        Ok(())
-    }
-}
+// ─────────────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
@@ -488,22 +463,42 @@ mod tests {
     }
 
     #[test]
-    fn round_trip_decode_wrap_via_encode_wrap() {
-        // EncodeWrap → bytes → DecodeWrap: the architectural compound proof.
-        use crate::decoder::{Decode, DecodeWrap, Reader};
-        let v = EncodeWrap {
-            label: "hi".into(),
-            count: Some(7),
-            flags: alloc::vec![true, false, true],
-        };
+    fn compound_fields_encoded_in_declaration_order() {
+        // Encode String + Option<u32> + Vec<bool> in sequence and verify the
+        // byte layout matches the expected postcard concatenation. This is the
+        // same byte sequence that the old EncodeWrap scaffold produced.
+        use crate::decoder::{Decode, Reader};
+        let label = String::from("hi");
+        let count: Option<u32> = Some(7);
+        let flags: Vec<bool> = alloc::vec![true, false, true];
+
         let mut b = fuzz_budget();
-        let bytes = encode_to_vec(&v, &mut b).unwrap();
+        let mut bytes = alloc::vec![];
+        {
+            let mut w = Writer::new(&mut bytes);
+            b.descend(|b| label.encode(&mut w, b)).unwrap().unwrap();
+            b.descend(|b| count.encode(&mut w, b)).unwrap().unwrap();
+            b.descend(|b| flags.encode(&mut w, b)).unwrap().unwrap();
+        }
+
         let mut r = Reader::new(&bytes);
         let mut b2 = fuzz_budget();
-        let dec = DecodeWrap::decode(&mut r, &mut b2).unwrap();
-        assert_eq!(dec.label, v.label);
-        assert_eq!(dec.count, v.count);
-        assert_eq!(dec.flags, v.flags);
+        let dec_label = b2
+            .descend(|b| String::decode(&mut r, b))
+            .unwrap()
+            .unwrap();
+        let dec_count = b2
+            .descend(|b| Option::<u32>::decode(&mut r, b))
+            .unwrap()
+            .unwrap();
+        let dec_flags = b2
+            .descend(|b| Vec::<bool>::decode(&mut r, b))
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(dec_label, label);
+        assert_eq!(dec_count, count);
+        assert_eq!(dec_flags, flags);
         assert!(r.is_exhausted());
     }
 }

@@ -10,9 +10,9 @@
 //! - validates discriminants, ranges, and length-prefixes explicitly
 //!   (`Decode::decode` returns [`DecodeError`] rather than panicking on
 //!   malformed input), and
-//! - shares postcard's byte format with the existing `decode_postcard` /
-//!   `encode_postcard` helpers so the cut-over from `Deserialize`-derived
-//!   round-tripping is byte-for-byte transparent.
+//! - shares postcard's byte format with the existing `encode_postcard` helper
+//!   for postcard-compatible types; types that require stable discriminants
+//!   (see [`crate::decode_core`]) use a custom but stable encoding.
 //!
 //! # Wire format (postcard-compatible)
 //!
@@ -36,25 +36,14 @@
 //! Only varint widths up to 5 bytes (`u32`) and 10 bytes (`u64`) are accepted;
 //! a longer varint is a [`DecodeError::LengthOverflow`].
 //!
-//! # Cut-over status
+//! # Cut-over status — v2 complete
 //!
-//! v2 (0.2.0) lands the trait, the [`Reader`] cursor, the helpers, and
-//! `Decode` impls for every primitive plus a representative compound
-//! ([`DecodeWrap`]) as architectural proof. The first follow-up cut adds
-//! `Decode` impls for the dol-core leaf type families
-//! (`Date`, `Time`, `DateTime`, `Offset`, `TimestampTz`, `Interval`,
-//! `Decimal`, `BitString`, `FileId`, `Point`, `Line`, `Segment`,
-//! `Rect`, `Circle`) — see [`crate::decode_core`]. The
-//! `decode_core_roundtrip` integration test asserts byte-for-byte
-//! parity with `postcard::to_allocvec(&v)` for every covered type.
-//!
-//! Still outstanding (next focused PR): the recursive enums in dol-core
-//! (`Value`, `Literal<'a>`, `LiteralRange<'a>`, `ValueRange`, `EnumDef`,
-//! `DataType`, `StructField`); the `Decode` impls in `dol-expr`,
-//! `dol-schema`, `dol-ir`, `dol-pipeline`, `dol-stream`; and finally the
-//! `Deserialize`-derive strip plus retirement of
-//! `decode_postcard<T: Deserialize>` / `decode_json<T: Deserialize>`
-//! once every type is migrated.
+//! All `dol-core` leaf types have `Decode` impls in [`crate::decode_core`]:
+//! primitives, datetime, numeric, geo, network, `DataType`, `StructField`,
+//! `Value`, `ValueRange`, `Literal<'static>`, and `LiteralRange<'static>`.
+//! The `decode_core_roundtrip` integration test asserts byte-for-byte parity
+//! with `postcard::to_allocvec(&v)` for postcard-compatible types and
+//! self-roundtrip for types with stable custom discriminants.
 //!
 //! # Example
 //!
@@ -460,42 +449,7 @@ impl<T: Decode> Decode for Vec<T> {
     }
 }
 
-// ─── Reference compound: architectural proof ────────────────────────────────
-
-/// Plain-old-data wrapper used as the architectural proof that a compound
-/// `Decode` impl composes cleanly from the primitive leaves.
-///
-/// `DecodeWrap` exists in v2 (0.2.0) only to exercise the trait shape from
-/// integration tests while the remaining ~150 in-memory IR/AST `Decode`
-/// impls are filled in by the follow-up cut. Once that PR merges,
-/// `DecodeWrap` may be retired or kept as a doctest fixture.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DecodeWrap {
-    /// String payload — exercises the `Decode for String` path.
-    pub label: String,
-    /// Optional unsigned — exercises `Decode for Option<u32>`.
-    pub count: Option<u32>,
-    /// Sequence — exercises `Decode for Vec<T>` plus budget descent.
-    pub flags: Vec<bool>,
-}
-
-impl Decode for DecodeWrap {
-    fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
-        // A struct decode walks fields in declaration order, charging one
-        // budget unit per descent so a deeply nested wrapper graph cannot
-        // exceed the configured recursion limit. Outer `?` surfaces
-        // `BudgetError::Depth`; inner `?` surfaces the field's
-        // `DecodeError`.
-        let label = budget.descend(|b| String::decode(reader, b))??;
-        let count = budget.descend(|b| Option::<u32>::decode(reader, b))??;
-        let flags = budget.descend(|b| Vec::<bool>::decode(reader, b))??;
-        Ok(Self {
-            label,
-            count,
-            flags,
-        })
-    }
-}
+// ─────────────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
@@ -605,7 +559,10 @@ mod tests {
     }
 
     #[test]
-    fn compound_decodes_in_field_order() {
+    fn compound_decodes_fields_in_declaration_order() {
+        // Manually compose bytes for: String "hello", Option<u32> Some(42),
+        // Vec<bool> [false, true, false] — the same sequence that would
+        // appear if they were fields of a struct decoded left-to-right.
         let bytes = [
             0x05, b'h', b'e', b'l', b'l', b'o', // label = "hello"
             0x01, 0x2a, // count = Some(42)
@@ -613,10 +570,20 @@ mod tests {
         ];
         let mut r = Reader::new(&bytes);
         let mut b = fuzz_budget();
-        let w = DecodeWrap::decode(&mut r, &mut b).unwrap();
-        assert_eq!(w.label, "hello");
-        assert_eq!(w.count, Some(42));
-        assert_eq!(w.flags, alloc::vec![false, true, false]);
+
+        let label = b.descend(|b| String::decode(&mut r, b)).unwrap().unwrap();
+        let count = b
+            .descend(|b| Option::<u32>::decode(&mut r, b))
+            .unwrap()
+            .unwrap();
+        let flags = b
+            .descend(|b| Vec::<bool>::decode(&mut r, b))
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(label, "hello");
+        assert_eq!(count, Some(42));
+        assert_eq!(flags, alloc::vec![false, true, false]);
         assert!(r.is_exhausted());
     }
 

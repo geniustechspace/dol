@@ -336,3 +336,66 @@ mod custom_rt {
         assert_eq!(v, self_rt(&v));
     }
 }
+
+// ─── Literal and LiteralRange self-roundtrip ──────────────────────────────────
+
+mod literal_rt {
+    use super::*;
+    use core::ops::Bound;
+    use dol_core::literal::{Literal, LiteralRange};
+
+    fn self_rt_lit(value: &Literal<'static>) -> Literal<'static> {
+        let mut budget = Budget::new(Limits::host());
+        let bytes = encode_to_vec(value, &mut budget).expect("Encode Literal");
+        let mut dec_budget = Budget::new(Limits::host());
+        let mut reader = dol_wire::decoder::Reader::new(&bytes);
+        let decoded = Literal::decode(&mut reader, &mut dec_budget)
+            .unwrap_or_else(|e| panic!("decode of {value:?} failed: {e}"));
+        assert!(reader.is_exhausted());
+        decoded
+    }
+
+    #[test]
+    fn scalars() {
+        for v in [
+            Literal::Null,
+            Literal::Bool(false),
+            Literal::Int32(-99),
+            Literal::UInt64(u64::MAX),
+            Literal::Float32(0.5_f32),
+            Literal::Uuid([2u8; 16]),
+        ] {
+            assert_eq!(v, self_rt_lit(&v));
+        }
+    }
+
+    #[test]
+    fn string_owned() {
+        use std::borrow::Cow;
+        let v = Literal::String(Cow::Owned("owned".into()));
+        assert_eq!(v, self_rt_lit(&v));
+    }
+
+    #[test]
+    fn range() {
+        let r = Literal::Range(Box::new(LiteralRange {
+            start: Bound::Included(Box::new(Literal::Int32(0))),
+            end: Bound::Excluded(Box::new(Literal::Int32(5))),
+        }));
+        assert_eq!(r, self_rt_lit(&r));
+    }
+
+    #[test]
+    fn range_unbounded() {
+        let r: LiteralRange<'static> = LiteralRange::unbounded();
+        let mut budget = Budget::new(Limits::host());
+        let bytes = encode_to_vec(&r, &mut budget).expect("Encode LiteralRange");
+        let mut dec_budget = Budget::new(Limits::host());
+        let mut reader = dol_wire::decoder::Reader::new(&bytes);
+        let decoded =
+            LiteralRange::decode(&mut reader, &mut dec_budget).expect("Decode LiteralRange");
+        assert_eq!(decoded.start, Bound::Unbounded);
+        assert_eq!(decoded.end, Bound::Unbounded);
+        assert!(reader.is_exhausted());
+    }
+}

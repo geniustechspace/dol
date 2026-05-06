@@ -29,7 +29,7 @@ use crate::numeric::Decimal;
 /// [`crate::Literal::float32`]/[`crate::Literal::float64`] fallible constructors
 /// to enforce finite-only values at the literal layer.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub enum Value {
     // ── Primitive ──

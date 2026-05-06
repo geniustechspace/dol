@@ -604,3 +604,126 @@ mod value_roundtrip {
         assert_eq!(v, rt_val(&v));
     }
 }
+
+// ─── Literal<'static> and LiteralRange<'static> self-roundtrip ───────────────
+//
+// Literal uses stable custom discriminants (not postcard-compatible), so
+// we test self-roundtrip via Encode → Decode only.
+
+mod literal_roundtrip {
+    use super::*;
+    use core::ops::Bound;
+    use dol_core::literal::{Literal, LiteralRange};
+    use dol_wire::encoder::encode_to_vec;
+
+    fn rt_lit(value: &Literal<'static>) -> Literal<'static> {
+        let mut budget = Budget::new(Limits::host());
+        let bytes = encode_to_vec(value, &mut budget).expect("Encode Literal");
+        let mut reader = Reader::new(&bytes);
+        let mut dec = Budget::new(Limits::host());
+        let decoded = Literal::decode(&mut reader, &mut dec)
+            .unwrap_or_else(|e| panic!("decode of {value:?} failed: {e}"));
+        assert!(reader.is_exhausted());
+        decoded
+    }
+
+    #[test]
+    fn scalars_round_trip() {
+        for v in [
+            Literal::Null,
+            Literal::Bool(true),
+            Literal::Bool(false),
+            Literal::Int8(-1),
+            Literal::Int32(42),
+            Literal::Int64(i64::MIN),
+            Literal::UInt8(255),
+            Literal::UInt64(u64::MAX),
+            Literal::Float32(1.5_f32),
+            Literal::Float64(f64::INFINITY),
+        ] {
+            assert_eq!(v, rt_lit(&v));
+        }
+    }
+
+    #[test]
+    fn strings_and_bytes_round_trip() {
+        use std::borrow::Cow;
+        for v in [
+            Literal::String(Cow::Borrowed("hello")),
+            Literal::Json(Cow::Borrowed("{}")),
+            Literal::Xml(Cow::Borrowed("<a/>")),
+            Literal::Enum(Cow::Borrowed("Red")),
+            Literal::Bytes(Cow::Borrowed(b"data".as_slice())),
+            Literal::Uuid([1u8; 16]),
+        ] {
+            // Decode always produces owned Cow, so compare via into_static
+            let encoded_v = v.clone().into_static();
+            let decoded = rt_lit(&encoded_v);
+            assert_eq!(encoded_v, decoded);
+        }
+    }
+
+    #[test]
+    fn composite_literals_round_trip() {
+        use std::borrow::Cow;
+        let arr = Literal::Array(Box::from(
+            [Literal::Int32(1), Literal::Int32(2)].as_slice(),
+        ));
+        assert_eq!(arr, rt_lit(&arr));
+
+        let map = Literal::Map(Box::from(
+            [(Cow::Borrowed("x"), Literal::Bool(true))].as_slice(),
+        ));
+        let map_static = map.clone().into_static();
+        assert_eq!(map_static, rt_lit(&map_static));
+
+        let range = Literal::Range(Box::new(LiteralRange {
+            start: Bound::Included(Box::new(Literal::Int32(1))),
+            end: Bound::Excluded(Box::new(Literal::Int32(10))),
+        }));
+        assert_eq!(range, rt_lit(&range));
+    }
+
+    #[test]
+    fn extension_literal_round_trip() {
+        let ext = Literal::Extension(Box::new((
+            Box::from("myvec"),
+            Box::from([1u8, 2, 3].as_slice()),
+        )));
+        assert_eq!(ext, rt_lit(&ext));
+    }
+
+    #[test]
+    fn literal_range_unbounded() {
+        let r: LiteralRange<'static> = LiteralRange::unbounded();
+        let mut budget = Budget::new(Limits::host());
+        let bytes = encode_to_vec(&r, &mut budget).expect("Encode LiteralRange");
+        let mut reader = Reader::new(&bytes);
+        let mut dec = Budget::new(Limits::host());
+        let decoded = LiteralRange::decode(&mut reader, &mut dec).expect("Decode LiteralRange");
+        assert_eq!(decoded.start, Bound::Unbounded);
+        assert_eq!(decoded.end, Bound::Unbounded);
+        assert!(reader.is_exhausted());
+    }
+
+    #[cfg(feature = "geo")]
+    #[test]
+    fn geo_literal_round_trip() {
+        let v = Literal::Point(dol_core::Point::try_new(1.0, 2.0).unwrap());
+        assert_eq!(v, rt_lit(&v));
+    }
+
+    #[cfg(feature = "datetime")]
+    #[test]
+    fn datetime_literal_round_trip() {
+        let v = Literal::Date(dol_core::Date::try_new(2026, 5, 6).unwrap());
+        assert_eq!(v, rt_lit(&v));
+    }
+
+    #[cfg(feature = "network")]
+    #[test]
+    fn network_literal_round_trip() {
+        let v = Literal::Inet(dol_core::IpAddr::v4(10, 0, 0, 1));
+        assert_eq!(v, rt_lit(&v));
+    }
+}
