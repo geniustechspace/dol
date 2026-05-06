@@ -137,6 +137,13 @@ documented under "0.2.0" below.
 
 #### Changed
 
+- **`.github/workflows/ci.yml` — `cargo-udeps` gate** (per
+  `docs/v2_plan.md` §78). Runs on the nightly toolchain
+  (`cargo-udeps` requires `rustc -Zunstable-options`), `--workspace
+  --all-targets --all-features`, side-by-side with `cargo-deny`.
+  Marked `continue-on-error: true` for the duration of the v2 cut so
+  nightly rustc instability cannot block the merge queue; the gate
+  flips to a hard fail once the workspace shape settles.
 - **`dol_expr::Interner` swapped to BLAKE3-truncated content addressing**
   (per `docs/v2_plan.md` §37). `StrId` is now the leading 32 bits of
   `dol_core::hash::hash32(content)` — cryptographic, the same byte
@@ -157,10 +164,18 @@ documented under "0.2.0" below.
 
 #### Deferred (separate follow-up PR)
 
-- Promotion of `clippy::indexing_slicing` and
-  `clippy::arithmetic_side_effects` from `warn` to `deny` (item 3 of the
-  Phase 2 plan). The workspace `Cargo.toml` already calls this out as a
-  per-call-site audit; tracking separately to keep the v2 cut atomic.
+- *(none — all phase-2 items have landed.)* The previous deferred item
+  (promotion of `clippy::indexing_slicing` /
+  `clippy::arithmetic_side_effects` from `warn` to `deny`) is now done:
+  the workspace lint table at `Cargo.toml:74-75` carries `= "deny"`,
+  and every production call-site has been audited per the prose at
+  `Cargo.toml:68-73`. Out-of-scope follow-ups tracked separately:
+  full `lib/expr` cut-over from the variant `ExprNode` enum to a
+  `PackedNode`-only representation (touches `arena.rs`, `expr.rs`,
+  every `lower_*`); widening `Id<Tag>` (and therefore `StrId`) to 64
+  bits to drive the §37 collision surface to ~zero; and concrete
+  backend impls of `KvStore` / `Catalog` (will land with the first
+  backend).
 
 ## [0.2.0] — 2026-05
 

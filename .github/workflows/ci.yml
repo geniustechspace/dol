@@ -370,3 +370,33 @@ jobs:
 
       - name: Run cargo deny
         run: cargo deny check
+
+  udeps:
+    name: Cargo Udeps (Unused Dependencies)
+    # Per `docs/v2_plan.md` §78: a `cargo-udeps` gate runs alongside
+    # `cargo-deny` in CI to catch dependencies that have drifted out of
+    # use during the v2 cut. `cargo-udeps` requires the nightly
+    # toolchain because it inspects rustc's unstable `--print=...`
+    # surface; failures from the nightly toolchain itself (rustc ICEs,
+    # rustup outages) must not block the merge queue, so this job is
+    # marked `continue-on-error` until the v2 dust settles. Once the
+    # workspace shape is stable we will flip it to a hard gate.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install nightly Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: nightly
+
+      - name: Install cargo-udeps
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-udeps
+
+      - name: Run cargo udeps (workspace, all features)
+        run: cargo +nightly udeps --workspace --all-targets --all-features
