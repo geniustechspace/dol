@@ -456,8 +456,15 @@ impl Decode for UnaryOp {
 /// validation against the arena's pool sizes is left to the
 /// `ExprArena::decode` pass-2 (so a truncated nodes vector produces a
 /// pool-bounds error rather than a half-decoded node).
+///
+/// **Budget accounting:** the whole node is one logical "field-of-its-
+/// parent" — the caller's tree-walker descends once for the
+/// `ExprNode::decode` call as a whole, not per scalar. Per-scalar
+/// `descend` calls were the variant-form pattern and would inflate the
+/// observed depth by the number of fields per node, defeating
+/// `Limits::max_depth`'s tree-depth contract.
 impl Decode for ExprNode {
-    fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
+    fn decode(reader: &mut Reader<'_>, _budget: &mut Budget) -> Result<Self, DecodeError> {
         let raw_op = reader.read_varint_u32()?;
         let tag: u8 = raw_op
             .try_into()
@@ -488,44 +495,26 @@ impl Decode for ExprNode {
             | ExprOp::Upsert
             | ExprOp::Exists
             | ExprOp::IsNull => {
-                let a = budget.descend(|b| {
-                    let _ = b;
-                    reader.read_varint_u32()
-                })??;
+                let a = reader.read_varint_u32()?;
                 (0, 0, a, 0, 0)
             }
             ExprOp::Bin => {
-                let aux_u32 = budget.descend(|b| {
-                    let _ = b;
-                    reader.read_varint_u32()
-                })??;
+                let aux_u32 = reader.read_varint_u32()?;
                 let aux: u16 = aux_u32.try_into().map_err(|_| DecodeError::InvalidVariant {
                     type_name: "ExprNode/Bin.aux",
                     seen: aux_u32,
                 })?;
-                let a = budget.descend(|b| {
-                    let _ = b;
-                    reader.read_varint_u32()
-                })??;
-                let b_ = budget.descend(|b| {
-                    let _ = b;
-                    reader.read_varint_u32()
-                })??;
+                let a = reader.read_varint_u32()?;
+                let b_ = reader.read_varint_u32()?;
                 (0, aux, a, b_, 0)
             }
             ExprOp::Una => {
-                let aux_u32 = budget.descend(|b| {
-                    let _ = b;
-                    reader.read_varint_u32()
-                })??;
+                let aux_u32 = reader.read_varint_u32()?;
                 let aux: u16 = aux_u32.try_into().map_err(|_| DecodeError::InvalidVariant {
                     type_name: "ExprNode/Una.aux",
                     seen: aux_u32,
                 })?;
-                let a = budget.descend(|b| {
-                    let _ = b;
-                    reader.read_varint_u32()
-                })??;
+                let a = reader.read_varint_u32()?;
                 (0, aux, a, 0, 0)
             }
             ExprOp::Agg => {
@@ -534,40 +523,19 @@ impl Decode for ExprNode {
                     type_name: "ExprNode/Agg.flags",
                     seen: flags_u32,
                 })?;
-                let a = budget.descend(|b| {
-                    let _ = b;
-                    reader.read_varint_u32()
-                })??;
-                let b_ = budget.descend(|b| {
-                    let _ = b;
-                    reader.read_varint_u32()
-                })??;
+                let a = reader.read_varint_u32()?;
+                let b_ = reader.read_varint_u32()?;
                 (flags, 0, a, b_, 0)
             }
             ExprOp::Cast | ExprOp::Alias | ExprOp::InSub => {
-                let a = budget.descend(|b| {
-                    let _ = b;
-                    reader.read_varint_u32()
-                })??;
-                let b_ = budget.descend(|b| {
-                    let _ = b;
-                    reader.read_varint_u32()
-                })??;
+                let a = reader.read_varint_u32()?;
+                let b_ = reader.read_varint_u32()?;
                 (0, 0, a, b_, 0)
             }
             ExprOp::Between => {
-                let a = budget.descend(|b| {
-                    let _ = b;
-                    reader.read_varint_u32()
-                })??;
-                let b_ = budget.descend(|b| {
-                    let _ = b;
-                    reader.read_varint_u32()
-                })??;
-                let c = budget.descend(|b| {
-                    let _ = b;
-                    reader.read_varint_u32()
-                })??;
+                let a = reader.read_varint_u32()?;
+                let b_ = reader.read_varint_u32()?;
+                let c = reader.read_varint_u32()?;
                 (0, 0, a, b_, c)
             }
             // ExprOp is `#[non_exhaustive]`; reject unknowns explicitly

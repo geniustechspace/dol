@@ -714,6 +714,45 @@ mod tests {
         assert!(matches!(err, LowerError::FuelExhausted));
     }
 
+    /// Companion to `deep_or_chain_does_not_overflow`: the same shape
+    /// of chain **succeeds** when the depth cap is set above the chain
+    /// depth. This pins the `DepthExceeded` rejection to the
+    /// artificial cap rather than a structural problem in the lowerer,
+    /// so a future regression on Budget threading can't pass the
+    /// rejection test by simply failing for the wrong reason.
+    ///
+    /// We use a modest depth (64) here because the current lowerer is
+    /// recursive — the `Budget::descend` cap is the production guard
+    /// against host-stack overflow, and the rejection test already
+    /// exercises chains far longer than this. A future iterative
+    /// work-stack rewrite (deferred follow-up) will let us crank this
+    /// up.
+    #[test]
+    fn deep_or_chain_succeeds_with_ample_depth_cap() {
+        use crate::tree::int;
+        let depth = 64usize;
+        let mut e = field("a").eq(int(0i32));
+        for _ in 0..depth {
+            e = e | field("b").eq(int(0i32));
+        }
+        let mut arena = ExprArena::new();
+        let mut interner = Interner::new();
+        let mut budget = Budget::new(Limits {
+            max_nodes: usize::MAX,
+            // `depth + epsilon` for the inner field/lit/eq nodes.
+            max_depth: (depth as u32).saturating_add(16),
+            max_bytes: usize::MAX,
+            max_str_bytes: usize::MAX,
+        });
+        let id = lower_expr_with_budget(&e, &mut arena, &mut interner, &mut budget)
+            .expect("ample-depth lowering should succeed");
+        // Root is the outer-most OR.
+        let (op, _, _) = arena.get(id).as_bin().expect("root is Bin");
+        assert_eq!(op, BinOp::Or);
+        // Depth fully restored on success.
+        assert_eq!(budget.depth(), 0);
+    }
+
     /// Deep-OR-chain regression: lowering must reject via Budget
     /// (rather than blow the host stack) when the cap is set below the
     /// chain depth. The chain length here (`8 192`) is well above the

@@ -371,8 +371,14 @@ impl Encode for UnaryOp {
 /// The wire format is byte-stable across hosts and small (≈ 1–4 bytes
 /// per leaf, ≈ 7 bytes per Bin) — comparable to the previous
 /// variant-tag form.
+///
+/// **Budget accounting:** the whole node is one logical "field-of-its-
+/// parent", so we charge one `descend` for the encode call as a whole
+/// (in the caller's tree-walker), then write each scalar inline.
+/// Per-scalar `descend` was the variant-form pattern and is unhelpful
+/// here — these are flat reads off the POD, not recursive sub-encodes.
 impl Encode for ExprNode {
-    fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
+    fn encode(&self, w: &mut Writer<'_>, _b: &mut Budget) -> Result<(), EncodeError> {
         let op = ExprOp::from_u8(self.op).ok_or(EncodeError::Custom("ExprNode: unknown opcode"))?;
         // Tag byte first.
         w.write_varint_u32(self.op as u32)?;
@@ -397,73 +403,35 @@ impl Encode for ExprNode {
             | ExprOp::Upsert
             | ExprOp::Exists
             | ExprOp::IsNull => {
-                b.descend(|b| {
-                    let _ = b;
-                    w.write_varint_u32(self.a)
-                })??;
+                w.write_varint_u32(self.a)?;
             }
-            // aux + a + b — Bin(BinOp, lhs, rhs) and Una(UnaryOp, operand, _unused).
+            // aux + a + b — Bin(BinOp, lhs, rhs).
             ExprOp::Bin => {
-                b.descend(|b| {
-                    let _ = b;
-                    w.write_varint_u32(self.aux as u32)
-                })??;
-                b.descend(|b| {
-                    let _ = b;
-                    w.write_varint_u32(self.a)
-                })??;
-                b.descend(|b| {
-                    let _ = b;
-                    w.write_varint_u32(self.b)
-                })??;
+                w.write_varint_u32(self.aux as u32)?;
+                w.write_varint_u32(self.a)?;
+                w.write_varint_u32(self.b)?;
             }
+            // aux + a — Una(UnaryOp, operand).
             ExprOp::Una => {
-                b.descend(|b| {
-                    let _ = b;
-                    w.write_varint_u32(self.aux as u32)
-                })??;
-                b.descend(|b| {
-                    let _ = b;
-                    w.write_varint_u32(self.a)
-                })??;
+                w.write_varint_u32(self.aux as u32)?;
+                w.write_varint_u32(self.a)?;
             }
             // flags + a + b — Agg(distinct, func StrId, expr NodeId).
             ExprOp::Agg => {
                 w.write_varint_u32(self.flags as u32)?;
-                b.descend(|b| {
-                    let _ = b;
-                    w.write_varint_u32(self.a)
-                })??;
-                b.descend(|b| {
-                    let _ = b;
-                    w.write_varint_u32(self.b)
-                })??;
+                w.write_varint_u32(self.a)?;
+                w.write_varint_u32(self.b)?;
             }
             // a + b — Cast(expr, to), Alias(expr, name), InSub(expr, sub).
             ExprOp::Cast | ExprOp::Alias | ExprOp::InSub => {
-                b.descend(|b| {
-                    let _ = b;
-                    w.write_varint_u32(self.a)
-                })??;
-                b.descend(|b| {
-                    let _ = b;
-                    w.write_varint_u32(self.b)
-                })??;
+                w.write_varint_u32(self.a)?;
+                w.write_varint_u32(self.b)?;
             }
             // a + b + c — Between(expr, lo, hi).
             ExprOp::Between => {
-                b.descend(|b| {
-                    let _ = b;
-                    w.write_varint_u32(self.a)
-                })??;
-                b.descend(|b| {
-                    let _ = b;
-                    w.write_varint_u32(self.b)
-                })??;
-                b.descend(|b| {
-                    let _ = b;
-                    w.write_varint_u32(self.c)
-                })??;
+                w.write_varint_u32(self.a)?;
+                w.write_varint_u32(self.b)?;
+                w.write_varint_u32(self.c)?;
             }
             // ExprOp is `#[non_exhaustive]`; future opcodes added in
             // `dol-expr` must extend this match before they roundtrip.
