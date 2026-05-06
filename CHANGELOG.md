@@ -34,6 +34,15 @@ documented under "0.2.0" below.
 
 #### Added
 
+- **`dol_core::hash` chokepoint module** (gated by the new `hash` cargo
+  feature, off by default to preserve the minimal `no_std + alloc`
+  shape). Newtype `Hasher` wrapping `blake3::Hasher`, plus `Digest32`
+  (4 B), `Digest128` (16 B), `Digest256` (32 B) byte-aliases and
+  one-shot `hash32` / `hash128` / `hash256` helpers. All truncations are
+  byte-prefix-consistent. `dol-wire`'s `hash` feature now routes through
+  this module; the workspace contains zero direct `blake3::*` calls
+  outside `dol_core::hash` (per `docs/v2_plan.md` §25 — "everyone uses
+  these, never blake3 directly. Lets us swap if needed").
 - **`dol_core::policy::Quota` + `QuotaCaps`.** Cross-traversal cumulative
   resource quota (per-tenant / per-session) layered on top of `Budget`.
   Includes `Quota::consume(&Budget) -> Result<(), BudgetError>`,

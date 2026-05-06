@@ -18,6 +18,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 [dependencies]
 smallvec = { workspace = true }
 serde    = { workspace = true, optional = true }
+blake3   = { workspace = true, optional = true }
 
 [features]
 # ── Cargo features ───────────────────────────────────────────────────────────
@@ -46,6 +47,11 @@ geo      = []
 network  = []
 datetime = []
 numeric  = []
+# `hash` enables the `dol_core::hash` chokepoint module — the only place
+# in the workspace allowed to call `blake3` directly. Off by default to
+# preserve the minimal `no_std + alloc` shape; opt-in for crates that
+# need content-hashing (`dol-wire`, future `Signed<T>` envelopes).
+hash     = ["dep:blake3"]
 
 [dev-dependencies]
 serde_json = { workspace = true }

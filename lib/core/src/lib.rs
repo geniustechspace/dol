@@ -92,6 +92,8 @@ extern crate alloc;
 // ─── Namespaced infrastructure ───────────────────────────────────────────────
 
 pub mod diag;
+#[cfg(feature = "hash")]
+pub mod hash;
 pub mod id;
 pub mod policy;
 pub mod raw;

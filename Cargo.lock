@@ -251,6 +251,7 @@ dependencies = [
 name = "dol-core"
 version = "0.2.0"
 dependencies = [
+ "blake3",
  "proptest",
  "serde",
  "serde_json",
@@ -346,7 +347,6 @@ dependencies = [
 name = "dol-wire"
 version = "0.2.0"
 dependencies = [
- "blake3",
  "dol-core",
  "dol-expr",
  "dol-ir",

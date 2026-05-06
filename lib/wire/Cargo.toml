@@ -18,7 +18,6 @@ smallvec   = { workspace = true }
 serde      = { workspace = true, optional = true }
 postcard   = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
-blake3     = { workspace = true, optional = true }
 
 [features]
 default     = []
@@ -35,8 +34,10 @@ serde       = [
 postcard    = ["serde", "std", "dep:postcard"]
 # Human-readable codec (debugging / interop).
 json        = ["serde", "std", "dep:serde_json"]
-# Content hashing of canonical wire bytes via BLAKE3.
-hash        = ["std", "dep:blake3"]
+# Content hashing of canonical wire bytes — routed through the
+# `dol_core::hash` chokepoint (the only crate allowed to depend on
+# `blake3` directly).
+hash        = ["std", "dol-core/hash"]
 # Pass-through gates that surface dol-core's optional type families to
 # this crate. Required for the matching `Decode` impls
 # (`Date`, `Time`, …, `Decimal`, `BitString`, geo / network leaves) to
