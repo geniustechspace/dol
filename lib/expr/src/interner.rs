@@ -6,13 +6,21 @@ use crate::ids::StrId;
 
 /// String interner with **content-addressed** [`StrId`]s.
 ///
-/// Each [`StrId`] is the FNV-1a 32-bit hash of the string's bytes —
-/// the same hash that backs the workspace's extension `Symbol` ids
-/// (`lib/pipeline/src/extension.rs`, `lib/stream/src/extension.rs`).
-/// Two interner instances therefore produce **identical** ids for the
-/// same string, even across processes / machines, which lets ids be
-/// reused as plan-cache keys, on-disk indices, and IoT idempotency
-/// tokens without coordinating an in-memory registry.
+/// Each [`StrId`] is the leading 32 bits of the BLAKE3 digest of the
+/// string's bytes (via the workspace's `dol_core::hash` chokepoint —
+/// the only place in the workspace that calls into `blake3` directly,
+/// per `docs/v2_plan.md` §25/§37). Two interner instances therefore
+/// produce **identical** ids for the same string, even across processes
+/// / machines / language bindings, which lets ids be reused as
+/// plan-cache keys, on-disk indices, signed-manifest references, and
+/// IoT idempotency tokens without coordinating an in-memory registry.
+///
+/// BLAKE3 is cryptographic — an attacker controlling input cannot steer
+/// distinct strings into the same id without breaking the underlying
+/// primitive. (FNV-1a, the workspace's compile-time `Symbol` hash for
+/// extension dispatch, is fine for that closed set of vendor-blessed
+/// constants but unsuitable for runtime user input; this is why the
+/// interner uses BLAKE3 even though the hash output is truncated.)
 ///
 /// Strings themselves still live in a single bump-allocated byte blob
 /// (`bytes`), with a `(offset, len)` slot per id stored in `slots`.
@@ -21,7 +29,8 @@ use crate::ids::StrId;
 /// (a few thousand identifiers) the birthday probability is negligible
 /// (~2⁻²⁰ at 4 K strings), but we never silently fold two distinct
 /// strings together — that would invalidate every property the rest of
-/// the IR relies on.
+/// the IR relies on. Future work tracked in the v2 plan widens
+/// [`StrId`] to 64 bits so this collision surface vanishes entirely.
 ///
 /// The on-the-wire serde codec is a flat `Vec<String>` in
 /// **canonical (sorted-by-id) order**, so two interners populated with
@@ -33,9 +42,9 @@ use crate::ids::StrId;
 pub struct Interner {
     /// Concatenated UTF-8 bytes for every interned string.
     bytes: Vec<u8>,
-    /// `id -> (offset, len)` into `bytes`. The id is the FNV-1a 32-bit
-    /// hash of the slice; we store the slot directly so `get(id)` is a
-    /// single hash-map lookup.
+    /// `id -> (offset, len)` into `bytes`. The id is the leading 32
+    /// bits of `BLAKE3(slice)`; we store the slot directly so `get(id)`
+    /// is a single hash-map lookup.
     slots: HashMap<StrId, (u32, u32)>,
 }
 
@@ -74,9 +83,9 @@ impl Interner {
     ///
     /// # Panics
     ///
-    /// Panics on a 32-bit FNV-1a collision (two distinct strings that
-    /// share the same id). Use [`try_intern`](Self::try_intern) on any
-    /// path that handles untrusted input.
+    /// Panics on a 32-bit BLAKE3-prefix collision (two distinct strings
+    /// that share the same id). Use [`try_intern`](Self::try_intern) on
+    /// any path that handles untrusted input.
     //
     // Lint exemption: this is the documented "panic on collision"
     // counterpart to `try_intern`; v2's no-panic invariant carves out
@@ -87,7 +96,7 @@ impl Interner {
             Ok(id) => id,
             Err(InternError::Collision { id }) => {
                 panic!(
-                    "dol-expr::Interner: 32-bit FNV-1a collision on id {:#010x}; \
+                    "dol-expr::Interner: 32-bit BLAKE3-prefix collision on id {:#010x}; \
                      use try_intern on adversarial input",
                     id.get()
                 )
@@ -211,10 +220,11 @@ impl Interner {
 
 /// Compute the content-addressed [`StrId`] for an arbitrary byte slice.
 ///
-/// Uses FNV-1a 32-bit and folds the all-zero hash to `1` so the result
-/// fits the [`NonZeroU32`] niche backing [`StrId`]. The fold introduces
-/// a single artificial collision (the empty hash and `1` map to the
-/// same id) at a one-in-2³² rate, surfaced through the standard
+/// Uses the leading 32 bits of `dol_core::hash::hash32` (BLAKE3,
+/// little-endian byte order) and folds the all-zero hash to `1` so the
+/// result fits the [`NonZeroU32`] niche backing [`StrId`]. The fold
+/// introduces a single artificial collision (the empty hash and `1` map
+/// to the same id) at a one-in-2³² rate, surfaced through the standard
 /// [`InternError::Collision`] path.
 //
 // Lint exemption: `NonZeroU32::new(...)` is fed a value that has just
@@ -222,30 +232,10 @@ impl Interner {
 // invariant rather than a runtime failure path.
 #[allow(clippy::expect_used)]
 fn strid_for(bytes: &[u8]) -> StrId {
-    let h = fnv1a_32(bytes);
+    let digest = dol_core::hash::hash32(bytes);
+    let h = u32::from_le_bytes(digest);
     let nz = NonZeroU32::new(if h == 0 { 1 } else { h }).expect("non-zero by construction");
     StrId::new(nz)
-}
-
-/// `const`-eval FNV-1a 32-bit hash. Stable; matches the spec basis/prime
-/// and the [`Symbol`] convention used by extensions in
-/// `lib/pipeline/src/extension.rs` and `lib/stream/src/extension.rs`.
-///
-/// [`Symbol`]: dol_core::ext::Symbol
-// `i < bytes.len()` bounds the indexing; `bytes.len() <= isize::MAX` so
-// `i += 1` cannot overflow `usize`.
-#[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
-const fn fnv1a_32(bytes: &[u8]) -> u32 {
-    // FNV-1a 32-bit constants per the reference spec.
-    let mut hash: u32 = 0x811c_9dc5;
-    let prime: u32 = 0x0100_0193;
-    let mut i = 0;
-    while i < bytes.len() {
-        hash ^= bytes[i] as u32;
-        hash = hash.wrapping_mul(prime);
-        i += 1;
-    }
-    hash
 }
 
 #[cfg(feature = "serde")]

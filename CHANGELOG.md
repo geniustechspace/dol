@@ -137,6 +137,16 @@ documented under "0.2.0" below.
 
 #### Changed
 
+- **`dol_expr::Interner` swapped to BLAKE3-truncated content addressing**
+  (per `docs/v2_plan.md` §37). `StrId` is now the leading 32 bits of
+  `dol_core::hash::hash32(content)` — cryptographic, the same byte
+  prefix BLAKE3 emits for content addressing across the workspace. The
+  on-disk Symbol IDs of the workspace's compile-time extension dispatch
+  (`lib/{pipeline,stream}/src/extension.rs`) keep using FNV-1a, since
+  those need `const fn` evaluation and are scoped to a closed,
+  vendor-blessed set; user-supplied strings (the interner's domain) are
+  the case where collision-resistance against adversarial input
+  matters. `dol-expr` unconditionally enables `dol-core/hash`.
 - **`.github/workflows/ci.yml`** — the per-crate "Serde round-trip
   gate" is renamed to "Wire round-trip gate" and now runs the
   `dol-wire` integration tests (`program_roundtrip`, `decode_robustness`,

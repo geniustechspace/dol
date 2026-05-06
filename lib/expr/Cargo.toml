@@ -18,8 +18,10 @@ rustdoc-args = ["--cfg", "docsrs"]
 [dependencies]
 # Hand-rolled (not `workspace = true`) so we can opt out of `dol-core`'s
 # default features and stay `no_std + alloc`-clean. The path mirrors the
-# workspace dep.
-dol-core  = { path = "../core", default-features = false }
+# workspace dep. `hash` is unconditionally enabled because the
+# content-addressed `Interner` (BLAKE3-prefix `StrId`s, per
+# `docs/v2_plan.md` §37) is core to this crate.
+dol-core  = { path = "../core", default-features = false, features = ["hash"] }
 hashbrown = { workspace = true }
 smallvec  = { workspace = true }
 bytemuck  = { workspace = true }
