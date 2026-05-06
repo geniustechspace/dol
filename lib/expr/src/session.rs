@@ -3,7 +3,6 @@ use smallvec::SmallVec;
 use dol_core::policy::{Budget, Limits};
 
 use crate::arena::{ExprArena, FieldNode, FieldStep};
-use crate::expr::ExprNode;
 use crate::ids::{NodeId, StrId};
 use crate::interner::Interner;
 use crate::lower::{LowerError, lower_expr_with_budget};
@@ -134,7 +133,7 @@ impl BuildSession {
             name: col_id,
             steps: SmallVec::new(),
         });
-        self.arena.alloc(ExprNode::Field(fid))
+        self.arena.alloc_field_ref(fid)
     }
 
     /// Build a qualified field reference (table alias or schema-qualified name).
@@ -153,7 +152,7 @@ impl BuildSession {
             name: col_id,
             steps,
         });
-        self.arena.alloc(ExprNode::Field(fid))
+        self.arena.alloc_field_ref(fid)
     }
 
     /// Build a namespace reference (container address without a field).
@@ -162,7 +161,7 @@ impl BuildSession {
     /// when passing a table/bucket path as an operand.
     pub fn namespace(&mut self, path: &str) -> NodeId {
         let id = self.interner.intern(path);
-        self.arena.alloc(ExprNode::Namespace(id))
+        self.arena.alloc_namespace(id)
     }
 
     /// Intern a string and return its [`StrId`] (e.g. for building

@@ -103,3 +103,13 @@ pub enum FieldTag {}
 /// Index into `ExprArena::fields` — identifies a pooled
 /// [`crate::FieldNode`].
 pub type FieldId = Id<FieldTag>;
+
+/// Tag for `ExprArena::array_lits` ids. Phantom marker.
+pub enum ArrayLitTag {}
+/// Index into `ExprArena::array_lits` — identifies a pooled
+/// [`crate::ArrayLitNode`].
+///
+/// Introduced when the variant `ExprNode::ArrayLit(SmallVec<[NodeId; 4]>)`
+/// was replaced by the 16-byte packed [`crate::ExprNode`]; the inline
+/// element list was moved to its own pool.
+pub type ArrayLitId = Id<ArrayLitTag>;

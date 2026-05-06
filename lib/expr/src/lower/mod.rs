@@ -15,8 +15,8 @@ use alloc::{
     vec::Vec,
 };
 
-use crate::arena::{ExprArena, FieldNode, FuncNode, InListNode, ObjLitNode};
-use crate::expr::{BinOp, ExprNode, Order, UnaryOp as ArenaUnaryOp};
+use crate::arena::{ArrayLitNode, ExprArena, FieldNode, FuncNode, InListNode, ObjLitNode};
+use crate::expr::{BinOp, Order, UnaryOp as ArenaUnaryOp};
 use crate::ids::NodeId;
 use crate::interner::Interner;
 use crate::tree::{Direction, Expr, OrderByExpr};
@@ -184,7 +184,7 @@ fn lower_inner(
             // A bare container address — interned as its dotted form.
             let dotted = path.iter().collect::<Vec<_>>().join(".");
             let id = interner.intern(&dotted);
-            Ok(arena.alloc(ExprNode::Namespace(id)))
+            Ok(arena.alloc_namespace(id))
         }
 
         Expr::Field { base, name, steps } => {
@@ -216,15 +216,15 @@ fn lower_inner(
                 name: leaf_id,
                 steps: arena_steps,
             });
-            Ok(arena.alloc(ExprNode::Field(fid)))
+            Ok(arena.alloc_field_ref(fid))
         }
 
-        Expr::Param => Ok(arena.alloc(ExprNode::Param)),
+        Expr::Param => Ok(arena.alloc_param()),
 
         Expr::Value(lit) => {
             // dol-expr::Literal — clone directly.
             let lid = arena.alloc_lit(lit.clone().into_static());
-            Ok(arena.alloc(ExprNode::Lit(lid)))
+            Ok(arena.alloc_lit_ref(lid))
         }
 
         Expr::Array(elements) => {
@@ -232,7 +232,8 @@ fn lower_inner(
             for e in elements {
                 ids.push(lower_child(e, arena, interner, budget)?);
             }
-            Ok(arena.alloc(ExprNode::ArrayLit(ids)))
+            let aid = arena.alloc_array_lit(ArrayLitNode { items: ids });
+            Ok(arena.alloc_array_lit_ref(aid))
         }
 
         Expr::Object(fields) => {
@@ -243,18 +244,14 @@ fn lower_inner(
                 pairs.push((kid, vid));
             }
             let oid = arena.alloc_obj_lit(ObjLitNode(pairs));
-            Ok(arena.alloc(ExprNode::ObjectLit(oid)))
+            Ok(arena.alloc_object_lit_ref(oid))
         }
 
         Expr::BinaryOp { left, op, right } => {
             let lhs = lower_child(left, arena, interner, budget)?;
             let rhs = lower_child(right, arena, interner, budget)?;
             let bin_op = lower_binop(op);
-            Ok(arena.alloc(ExprNode::BinOp {
-                op: bin_op,
-                lhs,
-                rhs,
-            }))
+            Ok(arena.alloc_bin(bin_op, lhs, rhs))
         }
 
         Expr::UnaryOp { op, expr: inner } => {
@@ -273,10 +270,7 @@ fn lower_inner(
                         interner,
                         budget,
                     )?;
-                    return Ok(arena.alloc(ExprNode::UnaryOp {
-                        op: ArenaUnaryOp::Not,
-                        operand: in_node,
-                    }));
+                    return Ok(arena.alloc_una(ArenaUnaryOp::Not, in_node));
                 }
             }
 
@@ -288,10 +282,7 @@ fn lower_inner(
                 CoreUnaryOp::IsNotNull => ArenaUnaryOp::IsNotNull,
                 CoreUnaryOp::BitNot => ArenaUnaryOp::BitNot,
             };
-            Ok(arena.alloc(ExprNode::UnaryOp {
-                op: arena_op,
-                operand: inner_id,
-            }))
+            Ok(arena.alloc_una(arena_op, inner_id))
         }
 
         Expr::Func { name, args } => {
@@ -304,7 +295,7 @@ fn lower_inner(
                 name: func_name,
                 args: arg_ids,
             });
-            Ok(arena.alloc(ExprNode::Func(fid)))
+            Ok(arena.alloc_func_ref(fid))
         }
 
         Expr::Cast {
@@ -316,10 +307,7 @@ fn lower_inner(
             // rendering so the interned type name is wire-stable across
             // Rust toolchain upgrades.
             let type_name = interner.intern(as_type.type_name());
-            Ok(arena.alloc(ExprNode::Cast {
-                expr: inner_id,
-                to: type_name,
-            }))
+            Ok(arena.alloc_cast(inner_id, type_name))
         }
 
         Expr::Case { whens, else_expr } => {
@@ -337,7 +325,7 @@ fn lower_inner(
                 branches,
                 else_: else_id,
             });
-            Ok(arena.alloc(ExprNode::Case(cid)))
+            Ok(arena.alloc_case_ref(cid))
         }
 
         Expr::Between {
@@ -348,7 +336,7 @@ fn lower_inner(
             let eid = lower_child(inner, arena, interner, budget)?;
             let lo = lower_child(low, arena, interner, budget)?;
             let hi = lower_child(high, arena, interner, budget)?;
-            Ok(arena.alloc(ExprNode::Between { expr: eid, lo, hi }))
+            Ok(arena.alloc_between(eid, lo, hi))
         }
 
         Expr::InList { expr: inner, list } => {
@@ -361,16 +349,13 @@ fn lower_inner(
                 expr: eid,
                 list: ids,
             });
-            Ok(arena.alloc(ExprNode::InList(in_id)))
+            Ok(arena.alloc_in_list_ref(in_id))
         }
 
         Expr::Alias { expr: inner, alias } => {
             let inner_id = lower_child(inner, arena, interner, budget)?;
             let aid = interner.intern(alias.as_str());
-            Ok(arena.alloc(ExprNode::Alias {
-                expr: inner_id,
-                name: aid,
-            }))
+            Ok(arena.alloc_alias(inner_id, aid))
         }
 
         Expr::Star => {
@@ -380,7 +365,7 @@ fn lower_inner(
                 name: col,
                 steps: SmallVec::new(),
             });
-            Ok(arena.alloc(ExprNode::Field(fid)))
+            Ok(arena.alloc_field_ref(fid))
         }
 
         Expr::CountStar => {
@@ -391,12 +376,8 @@ fn lower_inner(
                 name: star_col,
                 steps: SmallVec::new(),
             });
-            let star_node = arena.alloc(ExprNode::Field(star_fid));
-            Ok(arena.alloc(ExprNode::Agg {
-                func: func_name,
-                expr: star_node,
-                distinct: false,
-            }))
+            let star_node = arena.alloc_field_ref(star_fid);
+            Ok(arena.alloc_agg(func_name, star_node, false))
         }
 
         Expr::Window {
@@ -435,7 +416,7 @@ fn lower_inner(
                 order,
                 frame: frame.clone(),
             });
-            Ok(arena.alloc(ExprNode::Window(wid)))
+            Ok(arena.alloc_window_ref(wid))
         }
     }
 }
@@ -504,11 +485,7 @@ pub fn lower_filters(
     }
     let mut result = ids.remove(0);
     for id in ids {
-        result = arena.alloc(ExprNode::BinOp {
-            op: BinOp::And,
-            lhs: result,
-            rhs: id,
-        });
+        result = arena.alloc_bin(BinOp::And, result, id);
     }
     Ok(Some(result))
 }
@@ -549,7 +526,6 @@ fn lower_binop(op: &crate::tree::OpDef) -> BinOp {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expr::ExprNode;
     use crate::tree::{field, namespace};
 
     #[test]
@@ -557,15 +533,11 @@ mod tests {
         let mut arena = ExprArena::new();
         let mut interner = Interner::new();
         let id = lower_expr(&field("email"), &mut arena, &mut interner).unwrap();
-        match arena.get(id) {
-            ExprNode::Field(fid) => {
-                let node = arena.get_field(*fid);
-                assert!(node.namespace.is_none());
-                assert_eq!(interner.get(node.name), "email");
-                assert!(node.steps.is_empty());
-            }
-            other => panic!("expected ExprNode::Field, got {:?}", other),
-        }
+        let fid = arena.get(id).as_field().expect("expected Field opcode");
+        let node = arena.get_field(fid);
+        assert!(node.namespace.is_none());
+        assert_eq!(interner.get(node.name), "email");
+        assert!(node.steps.is_empty());
     }
 
     #[test]
@@ -574,15 +546,11 @@ mod tests {
         let mut interner = Interner::new();
         let expr = namespace("users").field("email");
         let id = lower_expr(&expr, &mut arena, &mut interner).unwrap();
-        match arena.get(id) {
-            ExprNode::Field(fid) => {
-                let node = arena.get_field(*fid);
-                let ns = node.namespace.expect("anchored on namespace");
-                assert_eq!(interner.get(ns), "users");
-                assert_eq!(interner.get(node.name), "email");
-            }
-            other => panic!("expected ExprNode::Field, got {:?}", other),
-        }
+        let fid = arena.get(id).as_field().expect("expected Field opcode");
+        let node = arena.get_field(fid);
+        let ns = node.namespace.expect("anchored on namespace");
+        assert_eq!(interner.get(ns), "users");
+        assert_eq!(interner.get(node.name), "email");
     }
 
     #[test]
@@ -590,12 +558,11 @@ mod tests {
         let mut arena = ExprArena::new();
         let mut interner = Interner::new();
         let id = lower_expr(&namespace("schema.users"), &mut arena, &mut interner).unwrap();
-        match arena.get(id) {
-            ExprNode::Namespace(sid) => {
-                assert_eq!(interner.get(*sid), "schema.users");
-            }
-            other => panic!("expected ExprNode::Namespace, got {:?}", other),
-        }
+        let sid = arena
+            .get(id)
+            .as_namespace()
+            .expect("expected Namespace opcode");
+        assert_eq!(interner.get(sid), "schema.users");
     }
 
     #[test]
@@ -605,23 +572,19 @@ mod tests {
         let mut interner = Interner::new();
         let expr = field("profile").get("address").get("city");
         let id = lower_expr(&expr, &mut arena, &mut interner).unwrap();
-        match arena.get(id) {
-            ExprNode::Field(fid) => {
-                let node = arena.get_field(*fid);
-                assert_eq!(interner.get(node.name), "profile");
-                assert_eq!(node.steps.len(), 2);
-                let labels: Vec<&str> = node
-                    .steps
-                    .iter()
-                    .map(|s| match s {
-                        FieldStep::Key(id) => interner.get(*id),
-                        FieldStep::Index(_) => panic!("unexpected index step"),
-                    })
-                    .collect();
-                assert_eq!(labels, ["address", "city"]);
-            }
-            other => panic!("expected ExprNode::Field, got {:?}", other),
-        }
+        let fid = arena.get(id).as_field().expect("expected Field opcode");
+        let node = arena.get_field(fid);
+        assert_eq!(interner.get(node.name), "profile");
+        assert_eq!(node.steps.len(), 2);
+        let labels: Vec<&str> = node
+            .steps
+            .iter()
+            .map(|s| match s {
+                FieldStep::Key(id) => interner.get(*id),
+                FieldStep::Index(_) => panic!("unexpected index step"),
+            })
+            .collect();
+        assert_eq!(labels, ["address", "city"]);
     }
 
     #[test]
@@ -635,10 +598,8 @@ mod tests {
             expr: alloc::boxed::Box::new(inner),
         };
         let id = lower_expr(&expr, &mut arena, &mut interner).unwrap();
-        match arena.get(id) {
-            ExprNode::UnaryOp { op, .. } => assert_eq!(*op, ArenaUnaryOp::BitNot),
-            other => panic!("expected ExprNode::UnaryOp, got {:?}", other),
-        }
+        let (op, _) = arena.get(id).as_una().expect("expected Una opcode");
+        assert_eq!(op, ArenaUnaryOp::BitNot);
     }
 
     #[test]
@@ -652,13 +613,9 @@ mod tests {
             as_type: DataType::Int64,
         };
         let id = lower_expr(&expr, &mut arena, &mut interner).unwrap();
-        match arena.get(id) {
-            ExprNode::Cast { to, .. } => {
-                // `DataType::Int64` has the stable name `"int64"`.
-                assert_eq!(interner.get(*to), "int64");
-            }
-            other => panic!("expected ExprNode::Cast, got {:?}", other),
-        }
+        let (_, to) = arena.get(id).as_cast().expect("expected Cast opcode");
+        // `DataType::Int64` has the stable name `"int64"`.
+        assert_eq!(interner.get(to), "int64");
     }
 
     #[test]
@@ -696,7 +653,7 @@ mod tests {
         // Depth fully restored after the call returns.
         assert_eq!(budget.depth(), 0);
         // And the node is a BinOp.
-        assert!(matches!(arena.get(id), ExprNode::BinOp { .. }));
+        assert!(arena.get(id).as_bin().is_some());
     }
 
     #[test]
@@ -755,5 +712,35 @@ mod tests {
         let expr = field("a").eq(int(1i32)) & field("b").eq(int(2i32));
         let err = sess.lower(&expr).unwrap_err();
         assert!(matches!(err, LowerError::FuelExhausted));
+    }
+
+    /// Deep-OR-chain regression: lowering must reject via Budget
+    /// (rather than blow the host stack) when the cap is set below the
+    /// chain depth. The chain length here (`8 192`) is well above the
+    /// typical SQL backend's nesting limit yet small enough to keep
+    /// `Box<Expr>`'s recursive `Drop` within the default test stack —
+    /// the production guard is the `Limits::max_depth` cap, not the
+    /// host stack.
+    #[test]
+    fn deep_or_chain_does_not_overflow() {
+        use crate::tree::int;
+        let depth = 8_192usize;
+        let mut e = field("a").eq(int(0i32));
+        for _ in 0..depth {
+            e = e | field("b").eq(int(0i32));
+        }
+        let mut arena = ExprArena::new();
+        let mut interner = Interner::new();
+        // Cap below the chain depth so the lowerer rejects with
+        // DepthExceeded — no host-stack overflow even though the cap is
+        // small enough to cut early.
+        let mut budget = Budget::new(Limits {
+            max_nodes: usize::MAX,
+            max_depth: 128,
+            max_bytes: usize::MAX,
+            max_str_bytes: usize::MAX,
+        });
+        let result = lower_expr_with_budget(&e, &mut arena, &mut interner, &mut budget);
+        assert!(matches!(result, Err(LowerError::DepthExceeded { .. })));
     }
 }

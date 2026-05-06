@@ -5,16 +5,16 @@
 //! ```
 
 pub use crate::arena::{
-    CaseNode, ExprArena, FieldNode, FieldStep, FuncNode, InListNode, ObjLitNode, Span, SpanTable,
-    WindowNode,
+    ArrayLitNode, CaseNode, ExprArena, FieldNode, FieldStep, FuncNode, InListNode, ObjLitNode,
+    Span, SpanTable, WindowNode,
 };
 pub use crate::expr::{
-    BinOp, ConflictClause, DeleteNode, ExprNode, InsertNode, JoinNode, JoinType, LockHint, Order,
-    QueryNode, UnaryOp, UpdateNode, UpsertNode,
+    BinOp, ConflictClause, DeleteNode, ExprNode, ExprOp, InsertNode, JoinNode, JoinType, LockHint,
+    Order, QueryNode, UnaryOp, UpdateNode, UpsertNode,
 };
 pub use crate::ids::{
-    CaseId, DeleteId, FieldId, FuncId, InListId, InsertId, LiteralId, NodeId, ObjLitId, QueryId,
-    SpanId, StrId, TypeId, UpdateId, UpsertId, WindowId,
+    ArrayLitId, CaseId, DeleteId, FieldId, FuncId, InListId, InsertId, LiteralId, NodeId,
+    ObjLitId, QueryId, SpanId, StrId, TypeId, UpdateId, UpsertId, WindowId,
 };
 pub use crate::interner::Interner;
 pub use crate::session::BuildSession;

@@ -4,8 +4,8 @@ use smallvec::SmallVec;
 
 use crate::expr::{DeleteNode, ExprNode, InsertNode, Order, QueryNode, UpdateNode, UpsertNode};
 use crate::ids::{
-    CaseId, DeleteId, FieldId, FuncId, Id, InListId, InsertId, LiteralId, NodeId, ObjLitId,
-    QueryId, SpanId, StrId, UpdateId, UpsertId, WindowId,
+    ArrayLitId, CaseId, DeleteId, FieldId, FuncId, Id, InListId, InsertId, LiteralId, NodeId,
+    ObjLitId, QueryId, SpanId, StrId, UpdateId, UpsertId, WindowId,
 };
 use crate::types::value::Literal;
 
@@ -46,7 +46,7 @@ fn get_in<T, Tag: ?Sized>(vec: &[T], id: Id<Tag>) -> &T {
 
 /// A single traversal step inside a [`FieldNode`] path.
 ///
-/// Steps allow a [`ExprNode::Field`] to express arbitrarily deep navigation
+/// Steps allow a [`crate::expr::ExprOp::Field`] to express arbitrarily deep navigation
 /// through JSON/object structures or arrays, independent of the backing store:
 ///
 /// | Step | Postgres JSONB              | REST / document |
@@ -63,10 +63,10 @@ pub enum FieldStep {
     Index(u32),
 }
 
-/// Payload for [`ExprNode::Field`], stored in `ExprArena::fields`.
+/// Payload for [`crate::expr::ExprOp::Field`], stored in `ExprArena::fields`.
 ///
 /// A `Field` is a leaf reference: a named attribute optionally anchored on
-/// a container [`ExprNode::Namespace`] (whose dotted address is interned as
+/// a container [`crate::expr::ExprOp::Namespace`] (whose dotted address is interned as
 /// `namespace`), with an optional traversal chain that follows the leaf
 /// (e.g. JSON key / index access).
 ///
@@ -92,7 +92,7 @@ pub struct FieldNode {
 
 // ─── Pooled payload structs ───────────────────────────────────────────────────
 
-/// Payload for [`ExprNode::Func`], stored in `ExprArena::funcs`.
+/// Payload for [`crate::expr::ExprOp::Func`], stored in `ExprArena::funcs`.
 ///
 /// Moved out of the enum variant to keep `ExprNode` ≤ 32 bytes: the
 /// two fields (`name: u32` + 4-byte alignment gap + 24-byte `SmallVec`)
@@ -105,7 +105,7 @@ pub struct FuncNode {
     pub args: SmallVec<[NodeId; 4]>,
 }
 
-/// Payload for [`ExprNode::ObjectLit`], stored in `ExprArena::obj_lits`.
+/// Payload for [`crate::expr::ExprOp::ObjectLit`], stored in `ExprArena::obj_lits`.
 ///
 /// The inline buffer of `SmallVec<[(StrId, NodeId); 4]>` is 4 × 8 = 32 bytes
 /// on its own — already over budget before the discriminant word is counted.
@@ -113,7 +113,7 @@ pub struct FuncNode {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ObjLitNode(pub SmallVec<[(StrId, NodeId); 4]>);
 
-/// Payload for [`ExprNode::Window`], stored in `ExprArena::windows`.
+/// Payload for [`crate::expr::ExprOp::Window`], stored in `ExprArena::windows`.
 ///
 /// Two `SmallVec` fields (each 24 bytes) plus `func: StrId` total 52+ bytes
 /// of payload — pooled to keep `ExprNode` ≤ 32 bytes.
@@ -131,7 +131,7 @@ pub struct WindowNode {
     pub frame: Option<crate::tree::WindowFrame>,
 }
 
-/// Payload for [`ExprNode::Case`], stored in `ExprArena::cases`.
+/// Payload for [`crate::expr::ExprOp::Case`], stored in `ExprArena::cases`.
 ///
 /// `SmallVec<[(NodeId, NodeId); 4]>` has a 32-byte inline buffer, making the
 /// variant payload 36+ bytes — pooled to keep `ExprNode` ≤ 32 bytes.
@@ -146,7 +146,7 @@ pub struct CaseNode {
     pub else_: Option<NodeId>,
 }
 
-/// Payload for [`ExprNode::InList`], stored in `ExprArena::in_lists`.
+/// Payload for [`crate::expr::ExprOp::InList`], stored in `ExprArena::in_lists`.
 ///
 /// `SmallVec<[NodeId; 8]>` has a 32-byte inline buffer, making the variant
 /// payload 36+ bytes — pooled to keep `ExprNode` ≤ 32 bytes.
@@ -155,6 +155,23 @@ pub struct CaseNode {
 pub struct InListNode {
     pub expr: NodeId,
     pub list: SmallVec<[NodeId; 8]>,
+}
+
+// ─── ArrayLitNode ────────────────────────────────────────────────────────────
+
+/// Payload for [`ExprNode`] nodes whose opcode is
+/// [`crate::expr::ExprOp::ArrayLit`].
+///
+/// In v1 the array-literal element list lived inline in the variant
+/// payload (`ExprNode::ArrayLit(SmallVec<[NodeId; 4]>)`), which is the
+/// only thing that pushed the old enum to 32 bytes. v2's 16-byte packed
+/// `ExprNode` cannot hold a `SmallVec` inline, so the elements moved
+/// into this side-pool struct accessed via [`ArrayLitId`].
+#[derive(Debug, Clone, PartialEq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub struct ArrayLitNode {
+    /// Element [`NodeId`]s in source order.
+    pub items: SmallVec<[NodeId; 4]>,
 }
 
 // ─── SpanTable ────────────────────────────────────────────────────────────────
@@ -267,6 +284,7 @@ pub struct Capacity {
     pub fields: usize,
     pub funcs: usize,
     pub obj_lits: usize,
+    pub array_lits: usize,
     pub windows: usize,
     pub cases: usize,
     pub in_lists: usize,
@@ -316,6 +334,8 @@ pub struct ExprArena {
     funcs: Vec<FuncNode>,
     /// Pooled object-literal payloads — lookup by [`ObjLitId`].
     obj_lits: Vec<ObjLitNode>,
+    /// Pooled array-literal payloads — lookup by [`ArrayLitId`].
+    array_lits: Vec<ArrayLitNode>,
     /// Pooled window-function payloads — lookup by [`WindowId`].
     windows: Vec<WindowNode>,
     /// Pooled CASE expression payloads — lookup by [`CaseId`].
@@ -353,6 +373,7 @@ impl ExprArena {
             lits: Vec::with_capacity(cap.lits),
             funcs: Vec::with_capacity(cap.funcs),
             obj_lits: Vec::with_capacity(cap.obj_lits),
+            array_lits: Vec::with_capacity(cap.array_lits),
             windows: Vec::with_capacity(cap.windows),
             cases: Vec::with_capacity(cap.cases),
             in_lists: Vec::with_capacity(cap.in_lists),
@@ -380,6 +401,7 @@ impl ExprArena {
             + self.lits.capacity() * size_of::<Literal<'static>>()
             + self.funcs.capacity() * size_of::<FuncNode>()
             + self.obj_lits.capacity() * size_of::<ObjLitNode>()
+            + self.array_lits.capacity() * size_of::<ArrayLitNode>()
             + self.windows.capacity() * size_of::<WindowNode>()
             + self.cases.capacity() * size_of::<CaseNode>()
             + self.in_lists.capacity() * size_of::<InListNode>()
@@ -395,8 +417,118 @@ impl ExprArena {
 
     // ── ExprNode pool ────────────────────────────────────────────────────────
 
+    /// Append a packed [`ExprNode`] to the hot pool and return its
+    /// [`NodeId`]. Most call sites should reach for the typed
+    /// constructors on [`ExprNode`] (e.g. [`ExprNode::bin`]) to keep
+    /// the raw `a`/`b`/`c` layout out of consumer code.
     pub fn alloc(&mut self, node: ExprNode) -> NodeId {
         alloc_in(&mut self.nodes, node)
+    }
+
+    // ── Typed `alloc_*` helpers — sugar for `alloc(ExprNode::*)`. ─────
+    //
+    // These mirror the constructors on `ExprNode` 1:1 and exist so
+    // callers don't have to chain `arena.alloc(ExprNode::bin(op, l, r))`
+    // everywhere. They keep the call sites readable now that the node
+    // is opaque-ish (op + 14 bytes).
+
+    /// Allocate a [`crate::expr::ExprOp::Bin`] node.
+    pub fn alloc_bin(&mut self, op: crate::expr::BinOp, lhs: NodeId, rhs: NodeId) -> NodeId {
+        self.alloc(ExprNode::bin(op, lhs, rhs))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Una`] node.
+    pub fn alloc_una(&mut self, op: crate::expr::UnaryOp, operand: NodeId) -> NodeId {
+        self.alloc(ExprNode::una(op, operand))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Field`] node referring to
+    /// `id` in the field-payload pool.
+    pub fn alloc_field_ref(&mut self, id: FieldId) -> NodeId {
+        self.alloc(ExprNode::field(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Param`] node with positional
+    /// index `0` (the legacy unindexed default).
+    pub fn alloc_param(&mut self) -> NodeId {
+        self.alloc(ExprNode::param(0))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Lit`] node.
+    pub fn alloc_lit_ref(&mut self, id: LiteralId) -> NodeId {
+        self.alloc(ExprNode::lit(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Namespace`] node.
+    pub fn alloc_namespace(&mut self, id: StrId) -> NodeId {
+        self.alloc(ExprNode::namespace(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::ObjectLit`] node.
+    pub fn alloc_object_lit_ref(&mut self, id: ObjLitId) -> NodeId {
+        self.alloc(ExprNode::object_lit(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::ArrayLit`] node.
+    pub fn alloc_array_lit_ref(&mut self, id: ArrayLitId) -> NodeId {
+        self.alloc(ExprNode::array_lit(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Func`] node.
+    pub fn alloc_func_ref(&mut self, id: FuncId) -> NodeId {
+        self.alloc(ExprNode::func(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Agg`] node.
+    pub fn alloc_agg(&mut self, func: StrId, expr: NodeId, distinct: bool) -> NodeId {
+        self.alloc(ExprNode::agg(func, expr, distinct))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Window`] node.
+    pub fn alloc_window_ref(&mut self, id: WindowId) -> NodeId {
+        self.alloc(ExprNode::window(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Cast`] node.
+    pub fn alloc_cast(&mut self, expr: NodeId, to: StrId) -> NodeId {
+        self.alloc(ExprNode::cast(expr, to))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Case`] node.
+    pub fn alloc_case_ref(&mut self, id: CaseId) -> NodeId {
+        self.alloc(ExprNode::case(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Alias`] node.
+    pub fn alloc_alias(&mut self, expr: NodeId, name: StrId) -> NodeId {
+        self.alloc(ExprNode::alias(expr, name))
+    }
+    /// Allocate a [`crate::expr::ExprOp::InList`] node.
+    pub fn alloc_in_list_ref(&mut self, id: InListId) -> NodeId {
+        self.alloc(ExprNode::in_list(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::InSub`] node.
+    pub fn alloc_in_sub(&mut self, expr: NodeId, sub: NodeId) -> NodeId {
+        self.alloc(ExprNode::in_sub(expr, sub))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Exists`] node.
+    pub fn alloc_exists(&mut self, sub: NodeId) -> NodeId {
+        self.alloc(ExprNode::exists(sub))
+    }
+    /// Allocate a standalone [`crate::expr::ExprOp::IsNull`] node.
+    pub fn alloc_is_null(&mut self, expr: NodeId) -> NodeId {
+        self.alloc(ExprNode::is_null(expr))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Between`] node.
+    pub fn alloc_between(&mut self, expr: NodeId, lo: NodeId, hi: NodeId) -> NodeId {
+        self.alloc(ExprNode::between(expr, lo, hi))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Query`] node.
+    pub fn alloc_query_ref(&mut self, id: QueryId) -> NodeId {
+        self.alloc(ExprNode::query(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Insert`] node.
+    pub fn alloc_insert_ref(&mut self, id: InsertId) -> NodeId {
+        self.alloc(ExprNode::insert(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Update`] node.
+    pub fn alloc_update_ref(&mut self, id: UpdateId) -> NodeId {
+        self.alloc(ExprNode::update(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Delete`] node.
+    pub fn alloc_delete_ref(&mut self, id: DeleteId) -> NodeId {
+        self.alloc(ExprNode::delete(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Upsert`] node.
+    pub fn alloc_upsert_ref(&mut self, id: UpsertId) -> NodeId {
+        self.alloc(ExprNode::upsert(id))
     }
 
     /// Retrieve an [`ExprNode`] by its [`NodeId`].
@@ -470,6 +602,16 @@ impl ExprArena {
     #[track_caller]
     pub fn get_obj_lit(&self, id: ObjLitId) -> &ObjLitNode {
         get_in(&self.obj_lits, id)
+    }
+
+    // ── ArrayLitNode pool ─────────────────────────────────────────────────────
+
+    pub fn alloc_array_lit(&mut self, arr: ArrayLitNode) -> ArrayLitId {
+        alloc_in(&mut self.array_lits, arr)
+    }
+    #[track_caller]
+    pub fn get_array_lit(&self, id: ArrayLitId) -> &ArrayLitNode {
+        get_in(&self.array_lits, id)
     }
 
     // ── WindowNode pool ───────────────────────────────────────────────────────
@@ -573,6 +715,9 @@ impl ExprArena {
     }
     pub fn obj_lits_slice(&self) -> &[ObjLitNode] {
         &self.obj_lits
+    }
+    pub fn array_lits_slice(&self) -> &[ArrayLitNode] {
+        &self.array_lits
     }
     pub fn windows_slice(&self) -> &[WindowNode] {
         &self.windows
