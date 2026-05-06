@@ -38,6 +38,9 @@ pub fn hex(digest: &Digest) -> String {
     out
 }
 
+// `n` is in `0..=15` by the match arms, so `b'0'+n` and `b'a'+n-10` cannot
+// overflow `u8`.
+#[allow(clippy::arithmetic_side_effects)]
 fn nibble(n: u8) -> char {
     match n {
         0..=9 => (b'0' + n) as char,

@@ -44,6 +44,9 @@ impl IpAddr {
 }
 
 impl fmt::Display for IpAddr {
+    // `b: &[u8; 16]`, `i` ranges 0..=7 so `i*2` and `i*2+1` are in 0..=15;
+    // both indexing and the multiplication are bounded by the array shape.
+    #[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::V4([a, b, c, d]) => write!(f, "{a}.{b}.{c}.{d}"),

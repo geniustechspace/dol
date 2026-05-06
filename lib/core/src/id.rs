@@ -90,6 +90,8 @@ impl<Tag: ?Sized> Id<Tag> {
     /// ```
     #[inline]
     #[must_use]
+    // `index < u32::MAX` is checked above, so `index as u32 + 1` cannot overflow.
+    #[allow(clippy::arithmetic_side_effects)]
     pub const fn from_index(index: usize) -> Option<Self> {
         // `index + 1` must fit in a `u32` and must not be zero.
         if index >= u32::MAX as usize {
@@ -112,6 +114,9 @@ impl<Tag: ?Sized> Id<Tag> {
     /// Zero-based index suitable for `Vec` / slice access.
     #[inline]
     #[must_use]
+    // `raw` is `NonZeroU32`, so `raw.get() >= 1` and the subtraction never
+    // underflows.
+    #[allow(clippy::arithmetic_side_effects)]
     pub const fn index(self) -> usize {
         self.raw.get() as usize - 1
     }

@@ -40,6 +40,9 @@ pub const TIMESERIES_SYMBOL: Symbol = Symbol::from_hash(fnv1a_32(TIMESERIES_NAME
 pub const IOT_SAMPLE_SYMBOL: Symbol = Symbol::from_hash(fnv1a_32(IOT_SAMPLE_NAME.as_bytes()));
 
 /// `const`-eval FNV-1a 32-bit hash. Stable; matches the spec basis/prime.
+// `i < bytes.len()` bounds the indexing; `bytes.len() <= isize::MAX` so
+// `i += 1` cannot overflow `usize`.
+#[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
 const fn fnv1a_32(bytes: &[u8]) -> u32 {
     let mut hash: u32 = 0x811c9dc5;
     let mut i = 0;

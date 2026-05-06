@@ -65,6 +65,10 @@ impl InsertQuery {
     }
 
     /// Total bind-parameter count for this INSERT.
+    // Both factors are bounded by user-input column-/row-counts; on a
+    // 64-bit `usize`, exceeding `usize::MAX` would require a query with
+    // >2^64 columns × rows, which is not representable in any caller.
+    #[allow(clippy::arithmetic_side_effects)]
     pub fn param_count(&self) -> usize {
         let field_count = if self.fields.is_empty() {
             self.field_names.as_ref().map_or(0, |n| n.len())
@@ -105,6 +109,9 @@ impl InsertQuery {
 
         // Generate one Param node per field per row.
         let mut values: smallvec::SmallVec<[dol_expr::ids::NodeId; 8]> = smallvec::SmallVec::new();
+        // `row_count * fields.len()` is bounded by the same constraints as
+        // `param_count`; not representable as overflow on 64-bit `usize`.
+        #[allow(clippy::arithmetic_side_effects)]
         for _ in 0..(self.row_count * fields.len()) {
             values.push(arena.alloc(ExprNode::Param));
         }

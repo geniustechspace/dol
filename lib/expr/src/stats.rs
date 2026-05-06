@@ -46,6 +46,9 @@ pub struct Stats {
 }
 
 /// Summarise the resident heap usage of an [`ExprArena`] / [`Interner`] pair.
+// Heap-byte estimate; multiplications and additions are bounded by `Vec`
+// capacities and would saturate at `usize::MAX` on 64-bit, which is harmless.
+#[allow(clippy::arithmetic_side_effects)]
 pub fn snapshot(arena: &ExprArena, interner: &Interner) -> Stats {
     use core::mem::size_of;
     let nodes_bytes = arena.nodes_capacity() * size_of::<crate::expr::ExprNode>();

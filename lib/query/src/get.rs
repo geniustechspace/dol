@@ -418,7 +418,11 @@ impl GetQuery {
                         rhs: rid,
                     }));
                 }
+                // `on_conditions.is_empty()` was checked above, so the
+                // loop ran at least once and `cond_ids` is non-empty.
+                #[allow(clippy::indexing_slicing)]
                 let mut result = cond_ids[0];
+                #[allow(clippy::indexing_slicing)]
                 for id in &cond_ids[1..] {
                     result = arena.alloc(ExprNode::BinOp {
                         op: dol_expr::expr::BinOp::And,

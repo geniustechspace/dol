@@ -108,6 +108,9 @@ impl std::error::Error for WireError {}
 /// encoded (postcard / json / …).
 pub fn frame(body: &[u8]) -> alloc::vec::Vec<u8> {
     let header = WireHeader::current().to_bytes();
+    // `Vec` capacity hint; both terms are slice lengths bounded by
+    // `isize::MAX`, the sum cannot overflow on a 64-bit platform.
+    #[allow(clippy::arithmetic_side_effects)]
     let mut out = alloc::vec::Vec::with_capacity(header.len() + body.len());
     out.extend_from_slice(&header);
     out.extend_from_slice(body);
@@ -121,7 +124,12 @@ pub fn unframe(bytes: &[u8]) -> Result<&[u8], WireError> {
         return Err(WireError::BadMagic);
     }
     let mut header_buf = [0u8; 8];
-    header_buf.copy_from_slice(&bytes[..8]);
-    let _ = WireHeader::from_bytes(header_buf)?;
-    Ok(&bytes[8..])
+    // `bytes.len() >= 8` was checked above, so slicing `..8` and `8..` is
+    // safe.
+    #[allow(clippy::indexing_slicing)]
+    {
+        header_buf.copy_from_slice(&bytes[..8]);
+        let _ = WireHeader::from_bytes(header_buf)?;
+        Ok(&bytes[8..])
+    }
 }

@@ -337,6 +337,9 @@ macro_rules! impl_decode_ivarint {
         $(
             impl Decode for $t {
                 #[inline]
+                // Zig-zag decode: `raw & 1` is 0 or 1, so the unary
+                // negation cannot overflow `i64`.
+                #[allow(clippy::arithmetic_side_effects)]
                 fn decode(reader: &mut Reader<'_>, _b: &mut Budget) -> Result<Self, DecodeError> {
                     // Postcard signed varint = zig-zag over the unsigned varint.
                     let raw = reader.$reader()? as u64;
@@ -407,6 +410,9 @@ impl Decode for u128 {
 
 impl Decode for i128 {
     #[inline]
+    // Zig-zag decode: `raw & 1` is 0 or 1, so the unary negation cannot
+    // overflow `i128`.
+    #[allow(clippy::arithmetic_side_effects)]
     fn decode(reader: &mut Reader<'_>, _b: &mut Budget) -> Result<Self, DecodeError> {
         // Postcard signed varint = zig-zag over the unsigned varint.
         // Zig-zag decode for i128: (raw >> 1) ^ -(raw & 1).

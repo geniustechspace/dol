@@ -98,11 +98,10 @@ impl PathExpr {
 
     /// Return the single segment string if this is a one-segment path.
     pub fn as_single(&self) -> Option<&str> {
-        if self.segments.len() == 1 {
-            Some(self.segments[0].as_str())
-        } else {
-            None
-        }
+        self.segments
+            .first()
+            .filter(|_| self.segments.len() == 1)
+            .map(|s| s.as_str())
     }
 
     /// Iterate over segment strings.

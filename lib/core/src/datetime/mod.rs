@@ -106,6 +106,10 @@ pub fn interval_nanos(nanos: i64) -> Value {
 ///
 /// Algorithm by Howard Hinnant (public domain).
 #[cfg(feature = "std")]
+// Hinnant's civil-from-days algorithm; intermediates are bounded by the
+// input range (Unix-epoch days fits comfortably in i64). All arithmetic
+// is provably non-overflowing for any `z` representable as i64.
+#[allow(clippy::arithmetic_side_effects)]
 fn days_to_ymd(z: i64) -> (i32, u8, u8) {
     let z = z + 719_468;
     let era: i64 = if z >= 0 { z } else { z - 146_096 } / 146_097;

@@ -19,16 +19,10 @@
 //!
 //! See `justfile` for higher-level recipes that wrap these.
 
-#![cfg_attr(
-    test,
-    allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        clippy::panic,
-        clippy::indexing_slicing,
-        clippy::arithmetic_side_effects
-    )
-)]
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
+// `xtask` is a build-time task runner, not production library code; the
+// budget-gate parser indexes into known shapes captured from `cargo` output.
+#![allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
 
 use std::process::{Command, ExitCode};
 

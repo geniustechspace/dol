@@ -19,6 +19,10 @@ use alloc::vec::Vec;
 use crate::{WireError, WireHeader};
 
 /// Encode `payload` to postcard bytes and prepend a [`WireHeader`].
+// `Vec` capacity hint; cannot exceed `isize::MAX` so the addition is
+// effectively bounded — saturation at `usize::MAX` would still be a valid
+// (oversized) hint.
+#[allow(clippy::arithmetic_side_effects)]
 pub fn encode<T: serde::Serialize>(payload: &T) -> Result<Vec<u8>, WireError> {
     let header = WireHeader::current().to_bytes();
     let body =

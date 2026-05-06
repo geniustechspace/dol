@@ -34,6 +34,10 @@ fn alloc_in<T, Tag: ?Sized>(vec: &mut Vec<T>, item: T) -> Id<Tag> {
 /// accessors.
 #[inline]
 #[track_caller]
+// Ids are produced by `push` and stored alongside the same `vec`; an
+// out-of-range index is a programmer error documented as such on the
+// callers (`ExprArena::get_*`).
+#[allow(clippy::indexing_slicing)]
 fn get_in<T, Tag: ?Sized>(vec: &[T], id: Id<Tag>) -> &T {
     &vec[id.index()]
 }
@@ -221,7 +225,12 @@ impl SpanTable {
             .iter()
             .rev()
             .position(|&o| o == owner)
-            .map(|rev_idx| &self.spans[self.spans.len() - 1 - rev_idx])
+            // `rev_idx` < `self.spans.len()` (returned by `position`); the
+            // arithmetic mirrors that bound and the indexing is safe.
+            .map(|rev_idx| {
+                #[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
+                &self.spans[self.spans.len() - 1 - rev_idx]
+            })
     }
 
     /// Total number of recorded spans.
@@ -361,6 +370,10 @@ impl ExprArena {
     /// (e.g. a `SmallVec` overflow allocation) which would require
     /// recursing per-node; callers that need a tighter accounting should
     /// reach for `crate::stats::arena_stats`.
+    // `usize` byte-count summation: every term is a `Vec` capacity bounded by
+    // `isize::MAX` and the total is a heap-byte estimate, not a security
+    // boundary; saturating at `usize::MAX` would still be a useful answer.
+    #[allow(clippy::arithmetic_side_effects)]
     pub fn heap_bytes(&self) -> usize {
         use core::mem::size_of;
         self.nodes.capacity() * size_of::<ExprNode>()

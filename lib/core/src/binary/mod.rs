@@ -47,6 +47,9 @@ impl BitString {
 }
 
 impl fmt::Display for BitString {
+    // `i / 8` is bounded by `bytes.len() == len.div_ceil(8)` (try_new
+    // invariant), and `7 - (i % 8)` is in 0..=7.
+    #[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("b'")?;
         for i in 0..self.len {

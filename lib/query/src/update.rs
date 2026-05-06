@@ -51,6 +51,9 @@ impl UpdateQuery {
     }
 
     /// Increment a column: `col = col + $N`.
+    // The `+` here is `Expr<'static>::Add` overloaded via `core::ops::Add`,
+    // not integer arithmetic; clippy can't tell from the symbol.
+    #[allow(clippy::arithmetic_side_effects)]
     pub fn set_increment(mut self, column: &str) -> Self {
         let expr = field_dyn(column) + Expr::Param;
         self.assignments.push((column.to_string(), expr));

@@ -196,8 +196,13 @@ impl FromStr for MacAddr {
             if count == bytes.len() {
                 return Err(ParseMacAddrError::invalid());
             }
-            bytes[count] = parse_hex_byte(part).ok_or_else(ParseMacAddrError::invalid)?;
-            count += 1;
+            // `count < bytes.len()` is enforced by the guard above; the
+            // increment cannot overflow because it is capped at 8.
+            #[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
+            {
+                bytes[count] = parse_hex_byte(part).ok_or_else(ParseMacAddrError::invalid)?;
+                count += 1;
+            }
         }
 
         match count {

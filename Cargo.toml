@@ -45,12 +45,13 @@ publish = false
 #   * `unsafe_code = "forbid"` is already declared per-crate; reasserted here
 #     so a future crate added without the per-crate attribute still fails
 #     closed.
-#   * The five clippy lints below are workspace-wide *warnings* in 0.2.0.
-#     Phase 2 of the v2 cut elevates them to `deny` once every production
-#     call-site has been audited and test modules carry the
-#     `#![cfg_attr(test, allow(...))]` exemption. Until then `warn` keeps CI
-#     green while still surfacing every remaining offender in `cargo clippy`
-#     output.
+#   * The five clippy lints below are workspace-wide `deny`s in v2. Tests carry
+#     the `#![cfg_attr(test, allow(...))]` exemption at every crate root and
+#     standalone test binaries (`tests/*.rs`) use `#![allow(...)]`. Production
+#     call-sites that genuinely cannot panic/overflow (calendar arithmetic,
+#     hashing inner loops, `Vec` capacity hints, post-length-check slice
+#     indexing) carry function-level or block-level `#[allow]` attributes with
+#     a one-line prose justification.
 [workspace.lints.rust]
 unsafe_code = "forbid"
 
@@ -64,15 +65,14 @@ unsafe_code = "forbid"
 unwrap_used             = "deny"
 expect_used             = "deny"
 panic                   = "deny"
-# `indexing_slicing` and `arithmetic_side_effects` stay at `warn` for v2:
-# they fire on every `+`, `-`, `arr[i]` in correct integer arithmetic
-# (calendar conversions, hashing inner loops, well-bounded indexing) and
-# converting them to `checked_*` / `.get(...)` would rewrite a substantial
-# amount of provably-correct code with no runtime benefit. CI surfaces new
-# offenders without breaking the build; the eventual deny-flip happens
-# alongside a function-level audit.
-indexing_slicing        = "warn"
-arithmetic_side_effects = "warn"
+# Phase 2 deny-flip: every production call-site has been audited. Sites that
+# legitimately cannot panic/overflow (calendar arithmetic, hashing inner
+# loops, post-length-check slice indexing, `Vec` capacity hints) carry a
+# scoped `#[allow]` with a one-line prose justification at the call-site;
+# everything else has been rewritten to `.get(...).ok_or(...)?` /
+# `checked_*().ok_or(...)?` against the function's existing error type.
+indexing_slicing        = "deny"
+arithmetic_side_effects = "deny"
 
 [workspace.dependencies]
 # ── Collections / utility ────────────────────────────────────────────────────

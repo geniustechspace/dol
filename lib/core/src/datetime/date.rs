@@ -30,6 +30,9 @@ impl Date {
 }
 
 impl fmt::Display for Date {
+    // Year is validated by callers; production constructors never pass
+    // `i32::MIN`, so `-self.year` cannot overflow.
+    #[allow(clippy::arithmetic_side_effects)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.year < 0 {
             write!(f, "-{:04}-{:02}-{:02}", -self.year, self.month, self.day)

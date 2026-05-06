@@ -63,6 +63,9 @@ impl Span {
 
     /// Byte offset one past the end of the span.
     #[inline]
+    // `start()` and `length()` are both 24-bit (`& 0x00FF_FFFF`); their sum
+    // fits in 25 bits and cannot overflow `u32`.
+    #[allow(clippy::arithmetic_side_effects)]
     pub const fn end(self) -> u32 {
         self.start() + self.length()
     }

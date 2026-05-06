@@ -97,6 +97,10 @@ impl Interner {
 
     /// Intern `s`, returning a stable [`StrId`] — or [`InternError::Collision`]
     /// when a different string already occupies the same id.
+    // Slot offsets and lengths are produced by `try_intern` against the same
+    // `bytes` blob; `off + len <= bytes.len()` is an internal invariant so
+    // the slice indexing and addition cannot escape bounds.
+    #[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
     pub fn try_intern(&mut self, s: &str) -> Result<StrId, InternError> {
         let id = strid_for(s.as_bytes());
         if let Some(&(off, len)) = self.slots.get(&id) {
@@ -138,6 +142,9 @@ impl Interner {
     // boundaries. We still go through `from_utf8` so the crate stays
     // `#![forbid(unsafe_code)]`-clean.
     #[allow(clippy::expect_used)]
+    // `(off, len)` was produced by `try_intern` against the same `bytes`
+    // blob; `off + len <= bytes.len()` holds by construction.
+    #[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
     pub fn get_opt(&self, id: StrId) -> Option<&str> {
         let &(off, len) = self.slots.get(&id)?;
         let raw = &self.bytes[off as usize..off as usize + len as usize];
@@ -145,6 +152,9 @@ impl Interner {
     }
 
     /// Return the [`StrId`] for `s` if it has already been interned.
+    // `(off, len)` was produced by `try_intern` against the same `bytes`
+    // blob; `off + len <= bytes.len()` holds by construction.
+    #[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
     pub fn try_get(&self, s: &str) -> Option<StrId> {
         let id = strid_for(s.as_bytes());
         let &(off, len) = self.slots.get(&id)?;
@@ -167,6 +177,10 @@ impl Interner {
     /// plus an estimate of the slot table footprint.
     ///
     /// Used by `crate::stats` to track memory wins between revisions.
+    // Heap-byte estimate; the multiplication and addition are bounded by
+    // `Vec`/`HashMap` capacities (≤ `isize::MAX`) and would saturate on a
+    // hypothetical overflow rather than mis-account.
+    #[allow(clippy::arithmetic_side_effects)]
     pub fn heap_bytes(&self) -> usize {
         let bytes_cap = self.bytes.capacity();
         // hashbrown doesn't expose the underlying allocation size, so
@@ -177,6 +191,9 @@ impl Interner {
     }
 
     #[allow(clippy::expect_used)]
+    // Slot offsets/lengths were produced by `try_intern` against the same
+    // `bytes` blob; `off + len <= bytes.len()` holds by construction.
+    #[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
     pub fn sorted_strings(&self) -> alloc::vec::Vec<&str> {
         let mut entries: alloc::vec::Vec<(StrId, &str)> = self
             .slots
@@ -215,6 +232,9 @@ fn strid_for(bytes: &[u8]) -> StrId {
 /// `lib/pipeline/src/extension.rs` and `lib/stream/src/extension.rs`.
 ///
 /// [`Symbol`]: dol_core::ext::Symbol
+// `i < bytes.len()` bounds the indexing; `bytes.len() <= isize::MAX` so
+// `i += 1` cannot overflow `usize`.
+#[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
 const fn fnv1a_32(bytes: &[u8]) -> u32 {
     // FNV-1a 32-bit constants per the reference spec.
     let mut hash: u32 = 0x811c_9dc5;
@@ -231,6 +251,9 @@ const fn fnv1a_32(bytes: &[u8]) -> u32 {
 #[cfg(feature = "serde")]
 impl serde::Serialize for Interner {
     #[allow(clippy::expect_used)]
+    // Slot offsets/lengths were produced by `try_intern` against the same
+    // `bytes` blob; `off + len <= bytes.len()` holds by construction.
+    #[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
     fn serialize<S: serde::Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
         // Serialise as a flat `Vec<String>` in canonical (sorted-by-id)
         // order so two interners with the same string set serialise
