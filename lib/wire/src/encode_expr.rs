@@ -15,7 +15,7 @@ use dol_expr::ids::{
 use dol_expr::interner::Interner;
 use dol_expr::tree::window::{FrameBound, FrameKind, WindowFrame};
 
-use crate::encoder::{Encode, EncodeError, Writer};
+use crate::encoder::{Encode, EncodeError, Writer, encode_slice};
 
 // ─── StrId ───────────────────────────────────────────────────────────────────
 
@@ -32,6 +32,7 @@ impl Encode for FieldStep {
                 w.write_varint_u32(1)?;
                 w.write_varint_u32(*i)?;
             }
+            _ => return Err(EncodeError::Custom("FieldStep: unknown variant")),
         }
         Ok(())
     }
@@ -178,8 +179,8 @@ impl Encode for Span {
 
 impl Encode for SpanTable {
     fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
-        b.descend(|b| self.spans_slice().encode(w, b))??;
-        b.descend(|b| self.owners_slice().encode(w, b))??;
+        b.descend(|b| encode_slice(self.spans_slice(), w, b))??;
+        b.descend(|b| encode_slice(self.owners_slice(), w, b))??;
         Ok(())
     }
 }
@@ -194,6 +195,7 @@ impl Encode for JoinType {
             JoinType::Right => w.write_varint_u32(2),
             JoinType::Full => w.write_varint_u32(3),
             JoinType::Cross => w.write_varint_u32(4),
+            _ => Err(EncodeError::Custom("JoinType: unknown variant")),
         }
     }
 }
@@ -239,6 +241,7 @@ impl Encode for ConflictClause {
                 w.write_varint_u32(1)?;
                 b.descend(|b| assignments.encode(w, b))??;
             }
+            _ => return Err(EncodeError::Custom("ConflictClause: unknown variant")),
         }
         Ok(())
     }
@@ -323,6 +326,7 @@ impl Encode for BinOp {
             BinOp::Concat => 21,
             BinOp::Arrow => 22,
             BinOp::LongArrow => 23,
+            _ => return Err(EncodeError::Custom("BinOp: unknown variant")),
         };
         w.write_varint_u32(tag)
     }
@@ -340,6 +344,7 @@ impl Encode for UnaryOp {
             UnaryOp::IsNotNull => 4,
             UnaryOp::IsTrue => 5,
             UnaryOp::IsFalse => 6,
+            _ => return Err(EncodeError::Custom("UnaryOp: unknown variant")),
         };
         w.write_varint_u32(tag)
     }
@@ -455,6 +460,7 @@ impl Encode for ExprNode {
                 w.write_varint_u32(23)?;
                 b.descend(|b| id.encode(w, b))??;
             }
+            _ => return Err(EncodeError::Custom("ExprNode: unknown variant")),
         }
         Ok(())
     }
@@ -479,20 +485,20 @@ impl Encode for Interner {
 impl Encode for ExprArena {
     fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
         // Write all pools in the same order as decode.
-        b.descend(|b| self.nodes_slice().encode(w, b))??;
+        b.descend(|b| encode_slice(self.nodes_slice(), w, b))??;
         b.descend(|b| self.span_table_ref().encode(w, b))??;
-        b.descend(|b| self.lits_slice().encode(w, b))??;
-        b.descend(|b| self.funcs_slice().encode(w, b))??;
-        b.descend(|b| self.obj_lits_slice().encode(w, b))??;
-        b.descend(|b| self.windows_slice().encode(w, b))??;
-        b.descend(|b| self.cases_slice().encode(w, b))??;
-        b.descend(|b| self.in_lists_slice().encode(w, b))??;
-        b.descend(|b| self.queries_slice().encode(w, b))??;
-        b.descend(|b| self.inserts_slice().encode(w, b))??;
-        b.descend(|b| self.updates_slice().encode(w, b))??;
-        b.descend(|b| self.deletes_slice().encode(w, b))??;
-        b.descend(|b| self.upserts_slice().encode(w, b))??;
-        b.descend(|b| self.fields_slice().encode(w, b))??;
+        b.descend(|b| encode_slice(self.lits_slice(), w, b))??;
+        b.descend(|b| encode_slice(self.funcs_slice(), w, b))??;
+        b.descend(|b| encode_slice(self.obj_lits_slice(), w, b))??;
+        b.descend(|b| encode_slice(self.windows_slice(), w, b))??;
+        b.descend(|b| encode_slice(self.cases_slice(), w, b))??;
+        b.descend(|b| encode_slice(self.in_lists_slice(), w, b))??;
+        b.descend(|b| encode_slice(self.queries_slice(), w, b))??;
+        b.descend(|b| encode_slice(self.inserts_slice(), w, b))??;
+        b.descend(|b| encode_slice(self.updates_slice(), w, b))??;
+        b.descend(|b| encode_slice(self.deletes_slice(), w, b))??;
+        b.descend(|b| encode_slice(self.upserts_slice(), w, b))??;
+        b.descend(|b| encode_slice(self.fields_slice(), w, b))??;
         Ok(())
     }
 }

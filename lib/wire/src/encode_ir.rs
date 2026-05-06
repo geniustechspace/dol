@@ -27,7 +27,7 @@ use dol_ir::Program;
 use dol_schema::constraint::{ComputedKind, EntityConstraint, RefAction, RelationRef};
 use dol_schema::{Entity, Field};
 
-use crate::encoder::{Encode, EncodeError, Writer};
+use crate::encoder::{Encode, EncodeError, Writer, encode_slice};
 
 // ─── Symbol ──────────────────────────────────────────────────────────────────
 
@@ -694,7 +694,7 @@ impl Encode for TxOp {
             }
             TxOp::Atomic { ops, opts } => {
                 w.write_varint_u32(6)?;
-                b.descend(|b| ops.as_slice().encode(w, b))??;
+                b.descend(|b| encode_slice(ops.as_slice(), w, b))??;
                 b.descend(|b| opts.encode(w, b))??;
             }
         }
@@ -714,7 +714,7 @@ impl Encode for ExtensionId {
 impl Encode for OperationExtension {
     fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
         b.descend(|b| self.id.encode(w, b))??;
-        b.descend(|b| self.payload.as_slice().encode(w, b))??;
+        b.descend(|b| encode_slice(self.payload.as_slice(), w, b))??;
         Ok(())
     }
 }
@@ -823,13 +823,13 @@ impl Encode for EntityConstraint {
         match self {
             EntityConstraint::Unique(fields) => {
                 w.write_varint_u32(0)?;
-                b.descend(|b| fields.as_slice().encode(w, b))??;
+                b.descend(|b| encode_slice(fields.as_slice(), w, b))??;
             }
             EntityConstraint::Relation { fields, ref_entity, ref_fields, on_delete } => {
                 w.write_varint_u32(1)?;
-                b.descend(|b| fields.as_slice().encode(w, b))??;
+                b.descend(|b| encode_slice(fields.as_slice(), w, b))??;
                 b.descend(|b| ref_entity.encode(w, b))??;
-                b.descend(|b| ref_fields.as_slice().encode(w, b))??;
+                b.descend(|b| encode_slice(ref_fields.as_slice(), w, b))??;
                 b.descend(|b| on_delete.encode(w, b))??;
             }
             EntityConstraint::Invariant(expr) => {
@@ -838,7 +838,7 @@ impl Encode for EntityConstraint {
             }
             EntityConstraint::Identity(fields) => {
                 w.write_varint_u32(3)?;
-                b.descend(|b| fields.as_slice().encode(w, b))??;
+                b.descend(|b| encode_slice(fields.as_slice(), w, b))??;
             }
         }
         Ok(())
@@ -869,8 +869,8 @@ impl Encode for Entity {
     fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
         b.descend(|b| self.name.encode(w, b))??;
         b.descend(|b| self.namespace.encode(w, b))??;
-        b.descend(|b| self.fields.as_slice().encode(w, b))??;
-        b.descend(|b| self.constraints.as_slice().encode(w, b))??;
+        b.descend(|b| encode_slice(self.fields.as_slice(), w, b))??;
+        b.descend(|b| encode_slice(self.constraints.as_slice(), w, b))??;
         Ok(())
     }
 }
@@ -900,7 +900,7 @@ impl Encode for CatalogEntry {
             CatalogEntry::Extension { kind, payload } => {
                 w.write_varint_u32(2)?;
                 b.descend(|b| kind.encode(w, b))??;
-                b.descend(|b| payload.as_slice().encode(w, b))??;
+                b.descend(|b| encode_slice(payload.as_slice(), w, b))??;
             }
         }
         Ok(())
@@ -910,7 +910,7 @@ impl Encode for CatalogEntry {
 impl Encode for SchemaCatalog {
     fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
         b.descend(|b| self.id.encode(w, b))??;
-        b.descend(|b| self.entries_slice().encode(w, b))??;
+        b.descend(|b| encode_slice(self.entries_slice(), w, b))??;
         Ok(())
     }
 }
@@ -919,7 +919,7 @@ impl Encode for SchemaCatalog {
 
 impl Encode for Program {
     fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
-        b.descend(|b| self.operations.as_slice().encode(w, b))??;
+        b.descend(|b| encode_slice(self.operations.as_slice(), w, b))??;
         b.descend(|b| self.arena.encode(w, b))??;
         b.descend(|b| self.interner.encode(w, b))??;
         b.descend(|b| self.schema_catalog.encode(w, b))??;

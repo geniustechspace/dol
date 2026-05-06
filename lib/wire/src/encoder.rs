@@ -445,6 +445,23 @@ impl<A: Encode, B: Encode> Encode for (A, B) {
     }
 }
 
+/// Encode a `&[T]` where `T: Encode` as a length-prefixed sequence.
+///
+/// A standalone function avoids an `impl Encode for [T]` that would overlap
+/// the specialised `impl Encode for [u8]` already in this module.
+pub fn encode_slice<T: Encode>(
+    slice: &[T],
+    w: &mut Writer<'_>,
+    b: &mut Budget,
+) -> Result<(), EncodeError> {
+    let len: u32 = slice.len().try_into().map_err(|_| EncodeError::LengthOverflow)?;
+    w.write_varint_u32(len)?;
+    for item in slice {
+        b.descend(|b| item.encode(w, b))??;
+    }
+    Ok(())
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
