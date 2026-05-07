@@ -277,6 +277,11 @@ fn decode_rejects_unknown_opcode() {
 
     // Construct a byte stream by hand: op = 0xFF (invalid) + 15 zero
     // bytes for the rest of the 16 B node form.
+    // `0xFF` is guaranteed to be outside the live `ExprOp` tag range
+    // (currently 0..=21, see `xtask::tag_table::EXPECTED_EXPROP`). This
+    // stays robust even if the tag space grows: the gate-tested
+    // append-only contract caps `ExprOp` well below 256, and `0xFF`
+    // is the canonical "unrecognised" sentinel for `from_u8` decoders.
     let buf: Vec<u8> = core::iter::once(0xFFu8)
         .chain(core::iter::repeat_n(0u8, 15))
         .collect();

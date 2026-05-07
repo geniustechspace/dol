@@ -55,6 +55,10 @@ pub const EXPECTED_BINOP: &[(&str, u16)] = &[
 ];
 
 /// Frozen `(variant_name, tag)` snapshot for [`UnaryOp`].
+///
+/// Append-only: never renumber an existing entry; never reuse a tag
+/// previously assigned to a removed variant within the same major
+/// version. (Same contract as [`EXPECTED_BINOP`].)
 pub const EXPECTED_UNARY: &[(&str, u16)] = &[
     ("Neg", 0),
     ("Not", 1),
@@ -66,6 +70,10 @@ pub const EXPECTED_UNARY: &[(&str, u16)] = &[
 ];
 
 /// Frozen `(variant_name, tag)` snapshot for [`ExprOp`].
+///
+/// Append-only: never renumber an existing entry; never reuse a tag
+/// previously assigned to a removed variant within the same major
+/// version. (Same contract as [`EXPECTED_BINOP`].)
 pub const EXPECTED_EXPROP: &[(&str, u8)] = &[
     ("Nop", 0),
     ("Namespace", 1),

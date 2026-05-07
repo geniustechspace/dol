@@ -488,7 +488,7 @@ impl ExprArena {
         // Lazily seed the dedup index from the existing `nodes` pool
         // so any nodes already allocated via the bulk path participate
         // in dedup from this point onward.
-        if self.node_index.is_none() {
+        let map = self.node_index.get_or_insert_with(|| {
             let mut map: HashMap<ExprNode, NodeId> =
                 HashMap::with_capacity(self.nodes.len());
             for (idx, n) in self.nodes.iter().enumerate() {
@@ -496,14 +496,8 @@ impl ExprArena {
                     map.entry(*n).or_insert(id);
                 }
             }
-            self.node_index = Some(map);
-        }
-        // SAFETY: we just initialised `node_index` if it was `None`.
-        #[allow(clippy::expect_used)]
-        let map = self
-            .node_index
-            .as_mut()
-            .expect("node_index initialised above");
+            map
+        });
         if let Some(&existing) = map.get(&node) {
             return existing;
         }

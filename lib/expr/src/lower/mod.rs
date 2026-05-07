@@ -276,7 +276,12 @@ fn lower_inner(
             // `tick(1)` only for *additional* spine layers (matching the
             // recursive cost of `lower_child → lower_inner`).
             let max_depth = budget.limits().max_depth;
-            let mut spine: Vec<(BinOp, &Expr<'_>)> = Vec::new();
+            // Inline buffer of 8 covers ~all real-world expressions
+            // (typical SQL filter has ≤ 4 BinaryOp layers); deep
+            // adversarial chains spill onto the heap and that is
+            // exactly the case we care about not blowing the host
+            // stack on.
+            let mut spine: SmallVec<[(BinOp, &Expr<'_>); 8]> = SmallVec::new();
             let mut cur: &Expr<'_> = expr;
             while let Expr::BinaryOp { left, op, right } = cur {
                 let bin_op = lower_binop(op);
