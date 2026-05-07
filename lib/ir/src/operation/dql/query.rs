@@ -15,7 +15,7 @@ use crate::target::Target;
 /// ```
 /// use dol_ir::operation::Query;
 /// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
-/// use dol_ir::Operation;
+/// use dol_ir::operation::Operation;
 ///
 /// // SELECT * FROM users
 /// let op: Operation = Query {
@@ -24,7 +24,7 @@ use crate::target::Target;
 /// }
 /// .into();
 ///
-/// assert_eq!(op.kind(), dol_ir::OpKind::Query);
+/// assert_eq!(op.kind(), dol_ir::operation::OpKind::Query);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

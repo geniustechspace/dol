@@ -19,7 +19,8 @@ extern crate alloc;
 use alloc::vec::Vec;
 
 use dol_ir::operation::{ExtensionId, ExtensionPayload, OperationExtension};
-use dol_ir::{Operation, Symbol};
+use dol_ir::operation::Operation;
+use dol_ir::target::Symbol;
 
 use crate::{Sample, TimeSeriesOp, WindowSpec};
 

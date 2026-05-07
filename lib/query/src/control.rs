@@ -7,7 +7,10 @@ use dol_expr::{ExprArena, Interner};
 use dol_ir::operation::{
     Grant, IsolationLevel, PolicyOp, PolicyScope, Revoke, StructuralVerb, TxBegin, TxOp, TxOptions,
 };
-use dol_ir::{Operation, Privilege, Program, Symbol, TargetKind};
+use dol_ir::operation::Operation;
+use dol_ir::privilege::Privilege;
+use dol_ir::program::Program;
+use dol_ir::target::{Symbol, TargetKind};
 use smallvec::SmallVec;
 
 use crate::target::{intern_symbol, target_from_parts};

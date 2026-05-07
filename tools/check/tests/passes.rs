@@ -10,10 +10,13 @@
 
 use dol_check::{capability_check, check_all, check_all_for, lint, schema_check, type_check};
 use dol_core::diag::Diagnostic;
+use dol_ir::capabilities::{BackendCapabilities, CapabilitySet, CapabilityTag};
 use dol_ir::operation::{OperationExtension, SchemaOp};
-use dol_ir::{
-    CapabilitySet, CapabilityTag, Locator, Program, SchemaRef, Symbol, Target, TargetKind,
-};
+use dol_ir::operation::meta::ExtensionId;
+use dol_ir::operation::Operation;
+use dol_ir::program::Program;
+use dol_ir::target::{Locator, Symbol, Target, TargetKind};
+use dol_schema::SchemaRef;
 
 fn empty_program() -> Program {
     let target = Target::new(TargetKind::Relation, Locator::new(Symbol::default()));
@@ -23,7 +26,7 @@ fn empty_program() -> Program {
 fn extension_program() -> Program {
     Program::from_operation(
         OperationExtension {
-            id: dol_ir::operation::ExtensionId::new(dol_ir::Symbol::default(), 0),
+            id: ExtensionId::new(Symbol::default(), 0),
             payload: vec![1, 2, 3],
         }
         .into(),

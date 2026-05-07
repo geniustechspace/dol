@@ -13,7 +13,7 @@ use alloc::string::String;
 use dol_core::diag::Diagnostic;
 use dol_core::span::Span;
 
-use crate::ProgramRef;
+use crate::program_ref::ProgramRef;
 use crate::capabilities::CapabilityCheck;
 
 extern crate alloc;
@@ -26,7 +26,7 @@ extern crate alloc;
 /// # Examples
 ///
 /// ```
-/// use dol_ir::BackendError;
+/// use dol_ir::backend::BackendError;
 ///
 /// let err = BackendError::unsupported("MERGE not supported by this backend");
 /// assert!(err.diagnostic().message.contains("MERGE"));

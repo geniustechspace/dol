@@ -4,8 +4,8 @@
 //! for DOL. Builders accept an [`Entity`] reference *or*
 //! a plain entity-name string; runtime-known names are first-class.
 //!
-//! Every `.try_build()` returns a [`dol_ir::Program`] containing one or more
-//! [`dol_ir::Operation`]s.
+//! Every `.try_build()` returns a [`dol_ir::program::Program`] containing one or more
+//! [`dol_ir::operation::Operation`]s.
 //!
 //! # Quick Start
 //!
@@ -25,7 +25,7 @@
 //!     .filter(field("id").eq(param()))
 //!     .try_build()
 //!     .expect("doc example: trivial filter must lower");
-//! assert_eq!(program.operations[0].kind(), dol_ir::OpKind::Query);
+//! assert_eq!(program.operations[0].kind(), dol_ir::operation::OpKind::Query);
 //!
 //! // From a plain string — no field metadata needed.
 //! let program = Query::from("users")
@@ -33,7 +33,7 @@
 //!     .fields(&["id", "email"])
 //!     .try_build()
 //!     .expect("doc example: trivial projection must lower");
-//! assert_eq!(program.operations[0].kind(), dol_ir::OpKind::Query);
+//! assert_eq!(program.operations[0].kind(), dol_ir::operation::OpKind::Query);
 //! ```
 
 #![forbid(unsafe_code)]

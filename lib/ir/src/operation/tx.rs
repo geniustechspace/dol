@@ -50,7 +50,7 @@ pub struct TxBegin {
 ///
 /// ```
 /// use dol_ir::operation::{TxBegin, TxOp, TxOptions, IsolationLevel};
-/// use dol_ir::Operation;
+/// use dol_ir::operation::Operation;
 ///
 /// // BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE
 /// let op: Operation = TxOp::Begin(TxBegin {
@@ -62,7 +62,7 @@ pub struct TxBegin {
 /// })
 /// .into();
 ///
-/// assert_eq!(op.kind(), dol_ir::OpKind::Tx);
+/// assert_eq!(op.kind(), dol_ir::operation::OpKind::Tx);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

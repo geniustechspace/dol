@@ -16,7 +16,7 @@ use core::fmt;
 
 use dol_expr::lower::LowerError;
 
-/// Reasons a query builder may refuse to produce a [`Program`](dol_ir::Program).
+/// Reasons a query builder may refuse to produce a [`Program`](dol_ir::program::Program).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum BuildError {

@@ -68,7 +68,7 @@ pub enum IndexMethod {
 /// ```
 /// use dol_ir::operation::{IndexDirection, IndexKey, IndexMethod, IndexOp, StructuralVerb};
 /// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
-/// use dol_ir::Operation;
+/// use dol_ir::operation::Operation;
 ///
 /// // CREATE INDEX idx_users_email ON users (email ASC)
 /// let op: Operation = IndexOp {
@@ -86,7 +86,7 @@ pub enum IndexMethod {
 /// }
 /// .into();
 ///
-/// assert_eq!(op.kind(), dol_ir::OpKind::Index);
+/// assert_eq!(op.kind(), dol_ir::operation::OpKind::Index);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

@@ -78,17 +78,17 @@ impl InsertQuery {
         field_count * self.row_count
     }
 
-    /// Build the arena-based IR as a [`dol_ir::Program`] containing a
-    /// single [`dol_ir::Operation::Insert`] referencing an arena
+    /// Build the arena-based IR as a [`dol_ir::program::Program`] containing a
+    /// single [`dol_ir::operation::Operation::Insert`] referencing an arena
     /// `ExprNode` of opcode [`dol_expr::expr::ExprOp::Insert`].
     ///
     /// Infallible in current shape (the builder only allocates `Param`
     /// placeholders), but returns `Result` for API consistency with the
     /// other builders. Will gain real failure modes once user-supplied
     /// VALUES expressions are supported.
-    pub fn try_build(self) -> Result<dol_ir::Program, crate::BuildError> {
+    pub fn try_build(self) -> Result<dol_ir::program::Program, crate::BuildError> {
         use dol_expr::expr::InsertNode;
-        use dol_ir::TargetKind;
+        use dol_ir::target::TargetKind;
         use dol_ir::operation::{Insert, InsertSource};
 
         let mut arena = dol_expr::ExprArena::new();
@@ -147,12 +147,12 @@ impl InsertQuery {
             &self.name,
             self.namespace.as_deref(),
         );
-        let op: dol_ir::Operation = Insert {
+        let op: dol_ir::operation::Operation = Insert {
             target,
             source: InsertSource::Node(body),
             returning: None,
         }
         .into();
-        Ok(dol_ir::Program::new(op, arena, interner))
+        Ok(dol_ir::program::Program::new(op, arena, interner))
     }
 }

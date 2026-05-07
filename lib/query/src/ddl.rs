@@ -1,14 +1,16 @@
 //! Schema-definition (DDL) helpers — produce [`Operation::Schema`],
 //! [`Operation::Field`], [`Operation::Lookup`] programs.
 //!
-//! Higher-level builders return [`dol_ir::Program`] directly. They take
+//! Higher-level builders return [`dol_ir::program::Program`] directly. They take
 //! ownership of name / namespace / field metadata and lower it onto the
 //! [`Target`](dol_ir::Target) + [`SchemaRef`] shape.
 
 use dol_expr::{ExprArena, Interner};
 use dol_ir::operation::{FieldOp, IndexOp, LookupOp, SchemaOp};
-use dol_ir::{Operation, Program, SchemaRef, TargetKind};
-use dol_schema::Entity;
+use dol_ir::operation::Operation;
+use dol_ir::program::Program;
+use dol_ir::target::TargetKind;
+use dol_schema::{Entity, SchemaRef};
 
 use crate::target::target_from_parts;
 
@@ -73,7 +75,7 @@ pub fn define_lookup(
     let mut interner = Interner::new();
     let target = target_from_parts(&mut interner, TargetKind::Relation, table, namespace);
     let name_sym = crate::target::intern_symbol(&mut interner, name);
-    let cols: SmallVec<[dol_ir::Symbol; 2]> = columns
+    let cols: SmallVec<[dol_ir::target::Symbol; 2]> = columns
         .iter()
         .map(|c| crate::target::intern_symbol(&mut interner, c))
         .collect();

@@ -27,7 +27,7 @@ pub enum PolicyScope {
 /// ```
 /// use dol_ir::operation::{PolicyOp, PolicyScope, StructuralVerb};
 /// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
-/// use dol_ir::Operation;
+/// use dol_ir::operation::Operation;
 ///
 /// // CREATE POLICY users_rls ON users FOR ALL USING (tenant_id = current_tenant())
 /// let op: Operation = PolicyOp {
@@ -40,7 +40,7 @@ pub enum PolicyScope {
 /// }
 /// .into();
 ///
-/// assert_eq!(op.kind(), dol_ir::OpKind::Policy);
+/// assert_eq!(op.kind(), dol_ir::operation::OpKind::Policy);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

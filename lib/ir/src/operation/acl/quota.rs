@@ -26,7 +26,7 @@ pub enum QuotaKind {
 /// ```
 /// use dol_ir::operation::{QuotaKind, QuotaOp, StructuralVerb};
 /// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
-/// use dol_ir::Operation;
+/// use dol_ir::operation::Operation;
 ///
 /// // Limit the "uploads" blob bucket to 10GB
 /// let op: Operation = QuotaOp {
@@ -39,7 +39,7 @@ pub enum QuotaKind {
 /// }
 /// .into();
 ///
-/// assert_eq!(op.kind(), dol_ir::OpKind::Quota);
+/// assert_eq!(op.kind(), dol_ir::operation::OpKind::Quota);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

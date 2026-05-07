@@ -2,7 +2,7 @@
 
 use smallvec::SmallVec;
 
-use crate::Privilege;
+use crate::privilege::Privilege;
 use crate::target::{Symbol, Target};
 
 /// `Revoke` operation: withdraw one or more privileges on a target from a set
@@ -20,7 +20,7 @@ use crate::target::{Symbol, Target};
 /// ```
 /// use dol_ir::operation::Revoke;
 /// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
-/// use dol_ir::{Operation, Privilege};
+/// use dol_ir::operation::Operation; use dol_ir::privilege::Privilege;
 /// use smallvec::smallvec;
 ///
 /// // REVOKE INSERT ON users FROM app_role
@@ -31,7 +31,7 @@ use crate::target::{Symbol, Target};
 ///     cascade: false,
 /// }
 /// .into();
-/// assert_eq!(op.kind(), dol_ir::OpKind::Revoke);
+/// assert_eq!(op.kind(), dol_ir::operation::OpKind::Revoke);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

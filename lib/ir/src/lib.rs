@@ -39,22 +39,3 @@ pub mod privilege;
 pub mod program;
 pub mod program_ref;
 pub mod target;
-
-/// Schema constraint types — re-exported from `dol-schema`, the canonical home.
-pub mod constraint {
-    pub use dol_schema::constraint::{ComputedKind, EntityConstraint, RefAction, RelationRef};
-}
-
-pub use backend::{Backend, BackendError};
-pub use capabilities::{BackendCapabilities, CapabilityCheck, CapabilitySet, CapabilityTag};
-pub use constraint::{ComputedKind, EntityConstraint, RefAction, RelationRef};
-pub use operation::{Category, OpKind, Operation};
-pub use privilege::Privilege;
-pub use program::{ExtendError, Program};
-pub use program_ref::ProgramRef;
-pub use target::{Locator, SchemaBinding, Symbol, Target, TargetKind};
-
-// Re-exports from dol-schema for backward compatibility (PR2)
-pub use dol_schema::{
-    CatalogEntry, CatalogId, SchemaId, SchemaRef, SchemaCatalog, TypeBody, TypeEntry,
-};

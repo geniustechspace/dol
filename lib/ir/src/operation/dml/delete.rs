@@ -15,7 +15,7 @@ use crate::target::Target;
 /// ```
 /// use dol_ir::operation::Delete;
 /// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
-/// use dol_ir::Operation;
+/// use dol_ir::operation::Operation;
 ///
 /// // DELETE FROM users WHERE id = 1
 /// let op: Operation = Delete {
@@ -24,7 +24,7 @@ use crate::target::Target;
 /// }
 /// .into();
 ///
-/// assert_eq!(op.kind(), dol_ir::OpKind::Delete);
+/// assert_eq!(op.kind(), dol_ir::operation::OpKind::Delete);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

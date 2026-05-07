@@ -34,7 +34,7 @@ pub enum LookupMethod {
 /// ```
 /// use dol_ir::operation::{LookupMethod, LookupOp, StructuralVerb};
 /// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
-/// use dol_ir::Operation;
+/// use dol_ir::operation::Operation;
 ///
 /// // Create a hash lookup on the "users" collection
 /// let op: Operation = LookupOp {
@@ -48,7 +48,7 @@ pub enum LookupMethod {
 /// }
 /// .into();
 ///
-/// assert_eq!(op.kind(), dol_ir::OpKind::Lookup);
+/// assert_eq!(op.kind(), dol_ir::operation::OpKind::Lookup);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

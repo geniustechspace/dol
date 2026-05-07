@@ -29,7 +29,7 @@ pub enum DescribeFacet {
 /// ```
 /// use dol_ir::operation::{Describe, DescribeFacet};
 /// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
-/// use dol_ir::Operation;
+/// use dol_ir::operation::Operation;
 ///
 /// // DESCRIBE users (field metadata)
 /// let op: Operation = Describe {
@@ -38,7 +38,7 @@ pub enum DescribeFacet {
 /// }
 /// .into();
 ///
-/// assert_eq!(op.kind(), dol_ir::OpKind::Describe);
+/// assert_eq!(op.kind(), dol_ir::operation::OpKind::Describe);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

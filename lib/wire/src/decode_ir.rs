@@ -8,7 +8,7 @@ use alloc::vec::Vec;
 
 use dol_core::policy::Budget;
 use dol_expr::ids::NodeId;
-use dol_ir::Program;
+use dol_ir::program::Program;
 use dol_ir::operation::acl::{
     AuditEvent, AuditOp, AuditSink, Grant, MaskOp, PolicyOp, PolicyScope, QuotaKind, QuotaOp,
     Revoke,

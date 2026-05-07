@@ -1,6 +1,6 @@
 //! # `dol-check` — static validator
 //!
-//! Every backend that consumes a [`dol_ir::Program`] is expected to call
+//! Every backend that consumes a [`dol_ir::program::Program`] is expected to call
 //! these checks first. They are pure functions that produce a list of
 //! [`dol_core::diag::Diagnostic`]s; an empty list means the program is well-formed.
 //!
@@ -43,7 +43,9 @@ extern crate alloc;
 pub mod sarif;
 
 use dol_core::diag::Diagnostic;
-use dol_ir::{CapabilityCheck, CapabilitySet, CapabilityTag, OpKind, Operation, Program};
+use dol_ir::capabilities::{CapabilityCheck, CapabilitySet, CapabilityTag};
+use dol_ir::operation::{Category, OpKind, Operation};
+use dol_ir::program::Program;
 
 /// Run the backend-agnostic passes ([`type_check`], [`schema_check`],
 /// [`lint`]) in order.
@@ -97,7 +99,7 @@ pub fn capability_check(
 /// Walk into [`TxOp::Atomic`] payloads so missing capabilities inside an
 /// atomic block are diagnosed alongside the outer `Tx` operation. Mirrors
 /// the recursive contract documented on
-/// [`Operation::all_targets`](dol_ir::Operation::all_targets).
+/// [`Operation::all_targets`](dol_ir::operation::Operation::all_targets).
 fn check_op_recursive(
     op: &Operation,
     provided: &CapabilitySet,
@@ -190,22 +192,22 @@ pub fn lint(_program: &Program, _out: &mut alloc::vec::Vec<Diagnostic>) {
 /// [`capability_check`] by translating the bitset's set bits into
 /// [`CapabilityTag`]s.
 ///
-/// Provided so existing callers can continue to pass [`dol_ir::BackendCapabilities`].
+/// Provided so existing callers can continue to pass [`dol_ir::capabilities::BackendCapabilities`].
 #[deprecated(
     since = "0.2.0",
     note = "use `capability_check` with a `CapabilitySet`"
 )]
 pub fn capability_check_bits(
     program: &Program,
-    caps: dol_ir::BackendCapabilities,
+    caps: dol_ir::capabilities::BackendCapabilities,
     out: &mut alloc::vec::Vec<Diagnostic>,
 ) {
     let provided = bits_to_set(caps);
     capability_check(program, &provided, out);
 }
 
-fn bits_to_set(caps: dol_ir::BackendCapabilities) -> CapabilitySet {
-    use dol_ir::BackendCapabilities as B;
+fn bits_to_set(caps: dol_ir::capabilities::BackendCapabilities) -> CapabilitySet {
+    use dol_ir::capabilities::BackendCapabilities as B;
     let mut s = CapabilitySet::new();
     let table: &[(B, CapabilityTag)] = &[
         (B::WINDOW_FUNCTIONS, CapabilityTag::WINDOW_FUNCTIONS),
@@ -247,7 +249,7 @@ fn bits_to_set(caps: dol_ir::BackendCapabilities) -> CapabilitySet {
 }
 
 /// Re-export so callers can name [`OpKind`] without depending on `dol-ir` directly.
-pub use dol_ir::OpKind as ReexportedOpKind;
+pub use dol_ir::operation::OpKind as ReexportedOpKind;
 const _: fn() = || {
     let _ = OpKind::Append;
 };
@@ -256,7 +258,9 @@ const _: fn() = || {
 mod tests {
     use super::*;
     use dol_ir::operation::{Append, InsertSource};
-    use dol_ir::{Locator, Operation, Program, Symbol, Target, TargetKind};
+    use dol_ir::operation::Operation;
+    use dol_ir::program::Program;
+    use dol_ir::target::{Locator, Symbol, Target, TargetKind};
 
     #[test]
     fn append_on_stream_topic_diagnoses_missing_capabilities() {

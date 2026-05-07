@@ -7,7 +7,9 @@
 
 use dol_expr::{ExprArena, Interner};
 use dol_ir::operation::{Insert, InsertSource, Query, Replace, ReplaceBody};
-use dol_ir::{Locator, Operation, Program, SchemaBinding, Target as IrTarget, TargetKind};
+use dol_ir::operation::Operation;
+use dol_ir::program::Program;
+use dol_ir::target::{Locator, SchemaBinding, Target as IrTarget, TargetKind};
 use smallvec::smallvec;
 
 use crate::target::intern_symbol;
@@ -28,13 +30,13 @@ fn blob_target(interner: &mut Interner, bucket: &str, key: &str) -> IrTarget {
 }
 
 fn filetree_target(interner: &mut Interner, path: &str) -> IrTarget {
-    let segments: smallvec::SmallVec<[dol_ir::Symbol; 2]> = path
+    let segments: smallvec::SmallVec<[dol_ir::target::Symbol; 2]> = path
         .split('/')
         .filter(|s| !s.is_empty())
         .map(|seg| intern_symbol(interner, seg))
         .collect();
     let (name, path_segs) = if let Some((last, head)) = segments.split_last() {
-        let head: smallvec::SmallVec<[dol_ir::Symbol; 2]> = head.iter().copied().collect();
+        let head: smallvec::SmallVec<[dol_ir::target::Symbol; 2]> = head.iter().copied().collect();
         (*last, head)
     } else {
         (intern_symbol(interner, ""), smallvec![])
@@ -148,7 +150,7 @@ pub fn write_file_from_path(dest: &str, source_path: &str) -> Program {
 /// ```
 /// use dol_query::storage::move_file;
 /// use dol_ir::operation::{SchemaOp, StructuralVerb};
-/// use dol_ir::{OpKind, Operation, TargetKind};
+/// use dol_ir::operation::{OpKind, Operation}; use dol_ir::target::TargetKind;
 ///
 /// let prog = move_file("fs/old/name.txt", "new-name.txt");
 /// assert_eq!(prog.operations.len(), 1);

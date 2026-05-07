@@ -12,7 +12,7 @@ use crate::target::Target;
 /// ```
 /// use dol_ir::operation::Probe;
 /// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
-/// use dol_ir::Operation;
+/// use dol_ir::operation::Operation;
 ///
 /// // HEAD s3://artifacts/build.log
 /// let op: Operation = Probe {
@@ -21,7 +21,7 @@ use crate::target::Target;
 /// }
 /// .into();
 ///
-/// assert_eq!(op.kind(), dol_ir::OpKind::Probe);
+/// assert_eq!(op.kind(), dol_ir::operation::OpKind::Probe);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

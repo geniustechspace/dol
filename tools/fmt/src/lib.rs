@@ -1,6 +1,6 @@
 //! # `dol-fmt` — canonical pretty-printer
 //!
-//! Renders an IR [`dol_ir::Program`] into a stable, human-readable text form.
+//! Renders an IR [`dol_ir::program::Program`] into a stable, human-readable text form.
 //! The output is **not** a parser surface; it exists for debugging,
 //! `insta`-style golden tests, and round-trip checks against `dol-wire`.
 //!
@@ -38,9 +38,10 @@ use alloc::string::String;
 use core::fmt::Write;
 
 use dol_expr::Interner;
-use dol_ir::operation::TxOp;
-use dol_ir::target::TargetKind;
-use dol_ir::{OpKind, Operation, Program, Target};
+use dol_ir::operation::tx::TxOp;
+use dol_ir::operation::{Category, OpKind, Operation};
+use dol_ir::program::Program;
+use dol_ir::target::{Target, TargetKind};
 
 /// Pretty-print a [`Program`] to a `String`.
 pub fn print(program: &Program) -> String {
@@ -165,13 +166,15 @@ mod tests {
     use super::*;
     use dol_expr::{ExprArena, Interner};
     use dol_ir::operation::{Insert, InsertSource, TxBegin, TxOp, TxOptions};
-    use dol_ir::{Locator, Program, Symbol, Target, TargetKind};
+    use dol_ir::operation::Operation;
+    use dol_ir::program::Program;
+    use dol_ir::target::{Locator, Symbol, Target, TargetKind};
 
     #[test]
     fn renders_lowercase_verb_and_locator_name() {
         let mut interner = Interner::new();
         let users = Symbol::new(interner.intern("users"));
-        let op: dol_ir::Operation = Insert {
+        let op: dol_ir::operation::Operation = Insert {
             target: Target::new(TargetKind::Relation, Locator::new(users)),
             source: InsertSource::Bindings,
             returning: None,
@@ -188,8 +191,8 @@ mod tests {
     #[test]
     fn renders_tx_subverb() {
         let interner = Interner::new();
-        let op: dol_ir::Operation =
-            dol_ir::Operation::Tx(alloc::boxed::Box::new(TxOp::Begin(TxBegin {
+        let op: dol_ir::operation::Operation =
+            dol_ir::operation::Operation::Tx(alloc::boxed::Box::new(TxOp::Begin(TxBegin {
                 opts: TxOptions::default(),
             })));
         let p = Program::new(op, ExprArena::new(), interner);

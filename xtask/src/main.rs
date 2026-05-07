@@ -120,8 +120,8 @@ fn size_report() -> bool {
         size_of::<dol_expr::ExprNode>()
     );
     println!(
-        "size_of::<dol_ir::Operation>()               = {}",
-        size_of::<dol_ir::Operation>()
+        "size_of::<dol_ir::operation::Operation>()               = {}",
+        size_of::<dol_ir::operation::Operation>()
     );
 
     let mut ok = true;
@@ -147,7 +147,7 @@ fn size_report() -> bool {
     budget!(dol_expr::ExprNode, 16);
     // Boxing every heavy payload (DDL bodies, DML arena handles, governance
     // structs) keeps `Operation` comfortably under its 64-byte budget.
-    budget!(dol_ir::Operation, 64);
+    budget!(dol_ir::operation::Operation, 64);
     ok
 }
 

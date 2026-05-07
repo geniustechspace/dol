@@ -54,7 +54,7 @@ pub enum SchemaBody {
 /// use dol_ir::operation::{SchemaBody, SchemaOp, StructuralVerb};
 /// use dol_schema::{CatalogId, SchemaId, SchemaRef};
 /// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
-/// use dol_ir::Operation;
+/// use dol_ir::operation::Operation;
 ///
 /// // CREATE TABLE users (...)
 /// let op: Operation = SchemaOp {
@@ -68,7 +68,7 @@ pub enum SchemaBody {
 /// }
 /// .into();
 ///
-/// assert_eq!(op.kind(), dol_ir::OpKind::Schema);
+/// assert_eq!(op.kind(), dol_ir::operation::OpKind::Schema);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

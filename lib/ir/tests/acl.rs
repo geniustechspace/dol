@@ -18,9 +18,10 @@ use dol_ir::operation::{
     AuditEvent, AuditOp, AuditSink, Grant, MaskOp, PolicyOp, PolicyScope, QuotaKind, QuotaOp,
     Revoke, StructuralVerb,
 };
-use dol_ir::{
-    CapabilityTag, Category, Locator, OpKind, Operation, Privilege, Symbol, Target, TargetKind,
-};
+use dol_ir::capabilities::CapabilityTag;
+use dol_ir::operation::{Category, OpKind, Operation};
+use dol_ir::privilege::Privilege;
+use dol_ir::target::{Locator, Symbol, Target, TargetKind};
 use smallvec::smallvec;
 
 fn rel(name_id: u32) -> Target {

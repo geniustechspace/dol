@@ -38,7 +38,7 @@ pub enum AuditSink {
 /// ```
 /// use dol_ir::operation::{AuditEvent, AuditOp, AuditSink, StructuralVerb};
 /// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
-/// use dol_ir::Operation;
+/// use dol_ir::operation::Operation;
 ///
 /// // Audit all writes on the "users" table
 /// let op: Operation = AuditOp {
@@ -50,7 +50,7 @@ pub enum AuditSink {
 /// }
 /// .into();
 ///
-/// assert_eq!(op.kind(), dol_ir::OpKind::Audit);
+/// assert_eq!(op.kind(), dol_ir::operation::OpKind::Audit);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

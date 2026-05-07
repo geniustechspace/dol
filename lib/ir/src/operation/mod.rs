@@ -53,7 +53,7 @@ pub use tx::{IsolationLevel, TxBegin, TxOp, TxOptions};
 /// ```
 /// use dol_ir::operation::{Insert, InsertSource, Operation};
 /// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
-/// use dol_ir::OpKind;
+/// use dol_ir::operation::OpKind;
 ///
 /// // Create an Insert operation for a SQL table
 /// let op: Operation = Insert {

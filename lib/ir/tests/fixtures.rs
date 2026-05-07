@@ -23,10 +23,10 @@ use dol_ir::operation::{
     Append, Delete, Describe, DescribeFacet, Insert, InsertSource, Probe, Query, Replace,
     ReplaceBody, SchemaOp, Update, Upsert,
 };
-use dol_ir::{
-    CapabilityTag, Category, Locator, OpKind, Operation, SchemaBinding, SchemaRef, Symbol, Target,
-    TargetKind,
-};
+use dol_ir::capabilities::CapabilityTag;
+use dol_ir::operation::{Category, OpKind, Operation};
+use dol_ir::target::{Locator, SchemaBinding, Symbol, Target, TargetKind};
+use dol_schema::SchemaRef;
 
 fn t(kind: TargetKind) -> Target {
     Target::new(kind, Locator::new(Symbol::default()))
@@ -218,7 +218,7 @@ fn dql_describe_relation_fields() {
 
 #[test]
 fn opaque_schema_binding_emits_opaque_schema_tag() {
-    use dol_ir::SchemaBinding;
+    use dol_ir::target::SchemaBinding;
     let op: Operation = Insert {
         target: t(TargetKind::Relation).with_schema(SchemaBinding::Opaque),
         source: InsertSource::Bindings,

@@ -1,9 +1,9 @@
 //! Small helpers shared across `dol-query` builders for building
-//! [`Target`](dol_ir::Target)s, [`Symbol`](dol_ir::Symbol)s, and
+//! [`Target`](dol_ir::Target)s, [`Symbol`](dol_ir::target::Symbol)s, and
 //! [`Locator`](dol_ir::Locator)s from owned name/namespace strings.
 
 use dol_expr::Interner;
-use dol_ir::{Locator, SchemaBinding, Symbol, Target, TargetKind};
+use dol_ir::target::{Locator, SchemaBinding, Symbol, Target, TargetKind};
 use smallvec::smallvec;
 
 /// Convert an owned `&str` into an interned [`Symbol`].

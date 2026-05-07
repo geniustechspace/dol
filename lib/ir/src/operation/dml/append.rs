@@ -18,7 +18,7 @@ use crate::target::Target;
 /// ```
 /// use dol_ir::operation::{Append, InsertSource};
 /// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
-/// use dol_ir::Operation;
+/// use dol_ir::operation::Operation;
 ///
 /// // Append to kafka://events.users topic
 /// let op: Operation = Append {
@@ -28,7 +28,7 @@ use crate::target::Target;
 /// }
 /// .into();
 ///
-/// assert_eq!(op.kind(), dol_ir::OpKind::Append);
+/// assert_eq!(op.kind(), dol_ir::operation::OpKind::Append);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

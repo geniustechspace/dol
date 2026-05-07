@@ -10,7 +10,8 @@ extern crate alloc;
 use alloc::vec::Vec;
 
 use dol_ir::operation::{ExtensionId, ExtensionPayload};
-use dol_ir::{Operation, Symbol};
+use dol_ir::operation::Operation;
+use dol_ir::target::Symbol;
 
 use crate::Graph;
 

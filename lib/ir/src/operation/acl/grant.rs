@@ -5,7 +5,7 @@
 
 use smallvec::SmallVec;
 
-use crate::Privilege;
+use crate::privilege::Privilege;
 use crate::target::{Symbol, Target};
 
 /// `Grant` operation: bestow one or more privileges on a target to a set of
@@ -22,7 +22,7 @@ use crate::target::{Symbol, Target};
 /// ```
 /// use dol_ir::operation::Grant;
 /// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
-/// use dol_ir::{Operation, Privilege};
+/// use dol_ir::operation::Operation; use dol_ir::privilege::Privilege;
 /// use smallvec::smallvec;
 ///
 /// // GRANT SELECT, INSERT ON users TO app_role
@@ -33,7 +33,7 @@ use crate::target::{Symbol, Target};
 ///     with_grant_option: false,
 /// }
 /// .into();
-/// assert_eq!(op.kind(), dol_ir::OpKind::Grant);
+/// assert_eq!(op.kind(), dol_ir::operation::OpKind::Grant);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

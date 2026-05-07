@@ -27,7 +27,7 @@ use crate::target::{Symbol, Target};
 /// use dol_core::DataType;
 /// use dol_ir::operation::{FieldDef, FieldOp, StructuralVerb};
 /// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
-/// use dol_ir::Operation;
+/// use dol_ir::operation::Operation;
 ///
 /// // ALTER TABLE users ADD COLUMN email TEXT NOT NULL
 /// let op: Operation = FieldOp {
@@ -52,7 +52,7 @@ use crate::target::{Symbol, Target};
 ///     new_name: None,
 /// }
 /// .into();
-/// assert_eq!(op.kind(), dol_ir::OpKind::Field);
+/// assert_eq!(op.kind(), dol_ir::operation::OpKind::Field);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

@@ -32,7 +32,7 @@ pub enum ReplaceBody {
 /// ```
 /// use dol_ir::operation::{Replace, ReplaceBody};
 /// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
-/// use dol_ir::Operation;
+/// use dol_ir::operation::Operation;
 ///
 /// // Replace a blob at s3://artifacts/build.log
 /// let op: Operation = Replace {
@@ -42,7 +42,7 @@ pub enum ReplaceBody {
 /// }
 /// .into();
 ///
-/// assert_eq!(op.kind(), dol_ir::OpKind::Replace);
+/// assert_eq!(op.kind(), dol_ir::operation::OpKind::Replace);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

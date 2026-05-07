@@ -15,7 +15,7 @@ use crate::target::Target;
 /// ```
 /// use dol_ir::operation::Upsert;
 /// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
-/// use dol_ir::Operation;
+/// use dol_ir::operation::Operation;
 ///
 /// // INSERT INTO users (...) ON CONFLICT DO UPDATE SET ...
 /// let op: Operation = Upsert {
@@ -24,7 +24,7 @@ use crate::target::Target;
 /// }
 /// .into();
 ///
-/// assert_eq!(op.kind(), dol_ir::OpKind::Upsert);
+/// assert_eq!(op.kind(), dol_ir::operation::OpKind::Upsert);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

@@ -54,8 +54,8 @@ impl DeleteQuery {
         self
     }
 
-    /// Build the arena-based IR as a [`dol_ir::Program`] containing a
-    /// single [`dol_ir::Operation::Delete`] referencing an arena
+    /// Build the arena-based IR as a [`dol_ir::program::Program`] containing a
+    /// single [`dol_ir::operation::Operation::Delete`] referencing an arena
     /// `ExprNode` of opcode [`dol_expr::expr::ExprOp::Delete`].
     ///
     /// Fallible: returns [`BuildError::Filter`](crate::BuildError::Filter) when lowering the WHERE
@@ -63,11 +63,11 @@ impl DeleteQuery {
     /// (depth or fuel cap from [`Limits::host`](dol_core::policy::Limits::host)).
     /// Callers needing a non-default budget can build the program manually
     /// using `dol_expr::lower::lower_filters` directly.
-    pub fn try_build(self) -> Result<dol_ir::Program, crate::BuildError> {
+    pub fn try_build(self) -> Result<dol_ir::program::Program, crate::BuildError> {
         use dol_core::policy::{Budget, Limits};
         use dol_expr::expr::DeleteNode;
         use dol_expr::lower::lower_filters;
-        use dol_ir::TargetKind;
+        use dol_ir::target::TargetKind;
         use dol_ir::operation::Delete;
 
         let mut arena = dol_expr::ExprArena::new();
@@ -109,8 +109,8 @@ impl DeleteQuery {
             &self.name,
             self.namespace.as_deref(),
         );
-        let op: dol_ir::Operation = Delete { target, node: body }.into();
-        Ok(dol_ir::Program::new(op, arena, interner))
+        let op: dol_ir::operation::Operation = Delete { target, node: body }.into();
+        Ok(dol_ir::program::Program::new(op, arena, interner))
     }
 }
 

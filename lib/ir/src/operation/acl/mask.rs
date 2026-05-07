@@ -16,7 +16,7 @@ use crate::target::{Symbol, Target};
 /// ```
 /// use dol_ir::operation::{MaskOp, StructuralVerb};
 /// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
-/// use dol_ir::Operation;
+/// use dol_ir::operation::Operation;
 ///
 /// // Mask the "ssn" column for non-admins
 /// let op: Operation = MaskOp {
@@ -28,7 +28,7 @@ use crate::target::{Symbol, Target};
 /// }
 /// .into();
 ///
-/// assert_eq!(op.kind(), dol_ir::OpKind::Mask);
+/// assert_eq!(op.kind(), dol_ir::operation::OpKind::Mask);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

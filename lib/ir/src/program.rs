@@ -14,7 +14,7 @@ use dol_schema::SchemaCatalog;
 /// ```
 /// use dol_ir::operation::{Insert, InsertSource};
 /// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
-/// use dol_ir::Program;
+/// use dol_ir::program::Program;
 ///
 /// let insert = Insert {
 ///     target: Target::new(TargetKind::Relation, Locator::new(Symbol::from_hash(0))),
@@ -77,9 +77,9 @@ impl Program {
         self
     }
 
-    /// Borrowed [`crate::ProgramRef`] view.
-    pub fn as_ref(&self) -> crate::ProgramRef<'_> {
-        crate::ProgramRef::from(self)
+    /// Borrowed [`crate::program_ref::ProgramRef`] view.
+    pub fn as_ref(&self) -> crate::program_ref::ProgramRef<'_> {
+        crate::program_ref::ProgramRef::from(self)
     }
 
     /// Append the operations of `other` to this program.
@@ -120,7 +120,7 @@ impl Program {
     /// ```
     /// use dol_ir::operation::{Insert, InsertSource, Operation, TxBegin, TxOp, TxOptions};
     /// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
-    /// use dol_ir::Program;
+    /// use dol_ir::program::Program;
     ///
     /// let begin = Program::from_operation(Operation::Tx(Box::new(TxOp::Begin(
     ///     TxBegin { opts: TxOptions::default() },

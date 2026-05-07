@@ -39,7 +39,7 @@ pub enum InsertSource {
 /// ```
 /// use dol_ir::operation::{Insert, InsertSource};
 /// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
-/// use dol_ir::Operation;
+/// use dol_ir::operation::Operation;
 ///
 /// // INSERT INTO users (...) VALUES (...)
 /// let op: Operation = Insert {
@@ -49,7 +49,7 @@ pub enum InsertSource {
 /// }
 /// .into();
 ///
-/// assert_eq!(op.kind(), dol_ir::OpKind::Insert);
+/// assert_eq!(op.kind(), dol_ir::operation::OpKind::Insert);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
