@@ -502,10 +502,6 @@ impl ExprArena {
     pub fn alloc_exists(&mut self, sub: NodeId) -> NodeId {
         self.alloc(ExprNode::exists(sub))
     }
-    /// Allocate a standalone [`crate::expr::ExprOp::IsNull`] node.
-    pub fn alloc_is_null(&mut self, expr: NodeId) -> NodeId {
-        self.alloc(ExprNode::is_null(expr))
-    }
     /// Allocate a [`crate::expr::ExprOp::Between`] node.
     pub fn alloc_between(&mut self, expr: NodeId, lo: NodeId, hi: NodeId) -> NodeId {
         self.alloc(ExprNode::between(expr, lo, hi))

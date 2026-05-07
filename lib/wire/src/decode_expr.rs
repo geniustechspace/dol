@@ -413,8 +413,8 @@ impl Decode for BinOp {
             19 => Ok(BinOp::Shl),
             20 => Ok(BinOp::Shr),
             21 => Ok(BinOp::Concat),
-            22 => Ok(BinOp::Arrow),
-            23 => Ok(BinOp::LongArrow),
+            22 => Ok(BinOp::IsDistinctFrom),
+            23 => Ok(BinOp::IsNotDistinctFrom),
             seen => Err(DecodeError::InvalidVariant {
                 type_name: "BinOp",
                 seen,
@@ -493,8 +493,7 @@ impl Decode for ExprNode {
             | ExprOp::Update
             | ExprOp::Delete
             | ExprOp::Upsert
-            | ExprOp::Exists
-            | ExprOp::IsNull => {
+            | ExprOp::Exists => {
                 let a = reader.read_varint_u32()?;
                 (0, 0, a, 0, 0)
             }

@@ -49,17 +49,16 @@ define_op!(OpOr, "OR", OpCategory::Logical);
 // ═══════════════════════════════════════════════════════════════════════════
 // Pattern matching operators
 // ═══════════════════════════════════════════════════════════════════════════
+//
+// `LIKE`, `ILIKE`, and `SIMILAR TO` earn `BinOp` slots — they are universally
+// rendered infix on every relational backend with a stable keyword spelling.
+// `REGEX_MATCH`, `REGEX_MATCH_INSENSITIVE`, and `GLOB` do **not** qualify
+// (Postgres `~`/`~*`, MySQL `REGEXP`, SQLite `GLOB` — three different infix
+// spellings); they live in `tree::func::registry` as named functions.
 
 define_op!(OpLike, "LIKE", OpCategory::Pattern);
 define_op!(OpIlike, "ILIKE", OpCategory::Pattern);
 define_op!(OpSimilarTo, "SIMILAR_TO", OpCategory::Pattern);
-define_op!(OpRegexMatch, "REGEX_MATCH", OpCategory::Pattern);
-define_op!(
-    OpRegexMatchInsensitive,
-    "REGEX_MATCH_INSENSITIVE",
-    OpCategory::Pattern
-);
-define_op!(OpGlob, "GLOB", OpCategory::Pattern);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // String operators
@@ -78,9 +77,12 @@ define_op!(OpShiftLeft, "SHIFT_LEFT", OpCategory::Bitwise);
 define_op!(OpShiftRight, "SHIFT_RIGHT", OpCategory::Bitwise);
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Collection containment operators
+// Collection containment operators — REMOVED
 // ═══════════════════════════════════════════════════════════════════════════
-
-define_op!(OpContains, "CONTAINS", OpCategory::Collection);
-define_op!(OpContainedBy, "CONTAINED_BY", OpCategory::Collection);
-define_op!(OpOverlap, "OVERLAP", OpCategory::Collection);
+//
+// `CONTAINS` (`@>`), `CONTAINED_BY` (`<@`), and `OVERLAP` (`&&`) are no
+// longer first-class operators. `CONTAINED_BY` semantically conflicted with
+// `IN` (`x <@ array_of(a,b,c)` and `x IN (a,b,c)` spell the same membership
+// test), and none of these are universally infix across backends. Use the
+// named functions `contains(haystack, needle)`, `overlaps(a, b)`, etc., in
+// `tree::func::registry` instead.

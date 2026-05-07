@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Operator / expression tier lock-down
+
+A principled cut of what earns a slot in `BinOp` / `UnaryOp` / `ExprOp`
+versus what belongs in `ExprOp::Func`. See the four-tier rule baked into
+the head of `lib/expr/src/expr.rs` for the criteria. Every construct
+goes in exactly one tier.
+
+The headline driver: `ContainedBy` (`<@`) semantically conflicted with
+`IN` (`x <@ array_of(a,b,c)` and `x IN (a,b,c)` spell the same
+membership test for scalar `x`). Removing `<@` from the IR resolves
+the conflict without losing expressiveness — `<@` is exactly
+`contains(b, a)`.
+
+#### Removed (wire-format break — acceptable per project stage)
+
+- **`BinOp::Arrow` (tag 22)** and **`BinOp::LongArrow` (tag 23)** — JSON
+  path step (`->`, `->>`) is not universally infix (Postgres / MySQL
+  only). Use the existing `JSON_GET` / `JSON_GET_TEXT` functions
+  instead; backends that have native infix render the call inline.
+- **`ExprOp::IsNull` (opcode 18)** — duplicated `UnaryOp::IsNull`. Only
+  the unary form remains; the standalone opcode is gone, and the
+  following opcodes shift down by one (`Between` 19→18, `Query` 20→19,
+  `Insert` 21→20, `Update` 22→21, `Delete` 23→22, `Upsert` 24→23).
+  `ExprArena::alloc_is_null`, `ExprNode::is_null`, and
+  `ExprNode::as_is_null` are deleted accordingly.
+- **`tree::op::registry`**: `OpContains`, `OpContainedBy`, `OpOverlap`,
+  `OpRegexMatch`, `OpRegexMatchInsensitive`, `OpGlob` deleted. None of
+  these are universally infix across backends and so do not qualify
+  for `BinOp` slots.
+- **`tree::op::meta::OpCategory::Collection`** variant removed (had no
+  members after the deletions above).
+- **`OpDef::CONTAINS` / `CONTAINED_BY` / `OVERLAP` / `REGEX_MATCH` /
+  `REGEX_MATCH_INSENSITIVE` / `GLOB`** name constants removed.
+
+#### Added
+
+- **`BinOp::IsDistinctFrom` (tag 22)** and **`BinOp::IsNotDistinctFrom`
+  (tag 23)** — promoted from the tree-only `OpIsDistinctFrom` /
+  `OpIsNotDistinctFrom` ZSTs, which previously had no real `BinOp`
+  mapping and silently fell through to `BinOp::Eq` in `lower_binop`.
+  Now they round-trip correctly through wire and lowering.
+- **`tree::func::registry`**: `RegexMatch` (`REGEX_MATCH`),
+  `RegexImatch` (`REGEX_IMATCH`), `GlobMatch` (`GLOB_MATCH`),
+  `Overlaps` (`OVERLAPS`). `Contains` already existed and now also
+  serves the collection containment role.
+- **DSL methods on `Expr`**: `contains(other)`, `overlaps(other)`,
+  `glob_match(other)`. `regex_match` and `regex_match_insensitive`
+  retained but now lower through `Func` (no behavior change for
+  callers — only the IR shape moves from `Bin` to `Func`).
+
+#### Tag-table stability
+
+After this cut, `BinOp::as_u16`, `UnaryOp::as_u16`, and
+`ExprOp::from_u8` tag tables are **frozen append-only**. New variants
+must use the next free tag; never renumber. The four-tier rule is
+documented at the head of `lib/expr/src/expr.rs` so future additions
+get the question right the first time.
+
+#### Deferred
+
+The companion `In` (collapsing `InList` + `InSub`) and `Composite`
+(collapsing `ObjectLit` + `ArrayLit`) opcode unifications are kept on
+the previously-planned roadmap and tracked separately; this PR is
+scoped to the operator/expression lock-down.
+
 ### Phase 2 — finalize v2 (single PR, no shims)
 
 This entry rounds out the v2 cut started in 0.2.0. No new package versions

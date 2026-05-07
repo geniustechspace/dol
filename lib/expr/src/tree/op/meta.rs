@@ -7,6 +7,13 @@ use core::fmt;
 use super::super::compact_name::CompactName;
 
 /// Classification of a DOL binary operator.
+///
+/// This enum is intentionally a 1:1 mirror of the
+/// [`BinOp`](crate::expr::BinOp) tier (Tier A in the four-tier rule
+/// — see `lib/expr/src/expr.rs` head doc). Categories that suggested
+/// tier confusion (`Collection`, regex/glob in `Pattern`) were removed
+/// when those constructs moved to function calls in
+/// `tree::func::registry`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
@@ -19,14 +26,15 @@ pub enum OpCategory {
     Arithmetic,
     /// Logical operators: `AND`, `OR`.
     Logical,
-    /// Pattern matching operators: `LIKE`, `ILIKE`, `SIMILAR TO`, `~`, `~*`, `GLOB`.
+    /// Pattern matching operators: `LIKE`, `ILIKE`, `SIMILAR TO`.
+    /// Regex and glob variants live in `tree::func::registry` as
+    /// `REGEX_MATCH` / `REGEX_IMATCH` / `GLOB_MATCH` — they are not
+    /// universally infix and so do not qualify as `BinOp`s.
     Pattern,
     /// String operators: `||` (concatenation).
     StringOp,
     /// Bitwise operators: `&`, `|`, `^`, `<<`, `>>`.
     Bitwise,
-    /// Collection containment operators: `@>`, `<@`, `&&`.
-    Collection,
 }
 
 /// A rich operator definition: name + kind.
@@ -91,9 +99,6 @@ impl OpDef {
     pub const LIKE: &str = "LIKE";
     pub const ILIKE: &str = "ILIKE";
     pub const SIMILAR_TO: &str = "SIMILAR_TO";
-    pub const REGEX_MATCH: &str = "REGEX_MATCH";
-    pub const REGEX_MATCH_INSENSITIVE: &str = "REGEX_MATCH_INSENSITIVE";
-    pub const GLOB: &str = "GLOB";
 
     // String
     pub const CONCAT: &str = "CONCAT";
@@ -104,11 +109,6 @@ impl OpDef {
     pub const BIT_XOR: &str = "BIT_XOR";
     pub const SHIFT_LEFT: &str = "SHIFT_LEFT";
     pub const SHIFT_RIGHT: &str = "SHIFT_RIGHT";
-
-    // Collection containment
-    pub const CONTAINS: &str = "CONTAINS";
-    pub const CONTAINED_BY: &str = "CONTAINED_BY";
-    pub const OVERLAP: &str = "OVERLAP";
 }
 
 impl fmt::Display for OpDef {

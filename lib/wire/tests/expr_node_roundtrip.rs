@@ -166,12 +166,6 @@ fn exists_round_trips() {
 }
 
 #[test]
-fn is_null_round_trips() {
-    let n = ExprNode::is_null(nid(4));
-    assert_eq!(round_trip(n), n);
-}
-
-#[test]
 fn between_round_trips() {
     let n = ExprNode::between(nid(2), nid(3), nid(4));
     assert_eq!(round_trip(n), n);

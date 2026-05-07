@@ -332,8 +332,8 @@ impl Encode for BinOp {
             BinOp::Shl => 19,
             BinOp::Shr => 20,
             BinOp::Concat => 21,
-            BinOp::Arrow => 22,
-            BinOp::LongArrow => 23,
+            BinOp::IsDistinctFrom => 22,
+            BinOp::IsNotDistinctFrom => 23,
             _ => return Err(EncodeError::Custom("BinOp: unknown variant")),
         };
         w.write_varint_u32(tag)
@@ -401,8 +401,7 @@ impl Encode for ExprNode {
             | ExprOp::Update
             | ExprOp::Delete
             | ExprOp::Upsert
-            | ExprOp::Exists
-            | ExprOp::IsNull => {
+            | ExprOp::Exists => {
                 w.write_varint_u32(self.a)?;
             }
             // aux + a + b — Bin(BinOp, lhs, rhs).

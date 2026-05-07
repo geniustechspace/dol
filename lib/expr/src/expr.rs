@@ -1,6 +1,67 @@
 //! Expression-IR core: the 16-byte packed [`ExprNode`] plus its
 //! operand-family enums and pooled side-payload structs.
 //!
+//! # The four-tier rule (operator/expression lock-down)
+//!
+//! Every expression construct lands in **exactly one** of these tiers.
+//! The criteria are mutually exclusive; do not add a construct that
+//! would qualify for two. When in doubt, default to Tier D.
+//!
+//! ## Tier A — [`BinOp`] (sub-opcode in [`ExprNode::aux`] of [`ExprOp::Bin`])
+//!
+//! A construct is a `BinOp` iff **all** hold:
+//! 1. **Fixed arity 2** — exactly two operand expressions.
+//! 2. **Uniform algebraic shape** — both operands are typed values; no
+//!    structural requirement on either side beyond "is an expression".
+//! 3. **Total within its category** — well-defined for *every* operand
+//!    pair within a closed type class (numbers, strings, booleans,
+//!    integers-for-bitwise, …); not "well-defined only when RHS happens
+//!    to be a list".
+//! 4. **Universal infix** — every relational backend renders it as a
+//!    stable infix operator (or has a trivial 1:1 keyword spelling).
+//! 5. **Wire cost is one tag** — fits entirely in the 16-bit `aux`
+//!    discriminant; never needs side-pool storage.
+//!
+//! ## Tier B — [`UnaryOp`] (sub-opcode in [`ExprNode::aux`] of [`ExprOp::Una`])
+//!
+//! Same five rules as Tier A with arity 1.
+//!
+//! ## Tier C — structural [`ExprOp`] node
+//!
+//! A construct is a structural opcode iff **any** holds:
+//! 1. **Variable arity** — admits 0..n operands or branches (CASE,
+//!    IN-list, Func, Window, Agg).
+//! 2. **Role-asymmetric operands** — e.g. CAST's RHS is a *type*,
+//!    ALIAS's is a *name*, IN's RHS is a *collection context*,
+//!    BETWEEN's three operands have distinct roles (probe/lo/hi).
+//! 3. **Side-pool payload** — references a pooled record (`FieldId`,
+//!    `FuncId`, `CaseId`, `WindowId`, `QueryId`, `LiteralId`, …)
+//!    rather than just two `NodeId`s.
+//! 4. **Statement, not value** — `Insert`, `Update`, `Delete`,
+//!    `Upsert`, `Query` produce row sets / row counts, not scalars.
+//!
+//! ## Tier D — function call ([`ExprOp::Func`] with a name in `FuncId`)
+//!
+//! Default destination. Use Tier D when:
+//! 1. **Cross-backend rendering is non-uniform** — one backend renders
+//!    it infix, another as a function, a third as a built-in keyword.
+//! 2. **Open-set semantics** — new variants land regularly (text
+//!    manipulation, JSON paths, geo predicates, regex flavors, …).
+//! 3. **Cleanly definable as `name(args…)`** without role asymmetry.
+//!
+//! There is no `TernaryOp` register: standard SQL has exactly one
+//! ternary construct (BETWEEN), which earns a Tier C slot. If a second
+//! ternary ever lands, revisit then.
+//!
+//! ## Tag-table stability
+//!
+//! After this lock-down, [`BinOp::as_u16`] and [`UnaryOp::as_u16`]
+//! tag tables are **append-only**. Never renumber an existing variant;
+//! never reuse a tag value previously assigned to a removed variant
+//! within the same major version.
+//!
+//! ---
+//!
 //! `ExprNode` is the single canonical node representation in the v2
 //! expression engine. It is `#[repr(C)]`, `bytemuck::{Pod, Zeroable}`,
 //! and exactly 16 bytes, so:
@@ -47,6 +108,21 @@ use crate::ids::{
 /// Binary operator menu. Stored in [`ExprNode::aux`] for [`ExprOp::Bin`]
 /// nodes via [`BinOp::as_u16`] / [`BinOp::try_from_u16`]; lowering and
 /// backends must round-trip through those helpers (never cast directly).
+///
+/// # Tag-table stability
+///
+/// Tags 0..=23 are **frozen** by the operator lock-down (see
+/// [module docs][self]). New variants must use tag 24 and above; never
+/// renumber an existing variant.
+///
+/// # Membership
+///
+/// To earn a slot here, a construct must satisfy the Tier A criteria
+/// in the [module docs][self]: fixed arity 2, uniform algebraic shape,
+/// total within a closed type class, universal infix across backends,
+/// and a wire cost of one tag. Anything else (e.g. JSON-arrow,
+/// `CONTAINS`, `OVERLAPS`, `REGEX_MATCH`, `GLOB`) belongs in
+/// [`ExprOp::Func`] with a `FuncId`-pooled name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
@@ -73,8 +149,12 @@ pub enum BinOp {
     Shl,
     Shr,
     Concat,
-    Arrow,
-    LongArrow,
+    /// `a IS DISTINCT FROM b` — null-safe inequality. Promoted to
+    /// [`BinOp`] from the tree-side `OpDef::IS_DISTINCT_FROM` so it
+    /// lowers through the fast path rather than a string-named lookup.
+    IsDistinctFrom,
+    /// `a IS NOT DISTINCT FROM b` — null-safe equality.
+    IsNotDistinctFrom,
 }
 
 impl BinOp {
@@ -107,8 +187,8 @@ impl BinOp {
             BinOp::Shl => 19,
             BinOp::Shr => 20,
             BinOp::Concat => 21,
-            BinOp::Arrow => 22,
-            BinOp::LongArrow => 23,
+            BinOp::IsDistinctFrom => 22,
+            BinOp::IsNotDistinctFrom => 23,
         }
     }
 
@@ -139,8 +219,8 @@ impl BinOp {
             19 => BinOp::Shl,
             20 => BinOp::Shr,
             21 => BinOp::Concat,
-            22 => BinOp::Arrow,
-            23 => BinOp::LongArrow,
+            22 => BinOp::IsDistinctFrom,
+            23 => BinOp::IsNotDistinctFrom,
             _ => return None,
         })
     }
@@ -371,23 +451,19 @@ pub enum ExprOp {
     InSub = 16,
     /// `EXISTS(subquery)`. `a` is the subquery [`NodeId`].
     Exists = 17,
-    /// Standalone `IS NULL` reference (distinct from
-    /// [`UnaryOp::IsNull`], which lives in `Una::aux`). `a` is the
-    /// operand [`NodeId`].
-    IsNull = 18,
     /// `expr BETWEEN lo AND hi`. `a`/`b`/`c` are the three operand
     /// [`NodeId`]s.
-    Between = 19,
+    Between = 18,
     /// SELECT subquery. `a` is a [`QueryId`] into `ExprArena::queries`.
-    Query = 20,
+    Query = 19,
     /// INSERT statement. `a` is an [`InsertId`] into `ExprArena::inserts`.
-    Insert = 21,
+    Insert = 20,
     /// UPDATE statement. `a` is an [`UpdateId`] into `ExprArena::updates`.
-    Update = 22,
+    Update = 21,
     /// DELETE statement. `a` is a [`DeleteId`] into `ExprArena::deletes`.
-    Delete = 23,
+    Delete = 22,
     /// UPSERT statement. `a` is an [`UpsertId`] into `ExprArena::upserts`.
-    Upsert = 24,
+    Upsert = 23,
 }
 
 impl ExprOp {
@@ -415,13 +491,12 @@ impl ExprOp {
             15 => Self::InList,
             16 => Self::InSub,
             17 => Self::Exists,
-            18 => Self::IsNull,
-            19 => Self::Between,
-            20 => Self::Query,
-            21 => Self::Insert,
-            22 => Self::Update,
-            23 => Self::Delete,
-            24 => Self::Upsert,
+            18 => Self::Between,
+            19 => Self::Query,
+            20 => Self::Insert,
+            21 => Self::Update,
+            22 => Self::Delete,
+            23 => Self::Upsert,
             _ => return None,
         })
     }
@@ -586,11 +661,6 @@ impl ExprNode {
     #[must_use]
     pub const fn exists(sub: NodeId) -> Self {
         Self::raw(ExprOp::Exists, 0, 0, sub.get(), 0, 0)
-    }
-
-    #[must_use]
-    pub const fn is_null(expr: NodeId) -> Self {
-        Self::raw(ExprOp::IsNull, 0, 0, expr.get(), 0, 0)
     }
 
     #[must_use]
@@ -805,17 +875,6 @@ impl ExprNode {
         }
     }
 
-    /// Extract the operand [`NodeId`] of a standalone [`ExprOp::IsNull`]
-    /// node. (Distinct from [`UnaryOp::IsNull`] inside [`ExprOp::Una`].)
-    #[must_use]
-    pub fn as_is_null(&self) -> Option<NodeId> {
-        if self.opcode()? == ExprOp::IsNull {
-            NodeId::from_u32(self.a)
-        } else {
-            None
-        }
-    }
-
     /// Extract `(expr, lo, hi)` of a [`ExprOp::Between`] node.
     #[must_use]
     pub fn as_between(&self) -> Option<(NodeId, NodeId, NodeId)> {
@@ -894,7 +953,6 @@ impl ExprNode {
             Some(ExprOp::Alias) => [self.a, 0, 0], // a = expr NodeId, b = StrId
             Some(ExprOp::InSub) => [self.a, self.b, 0],
             Some(ExprOp::Exists) => [self.a, 0, 0],
-            Some(ExprOp::IsNull) => [self.a, 0, 0],
             Some(ExprOp::Between) => [self.a, self.b, self.c],
             // Side-pool ops (Field, Func, Case, Window, InList, ObjectLit,
             // ArrayLit, Query, Insert, Update, Delete, Upsert) and leaf ops
@@ -957,10 +1015,11 @@ mod codec_tests {
 
     #[test]
     fn expr_op_u8_round_trips() {
-        for tag in 0u8..=24 {
+        for tag in 0u8..=23 {
             let op = ExprOp::from_u8(tag).expect("known tag");
             assert_eq!(op as u8, tag);
         }
+        assert!(ExprOp::from_u8(24).is_none());
         assert!(ExprOp::from_u8(255).is_none());
     }
 

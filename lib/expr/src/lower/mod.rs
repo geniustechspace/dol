@@ -519,6 +519,8 @@ fn lower_binop(op: &crate::tree::OpDef) -> BinOp {
         "BIT_XOR" => BinOp::BitXor,
         "SHIFT_LEFT" => BinOp::Shl,
         "SHIFT_RIGHT" => BinOp::Shr,
+        "IS_DISTINCT_FROM" => BinOp::IsDistinctFrom,
+        "IS_NOT_DISTINCT_FROM" => BinOp::IsNotDistinctFrom,
         _ => BinOp::Eq, // Fallback for unknown operators.
     }
 }
