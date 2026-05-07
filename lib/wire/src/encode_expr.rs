@@ -375,67 +375,37 @@ impl Encode for UnaryOp {
 /// **Budget accounting:** the whole node is one logical "field-of-its-
 /// parent", so we charge one `descend` for the encode call as a whole
 /// (in the caller's tree-walker), then write each scalar inline.
-/// Per-scalar `descend` was the variant-form pattern and is unhelpful
-/// here — these are flat reads off the POD, not recursive sub-encodes.
+/// Wire encoding for the 16 B packed [`ExprNode`].
+///
+/// The layout on the wire is the same fixed 16-byte LE field-by-field
+/// form that `ExprNode` carries in memory: `op` (1 B), `flags` (1 B),
+/// `aux` (2 B LE), `a` (4 B LE), `b` (4 B LE), `c` (4 B LE). This
+/// is byte-stable across hosts (every multibyte field is encoded in
+/// explicit little-endian) and enables a bulk-POD fast path in
+/// `ExprArena::encode` — once each node is exactly 16 B on the wire,
+/// the nodes vector is `len + N × 16` bytes with no per-element
+/// branching.
+///
+/// On little-endian hosts (the overwhelming majority), this produces
+/// the same byte sequence as `bytemuck::cast_slice::<ExprNode, u8>`,
+/// so the field-by-field loop is effectively a memcpy. On big-endian
+/// hosts the explicit `to_le_bytes` path keeps the wire stable.
+///
+/// **Budget accounting:** the whole node is one logical
+/// "field-of-its-parent" — the caller's tree-walker descends once for
+/// the `ExprNode::encode` call as a whole, not per scalar.
 impl Encode for ExprNode {
     fn encode(&self, w: &mut Writer<'_>, _b: &mut Budget) -> Result<(), EncodeError> {
-        let op = ExprOp::from_u8(self.op).ok_or(EncodeError::Custom("ExprNode: unknown opcode"))?;
-        // Tag byte first.
-        w.write_varint_u32(self.op as u32)?;
-        match op {
-            // No payload: every field is zero.
-            ExprOp::Nop => {}
-            // Single u32 in `a` — pooled-id payload.
-            ExprOp::Namespace
-            | ExprOp::Field
-            | ExprOp::Param
-            | ExprOp::Lit
-            | ExprOp::ObjectLit
-            | ExprOp::ArrayLit
-            | ExprOp::Func
-            | ExprOp::Window
-            | ExprOp::Case
-            | ExprOp::InList
-            | ExprOp::Query
-            | ExprOp::Insert
-            | ExprOp::Update
-            | ExprOp::Delete
-            | ExprOp::Upsert
-            | ExprOp::Exists => {
-                w.write_varint_u32(self.a)?;
-            }
-            // aux + a + b — Bin(BinOp, lhs, rhs).
-            ExprOp::Bin => {
-                w.write_varint_u32(self.aux as u32)?;
-                w.write_varint_u32(self.a)?;
-                w.write_varint_u32(self.b)?;
-            }
-            // aux + a — Una(UnaryOp, operand).
-            ExprOp::Una => {
-                w.write_varint_u32(self.aux as u32)?;
-                w.write_varint_u32(self.a)?;
-            }
-            // flags + a + b — Agg(distinct, func StrId, expr NodeId).
-            ExprOp::Agg => {
-                w.write_varint_u32(self.flags as u32)?;
-                w.write_varint_u32(self.a)?;
-                w.write_varint_u32(self.b)?;
-            }
-            // a + b — Cast(expr, to), Alias(expr, name), InSub(expr, sub).
-            ExprOp::Cast | ExprOp::Alias | ExprOp::InSub => {
-                w.write_varint_u32(self.a)?;
-                w.write_varint_u32(self.b)?;
-            }
-            // a + b + c — Between(expr, lo, hi).
-            ExprOp::Between => {
-                w.write_varint_u32(self.a)?;
-                w.write_varint_u32(self.b)?;
-                w.write_varint_u32(self.c)?;
-            }
-            // ExprOp is `#[non_exhaustive]`; future opcodes added in
-            // `dol-expr` must extend this match before they roundtrip.
-            _ => return Err(EncodeError::Custom("ExprNode: unsupported opcode")),
-        }
+        // Reject unknown opcodes at encode time so a corrupted
+        // in-memory arena cannot quietly produce undecodable bytes.
+        let _ = ExprOp::from_u8(self.op)
+            .ok_or(EncodeError::Custom("ExprNode: unknown opcode"))?;
+        w.write_u8(self.op)?;
+        w.write_u8(self.flags)?;
+        w.write_bytes(&self.aux.to_le_bytes())?;
+        w.write_bytes(&self.a.to_le_bytes())?;
+        w.write_bytes(&self.b.to_le_bytes())?;
+        w.write_bytes(&self.c.to_le_bytes())?;
         Ok(())
     }
 }

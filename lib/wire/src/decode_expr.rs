@@ -445,110 +445,35 @@ impl Decode for UnaryOp {
 
 // ─── ExprNode (16 B packed POD) ──────────────────────────────────────────────
 
-/// Mirror of the per-opcode field-by-field [`Encode`] in
-/// `encode_expr.rs`. A leading varint carries the opcode; the per-op
-/// arms read only the fields that opcode populates, so the wire format
-/// is byte-for-byte stable across hosts and dense for leaf nodes.
+/// Mirror of the fixed-16-byte LE [`Encode`] for [`ExprNode`] in
+/// `encode_expr.rs`. Reads `op` (1 B), `flags` (1 B), `aux` (2 B LE),
+/// `a` (4 B LE), `b` (4 B LE), `c` (4 B LE), validates the opcode
+/// byte against [`ExprOp::from_u8`], and stores ids verbatim — the
+/// `ExprArena::decode` pass-2 enforces that they reference live pool
+/// slots.
 ///
 /// Unknown opcodes surface as
-/// [`DecodeError::InvalidVariant { type_name: "ExprNode", … }`]; ids
-/// are read as `u32` and stored verbatim in `a`/`b`/`c` — out-of-range
-/// validation against the arena's pool sizes is left to the
-/// `ExprArena::decode` pass-2 (so a truncated nodes vector produces a
-/// pool-bounds error rather than a half-decoded node).
+/// [`DecodeError::InvalidVariant { type_name: "ExprNode", … }`].
 ///
-/// **Budget accounting:** the whole node is one logical "field-of-its-
-/// parent" — the caller's tree-walker descends once for the
-/// `ExprNode::decode` call as a whole, not per scalar. Per-scalar
-/// `descend` calls were the variant-form pattern and would inflate the
-/// observed depth by the number of fields per node, defeating
-/// `Limits::max_depth`'s tree-depth contract.
+/// **Budget accounting:** the whole node is one logical
+/// "field-of-its-parent" — the caller's tree-walker descends once for
+/// the `ExprNode::decode` call as a whole, not per scalar.
 impl Decode for ExprNode {
     fn decode(reader: &mut Reader<'_>, _budget: &mut Budget) -> Result<Self, DecodeError> {
-        let raw_op = reader.read_varint_u32()?;
-        let tag: u8 = raw_op
-            .try_into()
-            .map_err(|_| DecodeError::InvalidVariant {
-                type_name: "ExprNode",
-                seen: raw_op,
-            })?;
-        let op = ExprOp::from_u8(tag).ok_or(DecodeError::InvalidVariant {
+        let op = reader.read_u8()?;
+        // Reject unknown opcodes immediately so a stale build cannot
+        // silently zero-fill a node added by a newer encoder.
+        let _ = ExprOp::from_u8(op).ok_or(DecodeError::InvalidVariant {
             type_name: "ExprNode",
-            seen: raw_op,
+            seen: u32::from(op),
         })?;
-        let (flags, aux, a, b, c) = match op {
-            ExprOp::Nop => (0u8, 0u16, 0u32, 0u32, 0u32),
-            ExprOp::Namespace
-            | ExprOp::Field
-            | ExprOp::Param
-            | ExprOp::Lit
-            | ExprOp::ObjectLit
-            | ExprOp::ArrayLit
-            | ExprOp::Func
-            | ExprOp::Window
-            | ExprOp::Case
-            | ExprOp::InList
-            | ExprOp::Query
-            | ExprOp::Insert
-            | ExprOp::Update
-            | ExprOp::Delete
-            | ExprOp::Upsert
-            | ExprOp::Exists => {
-                let a = reader.read_varint_u32()?;
-                (0, 0, a, 0, 0)
-            }
-            ExprOp::Bin => {
-                let aux_u32 = reader.read_varint_u32()?;
-                let aux: u16 = aux_u32.try_into().map_err(|_| DecodeError::InvalidVariant {
-                    type_name: "ExprNode/Bin.aux",
-                    seen: aux_u32,
-                })?;
-                let a = reader.read_varint_u32()?;
-                let b_ = reader.read_varint_u32()?;
-                (0, aux, a, b_, 0)
-            }
-            ExprOp::Una => {
-                let aux_u32 = reader.read_varint_u32()?;
-                let aux: u16 = aux_u32.try_into().map_err(|_| DecodeError::InvalidVariant {
-                    type_name: "ExprNode/Una.aux",
-                    seen: aux_u32,
-                })?;
-                let a = reader.read_varint_u32()?;
-                (0, aux, a, 0, 0)
-            }
-            ExprOp::Agg => {
-                let flags_u32 = reader.read_varint_u32()?;
-                let flags: u8 = flags_u32.try_into().map_err(|_| DecodeError::InvalidVariant {
-                    type_name: "ExprNode/Agg.flags",
-                    seen: flags_u32,
-                })?;
-                let a = reader.read_varint_u32()?;
-                let b_ = reader.read_varint_u32()?;
-                (flags, 0, a, b_, 0)
-            }
-            ExprOp::Cast | ExprOp::Alias | ExprOp::InSub => {
-                let a = reader.read_varint_u32()?;
-                let b_ = reader.read_varint_u32()?;
-                (0, 0, a, b_, 0)
-            }
-            ExprOp::Between => {
-                let a = reader.read_varint_u32()?;
-                let b_ = reader.read_varint_u32()?;
-                let c = reader.read_varint_u32()?;
-                (0, 0, a, b_, c)
-            }
-            // ExprOp is `#[non_exhaustive]`; reject unknowns explicitly
-            // so a stale build cannot silently zero-fill a node added by
-            // a newer encoder.
-            _ => {
-                return Err(DecodeError::InvalidVariant {
-                    type_name: "ExprNode",
-                    seen: raw_op,
-                });
-            }
-        };
+        let flags = reader.read_u8()?;
+        let aux = u16::from_le_bytes(reader.read_array::<2>()?);
+        let a = u32::from_le_bytes(reader.read_array::<4>()?);
+        let b = u32::from_le_bytes(reader.read_array::<4>()?);
+        let c = u32::from_le_bytes(reader.read_array::<4>()?);
         Ok(ExprNode {
-            op: tag,
+            op,
             flags,
             aux,
             a,
