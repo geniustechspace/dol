@@ -1,6 +1,6 @@
-//! Typed [`ExtensionPayload`] wrapper for `dol-pipeline`.
+//! Typed [`ExtensionPayload`] wrapper for `dol_query::pipeline`.
 //!
-//! Wraps a [`Graph`] into an [`OperationExtension`](dol_command::operation::OperationExtension)
+//! Wraps a [`Graph`] into an [`OperationExtension`](crate::operation::OperationExtension)
 //! under the stable identifier `dol.pipeline/graph` (version 1). Encoded
 //! with `postcard` when the `serde` feature is enabled; otherwise
 //! [`PipelinePayload::encode`] returns an empty byte vector and
@@ -9,11 +9,10 @@
 extern crate alloc;
 use alloc::vec::Vec;
 
-use dol_command::operation::Operation;
-use dol_command::operation::{ExtensionId, ExtensionPayload};
-use dol_command::target::Symbol;
+use crate::operation::{ExtensionId, ExtensionPayload, Operation};
+use crate::target::Symbol;
 
-use super::Graph;
+use dol_query::pipeline::Graph;
 
 /// Stable extension name.
 pub const EXTENSION_NAME: &str = "dol.pipeline/graph";
@@ -93,7 +92,7 @@ impl PipelinePayload {
     /// Wrap `graph` into an [`Operation::Extension`].
     pub fn into_operation(self) -> Operation {
         Operation::Extension(alloc::boxed::Box::new(
-            dol_command::operation::OperationExtension::from_payload(&self),
+            crate::operation::OperationExtension::from_payload(&self),
         ))
     }
 }

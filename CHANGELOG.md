@@ -7,11 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Dependency-graph alignment (PR 7 + PR 8a + PR 9)
+### Dependency-graph alignment (PR 7 + PR 8a + PR 9 + PR 10)
 
-Three of the four DAG violations identified in the v2-layout audit are
-now fixed. The remaining one (`dol-query → dol-command`) is deferred
-because the IR types it produces would have to move out of `dol-command`.
+All four DAG violations identified in the v2-layout audit are now fixed.
+The workspace dependency graph matches what's documented at the top of
+the root `Cargo.toml`: `core` ← `expr` ← `schema` ← `command`,
+`query` ← `core`/`expr`/gated `schema` (no `command` edge), and
+`command` ← gated `query` (replacing the historical reverse edge).
+
+#### `dol-query → dol-command` edge inverted (PR 10)
+
+The honest path described in the previous CHANGELOG entry — design a
+query-native plan that `dol-command` adapts — turned out not to be the
+cleanest option. The *invert-the-dependency* path is simpler and ends
+up at the same v2 DAG shape with fewer moving pieces:
+
+- `dol-query` is now a **pure data crate**. It owns the DSL builder
+  structs (`GetQuery`, `InsertQuery`, `UpdateQuery`, `DeleteQuery`,
+  `UpsertQuery`), the `JoinClause`/`JoinKind` types, and the streaming
+  / pipeline data (`WindowSpec`, `TimeSeriesOp`, `Sample`, `Graph`,
+  `Node`, …). The builder structs' fields and `Query.{name, namespace,
+  field_names}` are now `pub` so cross-crate lowering can read them
+  without going through accessors.
+- The lowering that turns a builder into a `dol_command::Program`
+  (formerly `try_build` methods on each builder) now lives in
+  `dol_command::lower_query`, behind a new default-on `query` feature
+  on `dol-command`. Free functions: `lower_get`, `lower_insert`,
+  `lower_update`, `lower_delete`, `lower_upsert`. A `BuildProgram`
+  trait re-creates the historical chained `builder.try_build()`
+  ergonomics — callers add `use dol_command::lower_query::BuildProgram;`
+  and the old call patterns work unchanged.
+- `BuildError` (formerly `dol_query::BuildError`) moved to
+  `dol_command::lower_query::BuildError`. The variants are unchanged
+  (`Filter`, `Having`, `Projection`, `GroupBy`, `OrderBy`, `SetValue`,
+  `JoinOn`).
+- The typed `OperationExtension` payload wrappers
+  (`WindowPayload`, `TimeSeriesPayload`, `SamplePayload`,
+  `PipelinePayload`) and their stable `Symbol` constants
+  (`WINDOW_SYMBOL`, `TIMESERIES_SYMBOL`, `IOT_SAMPLE_SYMBOL`,
+  pipeline `EXTENSION_SYMBOL`) moved to
+  `dol_command::query_extensions::{stream, pipeline}`. The wrappers
+  `impl ExtensionPayload` natively (the trait lives in `dol-command`),
+  so `OperationExtension::from_payload(&p).into_operation()` works
+  without any back-edge from `dol-query`.
+- `dol-query`'s prelude no longer re-exports anything from
+  `dol-command`. Consumers of the IR helpers and types
+  (`define_entity`, `tx_begin`, `IsolationLevel`, `PolicyScope`,
+  `Privilege`, `SchemaBinding`, …) import directly from
+  `dol_command::builders` and `dol_command::prelude`, where they
+  always lived.
+- `dol-query`'s `dol-command` runtime dep is gone; it's now a
+  *dev-dependency* with the `query` feature, used by the integration
+  tests in `lib/query/tests/integration.rs` (moved out of
+  `lib/query/src/tests.rs`; an inner `#[cfg(test)] mod tests;` would
+  have given the test binary a different `dol_query::GetQuery` type
+  than the one `dol-command`'s `BuildProgram` impl was compiled
+  against).
+- `cargo tree -p dol-query --edges normal` confirms zero
+  `dol-command` references. With the new `dol-command --features
+  query`, the graph is `command → query` only.
+- `dol`'s `query` feature now forwards `dol-command/query` so umbrella
+  consumers see the lowering surface.
+
+### Done previously in this cycle
 
 #### `dol-command`: `dol-schema` is now a default-on `schema` feature (PR 9)
 
@@ -73,20 +131,6 @@ resolved by **relocating the small handle types into `dol-core`**:
 - The doctest in `dol_query::lib`'s top-level docs is now split: the
   `&str` half is unconditional, the `&Entity` half is gated behind
   `#[cfg(feature = "schema")]`.
-
-#### Still deferred
-
-- **`dol-query → dol-command` removal** (originally proposed as "PR 10").
-  Cannot be solved by a `dol-core` handle relocation: `dol-query`'s
-  `try_build` literally produces `dol_command::Operation` /
-  `dol_command::Program` values, and these are far too large/central
-  (the entire IR, all five DML variants, OperationExtension, the wire
-  codec contract) to relocate. The honest path is to design a
-  query-native plan type (`dol_query::Plan`) that mirrors
-  `Operation`'s five variants and add `From<Plan> for Program`
-  adapters in `dol-command` behind a new `query` feature. 85
-  references across 13 query files. Comparable in scope to the
-  original v2 refactor; needs its own multi-PR session.
 
 ### Crate rename: `dol-ir` → `dol-command`
 

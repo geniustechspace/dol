@@ -47,3 +47,16 @@ pub mod privilege;
 pub mod program;
 pub mod program_ref;
 pub mod target;
+
+/// Lower the fluent [`dol_query`] DSL builders into [`program::Program`]
+/// values. Only available with `feature = "query"` (default-on); see the
+/// module docs for the full surface.
+#[cfg(feature = "query")]
+pub mod lower_query;
+
+/// Typed [`operation::OperationExtension`] payloads wrapping
+/// [`dol_query`]'s streaming and pipeline data into
+/// [`operation::Operation::Extension`]. Only available with
+/// `feature = "query"`.
+#[cfg(feature = "query")]
+pub mod query_extensions;

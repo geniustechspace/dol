@@ -12,11 +12,19 @@ readme = "README.md"
 # is on by default to preserve the field-aware `Query::from(&Entity)` API.
 dol-schema = { workspace = true, optional = true }
 dol-expr   = { workspace = true }
-dol-command     = { workspace = true }
 dol-core   = { workspace = true }
 smallvec   = { workspace = true }
 serde      = { workspace = true, optional = true }
-postcard   = { workspace = true, optional = true }
+
+[dev-dependencies]
+# `dol-command` is a *dev*-only dep so the `dol-query` crate itself stays
+# independent of the IR layer in its consumer-facing surface (this is the
+# v2 DAG: `query` sits *below* `command`, not above it). The lowering that
+# turns the DSL builders into `Program`s lives in `dol_command::lower_query`,
+# and integration tests in `tests/` exercise that path. The `query` feature
+# pulls dol-query back in on dol-command's side.
+dol-command = { workspace = true, features = ["query"] }
+postcard    = { workspace = true }
 
 [features]
 default = ["schema"]
@@ -27,14 +35,11 @@ schema = ["dep:dol-schema"]
 std = [
     "dol-core/std",
     "dol-expr/std",
-    "dol-command/std",
     "dol-schema?/std",
 ]
 sql = []
 serde = [
     "dep:serde",
-    "dep:postcard",
-    "dol-command/serde",
     "dol-core/serde",
     "dol-expr/serde",
     "dol-schema?/serde",

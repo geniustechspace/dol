@@ -318,7 +318,9 @@ version = "0.2.0"
 dependencies = [
  "dol-core",
  "dol-expr",
+ "dol-query",
  "dol-schema",
+ "postcard",
  "serde",
  "serde_json",
  "smallvec",

@@ -60,3 +60,14 @@ pub mod acl {
 pub mod tx {
     pub use crate::operation::{IsolationLevel, TxBegin, TxOp, TxOptions};
 }
+
+/// Lower the fluent [`dol_query`] DSL builders to a [`Program`]. Only
+/// available when `dol-command` is built with `feature = "query"`
+/// (default-on).
+#[cfg(feature = "query")]
+pub mod query {
+    pub use crate::lower_query::{
+        BuildError, BuildProgram, lower_delete, lower_get, lower_insert, lower_update,
+        lower_upsert,
+    };
+}

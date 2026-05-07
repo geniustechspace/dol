@@ -11,20 +11,20 @@
 //! Pipelines are **descriptive only** — this module provides type inference
 //! over their node schemas; execution is a backend concern.
 //!
-//! Pipelines compose with [`dol_command::operation::Operation`] via the
-//! [`Operation::Extension`](dol_command::operation::Operation::Extension) seam:
-//! a [`Graph`] is wrapped in a [`PipelinePayload`] (a typed
-//! [`ExtensionPayload`](dol_command::operation::ExtensionPayload)) and embedded
-//! into a [`dol_command::program::Program`].
+//! Pipelines compose with `dol_command::operation::Operation` via the
+//! `Operation::Extension` seam: a [`Graph`] is wrapped in a
+//! `dol_command::query_extensions::pipeline::PipelinePayload` (a typed
+//! `dol_command::operation::ExtensionPayload`) and embedded into a
+//! `dol_command::program::Program`. Hosting the payload wrapper on the
+//! `dol-command` side preserves the v2 dependency graph
+//! (`command → query`, never the reverse).
 
 #![allow(clippy::large_enum_variant)]
 
-pub mod extension;
 pub mod graph;
 pub mod node;
 pub mod schema;
 
-pub use extension::{EXTENSION_NAME, EXTENSION_SYMBOL, EXTENSION_VERSION, PipelinePayload};
 pub use graph::{Graph, NodeIdx};
 pub use node::{Node, Sink, Source, Transform};
 pub use schema::{ColumnSchema, RowSchema};

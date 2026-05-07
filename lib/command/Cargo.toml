@@ -17,27 +17,42 @@ dol-expr   = { path = "../expr",   default-features = false }
 # `CatalogId`, `TypeBody`, `ComputedKind`, `RefAction`, `RelationRef`) live
 # in `dol-core::schema` and are always available.
 dol-schema = { path = "../schema", default-features = false, features = ["expr"], optional = true }
+# `dol-query` is gated behind the `query` feature: it pulls in the fluent
+# DSL builder structs (`GetQuery`, `InsertQuery`, …) and the streaming /
+# pipeline data types so that `dol-command` can host their `Program`
+# lowering (`lower_query::*`) and `OperationExtension` wrappers
+# (`query_extensions::*`) without forcing every consumer to take the
+# DSL dep.
+dol-query  = { path = "../query",  default-features = false, optional = true }
 dol-core   = { path = "../core",   default-features = false }
 smallvec   = { workspace = true }
 serde      = { workspace = true, optional = true }
+postcard   = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
 
 [features]
-# `default = ["schema"]` keeps the historical surface (programs that embed
-# a `SchemaCatalog`, `define_from_entity` builder, prelude re-exports of
-# storage types). Disable to drop the `dol-schema` dep entirely; programs
-# can still reference schemas via `SchemaRef` handles + `SchemaBinding`.
-default = ["schema"]
+# `default = ["schema", "query"]` keeps the historical surface: programs
+# that embed a `SchemaCatalog`, the `define_from_entity` builder, the
+# prelude re-exports of storage types, the fluent query lowering
+# (`lower_query::lower_get`, …), and the typed `Operation::Extension`
+# payloads for stream/pipeline. Disable to drop the corresponding deps.
+default = ["schema", "query"]
 # Pull in `dol-schema` for the catalog *storage* surface.
 schema = ["dep:dol-schema"]
-std = ["dol-core/std", "dol-expr/std", "dol-schema?/std"]
+# Pull in `dol-query` for the fluent DSL types and host their lowering
+# (`lower_query::*`) plus typed `OperationExtension` wrappers
+# (`query_extensions::*`). The streaming / pipeline payload encoders also
+# need `serde + postcard` to round-trip via `dol-wire::Decode`.
+query = ["dep:dol-query", "dep:postcard"]
+std = ["dol-core/std", "dol-expr/std", "dol-schema?/std", "dol-query?/std"]
 serde = [
     "dep:serde",
     "dol-expr/serde",
     "dol-schema?/serde",
     "dol-core/serde",
+    "dol-query?/serde",
     "smallvec/serde",
 ]
 raw = []

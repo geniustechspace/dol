@@ -1,12 +1,13 @@
-//! Errors returned by the fallible `try_build()` family on every query builder.
+//! Errors returned by the fallible `lower_*` family on every query builder.
 //!
 //! v2 invariant: production code may not panic. The five query builders
-//! ([`crate::DeleteQuery`], [`crate::UpdateQuery`], [`crate::InsertQuery`],
-//! [`crate::UpsertQuery`], [`crate::GetQuery`]) used to call
-//! `dol_expr::lower::lower_*` and unwrap the result, which meant a deep
-//! filter expression or a runaway projection could panic the caller. Each
-//! builder now exposes `try_build(self) -> Result<Program, BuildError>` and
-//! threads a [`Budget`](dol_core::policy::Budget) through the lowering so
+//! ([`dol_query::DeleteQuery`], [`dol_query::UpdateQuery`],
+//! [`dol_query::InsertQuery`], [`dol_query::UpsertQuery`],
+//! [`dol_query::GetQuery`]) used to call `dol_expr::lower::lower_*` and
+//! unwrap the result, which meant a deep filter expression or a runaway
+//! projection could panic the caller. Each lowering entry point now
+//! returns `Result<Program, BuildError>` and threads a
+//! [`Budget`](dol_core::policy::Budget) through the lowering so
 //! adversarial input is rejected with a clean error.
 
 extern crate alloc;
@@ -16,7 +17,7 @@ use core::fmt;
 
 use dol_expr::lower::LowerError;
 
-/// Reasons a query builder may refuse to produce a [`Program`](dol_command::program::Program).
+/// Reasons a query lowering may refuse to produce a [`Program`](crate::program::Program).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum BuildError {

@@ -1,10 +1,29 @@
 //! Integration tests for `dol-query` builders against the
 //! [`Operation`](dol_command::operation::Operation) IR.
+//!
+//! These live in `tests/` (not as a `#[cfg(test)]` inner module of
+//! `src/lib.rs`) because they assert that
+//! `impl dol_command::lower_query::BuildProgram for dol_query::GetQuery`
+//! resolves correctly across the dev-dep edge — which only works when
+//! the test binary sees the same `dol_query::GetQuery` type that
+//! `dol-command` was compiled against. An inner `mod tests;` would
+//! re-compile `dol-query` with `#[cfg(test)]` and break that identity.
 
-use alloc::{boxed::Box, format, string::String, vec};
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects
+)]
 
-use super::*;
-use dol_schema::{DataType, Field};
+use std::{boxed::Box, format, string::String, vec};
+
+// Brings `try_build()` into scope as the historical-style chained method
+// on every builder. The actual lowering lives in `dol_command::lower_query`.
+use dol_command::lower_query::BuildProgram;
+use dol_query::Query;
+use dol_schema::{DataType, Entity, Field};
 
 fn users_entity() -> Entity {
     Entity::new(

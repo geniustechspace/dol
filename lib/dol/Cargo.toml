@@ -43,7 +43,7 @@ command  = ["dep:dol-command", "expr", "schema", "dol-command?/schema"]
 wire     = ["dep:dol-wire", "command"]
 check    = ["dep:dol-check", "command"]
 fmt      = ["dep:dol-fmt", "command"]
-query    = ["dep:dol-query", "command"]
+query    = ["dep:dol-query", "command", "dol-command?/query"]
 
 # ── Granular dol-core features (default-on in dol-core itself) ───────────────
 # These pass-throughs let umbrella consumers add or omit dol-core variant

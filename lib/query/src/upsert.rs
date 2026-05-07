@@ -5,6 +5,10 @@
 //! the write entirely (`then_skip`). The "match" condition is store-neutral:
 //! SQL backends may render it as `ON CONFLICT`, document stores as a unique
 //! filter, KV stores as an `IF NOT EXISTS` precondition, etc.
+//!
+//! Pure data: lowering to a `dol_command::program::Program` is handled
+//! by [`dol_command::lower_query::lower_upsert`] (or via the
+//! [`BuildProgram`](dol_command::lower_query::BuildProgram) trait).
 
 use alloc::{
     string::{String, ToString},
@@ -21,19 +25,33 @@ use dol_expr::tree::Expr;
 /// A composable upsert builder that works with any entity source.
 ///
 /// Construct via [`Query::from(...).upsert()`](crate::Query::upsert).
+///
+/// All fields are `pub` so the lowering host crate (`dol-command` with the
+/// `query` feature, default-on) can read them without going through
+/// accessors.
 #[derive(Debug, Clone)]
-#[must_use = "builders do nothing until .try_build() is called"]
+#[must_use = "builders do nothing until lowered to a Program"]
 pub struct UpsertQuery {
-    name: String,
-    namespace: Option<String>,
-    field_names: Option<Vec<String>>,
-    fields: Vec<String>,
-    conflict_fields: Vec<String>,
-    conflict_constraint: Option<String>,
-    update_fields: Vec<String>,
-    then_skip_flag: bool,
-    conflict_filters: Vec<Expr<'static>>,
-    returning: Vec<String>,
+    /// Target entity name (last dotted segment).
+    pub name: String,
+    /// Optional namespace prefix.
+    pub namespace: Option<String>,
+    /// Optional list of all field names (default for `fields` when empty).
+    pub field_names: Option<Vec<String>>,
+    /// Explicit columns to insert.
+    pub fields: Vec<String>,
+    /// Match-on column list (e.g. SQL `ON CONFLICT (a, b)`).
+    pub conflict_fields: Vec<String>,
+    /// Optional named constraint to match on.
+    pub conflict_constraint: Option<String>,
+    /// Columns to update on conflict (with `EXCLUDED.col` references).
+    pub update_fields: Vec<String>,
+    /// When true, conflict is a no-op (`DO NOTHING`).
+    pub then_skip_flag: bool,
+    /// Optional WHERE clause restricting which conflicts get patched.
+    pub conflict_filters: Vec<Expr<'static>>,
+    /// Column names to return (`*` for all).
+    pub returning: Vec<String>,
 }
 
 impl UpsertQuery {
@@ -114,98 +132,5 @@ impl UpsertQuery {
         } else {
             self.fields.len()
         }
-    }
-
-    /// Build the arena-based IR as a [`dol_command::program::Program`] containing a
-    /// single [`dol_command::operation::Operation::Upsert`] referencing an arena
-    /// `ExprNode` of opcode [`dol_expr::expr::ExprOp::Upsert`].
-    ///
-    /// Infallible in current shape (the builder only emits `Param`
-    /// placeholders and structural `EXCLUDED.col` field references), but
-    /// returns `Result` for API consistency with the other builders.
-    pub fn try_build(self) -> Result<dol_command::program::Program, crate::BuildError> {
-        use dol_command::operation::Upsert;
-        use dol_command::target::TargetKind;
-        use dol_expr::expr::{ConflictClause, UpsertNode};
-
-        let mut arena = dol_expr::ExprArena::new();
-        let mut interner = dol_expr::Interner::new();
-
-        let fields = if self.fields.is_empty() {
-            self.field_names.unwrap_or_default()
-        } else {
-            self.fields
-        };
-
-        let target_str = interner.intern(&dol_expr::lower::qualified_name(
-            &self.name,
-            &self.namespace,
-        ));
-        let columns: smallvec::SmallVec<[dol_expr::ids::StrId; 8]> =
-            fields.iter().map(|f| interner.intern(f)).collect();
-
-        // One Param per field.
-        let values: smallvec::SmallVec<[dol_expr::ids::NodeId; 8]> =
-            fields.iter().map(|_| arena.alloc_param()).collect();
-
-        let returning: smallvec::SmallVec<[dol_expr::ids::NodeId; 4]> = self
-            .returning
-            .iter()
-            .map(|r| {
-                let col = interner.intern(r);
-                let fid = arena.alloc_field(dol_expr::FieldNode {
-                    namespace: None,
-                    name: col,
-                    steps: smallvec::SmallVec::new(),
-                });
-                arena.alloc_field_ref(fid)
-            })
-            .collect();
-
-        let conflict = if self.then_skip_flag {
-            Some(ConflictClause::DoNothing)
-        } else if !self.update_fields.is_empty() {
-            let assignments: smallvec::SmallVec<
-                [(dol_expr::ids::StrId, dol_expr::ids::NodeId); 4],
-            > = self
-                .update_fields
-                .iter()
-                .map(|col| {
-                    let col_id = interner.intern(col);
-                    // EXCLUDED.col reference
-                    let ns = interner.intern("EXCLUDED");
-                    let c = interner.intern(col);
-                    let fid = arena.alloc_field(dol_expr::FieldNode {
-                        namespace: Some(ns),
-                        name: c,
-                        steps: smallvec::SmallVec::new(),
-                    });
-                    let val_id = arena.alloc_field_ref(fid);
-                    (col_id, val_id)
-                })
-                .collect();
-            Some(ConflictClause::DoUpdate { assignments })
-        } else {
-            None
-        };
-
-        let unode = UpsertNode {
-            target: target_str,
-            columns,
-            values,
-            returning,
-            conflict,
-        };
-        let uid = arena.alloc_upsert(unode);
-        let body = arena.alloc_upsert_ref(uid);
-
-        let target = dol_command::builders::target::target_from_parts(
-            &mut interner,
-            TargetKind::Relation,
-            &self.name,
-            self.namespace.as_deref(),
-        );
-        let op: dol_command::operation::Operation = Upsert { target, node: body }.into();
-        Ok(dol_command::program::Program::new(op, arena, interner))
     }
 }

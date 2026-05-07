@@ -1,30 +1,40 @@
 //! GET (SELECT) query builder for `dol-query`.
 //!
-//! Mirrors `dol-builder::GetBuilder` but works with owned name/namespace
-//! instead of requiring a static `&Entity` reference.
+//! Pure data: lowering to a `dol_command::program::Program` is handled
+//! by [`dol_command::lower_query::lower_get`] (or via the
+//! [`BuildProgram`](dol_command::lower_query::BuildProgram) trait).
 
 use alloc::{
-    format,
     string::{String, ToString},
     vec::Vec,
 };
 
 use crate::JoinKind;
-#[cfg(feature = "sql")]
 use dol_expr::expr::LockHint;
 use dol_expr::tree::{Direction, Expr, NullsPosition, OrderByExpr, field_dyn};
 
 // ---------------------------------------------------------------------------
-// Private join helper
+// Public join helper
 // ---------------------------------------------------------------------------
 
+/// One JOIN clause: target entity, optional alias, and `(left, right)`
+/// equality condition pairs.
+///
+/// `pub` so the lowering host crate (`dol-command` with the `query`
+/// feature) can read it without going through accessors.
 #[derive(Debug, Clone)]
-struct JoinClause {
-    join_type: JoinKind,
-    target_name: String,
-    target_namespace: Option<String>,
-    alias: Option<String>,
-    on_conditions: Vec<(String, String)>,
+pub struct JoinClause {
+    /// What kind of join (`INNER`, `LEFT`, `CROSS`, …).
+    pub join_type: JoinKind,
+    /// Last dotted segment of the target entity name.
+    pub target_name: String,
+    /// Optional namespace (everything before the last dotted segment).
+    pub target_namespace: Option<String>,
+    /// Optional alias (`FROM ... AS alias`).
+    pub alias: Option<String>,
+    /// `(left_column, right_column)` equality pairs forming the
+    /// `ON ... AND ...` condition. Empty for `CROSS JOIN`.
+    pub on_conditions: Vec<(String, String)>,
 }
 
 // ===========================================================================
@@ -34,31 +44,51 @@ struct JoinClause {
 /// A composable SELECT query builder that works with any entity source.
 ///
 /// Construct via [`Query::from(...).get()`](crate::Query::get).
+///
+/// All fields are `pub` so the lowering host crate (`dol-command` with the
+/// `query` feature, default-on) can read them without going through
+/// accessors.
 #[derive(Debug, Clone)]
-#[must_use = "builders do nothing until .try_build() is called"]
+#[must_use = "builders do nothing until lowered to a Program"]
 pub struct GetQuery {
-    name: String,
-    namespace: Option<String>,
-    field_names: Option<Vec<String>>,
-    table_alias: Option<String>,
-    projections: Vec<Expr<'static>>,
-    joins: Vec<JoinClause>,
-    filters: Vec<Expr<'static>>,
-    group_by: Vec<Expr<'static>>,
-    having: Vec<Expr<'static>>,
-    order_by: Vec<OrderByExpr<'static>>,
-    has_offset: bool,
-    has_limit: bool,
-    distinct: bool,
-    distinct_on: Vec<String>,
-    /// Row-level lock hint. SQL-only — settable via [`for_update`], [`for_share`],
-    /// or [`lock`] when the `sql` feature is enabled.
+    /// Target entity name (last dotted segment of the source string).
+    pub name: String,
+    /// Optional namespace prefix.
+    pub namespace: Option<String>,
+    /// Optional list of all field names (used as a default projection
+    /// when `projections` is empty).
+    pub field_names: Option<Vec<String>>,
+    /// Optional table alias (`FROM table AS alias`).
+    pub table_alias: Option<String>,
+    /// Projection expressions; empty falls back to `field_names`.
+    pub projections: Vec<Expr<'static>>,
+    /// JOIN clauses to apply.
+    pub joins: Vec<JoinClause>,
+    /// Filter expressions; AND-joined when lowered.
+    pub filters: Vec<Expr<'static>>,
+    /// `GROUP BY` columns/expressions.
+    pub group_by: Vec<Expr<'static>>,
+    /// `HAVING` clauses; AND-joined when lowered.
+    pub having: Vec<Expr<'static>>,
+    /// `ORDER BY` clauses.
+    pub order_by: Vec<OrderByExpr<'static>>,
+    /// Whether `OFFSET ?` is present.
+    pub has_offset: bool,
+    /// Whether `LIMIT ?` is present.
+    pub has_limit: bool,
+    /// Whether `SELECT DISTINCT` is set.
+    pub distinct: bool,
+    /// Optional `DISTINCT ON (cols)` (PostgreSQL).
+    pub distinct_on: Vec<String>,
+    /// Row-level lock hint. SQL-only — settable via [`for_update`],
+    /// [`for_share`], or [`lock`] when the `sql` feature is enabled, but
+    /// the field itself is always present so cross-crate lowering does
+    /// not need to be feature-gated.
     ///
     /// [`for_update`]: Self::for_update
     /// [`for_share`]:  Self::for_share
     /// [`lock`]:       Self::lock
-    #[cfg(feature = "sql")]
-    lock_mode: Option<LockHint>,
+    pub lock_mode: Option<LockHint>,
 }
 
 impl GetQuery {
@@ -82,7 +112,6 @@ impl GetQuery {
             has_limit: false,
             distinct: false,
             distinct_on: Vec::new(),
-            #[cfg(feature = "sql")]
             lock_mode: None,
         }
     }
@@ -309,189 +338,6 @@ impl GetQuery {
     pub fn lock(mut self, mode: LockHint) -> Self {
         self.lock_mode = Some(mode);
         self
-    }
-
-    // ── Build to IR ─────────────────────────────────────────────────────
-
-    /// Consume the builder and produce a [`dol_command::program::Program`] holding a
-    /// single [`dol_command::operation::Operation::Query`] that references an arena
-    /// `ExprNode` of opcode [`dol_expr::expr::ExprOp::Query`] carrying
-    /// the SELECT body.
-    ///
-    /// When no projections have been set and Entity field metadata is
-    /// available, all entity fields are selected by default.
-    ///
-    /// Fallible: returns the matching [`BuildError`](crate::BuildError) variant when lowering
-    /// any of the projection / WHERE / GROUP BY / HAVING / ORDER BY
-    /// expressions exhausts the default budget.
-    pub fn try_build(self) -> Result<dol_command::program::Program, crate::BuildError> {
-        use dol_command::operation::Query as OpQuery;
-        use dol_command::target::TargetKind;
-        use dol_core::policy::{Budget, Limits};
-        use dol_expr::expr::{JoinNode, JoinType as ArenaJoinType, QueryNode};
-        use dol_expr::ids::NodeId;
-        use dol_expr::lower::{lower_expr_with_budget, lower_exprs, lower_filters, lower_order_by};
-        use smallvec::SmallVec;
-
-        let mut arena = dol_expr::ExprArena::new();
-        let mut interner = dol_expr::Interner::new();
-        let mut budget = Budget::new(Limits::host());
-
-        let from = interner.intern(&dol_expr::lower::qualified_name(
-            &self.name,
-            &self.namespace,
-        ));
-        let alias = self.table_alias.as_deref().map(|a| interner.intern(a));
-
-        // Default projections.
-        let proj_exprs: Vec<Expr<'static>> = if self.projections.is_empty() {
-            if let Some(ref names) = self.field_names {
-                names.iter().map(|n| field_dyn(n)).collect()
-            } else {
-                Vec::new()
-            }
-        } else {
-            self.projections
-        };
-        let columns: SmallVec<[NodeId; 8]> =
-            lower_exprs(&proj_exprs, &mut arena, &mut interner, &mut budget)
-                .map_err(crate::BuildError::Projection)?;
-
-        // Joins.
-        let mut joins: SmallVec<[JoinNode; 2]> = SmallVec::new();
-        for jc in self.joins {
-            // Honor the parsed `"namespace.name"` form by re-joining the
-            // dotted source. The interner deduplicates so this is cheap;
-            // backends parse the dotted form when they need the parts.
-            let source = match &jc.target_namespace {
-                Some(ns) => interner.intern(&format!("{ns}.{}", jc.target_name)),
-                None => interner.intern(&jc.target_name),
-            };
-            let alias = jc.alias.as_deref().map(|a| interner.intern(a));
-            let join_type = match jc.join_type {
-                JoinKind::Inner => ArenaJoinType::Inner,
-                JoinKind::Left => ArenaJoinType::Left,
-                JoinKind::Right => ArenaJoinType::Right,
-                JoinKind::Full => ArenaJoinType::Full,
-                JoinKind::Cross => ArenaJoinType::Cross,
-            };
-            // Build ON condition from pairs (`None` for absent, e.g.
-            // `CROSS JOIN`).
-            let on: Option<NodeId> = if jc.on_conditions.is_empty() {
-                None
-            } else {
-                // ON-conditions are simple `col = col` pairs and don't
-                // need budget-aware lowering — they're constructed
-                // structurally from interner ids. We still charge the
-                // budget at allocation so a 4 G `ON ... AND ...` chain
-                // can't run unbounded.
-                let mut cond_ids: Vec<NodeId> = Vec::new();
-                for (l, r) in &jc.on_conditions {
-                    // Charge two ticks: one for each `Field` allocation
-                    // (left and right column references) emitted below.
-                    // Keeps the worst-case `ON a=b AND c=d AND ...`
-                    // chain bounded by the configured fuel cap.
-                    budget.tick(2).map_err(|e| {
-                        crate::BuildError::JoinOn(dol_expr::lower::LowerError::from(e))
-                    })?;
-                    let lid = {
-                        let col = interner.intern(l);
-                        let fid = arena.alloc_field(dol_expr::FieldNode {
-                            namespace: None,
-                            name: col,
-                            steps: SmallVec::new(),
-                        });
-                        arena.alloc_field_ref(fid)
-                    };
-                    let rid = {
-                        let col = interner.intern(r);
-                        let fid = arena.alloc_field(dol_expr::FieldNode {
-                            namespace: None,
-                            name: col,
-                            steps: SmallVec::new(),
-                        });
-                        arena.alloc_field_ref(fid)
-                    };
-                    cond_ids.push(arena.alloc_bin(dol_expr::expr::BinOp::Eq, lid, rid));
-                }
-                // `on_conditions.is_empty()` was checked above, so the
-                // loop ran at least once and `cond_ids` is non-empty.
-                #[allow(clippy::indexing_slicing)]
-                let mut result = cond_ids[0];
-                #[allow(clippy::indexing_slicing)]
-                for id in &cond_ids[1..] {
-                    result = arena.alloc_bin(dol_expr::expr::BinOp::And, result, *id);
-                }
-                Some(result)
-            };
-            joins.push(JoinNode {
-                source,
-                alias,
-                join_type,
-                on,
-            });
-        }
-
-        let filter = lower_filters(&self.filters, &mut arena, &mut interner, &mut budget)
-            .map_err(crate::BuildError::Filter)?;
-
-        let mut group_by: SmallVec<[NodeId; 4]> = SmallVec::new();
-        for e in &self.group_by {
-            let nid = lower_expr_with_budget(e, &mut arena, &mut interner, &mut budget)
-                .map_err(crate::BuildError::GroupBy)?;
-            group_by.push(nid);
-        }
-
-        let having: Option<NodeId> = if self.having.is_empty() {
-            None
-        } else {
-            lower_filters(&self.having, &mut arena, &mut interner, &mut budget)
-                .map_err(crate::BuildError::Having)?
-        };
-
-        let mut order_by: SmallVec<[(NodeId, dol_expr::expr::Order); 4]> = SmallVec::new();
-        for ob in &self.order_by {
-            let pair = lower_order_by(ob, &mut arena, &mut interner, &mut budget)
-                .map_err(crate::BuildError::OrderBy)?;
-            order_by.push(pair);
-        }
-
-        #[cfg(feature = "sql")]
-        let lock = self.lock_mode;
-        #[cfg(not(feature = "sql"))]
-        let lock: Option<dol_expr::expr::LockHint> = None;
-
-        let qnode = QueryNode {
-            from,
-            alias,
-            joins,
-            filter,
-            columns,
-            group_by,
-            having,
-            order_by,
-            limit: None,
-            offset: None,
-            lock,
-        };
-
-        // Lower the QueryNode into the arena and reference it from
-        // Operation::Query.
-        let qid = arena.alloc_query(qnode);
-        let body = arena.alloc_query_ref(qid);
-
-        let target = dol_command::builders::target::target_from_parts(
-            &mut interner,
-            TargetKind::Relation,
-            &self.name,
-            self.namespace.as_deref(),
-        );
-        let op: dol_command::operation::Operation = OpQuery {
-            target,
-            node: Some(body),
-        }
-        .into();
-        Ok(dol_command::program::Program::new(op, arena, interner))
     }
 }
 

@@ -4,12 +4,19 @@
 //! for DOL. Builders accept an [`Entity`] reference *or*
 //! a plain entity-name string; runtime-known names are first-class.
 //!
-//! Every `.try_build()` returns a [`dol_command::program::Program`] containing one or more
-//! [`dol_command::operation::Operation`]s.
+//! `dol-query` is a **pure data** crate: it owns the DSL builder structs
+//! ([`GetQuery`], [`InsertQuery`], [`UpdateQuery`], [`DeleteQuery`],
+//! [`UpsertQuery`]) and the streaming / pipeline data types under
+//! [`stream`] and [`pipeline`]. The lowering that turns those builders
+//! into a `dol_command::program::Program` lives in
+//! `dol_command::lower_query` (with `dol-command`'s default-on `query`
+//! feature). This split inverts the v1 `dol-query → dol-command` edge so
+//! that the workspace DAG (`command → query`, never the reverse) holds.
 //!
 //! # Quick Start
 //!
 //! ```
+//! use dol_command::lower_query::{BuildProgram, lower_get};
 //! use dol_query::Query;
 //! use dol_expr::tree::{field, param};
 //!
@@ -23,20 +30,16 @@
 //! ]);
 //!
 //! // From an Entity — full field-aware API (requires the `schema` feature).
-//! let program = Query::from(&users)
+//! let q = Query::from(&users)
 //!     .get()
-//!     .filter(field("id").eq(param()))
-//!     .try_build()
-//!     .expect("doc example: trivial filter must lower");
+//!     .filter(field("id").eq(param()));
+//! let program = q.try_build().expect("doc example: trivial filter must lower");
 //! assert_eq!(program.operations[0].kind(), dol_command::operation::OpKind::Query);
 //! # }
 //!
 //! // From a plain string — no field metadata or `schema` feature needed.
-//! let program = Query::from("users")
-//!     .get()
-//!     .fields(&["id", "email"])
-//!     .try_build()
-//!     .expect("doc example: trivial projection must lower");
+//! let q = Query::from("users").get().fields(&["id", "email"]);
+//! let program = lower_get(q).expect("doc example: trivial projection must lower");
 //! assert_eq!(program.operations[0].kind(), dol_command::operation::OpKind::Query);
 //! ```
 
@@ -55,9 +58,11 @@
 #![warn(missing_docs)]
 
 extern crate alloc;
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
 mod delete;
-mod error;
 mod get;
 mod insert;
 pub mod pipeline;
@@ -67,18 +72,13 @@ mod update;
 mod upsert;
 
 pub use delete::DeleteQuery;
-pub use error::BuildError;
-pub use get::GetQuery;
+pub use get::{GetQuery, JoinClause};
 pub use insert::InsertQuery;
 pub use update::UpdateQuery;
 pub use upsert::UpsertQuery;
 
 #[cfg(feature = "schema")]
 use dol_schema::Entity;
-
-use alloc::format;
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
 
 // ---------------------------------------------------------------------------
 // Query — the universal entry point
@@ -89,11 +89,18 @@ use alloc::vec::Vec;
 /// Construct via `Query::from(&entity)` or `Query::from("entity_name")`.
 /// Then call `.get()`, `.insert()`, `.update()`, `.delete()`, or `.upsert()`
 /// to begin building a specific operation.
+///
+/// All fields are `pub` so the lowering host crate (`dol-command` with the
+/// `query` feature, default-on) and integration tests can read them.
 #[derive(Debug, Clone)]
 pub struct Query {
-    pub(crate) name: String,
-    pub(crate) namespace: Option<String>,
-    pub(crate) field_names: Option<Vec<String>>,
+    /// Last dotted segment of the source string (the entity name).
+    pub name: String,
+    /// Optional namespace prefix (everything before the last dotted segment).
+    pub namespace: Option<String>,
+    /// Optional list of all field names, populated when the `Query`
+    /// originated from an `Entity` (with the `schema` feature).
+    pub field_names: Option<Vec<String>>,
 }
 
 impl Query {
@@ -185,6 +192,3 @@ pub enum JoinKind {
     /// `CROSS JOIN` — Cartesian product; no `ON` clause.
     Cross,
 }
-
-#[cfg(all(test, feature = "schema"))]
-mod tests;

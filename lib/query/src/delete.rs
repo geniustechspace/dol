@@ -1,4 +1,10 @@
 //! DELETE query builder for `dol-query`.
+//!
+//! Pure data: the builder accumulates name / namespace / filters /
+//! returning columns. Lowering to a `dol_command::program::Program` is
+//! handled by [`dol_command::lower_query::lower_delete`] (or via the
+//! [`BuildProgram`](dol_command::lower_query::BuildProgram) trait, which
+//! provides the historical `.try_build()` method).
 
 use alloc::{
     string::{String, ToString},
@@ -15,13 +21,23 @@ use dol_expr::tree::Expr;
 /// A composable DELETE builder that works with any entity source.
 ///
 /// Construct via [`Query::from(...).delete()`](crate::Query::delete).
+///
+/// All fields are `pub` so the lowering host crate (`dol-command` with the
+/// `query` feature, default-on) can read them without going through
+/// accessors. Treat them as inputs to the lowering, not as a stable
+/// rebindable surface.
 #[derive(Debug, Clone)]
-#[must_use = "builders do nothing until .try_build() is called"]
+#[must_use = "builders do nothing until lowered to a Program"]
 pub struct DeleteQuery {
-    name: String,
-    namespace: Option<String>,
-    filters: Vec<Expr<'static>>,
-    returning: Vec<String>,
+    /// Target entity name (last dotted segment).
+    pub name: String,
+    /// Optional namespace prefix (everything before the last dotted
+    /// segment of the source string).
+    pub namespace: Option<String>,
+    /// Filter expressions; AND-joined when lowered.
+    pub filters: Vec<Expr<'static>>,
+    /// Column names to return (`*` for all).
+    pub returning: Vec<String>,
 }
 
 impl DeleteQuery {
@@ -52,65 +68,6 @@ impl DeleteQuery {
     pub fn returning(mut self, cols: &[&str]) -> Self {
         self.returning = cols.iter().map(|s| s.to_string()).collect();
         self
-    }
-
-    /// Build the arena-based IR as a [`dol_command::program::Program`] containing a
-    /// single [`dol_command::operation::Operation::Delete`] referencing an arena
-    /// `ExprNode` of opcode [`dol_expr::expr::ExprOp::Delete`].
-    ///
-    /// Fallible: returns [`BuildError::Filter`](crate::BuildError::Filter) when lowering the WHERE
-    /// clause exhausts the default [`Budget`](dol_core::policy::Budget)
-    /// (depth or fuel cap from [`Limits::host`](dol_core::policy::Limits::host)).
-    /// Callers needing a non-default budget can build the program manually
-    /// using `dol_expr::lower::lower_filters` directly.
-    pub fn try_build(self) -> Result<dol_command::program::Program, crate::BuildError> {
-        use dol_command::operation::Delete;
-        use dol_command::target::TargetKind;
-        use dol_core::policy::{Budget, Limits};
-        use dol_expr::expr::DeleteNode;
-        use dol_expr::lower::lower_filters;
-
-        let mut arena = dol_expr::ExprArena::new();
-        let mut interner = dol_expr::Interner::new();
-        let mut budget = Budget::new(Limits::host());
-
-        let target_str = interner.intern(&dol_expr::lower::qualified_name(
-            &self.name,
-            &self.namespace,
-        ));
-        let filter = lower_filters(&self.filters, &mut arena, &mut interner, &mut budget)
-            .map_err(crate::BuildError::Filter)?;
-
-        let returning: smallvec::SmallVec<[dol_expr::ids::NodeId; 4]> = self
-            .returning
-            .iter()
-            .map(|r| {
-                let col = interner.intern(r);
-                let fid = arena.alloc_field(dol_expr::FieldNode {
-                    namespace: None,
-                    name: col,
-                    steps: smallvec::SmallVec::new(),
-                });
-                arena.alloc_field_ref(fid)
-            })
-            .collect();
-
-        let dnode = DeleteNode {
-            target: target_str,
-            filter,
-            returning,
-        };
-        let did = arena.alloc_delete(dnode);
-        let body = arena.alloc_delete_ref(did);
-
-        let target = dol_command::builders::target::target_from_parts(
-            &mut interner,
-            TargetKind::Relation,
-            &self.name,
-            self.namespace.as_deref(),
-        );
-        let op: dol_command::operation::Operation = Delete { target, node: body }.into();
-        Ok(dol_command::program::Program::new(op, arena, interner))
     }
 }
 
