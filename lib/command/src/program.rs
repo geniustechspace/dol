@@ -4,6 +4,7 @@
 extern crate alloc;
 
 use crate::operation::Operation;
+#[cfg(feature = "schema")]
 use dol_schema::SchemaCatalog;
 
 /// A compiled DOL program: a sequence of [`Operation`]s plus the expression
@@ -36,6 +37,12 @@ pub struct Program {
     pub interner: dol_expr::Interner,
     /// Optional schema catalog. `None` means schemas are addressed solely
     /// through `SchemaBinding::Inferred` / `Opaque`.
+    ///
+    /// Only present when the crate is built with `feature = "schema"`.
+    /// Without it, programs cannot embed a catalog body and must address
+    /// schemas via [`SchemaBinding::Inferred`](crate::target::SchemaBinding::Inferred)
+    /// or [`SchemaBinding::Opaque`](crate::target::SchemaBinding::Opaque).
+    #[cfg(feature = "schema")]
     pub schema_catalog: Option<SchemaCatalog>,
 }
 
@@ -47,6 +54,7 @@ impl Program {
             operations: alloc::vec![op],
             arena,
             interner,
+            #[cfg(feature = "schema")]
             schema_catalog: None,
         }
     }
@@ -67,11 +75,15 @@ impl Program {
             operations: ops,
             arena,
             interner,
+            #[cfg(feature = "schema")]
             schema_catalog: None,
         }
     }
 
     /// Replace / set the schema catalog.
+    ///
+    /// Only available with `feature = "schema"`.
+    #[cfg(feature = "schema")]
     pub fn with_catalog(mut self, catalog: SchemaCatalog) -> Self {
         self.schema_catalog = Some(catalog);
         self
@@ -154,6 +166,7 @@ impl Program {
             mut operations,
             arena,
             interner,
+            #[cfg(feature = "schema")]
             schema_catalog,
         } = other;
         if self_empty {
@@ -161,11 +174,14 @@ impl Program {
             self.arena = arena;
             self.interner = interner;
         }
-        if self.schema_catalog.is_some() && schema_catalog.is_some() {
-            return Err(ExtendError::CatalogConflict);
-        }
-        if self.schema_catalog.is_none() {
-            self.schema_catalog = schema_catalog;
+        #[cfg(feature = "schema")]
+        {
+            if self.schema_catalog.is_some() && schema_catalog.is_some() {
+                return Err(ExtendError::CatalogConflict);
+            }
+            if self.schema_catalog.is_none() {
+                self.schema_catalog = schema_catalog;
+            }
         }
         self.operations.append(&mut operations);
         Ok(self)
@@ -198,6 +214,9 @@ pub enum ExtendError {
     /// Both programs carry a populated `schema_catalog`; merging two
     /// catalogs would require entry-level conflict resolution that is out
     /// of scope for this composition primitive.
+    ///
+    /// Only emitted when the crate is built with `feature = "schema"`.
+    #[cfg(feature = "schema")]
     CatalogConflict,
 }
 
@@ -216,6 +235,7 @@ impl core::fmt::Display for ExtendError {
                  other.arena={other_arena}, other.interner={other_interner}); id \
                  remapping is not yet implemented"
             ),
+            #[cfg(feature = "schema")]
             Self::CatalogConflict => {
                 f.write_str("Program::extend: both programs carry a populated schema_catalog")
             }

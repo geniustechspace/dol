@@ -7,13 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Dependency-graph alignment (partial — PR 7 + PR 8a)
+### Dependency-graph alignment (PR 7 + PR 8a + PR 9)
 
-Two of the four DAG violations identified in the v2-layout audit are
-fixed. The remaining two (`dol-command → dol-schema` and
-`dol-query → dol-command`) are deferred — see "Deferred" below.
+Three of the four DAG violations identified in the v2-layout audit are
+now fixed. The remaining one (`dol-query → dol-command`) is deferred
+because the IR types it produces would have to move out of `dol-command`.
 
-#### `dol-schema`: `dol-expr` is now a default-on `expr` feature
+#### `dol-command`: `dol-schema` is now a default-on `schema` feature (PR 9)
+
+The blocker called out in the previous PR ("`SchemaRef` is everywhere in
+every Operation, and `Program.schema_catalog: SchemaCatalog` is a hard
+field — gating it would cascade through every backend/wire/check") is
+resolved by **relocating the small handle types into `dol-core`**:
+
+- New `dol_core::schema` module hosts the zero-dep handle / classifier
+  types: `SchemaRef`, `SchemaId`, `CatalogId`, `TypeBody`,
+  `ComputedKind`, `RefAction`, `RelationRef`, `EntityConstraint`. These
+  are pure newtypes and small enums — they don't pull in any of the
+  catalog *storage* (`SchemaCatalog`, `Entity`, `Field`, `DataType`)
+  that justifies `dol-schema` existing as a separate crate.
+- `dol-schema`'s `schema_ref.rs`, `type_body.rs`, and `constraint.rs`
+  are now thin re-export shims over `dol_core::schema`. The names
+  `dol_schema::SchemaRef` / `TypeBody` / `RefAction` / etc. continue to
+  resolve, so downstream callers see no change.
+- `dol-command` imports the handles from `dol-core::schema` everywhere
+  they appear in the IR (`Target`, `SchemaOp`, `FieldDef`,
+  `prelude.rs`). With handles relocated, the *only* remaining
+  `dol-schema` usages in `dol-command` are the catalog *storage*
+  (`Program.schema_catalog`, `define_from_entity` builder) and the
+  prelude re-exports of `SchemaCatalog`/`CatalogEntry`/`TypeEntry`.
+- `dol-schema` is now an optional `schema` feature on `dol-command`,
+  default-on. Without it: `Program.schema_catalog` field, the
+  `Program::with_catalog` constructor, the `ProgramRef.schema_catalog`
+  field, the `ExtendError::CatalogConflict` variant, the
+  `define_from_entity` builder, and the prelude re-exports of catalog
+  storage types are all `#[cfg]`-gated out.
+- `cargo tree -p dol-command --no-default-features` confirms
+  `dol-schema` is no longer in the dependency graph; only `dol-core`,
+  `dol-expr`, and `smallvec`.
+
+#### `dol-schema`: `dol-expr` is now a default-on `expr` feature (PR 7)
 
 - `dol-schema` previously hard-depended on `dol-expr` for the
   `dol_expr::ids::StrId` type used in `TypeEntry` and
@@ -29,7 +62,7 @@ fixed. The remaining two (`dol-command → dol-schema` and
 - The `dol` umbrella's `schema` feature now forwards `dol-schema?/expr`
   so umbrella consumers also see the full catalog API.
 
-#### `dol-query`: `dol-schema` is now a default-on `schema` feature
+#### `dol-query`: `dol-schema` is now a default-on `schema` feature (PR 8a)
 
 - `dol-query` previously hard-depended on `dol-schema` for
   `Query::from(&Entity)`. The dep is now optional and gated by a new
@@ -41,22 +74,19 @@ fixed. The remaining two (`dol-command → dol-schema` and
   `&str` half is unconditional, the `&Entity` half is gated behind
   `#[cfg(feature = "schema")]`.
 
-#### Deferred
+#### Still deferred
 
-- **`dol-command → dol-schema` gating** (originally proposed as "PR 9").
-  Blocked on a coordinated API change: `Program.schema_catalog` is a
-  `SchemaCatalog` field, every `Symbol` in every Operation wraps
-  `dol_expr::ids::StrId`, and `Target` carries `SchemaRef`. Gating
-  these affects every backend, the wire codec, and the `dol` facade
-  re-exports — too large for a single PR alongside the other gates.
 - **`dol-query → dol-command` removal** (originally proposed as "PR 10").
-  Blocked on designing a query-native IR (`dol_query::Plan` /
-  `Statement`) that mirrors `dol_command::Operation`'s five variants,
-  plus `From<dol_query::Plan> for dol_command::Program` adapters in
-  `dol-command` behind a new `query` feature, plus moving the
-  `OperationExtension` wrapping for `stream`/`pipeline` payloads from
-  query to command. 85 references across 13 query files; comparable in
-  scope to the original v2 refactor.
+  Cannot be solved by a `dol-core` handle relocation: `dol-query`'s
+  `try_build` literally produces `dol_command::Operation` /
+  `dol_command::Program` values, and these are far too large/central
+  (the entire IR, all five DML variants, OperationExtension, the wire
+  codec contract) to relocate. The honest path is to design a
+  query-native plan type (`dol_query::Plan`) that mirrors
+  `Operation`'s five variants and add `From<Plan> for Program`
+  adapters in `dol-command` behind a new `query` feature. 85
+  references across 13 query files. Comparable in scope to the
+  original v2 refactor; needs its own multi-PR session.
 
 ### Crate rename: `dol-ir` → `dol-command`
 

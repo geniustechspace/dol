@@ -97,6 +97,7 @@ pub mod hash;
 pub mod id;
 pub mod policy;
 pub mod raw;
+pub mod schema;
 pub mod signing;
 pub mod span;
 pub mod storage;

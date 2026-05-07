@@ -6,6 +6,7 @@
 
 use crate::operation::Operation;
 use crate::program::Program;
+#[cfg(feature = "schema")]
 use dol_schema::SchemaCatalog;
 
 /// Borrowed view into a [`Program`].
@@ -20,7 +21,9 @@ pub struct ProgramRef<'a> {
     pub arena: &'a dol_expr::ExprArena,
     /// String interner for resolving symbols.
     pub interner: &'a dol_expr::Interner,
-    /// Optional schema catalog for resolving schema references.
+    /// Optional schema catalog for resolving schema references. Only
+    /// present when the crate is built with `feature = "schema"`.
+    #[cfg(feature = "schema")]
     pub schema_catalog: Option<&'a SchemaCatalog>,
 }
 
@@ -37,6 +40,7 @@ impl<'a> From<&'a Program> for ProgramRef<'a> {
             operations: p.operations.as_slice(),
             arena: &p.arena,
             interner: &p.interner,
+            #[cfg(feature = "schema")]
             schema_catalog: p.schema_catalog.as_ref(),
         }
     }

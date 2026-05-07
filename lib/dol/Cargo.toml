@@ -39,7 +39,7 @@ std = [
 # ── Individual layers ────────────────────────────────────────────────────────
 expr     = ["dep:dol-expr"]
 schema   = ["dep:dol-schema", "expr", "dol-schema?/expr"]
-command  = ["dep:dol-command", "expr", "schema"]
+command  = ["dep:dol-command", "expr", "schema", "dol-command?/schema"]
 wire     = ["dep:dol-wire", "command"]
 check    = ["dep:dol-check", "command"]
 fmt      = ["dep:dol-fmt", "command"]

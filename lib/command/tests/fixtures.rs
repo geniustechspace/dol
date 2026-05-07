@@ -26,7 +26,7 @@ use dol_command::operation::{
 use dol_command::operation::{Category, OpKind, Operation};
 use dol_command::target::{Locator, SchemaBinding, Symbol, Target, TargetKind};
 use dol_expr::ids::NodeId;
-use dol_schema::SchemaRef;
+use dol_core::schema::SchemaRef;
 
 fn t(kind: TargetKind) -> Target {
     Target::new(kind, Locator::new(Symbol::default()))

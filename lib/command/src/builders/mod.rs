@@ -20,9 +20,11 @@ pub mod target;
 
 pub use control::{define_policy, grant, revoke, tx_atomic, tx_begin, tx_commit, tx_rollback};
 pub use ddl::{
-    define_entity, define_entity_inferred, define_from_entity, define_index, define_lookup,
-    drop_entity, drop_field, drop_lookup, rename_field,
+    define_entity, define_entity_inferred, define_index, define_lookup, drop_entity, drop_field,
+    drop_lookup, rename_field,
 };
+#[cfg(feature = "schema")]
+pub use ddl::define_from_entity;
 pub use storage::{
     get_blob, list_blobs, move_file, put_blob, put_blob_from_path, read_file, write_file,
     write_file_from_path,

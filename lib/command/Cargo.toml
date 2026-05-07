@@ -11,7 +11,12 @@ readme = "README.md"
 # `dol-schema`'s default features and stay `no_std + alloc`-clean. The paths
 # mirror the workspace deps.
 dol-expr   = { path = "../expr",   default-features = false }
-dol-schema = { path = "../schema", default-features = false, features = ["expr"] }
+# `dol-schema` is gated behind the `schema` feature: only the catalog
+# *storage* types (`SchemaCatalog`, `Entity`, `CatalogEntry`, `TypeEntry`)
+# require it. The catalog *handle* types (`SchemaRef`, `SchemaId`,
+# `CatalogId`, `TypeBody`, `ComputedKind`, `RefAction`, `RelationRef`) live
+# in `dol-core::schema` and are always available.
+dol-schema = { path = "../schema", default-features = false, features = ["expr"], optional = true }
 dol-core   = { path = "../core",   default-features = false }
 smallvec   = { workspace = true }
 serde      = { workspace = true, optional = true }
@@ -20,12 +25,21 @@ serde      = { workspace = true, optional = true }
 serde_json = { workspace = true }
 
 [features]
-# `default = []` keeps the crate `no_std + alloc`-clean for embedded
-# consumers. Enable `std` to get `std::error::Error` impls and any future
-# std-dependent helpers.
-default = []
-std = ["dol-core/std", "dol-expr/std"]
-serde = ["dep:serde", "dol-expr/serde", "dol-schema/serde", "dol-core/serde", "smallvec/serde"]
+# `default = ["schema"]` keeps the historical surface (programs that embed
+# a `SchemaCatalog`, `define_from_entity` builder, prelude re-exports of
+# storage types). Disable to drop the `dol-schema` dep entirely; programs
+# can still reference schemas via `SchemaRef` handles + `SchemaBinding`.
+default = ["schema"]
+# Pull in `dol-schema` for the catalog *storage* surface.
+schema = ["dep:dol-schema"]
+std = ["dol-core/std", "dol-expr/std", "dol-schema?/std"]
+serde = [
+    "dep:serde",
+    "dol-expr/serde",
+    "dol-schema?/serde",
+    "dol-core/serde",
+    "smallvec/serde",
+]
 raw = []
 
 [lints]

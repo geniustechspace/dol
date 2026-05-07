@@ -6,7 +6,7 @@
 
 use dol_core::DataType;
 use dol_expr::ids::NodeId;
-use dol_schema::{ComputedKind, RelationRef};
+use dol_core::schema::{ComputedKind, RelationRef};
 
 use crate::operation::shared::StructuralVerb;
 use crate::target::{Symbol, Target};

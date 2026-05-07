@@ -16,8 +16,12 @@ pub use crate::program::Program;
 pub use crate::program_ref::ProgramRef;
 pub use crate::target::{Locator, SchemaBinding, Symbol, Target, TargetKind};
 
-// Schema catalog types from dol_schema
-pub use dol_schema::{CatalogEntry, CatalogId, SchemaCatalog, SchemaId, SchemaRef, TypeEntry};
+// Schema/field handle types from dol_core::schema (canonical home).
+pub use dol_core::schema::{CatalogId, SchemaId, SchemaRef, TypeBody};
+// Catalog *storage* types from dol_schema (gated — only available when
+// the parent crate is built with `feature = "schema"`).
+#[cfg(feature = "schema")]
+pub use dol_schema::{CatalogEntry, SchemaCatalog, TypeEntry};
 
 /// Data-manipulation verbs (`Insert`, `Update`, `Replace`, `Delete`,
 /// `Upsert`, `Append`).
@@ -33,8 +37,8 @@ pub mod ddl {
         FieldDef, FieldOp, IndexDirection, IndexKey, IndexMethod, IndexOp, LookupMethod, LookupOp,
         SchemaBody, SchemaOp,
     };
-    // Re-export TypeBody from dol_schema
-    pub use dol_schema::TypeBody;
+    // Re-export TypeBody from dol_core::schema (canonical home).
+    pub use dol_core::schema::TypeBody;
 }
 
 /// Data-query verbs (`Query`, `Probe`, `Describe`).
