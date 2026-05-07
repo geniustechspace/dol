@@ -7,7 +7,10 @@ description = "DOL Query — backend-neutral query entry point for any data sour
 readme = "README.md"
 
 [dependencies]
-dol-schema = { workspace = true }
+# `dol-schema` is gated behind the `schema` feature: queries can be built
+# from plain entity-name strings without any schema knowledge. The feature
+# is on by default to preserve the field-aware `Query::from(&Entity)` API.
+dol-schema = { workspace = true, optional = true }
 dol-expr   = { workspace = true }
 dol-command     = { workspace = true }
 dol-core   = { workspace = true }
@@ -16,16 +19,25 @@ serde      = { workspace = true, optional = true }
 postcard   = { workspace = true, optional = true }
 
 [features]
-default = []
-std = ["dol-core/std", "dol-expr/std", "dol-schema/std", "dol-command/std"]
+default = ["schema"]
+# Reference `dol-schema` types (e.g. `Query::from(&Entity)`). Without this
+# feature `Query` is constructed from `&str` only and the crate does not
+# pull in `dol-schema`.
+schema = ["dep:dol-schema"]
+std = [
+    "dol-core/std",
+    "dol-expr/std",
+    "dol-command/std",
+    "dol-schema?/std",
+]
 sql = []
 serde = [
     "dep:serde",
     "dep:postcard",
-    "dol-schema/serde",
     "dol-command/serde",
     "dol-core/serde",
     "dol-expr/serde",
+    "dol-schema?/serde",
     "smallvec/serde",
 ]
 

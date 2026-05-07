@@ -45,7 +45,9 @@ pub mod type_body;
 pub use constraint::{ComputedKind, EntityConstraint, RefAction, RelationRef};
 pub use field::Field;
 pub use field_type::DataType;
-pub use schema_catalog::{CatalogEntry, SchemaCatalog, TypeEntry};
+pub use schema_catalog::{CatalogEntry, SchemaCatalog};
+#[cfg(feature = "expr")]
+pub use schema_catalog::TypeEntry;
 pub use schema_ref::{CatalogId, SchemaId, SchemaRef};
 pub use type_body::TypeBody;
 

@@ -9,6 +9,7 @@
 //! through [`CatalogEntry::Extension`] for backend-specific shapes.
 
 use alloc::vec::Vec;
+#[cfg(feature = "expr")]
 use smallvec::SmallVec;
 
 use crate::schema_ref::{CatalogId, SchemaId};
@@ -21,9 +22,12 @@ extern crate alloc;
 pub enum CatalogEntry {
     /// Entity body (relation / document / KV / blob bucket).
     Entity(crate::Entity),
-    /// Named-type body.
+    /// Named-type body. Requires the `expr` feature for the interned name.
+    #[cfg(feature = "expr")]
     Type(TypeEntry),
-    /// Backend-specific body, codec-encoded.
+    /// Backend-specific body, codec-encoded. Requires the `expr` feature
+    /// for the interned kind tag.
+    #[cfg(feature = "expr")]
     Extension {
         /// Interned kind tag identifying the extension type. Resolve against
         /// the surrounding program's [`Interner`](dol_expr::Interner).
@@ -38,6 +42,9 @@ pub enum CatalogEntry {
 /// Names and members are interned [`dol_expr::ids::StrId`]s; resolve against
 /// the surrounding program's [`Interner`](dol_expr::Interner). The four-element
 /// inline buffer for `members` keeps the common case (small enums) in-line.
+///
+/// Requires the `expr` feature.
+#[cfg(feature = "expr")]
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TypeEntry {
@@ -111,7 +118,7 @@ impl SchemaCatalog {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "expr"))]
 mod tests {
     use super::*;
 

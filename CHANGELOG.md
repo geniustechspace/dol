@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Dependency-graph alignment (partial — PR 7 + PR 8a)
+
+Two of the four DAG violations identified in the v2-layout audit are
+fixed. The remaining two (`dol-command → dol-schema` and
+`dol-query → dol-command`) are deferred — see "Deferred" below.
+
+#### `dol-schema`: `dol-expr` is now a default-on `expr` feature
+
+- `dol-schema` previously hard-depended on `dol-expr` for the
+  `dol_expr::ids::StrId` type used in `TypeEntry` and
+  `CatalogEntry::{Type, Extension}`. The dep is now optional and gated
+  by a new `expr` feature (on by default).
+- With `--no-default-features`, `dol-schema` builds without
+  `dol-expr` in its dep tree (verified with `cargo tree`). The
+  `TypeEntry` struct and the `CatalogEntry::{Type, Extension}` variants
+  are gated out; only `CatalogEntry::Entity` remains.
+- `dol-wire` and `dol-command` opt into `dol-schema`'s `expr` feature
+  explicitly (they already depend on `dol-expr` directly), so the API
+  surface they see is unchanged.
+- The `dol` umbrella's `schema` feature now forwards `dol-schema?/expr`
+  so umbrella consumers also see the full catalog API.
+
+#### `dol-query`: `dol-schema` is now a default-on `schema` feature
+
+- `dol-query` previously hard-depended on `dol-schema` for
+  `Query::from(&Entity)`. The dep is now optional and gated by a new
+  `schema` feature (on by default).
+- With `--no-default-features`, `dol-query` builds without referencing
+  `dol-schema` directly. `Query::from(&str)` works unconditionally;
+  `Query::from(&Entity)` requires the `schema` feature.
+- The doctest in `dol_query::lib`'s top-level docs is now split: the
+  `&str` half is unconditional, the `&Entity` half is gated behind
+  `#[cfg(feature = "schema")]`.
+
+#### Deferred
+
+- **`dol-command → dol-schema` gating** (originally proposed as "PR 9").
+  Blocked on a coordinated API change: `Program.schema_catalog` is a
+  `SchemaCatalog` field, every `Symbol` in every Operation wraps
+  `dol_expr::ids::StrId`, and `Target` carries `SchemaRef`. Gating
+  these affects every backend, the wire codec, and the `dol` facade
+  re-exports — too large for a single PR alongside the other gates.
+- **`dol-query → dol-command` removal** (originally proposed as "PR 10").
+  Blocked on designing a query-native IR (`dol_query::Plan` /
+  `Statement`) that mirrors `dol_command::Operation`'s five variants,
+  plus `From<dol_query::Plan> for dol_command::Program` adapters in
+  `dol-command` behind a new `query` feature, plus moving the
+  `OperationExtension` wrapping for `stream`/`pipeline` payloads from
+  query to command. 85 references across 13 query files; comparable in
+  scope to the original v2 refactor.
+
 ### Crate rename: `dol-ir` → `dol-command`
 
 The IR crate has been renamed to **`dol-command`** to better reflect its

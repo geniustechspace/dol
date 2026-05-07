@@ -11,23 +11,27 @@
 //!
 //! ```
 //! use dol_query::Query;
-//! use dol_schema::{DataType, Entity, Field};
 //! use dol_expr::tree::{field, param};
+//!
+//! # #[cfg(feature = "schema")]
+//! # {
+//! use dol_schema::{DataType, Entity, Field};
 //!
 //! let users = Entity::new("users", vec![
 //!     Field::new("id", DataType::Uuid).identity(),
 //!     Field::new("email", DataType::unbounded_string()),
 //! ]);
 //!
-//! // From an Entity — full field-aware API.
+//! // From an Entity — full field-aware API (requires the `schema` feature).
 //! let program = Query::from(&users)
 //!     .get()
 //!     .filter(field("id").eq(param()))
 //!     .try_build()
 //!     .expect("doc example: trivial filter must lower");
 //! assert_eq!(program.operations[0].kind(), dol_command::operation::OpKind::Query);
+//! # }
 //!
-//! // From a plain string — no field metadata needed.
+//! // From a plain string — no field metadata or `schema` feature needed.
 //! let program = Query::from("users")
 //!     .get()
 //!     .fields(&["id", "email"])
@@ -69,6 +73,7 @@ pub use insert::InsertQuery;
 pub use update::UpdateQuery;
 pub use upsert::UpsertQuery;
 
+#[cfg(feature = "schema")]
 use dol_schema::Entity;
 
 use alloc::format;
@@ -132,6 +137,7 @@ impl Query {
     }
 }
 
+#[cfg(feature = "schema")]
 impl From<&Entity> for Query {
     fn from(entity: &Entity) -> Self {
         Self {
@@ -180,5 +186,5 @@ pub enum JoinKind {
     Cross,
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "schema"))]
 mod tests;

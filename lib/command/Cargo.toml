@@ -11,7 +11,7 @@ readme = "README.md"
 # `dol-schema`'s default features and stay `no_std + alloc`-clean. The paths
 # mirror the workspace deps.
 dol-expr   = { path = "../expr",   default-features = false }
-dol-schema = { path = "../schema", default-features = false }
+dol-schema = { path = "../schema", default-features = false, features = ["expr"] }
 dol-core   = { path = "../core",   default-features = false }
 smallvec   = { workspace = true }
 serde      = { workspace = true, optional = true }
