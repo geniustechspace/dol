@@ -7,11 +7,13 @@
 //! Schemas are referenced through the program's catalog
 //! ([`SchemaRef`]) rather than embedded inline. Backends that need the full
 //! schema body resolve it through
-//! [`SchemaCatalog`](crate::schema_catalog::SchemaCatalog).
+//! [`SchemaCatalog`](dol_schema::SchemaCatalog).
 
 use crate::operation::shared::StructuralVerb;
-use crate::schema_ref::SchemaRef;
 use crate::target::{Symbol, Target};
+
+// Import from dol_schema (now canonical home)
+use dol_schema::{SchemaRef, TypeBody};
 
 /// Body kind of a [`SchemaOp`] payload.
 ///
@@ -41,20 +43,6 @@ pub enum SchemaBody {
     Reference,
 }
 
-/// Type-body classification for `Schema { verb: Create, body: Type, .. }`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub enum TypeBody {
-    /// Enumerated type (e.g. PostgreSQL `CREATE TYPE ... AS ENUM`).
-    Enum,
-    /// Composite / record type (e.g. PostgreSQL `CREATE TYPE ... AS (...)`.
-    Composite,
-    /// Distinct (domain) type with constraints.
-    Distinct,
-    /// Backend-specific type kind.
-    Other,
-}
-
 /// Schema-level structural operation.
 ///
 /// Maps to SQL `CREATE TABLE` / `DROP TABLE` / `ALTER TABLE` / `TRUNCATE`,
@@ -64,7 +52,7 @@ pub enum TypeBody {
 ///
 /// ```
 /// use dol_ir::operation::{SchemaBody, SchemaOp, StructuralVerb};
-/// use dol_ir::schema_ref::{CatalogId, SchemaId, SchemaRef};
+/// use dol_schema::{CatalogId, SchemaId, SchemaRef};
 /// use dol_ir::target::{Locator, Symbol, Target, TargetKind};
 /// use dol_ir::Operation;
 ///

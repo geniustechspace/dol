@@ -14,9 +14,10 @@ pub use crate::operation::{Category, OpKind, Operation};
 pub use crate::privilege::Privilege;
 pub use crate::program::Program;
 pub use crate::program_ref::ProgramRef;
-pub use crate::schema_catalog::{CatalogEntry, SchemaCatalog, TypeEntry};
-pub use crate::schema_ref::{CatalogId, SchemaId, SchemaRef};
 pub use crate::target::{Locator, SchemaBinding, Symbol, Target, TargetKind};
+
+// Schema catalog types from dol_schema
+pub use dol_schema::{CatalogEntry, CatalogId, SchemaId, SchemaRef, SchemaCatalog, TypeEntry};
 
 /// Data-manipulation verbs (`Insert`, `Update`, `Replace`, `Delete`,
 /// `Upsert`, `Append`).
@@ -30,8 +31,10 @@ pub mod dml {
 pub mod ddl {
     pub use crate::operation::{
         FieldDef, FieldOp, IndexDirection, IndexKey, IndexMethod, IndexOp, LookupMethod, LookupOp,
-        SchemaBody, SchemaOp, TypeBody,
+        SchemaBody, SchemaOp,
     };
+    // Re-export TypeBody from dol_schema
+    pub use dol_schema::TypeBody;
 }
 
 /// Data-query verbs (`Query`, `Probe`, `Describe`).

@@ -9,7 +9,7 @@
 
 use smallvec::SmallVec;
 
-use crate::schema_ref::SchemaRef;
+use dol_schema::SchemaRef;
 
 /// Interned name handle.
 ///

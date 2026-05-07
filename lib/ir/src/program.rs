@@ -4,7 +4,7 @@
 extern crate alloc;
 
 use crate::operation::Operation;
-use crate::schema_catalog::SchemaCatalog;
+use dol_schema::SchemaCatalog;
 
 /// A compiled DOL program: a sequence of [`Operation`]s plus the expression
 /// arena and interner needed to render any arena references they carry.

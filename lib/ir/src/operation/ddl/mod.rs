@@ -11,4 +11,7 @@ pub mod schema;
 pub use field::{FieldDef, FieldOp};
 pub use index::{IndexDirection, IndexKey, IndexMethod, IndexOp};
 pub use lookup::{LookupMethod, LookupOp};
-pub use schema::{SchemaBody, SchemaOp, TypeBody};
+pub use schema::{SchemaBody, SchemaOp};
+
+// Re-export TypeBody from dol_schema (canonical home)
+pub use dol_schema::TypeBody;

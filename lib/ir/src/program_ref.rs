@@ -6,7 +6,7 @@
 
 use crate::operation::Operation;
 use crate::program::Program;
-use crate::schema_catalog::SchemaCatalog;
+use dol_schema::SchemaCatalog;
 
 /// Borrowed view into a [`Program`].
 ///

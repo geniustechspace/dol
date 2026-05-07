@@ -1,10 +1,10 @@
 //! In-program schema catalog.
 //!
 //! Schemas live in a catalog rather than being embedded inline in every
-//! [`Operation`](crate::operation::Operation). Each catalog entry is keyed by
-//! [`SchemaId`] and resolved through a [`SchemaRef`](crate::SchemaRef).
+//! operation. Each catalog entry is keyed by [`SchemaId`] and resolved
+//! through a [`SchemaRef`].
 //!
-//! The catalog stores [`dol_schema::Entity`] for entity bodies and a small
+//! The catalog stores [`crate::Entity`] for entity bodies and a small
 //! [`TypeEntry`] for named-type bodies; backends can extend the catalog
 //! through [`CatalogEntry::Extension`] for backend-specific shapes.
 
@@ -12,7 +12,6 @@ use alloc::vec::Vec;
 use smallvec::SmallVec;
 
 use crate::schema_ref::{CatalogId, SchemaId};
-use crate::target::Symbol;
 
 extern crate alloc;
 
@@ -21,14 +20,14 @@ extern crate alloc;
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum CatalogEntry {
     /// Entity body (relation / document / KV / blob bucket).
-    Entity(dol_schema::Entity),
+    Entity(crate::Entity),
     /// Named-type body.
     Type(TypeEntry),
     /// Backend-specific body, codec-encoded.
     Extension {
         /// Interned kind tag identifying the extension type. Resolve against
         /// the surrounding program's [`Interner`](dol_expr::Interner).
-        kind: Symbol,
+        kind: dol_expr::ids::StrId,
         /// Opaque payload bytes.
         payload: Vec<u8>,
     },
@@ -36,19 +35,19 @@ pub enum CatalogEntry {
 
 /// Named-type body stored in the catalog.
 ///
-/// Names and members are interned [`Symbol`]s; resolve against the
-/// surrounding program's [`Interner`](dol_expr::Interner). The four-element
+/// Names and members are interned [`dol_expr::ids::StrId`]s; resolve against
+/// the surrounding program's [`Interner`](dol_expr::Interner). The four-element
 /// inline buffer for `members` keeps the common case (small enums) in-line.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TypeEntry {
     /// Interned type name.
-    pub name: Symbol,
+    pub name: dol_expr::ids::StrId,
     /// Type classification (enum, composite, distinct).
-    pub kind: crate::operation::TypeBody,
+    pub kind: crate::TypeBody,
     /// Optional list of variants (for enums) or fields (for composites),
     /// each interned. The four-slot inline buffer covers the common case.
-    pub members: SmallVec<[Symbol; 4]>,
+    pub members: SmallVec<[dol_expr::ids::StrId; 4]>,
 }
 
 /// Catalog of schemas referenced by a program.
@@ -120,9 +119,12 @@ mod tests {
     fn insert_and_get() {
         let mut cat = SchemaCatalog::new();
         let id = cat.insert(CatalogEntry::Type(TypeEntry {
-            name: Symbol::from_hash(0),
-            kind: crate::operation::TypeBody::Enum,
-            members: smallvec::smallvec![Symbol::from_hash(1), Symbol::from_hash(2)],
+            name: dol_expr::ids::StrId::from_u32(1).unwrap(),
+            kind: crate::TypeBody::Enum,
+            members: smallvec::smallvec![
+                dol_expr::ids::StrId::from_u32(2).unwrap(),
+                dol_expr::ids::StrId::from_u32(3).unwrap()
+            ],
         }));
         assert_eq!(cat.len(), 1);
         assert!(matches!(cat.get(id), Some(CatalogEntry::Type(_))));

@@ -15,8 +15,9 @@ use dol_ir::operation::acl::{
 };
 use dol_ir::operation::ddl::{
     FieldDef, FieldOp, IndexDirection, IndexKey, IndexMethod, IndexOp, LookupMethod, LookupOp,
-    SchemaBody, SchemaOp, TypeBody,
+    SchemaBody, SchemaOp,
 };
+use dol_schema::TypeBody;
 use dol_ir::operation::dml::{
     Append, Delete, Insert, InsertSource, Replace, ReplaceBody, Update, Upsert,
 };
@@ -25,9 +26,8 @@ use dol_ir::operation::meta::{ExtensionId, OperationExtension};
 use dol_ir::operation::tx::{IsolationLevel, TxBegin, TxOp, TxOptions};
 use dol_ir::operation::{Operation, StructuralVerb};
 use dol_ir::privilege::Privilege;
-use dol_ir::schema_catalog::{CatalogEntry, SchemaCatalog, TypeEntry};
-use dol_ir::schema_ref::{CatalogId, SchemaId, SchemaRef};
 use dol_ir::target::{Locator, SchemaBinding, Symbol, Target, TargetKind};
+use dol_schema::{CatalogEntry, CatalogId, SchemaId, SchemaRef, SchemaCatalog, TypeEntry};
 use dol_schema::constraint::{ComputedKind, EntityConstraint, RefAction, RelationRef};
 use dol_schema::{Entity, Field};
 
@@ -1126,10 +1126,10 @@ impl Decode for Entity {
 
 impl Decode for TypeEntry {
     fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
-        let name = budget.descend(|b| Symbol::decode(reader, b))??;
+        let name = budget.descend(|b| dol_expr::ids::StrId::decode(reader, b))??;
         let kind = budget.descend(|b| TypeBody::decode(reader, b))??;
         let members =
-            budget.descend(|b| smallvec::SmallVec::<[Symbol; 4]>::decode(reader, b))??;
+            budget.descend(|b| smallvec::SmallVec::<[dol_expr::ids::StrId; 4]>::decode(reader, b))??;
         Ok(TypeEntry {
             name,
             kind,
@@ -1150,7 +1150,7 @@ impl Decode for CatalogEntry {
                 Ok(CatalogEntry::Type(type_entry))
             }
             2 => {
-                let kind = budget.descend(|b| Symbol::decode(reader, b))??;
+                let kind = budget.descend(|b| dol_expr::ids::StrId::decode(reader, b))??;
                 let payload = budget.descend(|b| Vec::<u8>::decode(reader, b))??;
                 Ok(CatalogEntry::Extension { kind, payload })
             }

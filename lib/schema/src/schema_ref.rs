@@ -1,8 +1,8 @@
 //! Schema catalog handles.
 //!
-//! Schemas are data, not embedded Rust type walls. A
-//! [`Program`](crate::Program) carries an optional `SchemaCatalog`, and
-//! operations reference catalog entries by [`SchemaRef`] handle.
+//! Schemas are data, not embedded Rust type walls. A Program carries an
+//! optional `SchemaCatalog`, and operations reference catalog entries by
+//! [`SchemaRef`] handle.
 //!
 //! `CatalogId` and `SchemaId` are both transparent `u32` newtypes so a
 //! `SchemaRef` is two integers — cheap to copy, cheap to compare, and
@@ -79,9 +79,8 @@ impl From<u32> for SchemaId {
 /// Reference to a schema in a catalog.
 ///
 /// The pair `(catalog, schema)` resolves to a schema body inside a
-/// [`Program`](crate::Program)'s `schema_catalog`. The schema itself stays in
-/// the catalog rather than being inlined into every
-/// [`Operation`](crate::operation::Operation) payload.
+/// Program's `schema_catalog`. The schema itself stays in the catalog
+/// rather than being inlined into every Operation payload.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct SchemaRef {

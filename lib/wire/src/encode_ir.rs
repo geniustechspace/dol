@@ -10,8 +10,9 @@ use dol_ir::operation::acl::{
 };
 use dol_ir::operation::ddl::{
     FieldDef, FieldOp, IndexDirection, IndexKey, IndexMethod, IndexOp, LookupMethod, LookupOp,
-    SchemaBody, SchemaOp, TypeBody,
+    SchemaBody, SchemaOp,
 };
+use dol_schema::TypeBody;
 use dol_ir::operation::dml::{
     Append, Delete, Insert, InsertSource, Replace, ReplaceBody, Update, Upsert,
 };
@@ -20,9 +21,8 @@ use dol_ir::operation::meta::{ExtensionId, OperationExtension};
 use dol_ir::operation::tx::{IsolationLevel, TxBegin, TxOp, TxOptions};
 use dol_ir::operation::{Operation, StructuralVerb};
 use dol_ir::privilege::Privilege;
-use dol_ir::schema_catalog::{CatalogEntry, SchemaCatalog, TypeEntry};
-use dol_ir::schema_ref::{CatalogId, SchemaId, SchemaRef};
 use dol_ir::target::{Locator, SchemaBinding, Symbol, Target, TargetKind};
+use dol_schema::{CatalogEntry, CatalogId, SchemaId, SchemaRef, SchemaCatalog, TypeEntry};
 use dol_schema::constraint::{ComputedKind, EntityConstraint, RefAction, RelationRef};
 use dol_schema::{Entity, Field};
 

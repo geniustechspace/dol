@@ -392,7 +392,9 @@ name = "dol-schema"
 version = "0.2.0"
 dependencies = [
  "dol-core",
+ "dol-expr",
  "serde",
+ "smallvec",
 ]
 
 [[package]]
