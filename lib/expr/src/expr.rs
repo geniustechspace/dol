@@ -30,13 +30,15 @@
 //!
 //! A construct is a structural opcode iff **any** holds:
 //! 1. **Variable arity** — admits 0..n operands or branches (CASE,
-//!    IN-list, Func, Window, Agg).
+//!    Composite (array/object/tuple), Func, Window, Agg).
 //! 2. **Role-asymmetric operands** — e.g. CAST's RHS is a *type*,
-//!    ALIAS's is a *name*, IN's RHS is a *collection context*,
-//!    BETWEEN's three operands have distinct roles (probe/lo/hi).
+//!    ALIAS's is a *name*, IN's RHS is a *collection context*
+//!    (a child arena node whose opcode discriminates list / subquery
+//!    / param / field forms), BETWEEN's three operands have distinct
+//!    roles (probe/lo/hi).
 //! 3. **Side-pool payload** — references a pooled record (`FieldId`,
-//!    `FuncId`, `CaseId`, `WindowId`, `QueryId`, `LiteralId`, …)
-//!    rather than just two `NodeId`s.
+//!    `FuncId`, `CaseId`, `WindowId`, `CompositeId`, `QueryId`,
+//!    `LiteralId`, …) rather than just two `NodeId`s.
 //! 4. **Statement, not value** — `Insert`, `Update`, `Delete`,
 //!    `Upsert`, `Query` produce row sets / row counts, not scalars.
 //!

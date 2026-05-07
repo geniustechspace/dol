@@ -254,11 +254,58 @@ fn lower_inner(
             Ok(arena.alloc_composite_ref(cid))
         }
 
-        Expr::BinaryOp { left, op, right } => {
-            let lhs = lower_child(left, arena, interner, budget)?;
-            let rhs = lower_child(right, arena, interner, budget)?;
-            let bin_op = lower_binop(op);
-            Ok(arena.alloc_bin(bin_op, lhs, rhs))
+        Expr::BinaryOp { .. } => {
+            // ── Iterative left-spine walker ──────────────────────────────────
+            // Adversarial inputs (deep `a | b | c | ...` chains) build a
+            // left-recursive `BinaryOp` tree. Recursing through it would
+            // grow the host stack proportionally to chain length. We
+            // unwind the left spine iteratively on the heap so the only
+            // host-stack consumption is the (typically shallow) right
+            // operands plus the bottommost non-BinaryOp left.
+            //
+            // Budget accounting matches the per-AST-node recursive form:
+            // each spine layer pays one `budget.tick(1)` (just like the
+            // top-of-`lower_inner` charge for a recursive call), and the
+            // logical depth of the spine is checked against
+            // [`Limits::max_depth`] explicitly so we keep the same
+            // rejection contract a recursive `budget.descend` chain
+            // would have surfaced.
+            //
+            // The first spine layer's tick was already paid by the
+            // surrounding `lower_inner` entry above, so we charge
+            // `tick(1)` only for *additional* spine layers (matching the
+            // recursive cost of `lower_child → lower_inner`).
+            let max_depth = budget.limits().max_depth;
+            let mut spine: Vec<(BinOp, &Expr<'_>)> = Vec::new();
+            let mut cur: &Expr<'_> = expr;
+            while let Expr::BinaryOp { left, op, right } = cur {
+                let bin_op = lower_binop(op);
+                spine.push((bin_op, right.as_ref()));
+                cur = left.as_ref();
+                // Logical depth = spine layers walked + the surrounding
+                // `lower_child` `descend` already counted by `budget`.
+                let logical_depth = budget.depth().saturating_add(spine.len() as u32);
+                if logical_depth > max_depth {
+                    return Err(LowerError::DepthExceeded { depth: max_depth });
+                }
+                // Charge one tick per additional spine layer (the layer
+                // we just consumed). The very first layer was paid for
+                // at the top of `lower_inner`.
+                if spine.len() > 1 {
+                    budget.tick(1).map_err(|_| LowerError::FuelExhausted)?;
+                }
+            }
+            // `cur` is the bottommost non-`BinaryOp` left operand.
+            // Lower it through the normal recursive path — the recursion
+            // here is bounded by *its* depth, not the spine length.
+            let mut acc = lower_child(cur, arena, interner, budget)?;
+            // Build up the bin nodes bottom-up. Each right operand's
+            // recursion is bounded by the right operand's own depth.
+            while let Some((bin_op, right)) = spine.pop() {
+                let rhs = lower_child(right, arena, interner, budget)?;
+                acc = arena.alloc_bin(bin_op, acc, rhs);
+            }
+            Ok(acc)
         }
 
         Expr::UnaryOp { op, expr: inner } => {
@@ -735,16 +782,20 @@ mod tests {
     /// so a future regression on Budget threading can't pass the
     /// rejection test by simply failing for the wrong reason.
     ///
-    /// We use a modest depth (64) here because the current lowerer is
-    /// recursive — the `Budget::descend` cap is the production guard
-    /// against host-stack overflow, and the rejection test already
-    /// exercises chains far longer than this. A future iterative
-    /// work-stack rewrite (deferred follow-up) will let us crank this
-    /// up.
+    /// `BinaryOp` left-spine lowering is iterative (heap-allocated
+    /// spine vector), so the host stack does **not** scale with chain
+    /// depth during *lowering*. We therefore exercise a chain length
+    /// (8 192) two orders of magnitude above the previous recursive
+    /// cap (64) — a regression that reintroduces recursion into the
+    /// spine walk would overflow the default test stack on this input.
+    /// We're still bounded above by the recursive `Drop` of the
+    /// `Box<Expr>` chain at end of test (matching
+    /// `deep_or_chain_does_not_overflow`'s rationale), so we don't go
+    /// to 100 000 here even though the lowerer itself can take it.
     #[test]
     fn deep_or_chain_succeeds_with_ample_depth_cap() {
         use crate::tree::int;
-        let depth = 64usize;
+        let depth = 8_192usize;
         let mut e = field("a").eq(int(0i32));
         for _ in 0..depth {
             e = e | field("b").eq(int(0i32));
