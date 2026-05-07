@@ -302,7 +302,8 @@ define_func!(
     "JSON_HAS_ANY_KEY",
     Arity::Exact(2),
     FuncKind::Scalar
-);define_func!(
+);
+define_func!(
     JsonHasAllKeys,
     "JSON_HAS_ALL_KEYS",
     Arity::Exact(2),
