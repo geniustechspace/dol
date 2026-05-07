@@ -117,6 +117,14 @@ jobs:
       - name: Budget-gate (recursive entry points)
         run: cargo run -p xtask -- budget-gate
 
+      # Tag-table drift gate: the `BinOp`, `UnaryOp` and `ExprOp` tag
+      # tables are append-only by the four-tier rule (see
+      # `lib/expr/src/expr.rs`). The gate fails CI if the live enum and
+      # the snapshot in `xtask/src/tag_table.rs` disagree, catching
+      # accidental renumbering or unsnapshot enum extensions.
+      - name: Tag-table drift gate
+        run: cargo run -p xtask -- tag-table-gate
+
       # v2 invariant gate: every public IR / schema / value type must
       # round-trip through the budget-threaded `dol-wire::Decode` path.
       # `serde::Deserialize` is intentionally absent from in-memory IR/AST

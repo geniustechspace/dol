@@ -26,6 +26,8 @@
 
 use std::process::{Command, ExitCode};
 
+mod tag_table;
+
 fn main() -> ExitCode {
     let mut args = std::env::args().skip(1);
     let cmd = args.next().unwrap_or_else(|| "help".into());
@@ -41,6 +43,7 @@ fn main() -> ExitCode {
         ),
         "readme" => readme_check(),
         "budget-gate" => budget_gate(),
+        "tag-table-gate" => tag_table_gate(),
         "ci" => ci_gate(&rest),
         "help" | "-h" | "--help" => {
             print_help();
@@ -76,6 +79,10 @@ fn print_help() {
                         (`pub fn (walk|visit|decode|lower)*`) must take a\n             \
                         `&mut Budget`. Fails CI on any offender that lacks\n             \
                         an explicit `// budget-gate: opt-out` marker.\n  \
+           tag-table-gate  enforce that the frozen `BinOp`, `UnaryOp` and\n             \
+                        `ExprOp` tag tables match the tables snapshot baked\n             \
+                        into `xtask`. Adding/renumbering an opcode without\n             \
+                        updating the snapshot fails CI.\n  \
            ci           run the same gate chain as `.github/workflows/ci.yml`\n             \
                         locally (fmt, clippy, check, test, doctest no-default,\n             \
                         budget-gate, size, nostd, readme, mcu). Pass `--quick`\n             \
@@ -355,7 +362,7 @@ fn ci_gate(extra: &[String]) -> bool {
     // Each step is `(human-readable label, closure -> bool)`. Closures
     // let `mcu_check`/`budget_gate`/etc. share a uniform reporting path
     // with the `cargo`-shelling steps.
-    let steps: [(&str, &dyn Fn() -> bool); 9] = [
+    let steps: [(&str, &dyn Fn() -> bool); 10] = [
         ("fmt", &|| {
             run_cargo(&["fmt", "--all", "--", "--check"], &[])
         }),
@@ -389,6 +396,7 @@ fn ci_gate(extra: &[String]) -> bool {
             )
         }),
         ("budget-gate", &budget_gate),
+        ("tag-table-gate", &tag_table_gate),
         ("size", &size_report),
         ("nostd", &nostd_check),
         ("readme", &readme_check),
@@ -414,6 +422,38 @@ fn ci_gate(extra: &[String]) -> bool {
 
     eprintln!("\nxtask ci: all gates passed");
     true
+}
+
+// ---------------------------------------------------------------------------
+// tag-table-gate
+// ---------------------------------------------------------------------------
+
+/// Drift gate for the frozen `BinOp` / `UnaryOp` / `ExprOp` tag tables.
+///
+/// See [`crate::tag_table`] for the snapshot tables and the gate's
+/// positive- and negative-path assertions.
+fn tag_table_gate() -> bool {
+    match tag_table::run() {
+        Ok(()) => {
+            println!(
+                "xtask tag-table-gate: BinOp ({} entries), UnaryOp ({} entries), \
+                 ExprOp ({} entries) tag tables match the live enum",
+                tag_table::EXPECTED_BINOP.len(),
+                tag_table::EXPECTED_UNARY.len(),
+                tag_table::EXPECTED_EXPROP.len(),
+            );
+            true
+        }
+        Err(msg) => {
+            eprintln!("xtask tag-table-gate: drift detected:\n  {msg}");
+            eprintln!(
+                "\nFix: update both the affected enum (in `lib/expr/src/expr.rs`) \
+                 and the matching `EXPECTED_*` snapshot in `xtask/src/tag_table.rs` \
+                 in the same PR."
+            );
+            false
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
