@@ -23,8 +23,8 @@ extern crate alloc;
 /// Field meanings:
 ///
 /// * `nodes` — `ExprArena::nodes` capacity × `size_of::<ExprNode>()`.
-/// * `side_pools` — sum of every per-shape pool (fields, funcs, obj_lits,
-///   windows, cases, in_lists, queries, inserts, updates, deletes,
+/// * `side_pools` — sum of every per-shape pool (fields, funcs,
+///   composites, windows, cases, queries, inserts, updates, deletes,
 ///   upserts, lits, span table).
 /// * `interner` — bytes blob + slice index + lookup table footprint
 ///   (see [`Interner::heap_bytes`]).

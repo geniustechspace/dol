@@ -6,8 +6,8 @@ use alloc::vec::Vec;
 
 use dol_core::policy::Budget;
 use dol_expr::arena::{
-    ArrayLitNode, CaseNode, ExprArena, FieldNode, FieldStep, FuncNode, InListNode, ObjLitNode,
-    Span, SpanTable, WindowNode,
+    CaseNode, CompositeKind, CompositeNode, ExprArena, FieldNode, FieldStep, FuncNode, Span,
+    SpanTable, WindowNode,
 };
 use dol_expr::expr::{
     BinOp, ConflictClause, DeleteNode, ExprNode, ExprOp, InsertNode, JoinNode, JoinType, LockHint,
@@ -64,13 +64,29 @@ impl Decode for FuncNode {
     }
 }
 
-// ─── ObjLitNode ──────────────────────────────────────────────────────────────
+// ─── CompositeKind / CompositeNode ───────────────────────────────────────────
 
-impl Decode for ObjLitNode {
+impl Decode for CompositeKind {
+    fn decode(reader: &mut Reader<'_>, _b: &mut Budget) -> Result<Self, DecodeError> {
+        let raw = reader.read_varint_u32()?;
+        let tag: u8 = raw.try_into().map_err(|_| DecodeError::InvalidVariant {
+            type_name: "CompositeKind",
+            seen: raw,
+        })?;
+        CompositeKind::from_u8(tag).ok_or(DecodeError::InvalidVariant {
+            type_name: "CompositeKind",
+            seen: raw,
+        })
+    }
+}
+
+impl Decode for CompositeNode {
     fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
-        let inner =
-            budget.descend(|b| smallvec::SmallVec::<[(StrId, NodeId); 4]>::decode(reader, b))??;
-        Ok(ObjLitNode(inner))
+        let kind = budget.descend(|b| CompositeKind::decode(reader, b))??;
+        let items = budget.descend(|b| {
+            smallvec::SmallVec::<[(Option<StrId>, NodeId); 4]>::decode(reader, b)
+        })??;
+        Ok(CompositeNode { kind, items })
     }
 }
 
@@ -180,24 +196,8 @@ impl Decode for CaseNode {
     }
 }
 
-// ─── InListNode ──────────────────────────────────────────────────────────────
-
-impl Decode for InListNode {
-    fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
-        let expr = budget.descend(|b| NodeId::decode(reader, b))??;
-        let list = budget.descend(|b| smallvec::SmallVec::<[NodeId; 8]>::decode(reader, b))??;
-        Ok(InListNode { expr, list })
-    }
-}
-
-// ─── ArrayLitNode ────────────────────────────────────────────────────────────
-
-impl Decode for ArrayLitNode {
-    fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
-        let items = budget.descend(|b| smallvec::SmallVec::<[NodeId; 4]>::decode(reader, b))??;
-        Ok(ArrayLitNode { items })
-    }
-}
+// ─── (InListNode / ArrayLitNode decoders removed; collapsed into ─────────────
+//      CompositeNode above.)
 
 // ─── Span / SpanTable ────────────────────────────────────────────────────────
 
@@ -538,17 +538,12 @@ impl Decode for ExprArena {
             arena.alloc_func(func);
         }
 
-        // 5. obj_lits
-        let obj_lits = budget.descend(|b| Vec::<ObjLitNode>::decode(reader, b))??;
-        for obj in obj_lits {
-            arena.alloc_obj_lit(obj);
-        }
-
-        // 5b. array_lits (new in v2; lives between obj_lits and windows
-        //     to keep all "value-shaped" pools clustered).
-        let array_lits = budget.descend(|b| Vec::<ArrayLitNode>::decode(reader, b))??;
-        for arr in array_lits {
-            arena.alloc_array_lit(arr);
+        // 5. composites (unified array / object / tuple side-pool;
+        //    replaces the legacy `obj_lits`, `array_lits`, `in_lists`
+        //    pools).
+        let composites = budget.descend(|b| Vec::<CompositeNode>::decode(reader, b))??;
+        for comp in composites {
+            arena.alloc_composite(comp);
         }
 
         // 6. windows
@@ -563,13 +558,7 @@ impl Decode for ExprArena {
             arena.alloc_case(case);
         }
 
-        // 8. in_lists
-        let in_lists = budget.descend(|b| Vec::<InListNode>::decode(reader, b))??;
-        for il in in_lists {
-            arena.alloc_in_list(il);
-        }
-
-        // 9. queries
+        // 8. queries
         let queries = budget.descend(|b| Vec::<QueryNode>::decode(reader, b))??;
         for q in queries {
             arena.alloc_query(q);

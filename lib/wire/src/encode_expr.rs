@@ -4,8 +4,8 @@ extern crate alloc;
 
 use dol_core::policy::Budget;
 use dol_expr::arena::{
-    ArrayLitNode, CaseNode, ExprArena, FieldNode, FieldStep, FuncNode, InListNode, ObjLitNode,
-    Span, SpanTable, WindowNode,
+    CaseNode, CompositeKind, CompositeNode, ExprArena, FieldNode, FieldStep, FuncNode, Span,
+    SpanTable, WindowNode,
 };
 use dol_expr::expr::{
     BinOp, ConflictClause, DeleteNode, ExprNode, ExprOp, InsertNode, JoinNode, JoinType, LockHint,
@@ -58,11 +58,18 @@ impl Encode for FuncNode {
     }
 }
 
-// ─── ObjLitNode ──────────────────────────────────────────────────────────────
+// ─── CompositeNode ───────────────────────────────────────────────────────────
 
-impl Encode for ObjLitNode {
+impl Encode for CompositeKind {
+    fn encode(&self, w: &mut Writer<'_>, _b: &mut Budget) -> Result<(), EncodeError> {
+        w.write_varint_u32(*self as u32)
+    }
+}
+
+impl Encode for CompositeNode {
     fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
-        b.descend(|b| self.0.encode(w, b))??;
+        b.descend(|b| self.kind.encode(w, b))??;
+        b.descend(|b| self.items.encode(w, b))??;
         Ok(())
     }
 }
@@ -157,24 +164,8 @@ impl Encode for CaseNode {
     }
 }
 
-// ─── InListNode ──────────────────────────────────────────────────────────────
-
-impl Encode for InListNode {
-    fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
-        b.descend(|b| self.expr.encode(w, b))??;
-        b.descend(|b| self.list.encode(w, b))??;
-        Ok(())
-    }
-}
-
-// ─── ArrayLitNode ────────────────────────────────────────────────────────────
-
-impl Encode for ArrayLitNode {
-    fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
-        b.descend(|b| self.items.encode(w, b))??;
-        Ok(())
-    }
-}
+// ─── (InListNode / ArrayLitNode encoders removed; collapsed into ─────────────
+//      CompositeNode above.)
 
 // ─── Span / SpanTable ────────────────────────────────────────────────────────
 
@@ -436,11 +427,9 @@ impl Encode for ExprArena {
         b.descend(|b| self.span_table_ref().encode(w, b))??;
         b.descend(|b| encode_slice(self.lits_slice(), w, b))??;
         b.descend(|b| encode_slice(self.funcs_slice(), w, b))??;
-        b.descend(|b| encode_slice(self.obj_lits_slice(), w, b))??;
-        b.descend(|b| encode_slice(self.array_lits_slice(), w, b))??;
+        b.descend(|b| encode_slice(self.composites_slice(), w, b))??;
         b.descend(|b| encode_slice(self.windows_slice(), w, b))??;
         b.descend(|b| encode_slice(self.cases_slice(), w, b))??;
-        b.descend(|b| encode_slice(self.in_lists_slice(), w, b))??;
         b.descend(|b| encode_slice(self.queries_slice(), w, b))??;
         b.descend(|b| encode_slice(self.inserts_slice(), w, b))??;
         b.descend(|b| encode_slice(self.updates_slice(), w, b))??;

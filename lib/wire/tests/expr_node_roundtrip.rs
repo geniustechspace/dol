@@ -20,8 +20,8 @@
 use dol_core::policy::{Budget, Limits};
 use dol_expr::expr::{BinOp, ExprNode, UnaryOp};
 use dol_expr::ids::{
-    ArrayLitId, CaseId, DeleteId, FieldId, FuncId, InListId, InsertId, LiteralId, NodeId,
-    ObjLitId, QueryId, StrId, UpdateId, UpsertId, WindowId,
+    CaseId, CompositeId, DeleteId, FieldId, FuncId, InsertId, LiteralId, NodeId, QueryId, StrId,
+    UpdateId, UpsertId, WindowId,
 };
 use dol_wire::decoder::{Decode, Reader};
 use dol_wire::encoder::{Encode, Writer};
@@ -80,14 +80,11 @@ fn lit_round_trips() {
 }
 
 #[test]
-fn object_lit_round_trips() {
-    let n = ExprNode::object_lit(ObjLitId::from_u32(1).unwrap());
-    assert_eq!(round_trip(n), n);
-}
-
-#[test]
-fn array_lit_round_trips() {
-    let n = ExprNode::array_lit(ArrayLitId::from_u32(5).unwrap());
+fn composite_round_trips() {
+    // Single Composite opcode covers Array/Object/Tuple kinds; the
+    // CompositeId payload + side-pool encoding is exercised by the
+    // arena round-trip test below.
+    let n = ExprNode::composite(CompositeId::from_u32(1).unwrap());
     assert_eq!(round_trip(n), n);
 }
 
@@ -148,14 +145,11 @@ fn alias_round_trips() {
 }
 
 #[test]
-fn in_list_round_trips() {
-    let n = ExprNode::in_list(InListId::from_u32(13).unwrap());
-    assert_eq!(round_trip(n), n);
-}
-
-#[test]
-fn in_sub_round_trips() {
-    let n = ExprNode::in_sub(nid(2), nid(3));
+fn in_round_trips() {
+    // Single In opcode collapses InList + InSub. The collection is
+    // an arena NodeId whose own opcode discriminates list / subquery
+    // / param / field forms.
+    let n = ExprNode::in_(nid(2), nid(3));
     assert_eq!(round_trip(n), n);
 }
 
@@ -207,8 +201,7 @@ fn every_node_is_16_wire_bytes() {
         ExprNode::param(0),
         ExprNode::param(0xDEAD_BEEF),
         ExprNode::lit(LiteralId::from_u32(2).unwrap()),
-        ExprNode::object_lit(ObjLitId::from_u32(1).unwrap()),
-        ExprNode::array_lit(ArrayLitId::from_u32(5).unwrap()),
+        ExprNode::composite(CompositeId::from_u32(1).unwrap()),
         ExprNode::bin(BinOp::Eq, nid(1), nid(2)),
         ExprNode::una(UnaryOp::Not, nid(1)),
         ExprNode::func(FuncId::from_u32(4).unwrap()),
@@ -217,8 +210,7 @@ fn every_node_is_16_wire_bytes() {
         ExprNode::cast(nid(2), sid(9)),
         ExprNode::case(CaseId::from_u32(11).unwrap()),
         ExprNode::alias(nid(2), sid(3)),
-        ExprNode::in_list(InListId::from_u32(13).unwrap()),
-        ExprNode::in_sub(nid(2), nid(3)),
+        ExprNode::in_(nid(2), nid(3)),
         ExprNode::exists(nid(7)),
         ExprNode::between(nid(2), nid(3), nid(4)),
     ];

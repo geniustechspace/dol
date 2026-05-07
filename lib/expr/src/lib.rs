@@ -56,16 +56,16 @@ pub mod tree;
 pub mod types;
 
 pub use arena::{
-    ArrayLitNode, Capacity, CaseNode, ExprArena, FieldNode, FieldStep, FuncNode, InListNode,
-    ObjLitNode, Span, SpanTable, WindowNode,
+    Capacity, CaseNode, CompositeKind, CompositeNode, ExprArena, FieldNode, FieldStep, FuncNode,
+    Span, SpanTable, WindowNode,
 };
 pub use expr::{
     BinOp, ConflictClause, DeleteNode, ExprNode, ExprOp, InsertNode, JoinNode, JoinType, LockHint,
     Order, QueryNode, UnaryOp, UpdateNode, UpsertNode,
 };
 pub use ids::{
-    ArrayLitId, CaseId, DeleteId, FieldId, FuncId, InListId, InsertId, LiteralId, NodeId,
-    ObjLitId, QueryId, SpanId, StrId, TypeId, UpdateId, UpsertId, WindowId,
+    CaseId, CompositeId, DeleteId, FieldId, FuncId, InsertId, LiteralId, NodeId, QueryId, SpanId,
+    StrId, TypeId, UpdateId, UpsertId, WindowId,
 };
 pub use interner::{InternError, Interner};
 pub use lower::{LowerError, lower_expr, lower_expr_with_budget};

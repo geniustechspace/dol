@@ -15,7 +15,7 @@ use alloc::{
     vec::Vec,
 };
 
-use crate::arena::{ArrayLitNode, ExprArena, FieldNode, FuncNode, InListNode, ObjLitNode};
+use crate::arena::{CompositeKind, CompositeNode, ExprArena, FieldNode, FuncNode};
 use crate::expr::{BinOp, Order, UnaryOp as ArenaUnaryOp};
 use crate::ids::NodeId;
 use crate::interner::Interner;
@@ -228,23 +228,30 @@ fn lower_inner(
         }
 
         Expr::Array(elements) => {
-            let mut ids: SmallVec<[NodeId; 4]> = SmallVec::new();
+            let mut items: SmallVec<[(Option<crate::ids::StrId>, NodeId); 4]> = SmallVec::new();
             for e in elements {
-                ids.push(lower_child(e, arena, interner, budget)?);
+                let id = lower_child(e, arena, interner, budget)?;
+                items.push((None, id));
             }
-            let aid = arena.alloc_array_lit(ArrayLitNode { items: ids });
-            Ok(arena.alloc_array_lit_ref(aid))
+            let cid = arena.alloc_composite(CompositeNode {
+                kind: CompositeKind::Array,
+                items,
+            });
+            Ok(arena.alloc_composite_ref(cid))
         }
 
         Expr::Object(fields) => {
-            let mut pairs: SmallVec<[(crate::ids::StrId, NodeId); 4]> = SmallVec::new();
+            let mut items: SmallVec<[(Option<crate::ids::StrId>, NodeId); 4]> = SmallVec::new();
             for (k, v) in fields {
                 let kid = interner.intern(k.as_str());
                 let vid = lower_child(v, arena, interner, budget)?;
-                pairs.push((kid, vid));
+                items.push((Some(kid), vid));
             }
-            let oid = arena.alloc_obj_lit(ObjLitNode(pairs));
-            Ok(arena.alloc_object_lit_ref(oid))
+            let cid = arena.alloc_composite(CompositeNode {
+                kind: CompositeKind::Object,
+                items,
+            });
+            Ok(arena.alloc_composite_ref(cid))
         }
 
         Expr::BinaryOp { left, op, right } => {
@@ -340,16 +347,21 @@ fn lower_inner(
         }
 
         Expr::InList { expr: inner, list } => {
+            // Lower as `In(probe, Composite::Array(list))`. The
+            // collection is a child arena node whose opcode encodes
+            // the form (here: `Composite` with `Array` kind).
             let eid = lower_child(inner, arena, interner, budget)?;
-            let mut ids: SmallVec<[NodeId; 8]> = SmallVec::new();
+            let mut items: SmallVec<[(Option<crate::ids::StrId>, NodeId); 4]> = SmallVec::new();
             for e in list {
-                ids.push(lower_child(e, arena, interner, budget)?);
+                let id = lower_child(e, arena, interner, budget)?;
+                items.push((None, id));
             }
-            let in_id = arena.alloc_in_list(InListNode {
-                expr: eid,
-                list: ids,
+            let cid = arena.alloc_composite(CompositeNode {
+                kind: CompositeKind::Array,
+                items,
             });
-            Ok(arena.alloc_in_list_ref(in_id))
+            let coll = arena.alloc_composite_ref(cid);
+            Ok(arena.alloc_in(eid, coll))
         }
 
         Expr::Alias { expr: inner, alias } => {

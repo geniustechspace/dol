@@ -44,12 +44,6 @@ pub enum FuncTag {}
 /// [`crate::FuncNode`].
 pub type FuncId = Id<FuncTag>;
 
-/// Tag for `ExprArena::obj_lits` ids. Phantom marker.
-pub enum ObjLitTag {}
-/// Index into `ExprArena::obj_lits` — identifies a pooled
-/// [`crate::ObjLitNode`].
-pub type ObjLitId = Id<ObjLitTag>;
-
 /// Tag for `ExprArena::windows` ids. Phantom marker.
 pub enum WindowTag {}
 /// Index into `ExprArena::windows` — identifies a pooled
@@ -62,11 +56,19 @@ pub enum CaseTag {}
 /// [`crate::CaseNode`].
 pub type CaseId = Id<CaseTag>;
 
-/// Tag for `ExprArena::in_lists` ids. Phantom marker.
-pub enum InListTag {}
-/// Index into `ExprArena::in_lists` — identifies a pooled
-/// [`crate::InListNode`].
-pub type InListId = Id<InListTag>;
+/// Tag for `ExprArena::composites` ids. Phantom marker.
+pub enum CompositeTag {}
+/// Index into `ExprArena::composites` — identifies a pooled
+/// [`crate::CompositeNode`] (the unified array / object / tuple
+/// container introduced when [`crate::expr::ExprOp::ObjectLit`] and
+/// [`crate::expr::ExprOp::ArrayLit`] were collapsed onto a single
+/// [`crate::expr::ExprOp::Composite`] opcode).
+///
+/// The same pool also backs the row form of `IN (a, b, c)` via
+/// [`crate::expr::ExprOp::In`]: the right-hand collection is a
+/// [`crate::expr::ExprOp::Composite`] node whose `kind` is
+/// `Array` (one column) or `Tuple` (multi-column row).
+pub type CompositeId = Id<CompositeTag>;
 
 /// Tag for `ExprArena::queries` ids. Phantom marker.
 pub enum QueryTag {}
@@ -103,13 +105,3 @@ pub enum FieldTag {}
 /// Index into `ExprArena::fields` — identifies a pooled
 /// [`crate::FieldNode`].
 pub type FieldId = Id<FieldTag>;
-
-/// Tag for `ExprArena::array_lits` ids. Phantom marker.
-pub enum ArrayLitTag {}
-/// Index into `ExprArena::array_lits` — identifies a pooled
-/// [`crate::ArrayLitNode`].
-///
-/// Introduced when the variant `ExprNode::ArrayLit(SmallVec<[NodeId; 4]>)`
-/// was replaced by the 16-byte packed [`crate::ExprNode`]; the inline
-/// element list was moved to its own pool.
-pub type ArrayLitId = Id<ArrayLitTag>;

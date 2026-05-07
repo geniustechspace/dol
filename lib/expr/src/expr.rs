@@ -97,8 +97,8 @@ use bytemuck::{Pod, Zeroable};
 use smallvec::SmallVec;
 
 use crate::ids::{
-    ArrayLitId, CaseId, DeleteId, FieldId, FuncId, InListId, InsertId, LiteralId, NodeId,
-    ObjLitId, QueryId, StrId, UpdateId, UpsertId, WindowId,
+    CaseId, CompositeId, DeleteId, FieldId, FuncId, InsertId, LiteralId, NodeId, QueryId, StrId,
+    UpdateId, UpsertId, WindowId,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -417,53 +417,57 @@ pub enum ExprOp {
     Param = 3,
     /// Pooled literal. `a` is a [`LiteralId`] into `ExprArena::lits`.
     Lit = 4,
-    /// Pooled object literal. `a` is an [`ObjLitId`] into
-    /// `ExprArena::obj_lits`.
-    ObjectLit = 5,
-    /// Pooled array literal. `a` is an [`ArrayLitId`] into
-    /// `ExprArena::array_lits`.
-    ArrayLit = 6,
+    /// Pooled composite (array / object / tuple) literal. `a` is a
+    /// [`CompositeId`] into `ExprArena::composites`. The `kind`
+    /// (Array / Object / Tuple) lives on the side-pool record.
+    ///
+    /// Collapses the v2-prototype `ObjectLit` and `ArrayLit` opcodes
+    /// onto a single structural slot, with `Tuple` added to back the
+    /// row form of `IN (a, b, c)`.
+    Composite = 5,
     /// Binary operator. `aux` carries [`BinOp::as_u16`]; `a`/`b` are
     /// the operand [`NodeId`]s.
-    Bin = 7,
+    Bin = 6,
     /// Unary operator. `aux` carries [`UnaryOp::as_u16`]; `a` is the
     /// operand [`NodeId`].
-    Una = 8,
+    Una = 7,
     /// Function call. `a` is a [`FuncId`] into `ExprArena::funcs`.
-    Func = 9,
+    Func = 8,
     /// Aggregate. `flags` bit 0 is `distinct`; `a` is the aggregate
     /// function name [`StrId`]; `b` is the operand [`NodeId`].
-    Agg = 10,
+    Agg = 9,
     /// Window function. `a` is a [`WindowId`] into `ExprArena::windows`.
-    Window = 11,
+    Window = 10,
     /// `CAST(expr AS to)`. `a` is the operand [`NodeId`]; `b` is the
     /// target-type-name [`StrId`].
-    Cast = 12,
+    Cast = 11,
     /// `CASE WHEN …`. `a` is a [`CaseId`] into `ExprArena::cases`.
-    Case = 13,
+    Case = 12,
     /// `expr AS name`. `a` is the inner [`NodeId`]; `b` is the alias
     /// [`StrId`].
-    Alias = 14,
-    /// `expr IN (…)`. `a` is an [`InListId`] into `ExprArena::in_lists`.
-    InList = 15,
-    /// `expr IN (subquery)`. `a` is the operand [`NodeId`]; `b` is the
-    /// subquery [`NodeId`].
-    InSub = 16,
+    Alias = 13,
+    /// `probe IN collection`. `a` is the probe [`NodeId`]; `b` is the
+    /// collection [`NodeId`]. The collection's own opcode discriminates
+    /// the form: a [`Self::Composite`] (array / tuple), a
+    /// [`Self::Query`] (subquery), a [`Self::Param`] (parameter), or
+    /// a [`Self::Field`] (field-of-array). Replaces the v2-prototype
+    /// `InList` and `InSub` opcodes.
+    In = 14,
     /// `EXISTS(subquery)`. `a` is the subquery [`NodeId`].
-    Exists = 17,
+    Exists = 15,
     /// `expr BETWEEN lo AND hi`. `a`/`b`/`c` are the three operand
     /// [`NodeId`]s.
-    Between = 18,
+    Between = 16,
     /// SELECT subquery. `a` is a [`QueryId`] into `ExprArena::queries`.
-    Query = 19,
+    Query = 17,
     /// INSERT statement. `a` is an [`InsertId`] into `ExprArena::inserts`.
-    Insert = 20,
+    Insert = 18,
     /// UPDATE statement. `a` is an [`UpdateId`] into `ExprArena::updates`.
-    Update = 21,
+    Update = 19,
     /// DELETE statement. `a` is a [`DeleteId`] into `ExprArena::deletes`.
-    Delete = 22,
+    Delete = 20,
     /// UPSERT statement. `a` is an [`UpsertId`] into `ExprArena::upserts`.
-    Upsert = 23,
+    Upsert = 21,
 }
 
 impl ExprOp {
@@ -478,25 +482,23 @@ impl ExprOp {
             2 => Self::Field,
             3 => Self::Param,
             4 => Self::Lit,
-            5 => Self::ObjectLit,
-            6 => Self::ArrayLit,
-            7 => Self::Bin,
-            8 => Self::Una,
-            9 => Self::Func,
-            10 => Self::Agg,
-            11 => Self::Window,
-            12 => Self::Cast,
-            13 => Self::Case,
-            14 => Self::Alias,
-            15 => Self::InList,
-            16 => Self::InSub,
-            17 => Self::Exists,
-            18 => Self::Between,
-            19 => Self::Query,
-            20 => Self::Insert,
-            21 => Self::Update,
-            22 => Self::Delete,
-            23 => Self::Upsert,
+            5 => Self::Composite,
+            6 => Self::Bin,
+            7 => Self::Una,
+            8 => Self::Func,
+            9 => Self::Agg,
+            10 => Self::Window,
+            11 => Self::Cast,
+            12 => Self::Case,
+            13 => Self::Alias,
+            14 => Self::In,
+            15 => Self::Exists,
+            16 => Self::Between,
+            17 => Self::Query,
+            18 => Self::Insert,
+            19 => Self::Update,
+            20 => Self::Delete,
+            21 => Self::Upsert,
             _ => return None,
         })
     }
@@ -591,14 +593,11 @@ impl ExprNode {
         Self::raw(ExprOp::Lit, 0, 0, id.get(), 0, 0)
     }
 
+    /// Build a `Composite` (array / object / tuple) reference node.
+    /// `id` points into `ExprArena::composites`.
     #[must_use]
-    pub const fn object_lit(id: ObjLitId) -> Self {
-        Self::raw(ExprOp::ObjectLit, 0, 0, id.get(), 0, 0)
-    }
-
-    #[must_use]
-    pub const fn array_lit(id: ArrayLitId) -> Self {
-        Self::raw(ExprOp::ArrayLit, 0, 0, id.get(), 0, 0)
+    pub const fn composite(id: CompositeId) -> Self {
+        Self::raw(ExprOp::Composite, 0, 0, id.get(), 0, 0)
     }
 
     #[must_use]
@@ -648,14 +647,18 @@ impl ExprNode {
         Self::raw(ExprOp::Alias, 0, 0, expr.get(), name.get(), 0)
     }
 
+    /// Build an `In` (probe-IN-collection) node. `collection` is a
+    /// [`NodeId`] referring to another arena node whose opcode encodes
+    /// the form of the right-hand side: a [`ExprOp::Composite`]
+    /// (`(a, b, c)` row form), a [`ExprOp::Query`] (`(SELECT …)`
+    /// subquery form), a [`ExprOp::Param`] (`= ANY($1)` parameter
+    /// form), or a [`ExprOp::Field`] (field-of-array form).
+    ///
+    /// Replaces the v2-prototype `in_list` (pooled list) and `in_sub`
+    /// (subquery NodeId) constructors.
     #[must_use]
-    pub const fn in_list(id: InListId) -> Self {
-        Self::raw(ExprOp::InList, 0, 0, id.get(), 0, 0)
-    }
-
-    #[must_use]
-    pub const fn in_sub(expr: NodeId, sub: NodeId) -> Self {
-        Self::raw(ExprOp::InSub, 0, 0, expr.get(), sub.get(), 0)
+    pub const fn in_(probe: NodeId, collection: NodeId) -> Self {
+        Self::raw(ExprOp::In, 0, 0, probe.get(), collection.get(), 0)
     }
 
     #[must_use]
@@ -736,21 +739,12 @@ impl ExprNode {
         }
     }
 
-    /// Extract the [`ObjLitId`] payload of an [`ExprOp::ObjectLit`] node.
+    /// Extract the [`CompositeId`] payload of an [`ExprOp::Composite`]
+    /// node (array / object / tuple literal).
     #[must_use]
-    pub fn as_object_lit(&self) -> Option<ObjLitId> {
-        if self.opcode()? == ExprOp::ObjectLit {
-            ObjLitId::from_u32(self.a)
-        } else {
-            None
-        }
-    }
-
-    /// Extract the [`ArrayLitId`] payload of an [`ExprOp::ArrayLit`] node.
-    #[must_use]
-    pub fn as_array_lit(&self) -> Option<ArrayLitId> {
-        if self.opcode()? == ExprOp::ArrayLit {
-            ArrayLitId::from_u32(self.a)
+    pub fn as_composite(&self) -> Option<CompositeId> {
+        if self.opcode()? == ExprOp::Composite {
+            CompositeId::from_u32(self.a)
         } else {
             None
         }
@@ -844,25 +838,17 @@ impl ExprNode {
         Some((expr, name))
     }
 
-    /// Extract the [`InListId`] payload of a [`ExprOp::InList`] node.
+    /// Extract `(probe, collection)` of an [`ExprOp::In`] node.
+    /// The collection's opcode discriminates list / subquery / param /
+    /// field forms (see [`Self::in_`]).
     #[must_use]
-    pub fn as_in_list(&self) -> Option<InListId> {
-        if self.opcode()? == ExprOp::InList {
-            InListId::from_u32(self.a)
-        } else {
-            None
-        }
-    }
-
-    /// Extract `(expr, sub)` of a [`ExprOp::InSub`] node.
-    #[must_use]
-    pub fn as_in_sub(&self) -> Option<(NodeId, NodeId)> {
-        if self.opcode()? != ExprOp::InSub {
+    pub fn as_in(&self) -> Option<(NodeId, NodeId)> {
+        if self.opcode()? != ExprOp::In {
             return None;
         }
-        let expr = NodeId::from_u32(self.a)?;
-        let sub = NodeId::from_u32(self.b)?;
-        Some((expr, sub))
+        let probe = NodeId::from_u32(self.a)?;
+        let collection = NodeId::from_u32(self.b)?;
+        Some((probe, collection))
     }
 
     /// Extract the subquery [`NodeId`] of a [`ExprOp::Exists`] node.
@@ -951,13 +937,13 @@ impl ExprNode {
             Some(ExprOp::Agg) => [self.b, 0, 0], // a = func StrId, b = expr NodeId
             Some(ExprOp::Cast) => [self.a, 0, 0], // a = expr NodeId, b = StrId
             Some(ExprOp::Alias) => [self.a, 0, 0], // a = expr NodeId, b = StrId
-            Some(ExprOp::InSub) => [self.a, self.b, 0],
+            Some(ExprOp::In) => [self.a, self.b, 0], // a = probe, b = collection (both NodeId)
             Some(ExprOp::Exists) => [self.a, 0, 0],
             Some(ExprOp::Between) => [self.a, self.b, self.c],
-            // Side-pool ops (Field, Func, Case, Window, InList, ObjectLit,
-            // ArrayLit, Query, Insert, Update, Delete, Upsert) and leaf ops
-            // (Namespace, Param, Lit, Nop) reference non-`NodeId` payloads —
-            // no recursion through this edge.
+            // Side-pool ops (Field, Func, Case, Window, Composite,
+            // Query, Insert, Update, Delete, Upsert) and leaf ops
+            // (Namespace, Param, Lit, Nop) reference non-`NodeId`
+            // payloads — no recursion through this edge.
             _ => [0, 0, 0],
         };
         candidates.into_iter().filter_map(NodeId::from_u32)
@@ -1015,11 +1001,11 @@ mod codec_tests {
 
     #[test]
     fn expr_op_u8_round_trips() {
-        for tag in 0u8..=23 {
+        for tag in 0u8..=21 {
             let op = ExprOp::from_u8(tag).expect("known tag");
             assert_eq!(op as u8, tag);
         }
-        assert!(ExprOp::from_u8(24).is_none());
+        assert!(ExprOp::from_u8(22).is_none());
         assert!(ExprOp::from_u8(255).is_none());
     }
 
@@ -1047,9 +1033,13 @@ mod codec_tests {
         // Alias
         let n = ExprNode::alias(nid, sid);
         assert_eq!(n.as_alias(), Some((nid, sid)));
-        // InSub
-        let n = ExprNode::in_sub(nid, nid2);
-        assert_eq!(n.as_in_sub(), Some((nid, nid2)));
+        // In (collapsed InList + InSub)
+        let n = ExprNode::in_(nid, nid2);
+        assert_eq!(n.as_in(), Some((nid, nid2)));
+        // Composite (collapsed ObjectLit + ArrayLit)
+        let cid = crate::ids::CompositeId::from_u32(5).unwrap();
+        let n = ExprNode::composite(cid);
+        assert_eq!(n.as_composite(), Some(cid));
         // Between
         let n = ExprNode::between(nid, nid2, nid3);
         assert_eq!(n.as_between(), Some((nid, nid2, nid3)));

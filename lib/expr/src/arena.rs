@@ -5,8 +5,8 @@ use smallvec::SmallVec;
 
 use crate::expr::{DeleteNode, ExprNode, InsertNode, Order, QueryNode, UpdateNode, UpsertNode};
 use crate::ids::{
-    ArrayLitId, CaseId, DeleteId, FieldId, FuncId, Id, InListId, InsertId, LiteralId, NodeId,
-    ObjLitId, QueryId, SpanId, StrId, UpdateId, UpsertId, WindowId,
+    CaseId, CompositeId, DeleteId, FieldId, FuncId, Id, InsertId, LiteralId, NodeId, QueryId,
+    SpanId, StrId, UpdateId, UpsertId, WindowId,
 };
 use crate::types::value::Literal;
 
@@ -106,13 +106,61 @@ pub struct FuncNode {
     pub args: SmallVec<[NodeId; 4]>,
 }
 
-/// Payload for [`crate::expr::ExprOp::ObjectLit`], stored in `ExprArena::obj_lits`.
+/// Discriminator for the unified [`CompositeNode`] container.
 ///
-/// The inline buffer of `SmallVec<[(StrId, NodeId); 4]>` is 4 × 8 = 32 bytes
-/// on its own — already over budget before the discriminant word is counted.
+/// Three structural shapes share one side-pool:
+///
+/// * [`CompositeKind::Array`] — homogeneous list literal (`[1, 2, 3]`),
+///   item keys are `None`.
+/// * [`CompositeKind::Object`] — keyed object literal
+///   (`{ "x": 1, "y": 2 }`), every item key is `Some(StrId)`.
+/// * [`CompositeKind::Tuple`] — fixed-arity row literal
+///   (`(a, b, c)` in `IN (a, b, c)`), keys are `None` but the kind
+///   distinguishes the row form from a true list literal.
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[non_exhaustive]
+pub enum CompositeKind {
+    Array = 0,
+    Object = 1,
+    Tuple = 2,
+}
+
+impl CompositeKind {
+    /// Convert from a raw `u8` (e.g. wire byte).
+    #[must_use]
+    pub const fn from_u8(v: u8) -> Option<Self> {
+        Some(match v {
+            0 => Self::Array,
+            1 => Self::Object,
+            2 => Self::Tuple,
+            _ => return None,
+        })
+    }
+}
+
+/// Payload for [`crate::expr::ExprOp::Composite`], stored in
+/// `ExprArena::composites`.
+///
+/// Collapses the v2-prototype `ObjectLit`, `ArrayLit`, and `InList`
+/// side-pools onto a single record. Each item is a
+/// `(Option<StrId>, NodeId)` pair so an `Object` can stash its keys
+/// alongside its values without a parallel vector. For `Array` and
+/// `Tuple`, the key is always `None`.
+///
+/// The `Tuple` variant is what lets `IN (a, b, c)` lower to
+/// `In { probe, collection: Composite::Tuple(a, b, c) }` cleanly: the
+/// row form is structurally distinct from a true array literal.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct ObjLitNode(pub SmallVec<[(StrId, NodeId); 4]>);
+pub struct CompositeNode {
+    /// Which structural shape this is (Array / Object / Tuple).
+    pub kind: CompositeKind,
+    /// Items in source order. Object items carry a `Some(StrId)` key;
+    /// Array / Tuple items carry `None`.
+    pub items: SmallVec<[(Option<StrId>, NodeId); 4]>,
+}
 
 /// Payload for [`crate::expr::ExprOp::Window`], stored in `ExprArena::windows`.
 ///
@@ -147,33 +195,11 @@ pub struct CaseNode {
     pub else_: Option<NodeId>,
 }
 
-/// Payload for [`crate::expr::ExprOp::InList`], stored in `ExprArena::in_lists`.
-///
-/// `SmallVec<[NodeId; 8]>` has a 32-byte inline buffer, making the variant
-/// payload 36+ bytes — pooled to keep `ExprNode` ≤ 32 bytes.
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct InListNode {
-    pub expr: NodeId,
-    pub list: SmallVec<[NodeId; 8]>,
-}
-
-// ─── ArrayLitNode ────────────────────────────────────────────────────────────
-
-/// Payload for [`ExprNode`] nodes whose opcode is
-/// [`crate::expr::ExprOp::ArrayLit`].
-///
-/// In v1 the array-literal element list lived inline in the variant
-/// payload (`ExprNode::ArrayLit(SmallVec<[NodeId; 4]>)`), which is the
-/// only thing that pushed the old enum to 32 bytes. v2's 16-byte packed
-/// `ExprNode` cannot hold a `SmallVec` inline, so the elements moved
-/// into this side-pool struct accessed via [`ArrayLitId`].
-#[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct ArrayLitNode {
-    /// Element [`NodeId`]s in source order.
-    pub items: SmallVec<[NodeId; 4]>,
-}
+// ─── ArrayLitNode (removed) ──────────────────────────────────────────────────
+// `ArrayLitNode` and `InListNode` were collapsed into `CompositeNode`
+// (see above) when `ExprOp::ArrayLit` and `ExprOp::InList`/
+// `ExprOp::InSub` were collapsed onto `ExprOp::Composite` and
+// `ExprOp::In`.
 
 // ─── SpanTable ────────────────────────────────────────────────────────────────
 
@@ -284,11 +310,12 @@ pub struct Capacity {
     pub nodes: usize,
     pub fields: usize,
     pub funcs: usize,
-    pub obj_lits: usize,
-    pub array_lits: usize,
+    /// Pre-alloc for the unified array / object / tuple side-pool
+    /// (replaces the legacy `obj_lits`, `array_lits`, `in_lists`
+    /// fields).
+    pub composites: usize,
     pub windows: usize,
     pub cases: usize,
-    pub in_lists: usize,
     pub queries: usize,
     pub inserts: usize,
     pub updates: usize,
@@ -317,7 +344,7 @@ impl Capacity {
             funcs: 32,
             lits: 64,
             queries: 1,
-            in_lists: 4,
+            composites: 4,
             cases: 4,
             ..Self::default()
         }
@@ -333,16 +360,14 @@ pub struct ExprArena {
     lits: Vec<Literal<'static>>,
     /// Pooled function-call payloads — lookup by [`FuncId`].
     funcs: Vec<FuncNode>,
-    /// Pooled object-literal payloads — lookup by [`ObjLitId`].
-    obj_lits: Vec<ObjLitNode>,
-    /// Pooled array-literal payloads — lookup by [`ArrayLitId`].
-    array_lits: Vec<ArrayLitNode>,
+    /// Pooled array / object / tuple composite literals — lookup by
+    /// [`CompositeId`]. Replaces the legacy `obj_lits`, `array_lits`,
+    /// and `in_lists` pools.
+    composites: Vec<CompositeNode>,
     /// Pooled window-function payloads — lookup by [`WindowId`].
     windows: Vec<WindowNode>,
     /// Pooled CASE expression payloads — lookup by [`CaseId`].
     cases: Vec<CaseNode>,
-    /// Pooled IN-list payloads — lookup by [`InListId`].
-    in_lists: Vec<InListNode>,
     /// Pooled SELECT/query statement payloads — lookup by [`QueryId`].
     queries: Vec<QueryNode>,
     /// Pooled INSERT statement payloads — lookup by [`InsertId`].
@@ -381,11 +406,9 @@ impl ExprArena {
             span_table: SpanTable::default(),
             lits: Vec::with_capacity(cap.lits),
             funcs: Vec::with_capacity(cap.funcs),
-            obj_lits: Vec::with_capacity(cap.obj_lits),
-            array_lits: Vec::with_capacity(cap.array_lits),
+            composites: Vec::with_capacity(cap.composites),
             windows: Vec::with_capacity(cap.windows),
             cases: Vec::with_capacity(cap.cases),
-            in_lists: Vec::with_capacity(cap.in_lists),
             queries: Vec::with_capacity(cap.queries),
             inserts: Vec::with_capacity(cap.inserts),
             updates: Vec::with_capacity(cap.updates),
@@ -410,11 +433,9 @@ impl ExprArena {
         self.nodes.capacity() * size_of::<ExprNode>()
             + self.lits.capacity() * size_of::<Literal<'static>>()
             + self.funcs.capacity() * size_of::<FuncNode>()
-            + self.obj_lits.capacity() * size_of::<ObjLitNode>()
-            + self.array_lits.capacity() * size_of::<ArrayLitNode>()
+            + self.composites.capacity() * size_of::<CompositeNode>()
             + self.windows.capacity() * size_of::<WindowNode>()
             + self.cases.capacity() * size_of::<CaseNode>()
-            + self.in_lists.capacity() * size_of::<InListNode>()
             + self.queries.capacity() * size_of::<QueryNode>()
             + self.inserts.capacity() * size_of::<InsertNode>()
             + self.updates.capacity() * size_of::<UpdateNode>()
@@ -524,13 +545,10 @@ impl ExprArena {
     pub fn alloc_namespace(&mut self, id: StrId) -> NodeId {
         self.alloc(ExprNode::namespace(id))
     }
-    /// Allocate a [`crate::expr::ExprOp::ObjectLit`] node.
-    pub fn alloc_object_lit_ref(&mut self, id: ObjLitId) -> NodeId {
-        self.alloc(ExprNode::object_lit(id))
-    }
-    /// Allocate a [`crate::expr::ExprOp::ArrayLit`] node.
-    pub fn alloc_array_lit_ref(&mut self, id: ArrayLitId) -> NodeId {
-        self.alloc(ExprNode::array_lit(id))
+    /// Allocate a [`crate::expr::ExprOp::Composite`] reference node.
+    /// `id` points into `ExprArena::composites`.
+    pub fn alloc_composite_ref(&mut self, id: CompositeId) -> NodeId {
+        self.alloc(ExprNode::composite(id))
     }
     /// Allocate a [`crate::expr::ExprOp::Func`] node.
     pub fn alloc_func_ref(&mut self, id: FuncId) -> NodeId {
@@ -556,13 +574,11 @@ impl ExprArena {
     pub fn alloc_alias(&mut self, expr: NodeId, name: StrId) -> NodeId {
         self.alloc(ExprNode::alias(expr, name))
     }
-    /// Allocate a [`crate::expr::ExprOp::InList`] node.
-    pub fn alloc_in_list_ref(&mut self, id: InListId) -> NodeId {
-        self.alloc(ExprNode::in_list(id))
-    }
-    /// Allocate a [`crate::expr::ExprOp::InSub`] node.
-    pub fn alloc_in_sub(&mut self, expr: NodeId, sub: NodeId) -> NodeId {
-        self.alloc(ExprNode::in_sub(expr, sub))
+    /// Allocate a [`crate::expr::ExprOp::In`] node. `collection` is a
+    /// [`NodeId`] referring to the right-hand side; its opcode
+    /// discriminates the form (Composite / Query / Param / Field).
+    pub fn alloc_in(&mut self, probe: NodeId, collection: NodeId) -> NodeId {
+        self.alloc(ExprNode::in_(probe, collection))
     }
     /// Allocate a [`crate::expr::ExprOp::Exists`] node.
     pub fn alloc_exists(&mut self, sub: NodeId) -> NodeId {
@@ -656,24 +672,14 @@ impl ExprArena {
         get_in(&self.funcs, id)
     }
 
-    // ── ObjLitNode pool ───────────────────────────────────────────────────────
+    // ── CompositeNode pool ────────────────────────────────────────────────────
 
-    pub fn alloc_obj_lit(&mut self, obj: ObjLitNode) -> ObjLitId {
-        alloc_in(&mut self.obj_lits, obj)
+    pub fn alloc_composite(&mut self, comp: CompositeNode) -> CompositeId {
+        alloc_in(&mut self.composites, comp)
     }
     #[track_caller]
-    pub fn get_obj_lit(&self, id: ObjLitId) -> &ObjLitNode {
-        get_in(&self.obj_lits, id)
-    }
-
-    // ── ArrayLitNode pool ─────────────────────────────────────────────────────
-
-    pub fn alloc_array_lit(&mut self, arr: ArrayLitNode) -> ArrayLitId {
-        alloc_in(&mut self.array_lits, arr)
-    }
-    #[track_caller]
-    pub fn get_array_lit(&self, id: ArrayLitId) -> &ArrayLitNode {
-        get_in(&self.array_lits, id)
+    pub fn get_composite(&self, id: CompositeId) -> &CompositeNode {
+        get_in(&self.composites, id)
     }
 
     // ── WindowNode pool ───────────────────────────────────────────────────────
@@ -696,15 +702,7 @@ impl ExprArena {
         get_in(&self.cases, id)
     }
 
-    // ── InListNode pool ───────────────────────────────────────────────────────
-
-    pub fn alloc_in_list(&mut self, node: InListNode) -> InListId {
-        alloc_in(&mut self.in_lists, node)
-    }
-    #[track_caller]
-    pub fn get_in_list(&self, id: InListId) -> &InListNode {
-        get_in(&self.in_lists, id)
-    }
+    // ── (Removed: `InListNode` pool — collapsed into `composites` above.) ─────
 
     // ── QueryNode pool ────────────────────────────────────────────────────────
 
@@ -775,20 +773,14 @@ impl ExprArena {
     pub fn funcs_slice(&self) -> &[FuncNode] {
         &self.funcs
     }
-    pub fn obj_lits_slice(&self) -> &[ObjLitNode] {
-        &self.obj_lits
-    }
-    pub fn array_lits_slice(&self) -> &[ArrayLitNode] {
-        &self.array_lits
+    pub fn composites_slice(&self) -> &[CompositeNode] {
+        &self.composites
     }
     pub fn windows_slice(&self) -> &[WindowNode] {
         &self.windows
     }
     pub fn cases_slice(&self) -> &[CaseNode] {
         &self.cases
-    }
-    pub fn in_lists_slice(&self) -> &[InListNode] {
-        &self.in_lists
     }
     pub fn queries_slice(&self) -> &[QueryNode] {
         &self.queries
