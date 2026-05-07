@@ -57,6 +57,7 @@ dol-expr   = { workspace = true, features = ["serde"] }
 dol-core   = { workspace = true, features = ["serde", "datetime", "numeric", "geo", "network"] }
 postcard   = { workspace = true }
 smallvec   = { workspace = true }
+bytemuck   = { workspace = true }
 
 [lints]
 workspace = true

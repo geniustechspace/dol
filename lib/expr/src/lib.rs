@@ -1,13 +1,16 @@
 //! DOL expression engine — arena-based IR and user-facing tree DSL.
 //!
-//! This crate provides two expression representations:
+//! This crate provides two layers:
 //!
-//! - **`tree::Expr<'a>`** — A recursive tree AST with a fluent builder API.
-//!   This is what users compose expressions with (`field("x").eq(param())`).
+//! - **`tree::Expr<'a>`** — a recursive tree AST with a fluent builder
+//!   API. This is what users compose expressions with
+//!   (`field("x").eq(param())`).
 //!
-//! - **`ExprNode`** — A flat, arena-based node (≤ 32 bytes) for efficient
-//!   storage and backend processing. Tree expressions are lowered into this
-//!   form before rendering.
+//! - **[`ExprNode`]** — a flat, 16-byte packed POD node. Tree
+//!   expressions are lowered into this form before rendering. The
+//!   layout is `op + flags + aux + a + b + c`; see the
+//!   [`expr`] module for the opcode menu, typed
+//!   constructors, and `as_*` accessors.
 //!
 //! # Cargo features
 //!
@@ -44,7 +47,6 @@ pub mod ids;
 pub mod interner;
 #[allow(missing_docs)] // tracking: docs follow-up
 pub mod lower;
-pub mod packed;
 pub mod prelude;
 #[allow(missing_docs)] // tracking: docs follow-up
 pub mod session;
@@ -54,16 +56,16 @@ pub mod tree;
 pub mod types;
 
 pub use arena::{
-    Capacity, CaseNode, ExprArena, FieldNode, FieldStep, FuncNode, InListNode, ObjLitNode, Span,
-    SpanTable, WindowNode,
+    Capacity, CaseNode, CompositeKind, CompositeNode, ExprArena, FieldNode, FieldStep, FuncNode,
+    Span, SpanTable, WindowNode,
 };
 pub use expr::{
-    BinOp, ConflictClause, DeleteNode, ExprNode, InsertNode, JoinNode, JoinType, LockHint, Order,
-    QueryNode, UnaryOp, UpdateNode, UpsertNode,
+    BinOp, ConflictClause, DeleteNode, ExprNode, ExprOp, InsertNode, JoinNode, JoinType, LockHint,
+    Order, QueryNode, UnaryOp, UpdateNode, UpsertNode,
 };
 pub use ids::{
-    CaseId, DeleteId, FieldId, FuncId, InListId, InsertId, LiteralId, NodeId, ObjLitId, QueryId,
-    SpanId, StrId, TypeId, UpdateId, UpsertId, WindowId,
+    CaseId, CompositeId, DeleteId, FieldId, FuncId, InsertId, LiteralId, NodeId, QueryId, SpanId,
+    StrId, TypeId, UpdateId, UpsertId, WindowId,
 };
 pub use interner::{InternError, Interner};
 pub use lower::{LowerError, lower_expr, lower_expr_with_budget};

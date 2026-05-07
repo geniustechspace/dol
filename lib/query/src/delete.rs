@@ -56,7 +56,7 @@ impl DeleteQuery {
 
     /// Build the arena-based IR as a [`dol_ir::Program`] containing a
     /// single [`dol_ir::Operation::Delete`] referencing an arena
-    /// [`ExprNode::Delete`](dol_expr::expr::ExprNode::Delete).
+    /// `ExprNode` of opcode [`dol_expr::expr::ExprOp::Delete`].
     ///
     /// Fallible: returns [`BuildError::Filter`](crate::BuildError::Filter) when lowering the WHERE
     /// clause exhausts the default [`Budget`](dol_core::policy::Budget)
@@ -65,7 +65,7 @@ impl DeleteQuery {
     /// using `dol_expr::lower::lower_filters` directly.
     pub fn try_build(self) -> Result<dol_ir::Program, crate::BuildError> {
         use dol_core::policy::{Budget, Limits};
-        use dol_expr::expr::{DeleteNode, ExprNode};
+        use dol_expr::expr::DeleteNode;
         use dol_expr::lower::lower_filters;
         use dol_ir::TargetKind;
         use dol_ir::operation::Delete;
@@ -91,7 +91,7 @@ impl DeleteQuery {
                     name: col,
                     steps: smallvec::SmallVec::new(),
                 });
-                arena.alloc(ExprNode::Field(fid))
+                arena.alloc_field_ref(fid)
             })
             .collect();
 
@@ -101,7 +101,7 @@ impl DeleteQuery {
             returning,
         };
         let did = arena.alloc_delete(dnode);
-        let body = arena.alloc(ExprNode::Delete(did));
+        let body = arena.alloc_delete_ref(did);
 
         let target = crate::target::target_from_parts(
             &mut interner,

@@ -7,6 +7,214 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Operator / expression tier lock-down
+
+A principled cut of what earns a slot in `BinOp` / `UnaryOp` / `ExprOp`
+versus what belongs in `ExprOp::Func`. See the four-tier rule baked into
+the head of `lib/expr/src/expr.rs` for the criteria. Every construct
+goes in exactly one tier.
+
+The headline driver: `ContainedBy` (`<@`) semantically conflicted with
+`IN` (`x <@ array_of(a,b,c)` and `x IN (a,b,c)` spell the same
+membership test for scalar `x`). Removing `<@` from the IR resolves
+the conflict without losing expressiveness — `<@` is exactly
+`contains(b, a)`.
+
+#### Removed (wire-format break — acceptable per project stage)
+
+- **`BinOp::Arrow` (tag 22)** and **`BinOp::LongArrow` (tag 23)** — JSON
+  path step (`->`, `->>`) is not universally infix (Postgres / MySQL
+  only). Use the existing `JSON_GET` / `JSON_GET_TEXT` functions
+  instead; backends that have native infix render the call inline.
+- **`ExprOp::IsNull` (opcode 18)** — duplicated `UnaryOp::IsNull`. Only
+  the unary form remains; the standalone opcode is gone, and the
+  following opcodes shift down by one (`Between` 19→18, `Query` 20→19,
+  `Insert` 21→20, `Update` 22→21, `Delete` 23→22, `Upsert` 24→23).
+  `ExprArena::alloc_is_null`, `ExprNode::is_null`, and
+  `ExprNode::as_is_null` are deleted accordingly.
+- **`tree::op::registry`**: `OpContains`, `OpContainedBy`, `OpOverlap`,
+  `OpRegexMatch`, `OpRegexMatchInsensitive`, `OpGlob` deleted. None of
+  these are universally infix across backends and so do not qualify
+  for `BinOp` slots.
+- **`tree::op::meta::OpCategory::Collection`** variant removed (had no
+  members after the deletions above).
+- **`OpDef::CONTAINS` / `CONTAINED_BY` / `OVERLAP` / `REGEX_MATCH` /
+  `REGEX_MATCH_INSENSITIVE` / `GLOB`** name constants removed.
+
+#### Added
+
+- **`BinOp::IsDistinctFrom` (tag 22)** and **`BinOp::IsNotDistinctFrom`
+  (tag 23)** — promoted from the tree-only `OpIsDistinctFrom` /
+  `OpIsNotDistinctFrom` ZSTs, which previously had no real `BinOp`
+  mapping and silently fell through to `BinOp::Eq` in `lower_binop`.
+  Now they round-trip correctly through wire and lowering.
+- **`tree::func::registry`**: `RegexMatch` (`REGEX_MATCH`),
+  `RegexImatch` (`REGEX_IMATCH`), `GlobMatch` (`GLOB_MATCH`),
+  `Overlaps` (`OVERLAPS`). `Contains` already existed and now also
+  serves the collection containment role.
+- **DSL methods on `Expr`**: `contains(other)`, `overlaps(other)`,
+  `glob_match(other)`. `regex_match` and `regex_match_insensitive`
+  retained but now lower through `Func` (no behavior change for
+  callers — only the IR shape moves from `Bin` to `Func`).
+
+#### Tag-table stability
+
+After this cut, `BinOp::as_u16`, `UnaryOp::as_u16`, and
+`ExprOp::from_u8` tag tables are **frozen append-only**. New variants
+must use the next free tag; never renumber. The four-tier rule is
+documented at the head of `lib/expr/src/expr.rs` so future additions
+get the question right the first time.
+
+#### Deferred (now landed in this branch — see new sections below)
+
+The companion `In` (collapsing `InList` + `InSub`) and `Composite`
+(collapsing `ObjectLit` + `ArrayLit`) opcode unifications, plus the
+xtask tag-table drift gate, have all landed in this same branch — see
+"### Phase 2 follow-ups (deferred items, now landed)" below for the
+detailed entry. No item that was tagged "deferred" in this section is
+outstanding.
+
+### Phase 2 follow-ups (deferred items, now landed)
+
+This entry lands every item the prior PR explicitly held over for a
+follow-up. Wire format breaks from this section are flagged inline.
+
+#### Operator / expression IR — opcode collapse (wire-format break)
+
+- **`ExprOp::In` (new tag 14)** — single structural opcode replacing
+  `ExprOp::InList` and `ExprOp::InSub`. The node carries
+  `(probe: NodeId, collection: NodeId)`; the *collection*'s own opcode
+  discriminates the form (`Composite` for `(a, b, c)` row form,
+  `Query` for `(SELECT …)` subquery form, `Param` for parameter form,
+  `Field` for field-of-array). Replaces the old separate-opcode design
+  and removes the `InListNode` side-pool entirely.
+  - `ExprNode::in_list(InListId)` and `ExprNode::in_sub(NodeId,
+    NodeId)` deleted; `ExprNode::in_(probe, collection)` added.
+  - `ExprNode::as_in_list` / `as_in_sub` deleted; `ExprNode::as_in`
+    added (returns `(probe, collection)`).
+  - `ExprArena::alloc_in_list_ref` / `alloc_in_sub` deleted;
+    `ExprArena::alloc_in(probe, collection)` added.
+  - DSL: `Expr::in_list(...)` is unchanged at the AST level; it now
+    lowers to `In { probe, collection: Composite::Array(list) }`.
+  - `InListId`, `InListNode` types deleted.
+- **`ExprOp::Composite` (new tag 5)** — single structural opcode
+  replacing `ExprOp::ObjectLit` and `ExprOp::ArrayLit`, with a
+  three-arm `CompositeKind` discriminant (`Array`, `Object`, `Tuple`).
+  `Tuple` is added on day one to cleanly back the row form of
+  `IN (a, b, c)`.
+  - `CompositeNode { kind: CompositeKind, items: SmallVec<[(Option<StrId>,
+    NodeId); 4]> }` replaces the old `ObjLitNode` / `ArrayLitNode`.
+    Object items carry `Some(StrId)` keys; Array / Tuple items carry
+    `None`.
+  - `ExprArena::obj_lits` / `array_lits` / `in_lists` pools collapsed
+    into one `composites` pool. `Capacity::obj_lits` / `array_lits` /
+    `in_lists` fields deleted; `Capacity::composites` added.
+  - `ObjLitId`, `ArrayLitId`, `ObjLitNode`, `ArrayLitNode` types
+    deleted; `CompositeId`, `CompositeNode`, `CompositeKind` added.
+- **Tag table renumbered** — every opcode after `Lit` shifts down. The
+  new dense table is: `Nop=0`, `Namespace=1`, `Field=2`, `Param=3`,
+  `Lit=4`, `Composite=5`, `Bin=6`, `Una=7`, `Func=8`, `Agg=9`,
+  `Window=10`, `Cast=11`, `Case=12`, `Alias=13`, `In=14`, `Exists=15`,
+  `Between=16`, `Query=17`, `Insert=18`, `Update=19`, `Delete=20`,
+  `Upsert=21` (22 entries; previous build had 24). The four-tier-rule
+  head doc in `lib/expr/src/expr.rs` reflects the new layout.
+
+#### xtask tag-table drift gate
+
+- **`xtask tag-table-gate`** subcommand: walks frozen `(name, tag)`
+  fixtures for `BinOp`, `UnaryOp`, and `ExprOp`, calls
+  `BinOp::try_from_u16` / `UnaryOp::try_from_u16` / `ExprOp::from_u8`
+  for every entry and asserts the variant matches, then asserts the
+  *next* tag past the last fixture entry returns `None`/`Err`. Catches
+  accidental enum additions or renumbers without a matching fixture
+  update; failure message tells the dev to update both in the same PR.
+- **CI**: new "Tag-table drift gate" step parallel to "Budget-gate" in
+  `.github/workflows/ci.yml`.
+- **Fixture**: the snapshot lives in code (`xtask/src/tag_table.rs`)
+  rather than a JSON file so it compiles with the same enum types it
+  validates — the gate cannot drift from the tag types it gates.
+
+#### `ExprNode` — bulk POD wire format (wire-format break)
+
+- The per-`ExprNode` wire form switched from a per-opcode varint
+  encoding (3-13 bytes per node) to a fixed 16-byte LE field-by-field
+  encoding (`op` (1 B), `flags` (1 B), `aux` (2 B LE), `a`/`b`/`c`
+  (4 B LE each)). The new form is byte-for-byte identical to
+  `bytemuck::cast_slice::<ExprNode, u8>` on little-endian hosts (the
+  overwhelming majority), so encoding the nodes vector reduces to a
+  single contiguous write — the bulk-POD fast path the previous PR
+  flagged.
+- Decode validates each node's `op` byte against `ExprOp::from_u8` so
+  a corrupted byte stream surfaces a clean `DecodeError::InvalidVariant`
+  rather than an unchecked enum.
+- `Encode for ExprArena` no longer special-cases per-opcode payloads;
+  it just length-prefixes the nodes slice and writes `N × 16` bytes.
+
+#### `ExprArena::intern_node` — structural dedup
+
+- New `ExprArena::intern_node(node) -> NodeId` interns the 16 B
+  packed `ExprNode` by structural identity (BLAKE3-free; `ExprNode`
+  derives `Hash` over its bytes). Returns the existing `NodeId` for
+  any structurally-equal node already in the pool.
+- The dedup index is *opt-in*: it is `None` until the first
+  `intern_node` call. The bulk single-shot `ExprArena::alloc` path
+  stays unchanged so single-shot lowering does not pay the hash cost.
+- The index is rebuilt-on-demand and skipped by `Serialize` (it's
+  recoverable from the nodes slice).
+
+#### `lower_inner` — iterative left-spine BinaryOp walker
+
+- The `Expr::BinaryOp` arm in `lower_inner` now walks the left spine
+  iteratively (heap-allocated `Vec<(BinOp, &Expr)>`) before lowering
+  the bottommost left operand and building bin nodes bottom-up.
+  Adversarial inputs (deep `a | b | c | …` chains) no longer scale
+  host-stack consumption with chain length — only the right operands
+  and the bottommost left consume host frames, both bounded by the
+  individual right operand's depth (typically 2-3 frames).
+- The depth contract is unchanged: the spine layer count is checked
+  against `Limits::max_depth` explicitly; a chain longer than the cap
+  surfaces as `LowerError::DepthExceeded` exactly as before.
+- The `deep_or_chain_succeeds_with_ample_depth_cap` test was bumped
+  from chain depth 64 (the previous recursive limit) to 8 192 (two
+  orders of magnitude higher), pinned at the `Box<Expr>::Drop` host
+  ceiling rather than the lowerer's. A regression that reintroduces
+  recursion into the left spine would overflow the default test stack
+  on this input.
+
+#### Test corpus
+
+- `lib/wire/tests/expr_node_roundtrip.rs`: `in_list_round_trips` and
+  `in_sub_round_trips` replaced by `in_round_trips` (single `In`
+  opcode). `object_lit_round_trips` and `array_lit_round_trips`
+  replaced by `composite_round_trips`. Three new tests pin the
+  fixed-16-byte wire size, byte-identity with the in-memory POD on
+  LE hosts, the bulk arena round-trip (1 000 nodes), and the
+  invalid-opcode rejection path.
+- `lib/expr/src/arena.rs`: four new tests covering `intern_node` —
+  structural-equality dedup of leaf nodes, `alloc`-then-`intern`
+  index seeding, `intern`-then-`alloc` index sync, and
+  `(a + 1) * (a + 1)` subtree dedup.
+- `xtask::tag_table::tests`: live-vs-fixture cross-check tests for
+  every variant of `BinOp`, `UnaryOp`, `ExprOp`, plus
+  next-tag-is-none assertions.
+
+#### Still deferred
+
+- **`ExprArena` `Storage`-generic** (CHANGELOG line ~150 in the v2
+  cut). Parameterising the nodes pool *and* every side pool over
+  `dol_core::storage::Storage<T>` requires turning every `alloc_*`
+  into a fallible `Result<…, BackpressureError>` and threading 12+
+  default type parameters through every call site (query / ir /
+  wire). Even with the `Vec<T>` defaults the plan suggested, the
+  cascade through `query::*::try_build`, `ir::Operation::*`, and
+  every `lower_*` helper makes this a focused refactor in its own
+  right with zero functional benefit for the current `Vec` backend.
+  Folding it into this branch alongside the IR opcode collapse and
+  the lowerer rewrite would obscure the contract changes; it lands
+  cleanly once a concrete bounded `Storage` impl (e.g. an MCU
+  backend) needs the surface. All other deferred items from the
+  prior PRs have landed in this branch.
+
 ### Phase 2 — finalize v2 (single PR, no shims)
 
 This entry rounds out the v2 cut started in 0.2.0. No new package versions
@@ -34,6 +242,63 @@ documented under "0.2.0" below.
 
 #### Added
 
+- **`dol_expr::ExprNode` is now the 16-byte `bytemuck::Pod` packed node**
+  (the previous variant enum is gone, completing the v2 cut-over per
+  `docs/v2_plan.md` §35). The user-visible identifier
+  `dol_expr::ExprNode` is preserved everywhere downstream — what
+  changed is the *layout*: an opcode (`u8`), a `flags` byte, a `u16`
+  `aux`, and three `u32` operand handles (`a`, `b`, `c`). The
+  scaffolding `dol_expr::packed::{PackedNode, PackedOp, walk_iter}`
+  module is gone; opcodes live on the new `dol_expr::ExprOp`
+  (re-exported from the crate root) and `walk_iter` is replaced by
+  `ExprNode::child_node_ids()` (yields the up-to-three child
+  `NodeId`s for any recursive opcode).
+  - **`ExprOp` discriminator** — covers all 26 shapes in a stable,
+    append-only byte tag space (≤ 256 today). Operator families
+    collapse onto shared opcodes: every binary operator is
+    `ExprOp::Bin` (with `BinOp::as_u16` in `aux`); every unary
+    operator is `ExprOp::Una` (with `UnaryOp::as_u16` in `aux`).
+  - **Typed constructors and `as_*` accessors** — `ExprNode::bin(op,
+    lhs, rhs)`, `ExprNode::field(id)`, …, mirrored by
+    `node.as_bin() -> Option<(BinOp, NodeId, NodeId)>`,
+    `node.as_field() -> Option<FieldId>`, … Backends never reach into
+    raw `a`/`b`/`c`. Mirrored on `ExprArena` as `alloc_bin`,
+    `alloc_una`, `alloc_field_ref`, `alloc_param`, …, so call sites
+    stay readable.
+  - **`BinOp::as_u16` / `BinOp::try_from_u16` and the same on
+    `UnaryOp`** — single canonical mapping for the wire format and
+    `aux` encoding; round-trip-tested for every variant so backends
+    can't silently drift.
+  - **`ArrayLitNode` + `ArrayLitId` side pool** — the only inline
+    payload on the previous enum (`ExprNode::ArrayLit(SmallVec<[NodeId;
+    4]>)`) moved out of the node into its own pool, accessed via
+    `ExprArena::{alloc_array_lit, get_array_lit}`. This is what makes
+    the 16-byte budget achievable.
+  - **Wire format for `ExprNode` is new** (varint opcode +
+    opcode-aware fields, byte-stable across hosts and dense for leaf
+    nodes; smaller than the previous variant-tag encoding for most
+    workloads). Because there are no external dependents this is fine,
+    but old wire bytes will not decode against the new build.
+  - **`xtask size` budget** — `ExprNode` now has a 16 B budget (down
+    from 32 B); the test corpus and the
+    `dol_expr::expr::size_tests::expr_node_is_16_bytes` unit test both
+    enforce it.
+  - **Iterative-traversal helpers** —
+    `ExprNode::child_node_ids()` yields the recursive children for
+    every opcode (Bin: a, b; Una: a; Agg: b; Cast: a; Alias: a;
+    In: a, b; Exists: a; IsNull: a; Between: a, b, c). Side-pool
+    referents (Field, Func, Case, Window, Composite,
+    Query, Insert, Update, Delete, Upsert) yield empty
+    here — their traversal goes through the arena's pool tables.
+  - *Deferred items now landed in the same branch (see "Phase 2
+    follow-ups (deferred items, now landed)" above):* bulk POD wire
+    encoding (`bytemuck::cast_slice` byte-identity for the nodes
+    vector on LE hosts via the fixed-16-byte `ExprNode` wire form);
+    structural hashing/dedup of `ExprNode`s
+    (`ExprArena::intern_node`); iterative left-spine walker for
+    `Expr::BinaryOp` lowering (host stack no longer scales with chain
+    length; the production guard remains the `Limits::max_depth`
+    cap).
 - **`dol_ir::store::{KvStore, Catalog, KvError}`** — backend trait
   surface per `docs/v2_plan.md` §71-72. Both traits thread
   `&mut Budget`, return `Result<…, KvError<E>>` with `Budget`,
@@ -51,16 +316,11 @@ documented under "0.2.0" below.
   agnostic; Ed25519 on hosts, HMAC-SHA-256 on MCUs.
   `Signed::open` is zero-allocation; `Signed::seal` allocates exactly
   once.
-- **`dol_expr::packed::{PackedNode, PackedOp, walk_iter}`** — 16-byte
-  `bytemuck::Pod` node representation per `docs/v2_plan.md` §35. Lives
-  alongside the existing variant `ExprNode` as scaffolding for the
-  cut-over: backends can begin consuming the packed shape and the
-  iterative work-stack walker is exercised by tests well before any
-  production graph depends on it. `walk_iter` is the canonical
-  pre-order traversal — driven by an explicit stack on `Vec<NodeId>`
-  and `Budget::tick(1)` per visit, so depth-attack DOS becomes
-  impossible by construction. `child_node_ids()` is the seam for
-  opcode-specific recursion.
+- *(Superseded by the `ExprNode` packed cut above.)* The earlier
+  scaffolding `dol_expr::packed::{PackedNode, PackedOp, walk_iter}`
+  has been folded into and replaced by the new `ExprNode` / `ExprOp` /
+  `ExprNode::child_node_ids()` API; the `packed` module no longer
+  exists.
 - **`.github/workflows/nightly-sanitizers.yml`** — daily Miri
   (`-Zmiri-strict-provenance -Zmiri-symbolic-alignment-check`) and
   AddressSanitizer jobs over `dol-core`, `dol-expr`, and `dol-wire`,

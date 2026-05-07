@@ -7,7 +7,7 @@ use crate::target::Target;
 /// `Delete` operation.
 ///
 /// The WHERE filter + RETURNING projection live in an arena
-/// [`ExprNode::Delete`](dol_expr::expr::ExprNode::Delete) referenced by
+/// `ExprNode` of opcode [`ExprOp::Delete`](dol_expr::expr::ExprOp::Delete) referenced by
 /// [`Delete::node`].
 ///
 /// # Examples
@@ -31,6 +31,6 @@ use crate::target::Target;
 pub struct Delete {
     /// Target to delete from.
     pub target: Target,
-    /// Arena `NodeId` of the [`ExprNode::Delete`](dol_expr::expr::ExprNode::Delete) body.
+    /// Arena `NodeId` of the `ExprNode` of opcode [`ExprOp::Delete`](dol_expr::expr::ExprOp::Delete) body.
     pub node: NodeId,
 }

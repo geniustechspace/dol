@@ -137,7 +137,6 @@ fn lower_and_chain(c: &mut Criterion) {
 /// changes when the layout is changed, so a per-node throughput number is
 /// what matters.
 fn traverse_arena(c: &mut Criterion) {
-    use dol_expr::ExprNode;
     use dol_expr::session::BuildSession;
     use dol_expr::tree::{field, int};
 
@@ -174,7 +173,7 @@ fn traverse_arena(c: &mut Criterion) {
             let mut count = 0u32;
             for i in 0..arena.len() {
                 let id = dol_expr::ids::NodeId::from_index(i).expect("arena index fits in NodeId");
-                if matches!(arena.get(id), ExprNode::BinOp { .. }) {
+                if arena.get(id).as_bin().is_some() {
                     count += 1;
                 }
             }

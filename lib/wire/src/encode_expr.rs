@@ -4,12 +4,12 @@ extern crate alloc;
 
 use dol_core::policy::Budget;
 use dol_expr::arena::{
-    CaseNode, ExprArena, FieldNode, FieldStep, FuncNode, InListNode, ObjLitNode, Span, SpanTable,
-    WindowNode,
+    CaseNode, CompositeKind, CompositeNode, ExprArena, FieldNode, FieldStep, FuncNode, Span,
+    SpanTable, WindowNode,
 };
 use dol_expr::expr::{
-    BinOp, ConflictClause, DeleteNode, ExprNode, InsertNode, JoinNode, JoinType, LockHint, Order,
-    QueryNode, UnaryOp, UpdateNode, UpsertNode,
+    BinOp, ConflictClause, DeleteNode, ExprNode, ExprOp, InsertNode, JoinNode, JoinType, LockHint,
+    Order, QueryNode, UnaryOp, UpdateNode, UpsertNode,
 };
 use dol_expr::interner::Interner;
 use dol_expr::tree::window::{FrameBound, FrameKind, WindowFrame};
@@ -58,11 +58,18 @@ impl Encode for FuncNode {
     }
 }
 
-// ─── ObjLitNode ──────────────────────────────────────────────────────────────
+// ─── CompositeNode ───────────────────────────────────────────────────────────
 
-impl Encode for ObjLitNode {
+impl Encode for CompositeKind {
+    fn encode(&self, w: &mut Writer<'_>, _b: &mut Budget) -> Result<(), EncodeError> {
+        w.write_varint_u32(*self as u32)
+    }
+}
+
+impl Encode for CompositeNode {
     fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
-        b.descend(|b| self.0.encode(w, b))??;
+        b.descend(|b| self.kind.encode(w, b))??;
+        b.descend(|b| self.items.encode(w, b))??;
         Ok(())
     }
 }
@@ -157,15 +164,8 @@ impl Encode for CaseNode {
     }
 }
 
-// ─── InListNode ──────────────────────────────────────────────────────────────
-
-impl Encode for InListNode {
-    fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
-        b.descend(|b| self.expr.encode(w, b))??;
-        b.descend(|b| self.list.encode(w, b))??;
-        Ok(())
-    }
-}
+// ─── (InListNode / ArrayLitNode encoders removed; collapsed into ─────────────
+//      CompositeNode above.)
 
 // ─── Span / SpanTable ────────────────────────────────────────────────────────
 
@@ -323,8 +323,8 @@ impl Encode for BinOp {
             BinOp::Shl => 19,
             BinOp::Shr => 20,
             BinOp::Concat => 21,
-            BinOp::Arrow => 22,
-            BinOp::LongArrow => 23,
+            BinOp::IsDistinctFrom => 22,
+            BinOp::IsNotDistinctFrom => 23,
             _ => return Err(EncodeError::Custom("BinOp: unknown variant")),
         };
         w.write_varint_u32(tag)
@@ -349,122 +349,53 @@ impl Encode for UnaryOp {
     }
 }
 
-// ─── ExprNode ────────────────────────────────────────────────────────────────
+// ─── ExprNode (16 B packed POD) ──────────────────────────────────────────────
 
+/// Encode the packed [`ExprNode`] field-by-field, opcode-aware.
+///
+/// We do NOT just dump the 16 raw bytes: that would commit the wire
+/// format to a host-endian POD layout and waste bytes for opcodes that
+/// don't use all of `a`/`b`/`c`. Instead, write the opcode first and
+/// then only the fields that opcode actually uses (matching the
+/// per-opcode "Field layout" table in `dol_expr::expr`).
+///
+/// The wire format is byte-stable across hosts and small (≈ 1–4 bytes
+/// per leaf, ≈ 7 bytes per Bin) — comparable to the previous
+/// variant-tag form.
+///
+/// **Budget accounting:** the whole node is one logical "field-of-its-
+/// parent", so we charge one `descend` for the encode call as a whole
+/// (in the caller's tree-walker), then write each scalar inline.
+/// Wire encoding for the 16 B packed [`ExprNode`].
+///
+/// The layout on the wire is the same fixed 16-byte LE field-by-field
+/// form that `ExprNode` carries in memory: `op` (1 B), `flags` (1 B),
+/// `aux` (2 B LE), `a` (4 B LE), `b` (4 B LE), `c` (4 B LE). This
+/// is byte-stable across hosts (every multibyte field is encoded in
+/// explicit little-endian) and enables a bulk-POD fast path in
+/// `ExprArena::encode` — once each node is exactly 16 B on the wire,
+/// the nodes vector is `len + N × 16` bytes with no per-element
+/// branching.
+///
+/// On little-endian hosts (the overwhelming majority), this produces
+/// the same byte sequence as `bytemuck::cast_slice::<ExprNode, u8>`,
+/// so the field-by-field loop is effectively a memcpy. On big-endian
+/// hosts the explicit `to_le_bytes` path keeps the wire stable.
+///
+/// **Budget accounting:** the whole node is one logical
+/// "field-of-its-parent" — the caller's tree-walker descends once for
+/// the `ExprNode::encode` call as a whole, not per scalar.
 impl Encode for ExprNode {
-    fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
-        match self {
-            ExprNode::Namespace(id) => {
-                w.write_varint_u32(0)?;
-                b.descend(|b| id.encode(w, b))??;
-            }
-            ExprNode::Field(id) => {
-                w.write_varint_u32(1)?;
-                b.descend(|b| id.encode(w, b))??;
-            }
-            ExprNode::Param => {
-                w.write_varint_u32(2)?;
-            }
-            ExprNode::Lit(id) => {
-                w.write_varint_u32(3)?;
-                b.descend(|b| id.encode(w, b))??;
-            }
-            ExprNode::ObjectLit(id) => {
-                w.write_varint_u32(4)?;
-                b.descend(|b| id.encode(w, b))??;
-            }
-            ExprNode::ArrayLit(v) => {
-                w.write_varint_u32(5)?;
-                b.descend(|b| v.encode(w, b))??;
-            }
-            ExprNode::BinOp { op, lhs, rhs } => {
-                w.write_varint_u32(6)?;
-                b.descend(|b| op.encode(w, b))??;
-                b.descend(|b| lhs.encode(w, b))??;
-                b.descend(|b| rhs.encode(w, b))??;
-            }
-            ExprNode::UnaryOp { op, operand } => {
-                w.write_varint_u32(7)?;
-                b.descend(|b| op.encode(w, b))??;
-                b.descend(|b| operand.encode(w, b))??;
-            }
-            ExprNode::Func(id) => {
-                w.write_varint_u32(8)?;
-                b.descend(|b| id.encode(w, b))??;
-            }
-            ExprNode::Agg {
-                func,
-                expr,
-                distinct,
-            } => {
-                w.write_varint_u32(9)?;
-                b.descend(|b| func.encode(w, b))??;
-                b.descend(|b| expr.encode(w, b))??;
-                b.descend(|b| distinct.encode(w, b))??;
-            }
-            ExprNode::Window(id) => {
-                w.write_varint_u32(10)?;
-                b.descend(|b| id.encode(w, b))??;
-            }
-            ExprNode::Cast { expr, to } => {
-                w.write_varint_u32(11)?;
-                b.descend(|b| expr.encode(w, b))??;
-                b.descend(|b| to.encode(w, b))??;
-            }
-            ExprNode::Case(id) => {
-                w.write_varint_u32(12)?;
-                b.descend(|b| id.encode(w, b))??;
-            }
-            ExprNode::Alias { expr, name } => {
-                w.write_varint_u32(13)?;
-                b.descend(|b| expr.encode(w, b))??;
-                b.descend(|b| name.encode(w, b))??;
-            }
-            ExprNode::InList(id) => {
-                w.write_varint_u32(14)?;
-                b.descend(|b| id.encode(w, b))??;
-            }
-            ExprNode::InSub { expr, sub } => {
-                w.write_varint_u32(15)?;
-                b.descend(|b| expr.encode(w, b))??;
-                b.descend(|b| sub.encode(w, b))??;
-            }
-            ExprNode::Exists { sub } => {
-                w.write_varint_u32(16)?;
-                b.descend(|b| sub.encode(w, b))??;
-            }
-            ExprNode::IsNull { expr } => {
-                w.write_varint_u32(17)?;
-                b.descend(|b| expr.encode(w, b))??;
-            }
-            ExprNode::Between { expr, lo, hi } => {
-                w.write_varint_u32(18)?;
-                b.descend(|b| expr.encode(w, b))??;
-                b.descend(|b| lo.encode(w, b))??;
-                b.descend(|b| hi.encode(w, b))??;
-            }
-            ExprNode::Query(id) => {
-                w.write_varint_u32(19)?;
-                b.descend(|b| id.encode(w, b))??;
-            }
-            ExprNode::Insert(id) => {
-                w.write_varint_u32(20)?;
-                b.descend(|b| id.encode(w, b))??;
-            }
-            ExprNode::Update(id) => {
-                w.write_varint_u32(21)?;
-                b.descend(|b| id.encode(w, b))??;
-            }
-            ExprNode::Delete(id) => {
-                w.write_varint_u32(22)?;
-                b.descend(|b| id.encode(w, b))??;
-            }
-            ExprNode::Upsert(id) => {
-                w.write_varint_u32(23)?;
-                b.descend(|b| id.encode(w, b))??;
-            }
-            _ => return Err(EncodeError::Custom("ExprNode: unknown variant")),
-        }
+    fn encode(&self, w: &mut Writer<'_>, _b: &mut Budget) -> Result<(), EncodeError> {
+        // Reject unknown opcodes at encode time so a corrupted
+        // in-memory arena cannot quietly produce undecodable bytes.
+        let _ = ExprOp::from_u8(self.op).ok_or(EncodeError::Custom("ExprNode: unknown opcode"))?;
+        w.write_u8(self.op)?;
+        w.write_u8(self.flags)?;
+        w.write_bytes(&self.aux.to_le_bytes())?;
+        w.write_bytes(&self.a.to_le_bytes())?;
+        w.write_bytes(&self.b.to_le_bytes())?;
+        w.write_bytes(&self.c.to_le_bytes())?;
         Ok(())
     }
 }
@@ -495,10 +426,9 @@ impl Encode for ExprArena {
         b.descend(|b| self.span_table_ref().encode(w, b))??;
         b.descend(|b| encode_slice(self.lits_slice(), w, b))??;
         b.descend(|b| encode_slice(self.funcs_slice(), w, b))??;
-        b.descend(|b| encode_slice(self.obj_lits_slice(), w, b))??;
+        b.descend(|b| encode_slice(self.composites_slice(), w, b))??;
         b.descend(|b| encode_slice(self.windows_slice(), w, b))??;
         b.descend(|b| encode_slice(self.cases_slice(), w, b))??;
-        b.descend(|b| encode_slice(self.in_lists_slice(), w, b))??;
         b.descend(|b| encode_slice(self.queries_slice(), w, b))??;
         b.descend(|b| encode_slice(self.inserts_slice(), w, b))??;
         b.descend(|b| encode_slice(self.updates_slice(), w, b))??;

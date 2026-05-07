@@ -1,11 +1,12 @@
 use alloc::vec::Vec;
 
+use hashbrown::HashMap;
 use smallvec::SmallVec;
 
 use crate::expr::{DeleteNode, ExprNode, InsertNode, Order, QueryNode, UpdateNode, UpsertNode};
 use crate::ids::{
-    CaseId, DeleteId, FieldId, FuncId, Id, InListId, InsertId, LiteralId, NodeId, ObjLitId,
-    QueryId, SpanId, StrId, UpdateId, UpsertId, WindowId,
+    CaseId, CompositeId, DeleteId, FieldId, FuncId, Id, InsertId, LiteralId, NodeId, QueryId,
+    SpanId, StrId, UpdateId, UpsertId, WindowId,
 };
 use crate::types::value::Literal;
 
@@ -46,7 +47,7 @@ fn get_in<T, Tag: ?Sized>(vec: &[T], id: Id<Tag>) -> &T {
 
 /// A single traversal step inside a [`FieldNode`] path.
 ///
-/// Steps allow a [`ExprNode::Field`] to express arbitrarily deep navigation
+/// Steps allow a [`crate::expr::ExprOp::Field`] to express arbitrarily deep navigation
 /// through JSON/object structures or arrays, independent of the backing store:
 ///
 /// | Step | Postgres JSONB              | REST / document |
@@ -63,10 +64,10 @@ pub enum FieldStep {
     Index(u32),
 }
 
-/// Payload for [`ExprNode::Field`], stored in `ExprArena::fields`.
+/// Payload for [`crate::expr::ExprOp::Field`], stored in `ExprArena::fields`.
 ///
 /// A `Field` is a leaf reference: a named attribute optionally anchored on
-/// a container [`ExprNode::Namespace`] (whose dotted address is interned as
+/// a container [`crate::expr::ExprOp::Namespace`] (whose dotted address is interned as
 /// `namespace`), with an optional traversal chain that follows the leaf
 /// (e.g. JSON key / index access).
 ///
@@ -92,7 +93,7 @@ pub struct FieldNode {
 
 // ─── Pooled payload structs ───────────────────────────────────────────────────
 
-/// Payload for [`ExprNode::Func`], stored in `ExprArena::funcs`.
+/// Payload for [`crate::expr::ExprOp::Func`], stored in `ExprArena::funcs`.
 ///
 /// Moved out of the enum variant to keep `ExprNode` ≤ 32 bytes: the
 /// two fields (`name: u32` + 4-byte alignment gap + 24-byte `SmallVec`)
@@ -105,15 +106,63 @@ pub struct FuncNode {
     pub args: SmallVec<[NodeId; 4]>,
 }
 
-/// Payload for [`ExprNode::ObjectLit`], stored in `ExprArena::obj_lits`.
+/// Discriminator for the unified [`CompositeNode`] container.
 ///
-/// The inline buffer of `SmallVec<[(StrId, NodeId); 4]>` is 4 × 8 = 32 bytes
-/// on its own — already over budget before the discriminant word is counted.
+/// Three structural shapes share one side-pool:
+///
+/// * [`CompositeKind::Array`] — homogeneous list literal (`[1, 2, 3]`),
+///   item keys are `None`.
+/// * [`CompositeKind::Object`] — keyed object literal
+///   (`{ "x": 1, "y": 2 }`), every item key is `Some(StrId)`.
+/// * [`CompositeKind::Tuple`] — fixed-arity row literal
+///   (`(a, b, c)` in `IN (a, b, c)`), keys are `None` but the kind
+///   distinguishes the row form from a true list literal.
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[non_exhaustive]
+pub enum CompositeKind {
+    Array = 0,
+    Object = 1,
+    Tuple = 2,
+}
+
+impl CompositeKind {
+    /// Convert from a raw `u8` (e.g. wire byte).
+    #[must_use]
+    pub const fn from_u8(v: u8) -> Option<Self> {
+        Some(match v {
+            0 => Self::Array,
+            1 => Self::Object,
+            2 => Self::Tuple,
+            _ => return None,
+        })
+    }
+}
+
+/// Payload for [`crate::expr::ExprOp::Composite`], stored in
+/// `ExprArena::composites`.
+///
+/// Collapses the v2-prototype `ObjectLit`, `ArrayLit`, and `InList`
+/// side-pools onto a single record. Each item is a
+/// `(Option<StrId>, NodeId)` pair so an `Object` can stash its keys
+/// alongside its values without a parallel vector. For `Array` and
+/// `Tuple`, the key is always `None`.
+///
+/// The `Tuple` variant is what lets `IN (a, b, c)` lower to
+/// `In { probe, collection: Composite::Tuple(a, b, c) }` cleanly: the
+/// row form is structurally distinct from a true array literal.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct ObjLitNode(pub SmallVec<[(StrId, NodeId); 4]>);
+pub struct CompositeNode {
+    /// Which structural shape this is (Array / Object / Tuple).
+    pub kind: CompositeKind,
+    /// Items in source order. Object items carry a `Some(StrId)` key;
+    /// Array / Tuple items carry `None`.
+    pub items: SmallVec<[(Option<StrId>, NodeId); 4]>,
+}
 
-/// Payload for [`ExprNode::Window`], stored in `ExprArena::windows`.
+/// Payload for [`crate::expr::ExprOp::Window`], stored in `ExprArena::windows`.
 ///
 /// Two `SmallVec` fields (each 24 bytes) plus `func: StrId` total 52+ bytes
 /// of payload — pooled to keep `ExprNode` ≤ 32 bytes.
@@ -131,7 +180,7 @@ pub struct WindowNode {
     pub frame: Option<crate::tree::WindowFrame>,
 }
 
-/// Payload for [`ExprNode::Case`], stored in `ExprArena::cases`.
+/// Payload for [`crate::expr::ExprOp::Case`], stored in `ExprArena::cases`.
 ///
 /// `SmallVec<[(NodeId, NodeId); 4]>` has a 32-byte inline buffer, making the
 /// variant payload 36+ bytes — pooled to keep `ExprNode` ≤ 32 bytes.
@@ -146,16 +195,11 @@ pub struct CaseNode {
     pub else_: Option<NodeId>,
 }
 
-/// Payload for [`ExprNode::InList`], stored in `ExprArena::in_lists`.
-///
-/// `SmallVec<[NodeId; 8]>` has a 32-byte inline buffer, making the variant
-/// payload 36+ bytes — pooled to keep `ExprNode` ≤ 32 bytes.
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct InListNode {
-    pub expr: NodeId,
-    pub list: SmallVec<[NodeId; 8]>,
-}
+// ─── ArrayLitNode (removed) ──────────────────────────────────────────────────
+// `ArrayLitNode` and `InListNode` were collapsed into `CompositeNode`
+// (see above) when `ExprOp::ArrayLit` and `ExprOp::InList`/
+// `ExprOp::InSub` were collapsed onto `ExprOp::Composite` and
+// `ExprOp::In`.
 
 // ─── SpanTable ────────────────────────────────────────────────────────────────
 
@@ -266,10 +310,12 @@ pub struct Capacity {
     pub nodes: usize,
     pub fields: usize,
     pub funcs: usize,
-    pub obj_lits: usize,
+    /// Pre-alloc for the unified array / object / tuple side-pool
+    /// (replaces the legacy `obj_lits`, `array_lits`, `in_lists`
+    /// fields).
+    pub composites: usize,
     pub windows: usize,
     pub cases: usize,
-    pub in_lists: usize,
     pub queries: usize,
     pub inserts: usize,
     pub updates: usize,
@@ -298,7 +344,7 @@ impl Capacity {
             funcs: 32,
             lits: 64,
             queries: 1,
-            in_lists: 4,
+            composites: 4,
             cases: 4,
             ..Self::default()
         }
@@ -314,14 +360,14 @@ pub struct ExprArena {
     lits: Vec<Literal<'static>>,
     /// Pooled function-call payloads — lookup by [`FuncId`].
     funcs: Vec<FuncNode>,
-    /// Pooled object-literal payloads — lookup by [`ObjLitId`].
-    obj_lits: Vec<ObjLitNode>,
+    /// Pooled array / object / tuple composite literals — lookup by
+    /// [`CompositeId`]. Replaces the legacy `obj_lits`, `array_lits`,
+    /// and `in_lists` pools.
+    composites: Vec<CompositeNode>,
     /// Pooled window-function payloads — lookup by [`WindowId`].
     windows: Vec<WindowNode>,
     /// Pooled CASE expression payloads — lookup by [`CaseId`].
     cases: Vec<CaseNode>,
-    /// Pooled IN-list payloads — lookup by [`InListId`].
-    in_lists: Vec<InListNode>,
     /// Pooled SELECT/query statement payloads — lookup by [`QueryId`].
     queries: Vec<QueryNode>,
     /// Pooled INSERT statement payloads — lookup by [`InsertId`].
@@ -334,6 +380,14 @@ pub struct ExprArena {
     upserts: Vec<UpsertNode>,
     /// Pooled field-reference payloads — lookup by [`FieldId`].
     fields: Vec<FieldNode>,
+    /// Optional structural-dedup index for [`Self::intern_node`].
+    ///
+    /// `None` until the first `intern_node` call. Lazily initialised so
+    /// the bulk single-shot `alloc` path on a one-off lowering does not
+    /// pay for the hash table. Skipped by `Serialize` because it is
+    /// recoverable from the `nodes` slice.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    node_index: Option<HashMap<ExprNode, NodeId>>,
 }
 
 impl ExprArena {
@@ -352,16 +406,16 @@ impl ExprArena {
             span_table: SpanTable::default(),
             lits: Vec::with_capacity(cap.lits),
             funcs: Vec::with_capacity(cap.funcs),
-            obj_lits: Vec::with_capacity(cap.obj_lits),
+            composites: Vec::with_capacity(cap.composites),
             windows: Vec::with_capacity(cap.windows),
             cases: Vec::with_capacity(cap.cases),
-            in_lists: Vec::with_capacity(cap.in_lists),
             queries: Vec::with_capacity(cap.queries),
             inserts: Vec::with_capacity(cap.inserts),
             updates: Vec::with_capacity(cap.updates),
             deletes: Vec::with_capacity(cap.deletes),
             upserts: Vec::with_capacity(cap.upserts),
             fields: Vec::with_capacity(cap.fields),
+            node_index: None,
         }
     }
 
@@ -379,10 +433,9 @@ impl ExprArena {
         self.nodes.capacity() * size_of::<ExprNode>()
             + self.lits.capacity() * size_of::<Literal<'static>>()
             + self.funcs.capacity() * size_of::<FuncNode>()
-            + self.obj_lits.capacity() * size_of::<ObjLitNode>()
+            + self.composites.capacity() * size_of::<CompositeNode>()
             + self.windows.capacity() * size_of::<WindowNode>()
             + self.cases.capacity() * size_of::<CaseNode>()
-            + self.in_lists.capacity() * size_of::<InListNode>()
             + self.queries.capacity() * size_of::<QueryNode>()
             + self.inserts.capacity() * size_of::<InsertNode>()
             + self.updates.capacity() * size_of::<UpdateNode>()
@@ -395,8 +448,158 @@ impl ExprArena {
 
     // ── ExprNode pool ────────────────────────────────────────────────────────
 
+    /// Append a packed [`ExprNode`] to the hot pool and return its
+    /// [`NodeId`]. Most call sites should reach for the typed
+    /// constructors on [`ExprNode`] (e.g. [`ExprNode::bin`]) to keep
+    /// the raw `a`/`b`/`c` layout out of consumer code.
     pub fn alloc(&mut self, node: ExprNode) -> NodeId {
-        alloc_in(&mut self.nodes, node)
+        let id = alloc_in(&mut self.nodes, node);
+        // Keep the optional dedup index in sync so a later
+        // `intern_node` for the same shape can find this entry. We
+        // record on first-seen — duplicates that arrive via `alloc`
+        // are intentionally kept distinct because the caller chose
+        // the non-dedup entry point.
+        if let Some(map) = self.node_index.as_mut() {
+            map.entry(node).or_insert(id);
+        }
+        id
+    }
+
+    /// Allocate `node` if no structurally-equal node already exists in
+    /// the hot pool, otherwise return the existing [`NodeId`].
+    ///
+    /// This is the **opt-in** dedup path. Bulk lowering uses
+    /// [`Self::alloc`] (no hash cost); rewrites and CSE-style passes
+    /// use this entry point so that common subexpressions collapse
+    /// onto shared `NodeId`s.
+    ///
+    /// Structural equality is byte-for-byte over the 16-byte packed
+    /// node. Two nodes are equal iff their `(op, flags, aux, a, b, c)`
+    /// tuples match — which is the right semantics because side-pool
+    /// referents (`FieldId`, `LiteralId`, …) are themselves keyed by
+    /// content via their own pools.
+    ///
+    /// The dedup index is built lazily on first call and grows
+    /// alongside the `nodes` pool from there. Calling [`Self::alloc`]
+    /// after `intern_node` keeps the index in sync (the
+    /// newly-allocated node is recorded so a subsequent `intern_node`
+    /// can dedup against it).
+    pub fn intern_node(&mut self, node: ExprNode) -> NodeId {
+        // Lazily seed the dedup index from the existing `nodes` pool
+        // so any nodes already allocated via the bulk path participate
+        // in dedup from this point onward.
+        let map = self.node_index.get_or_insert_with(|| {
+            let mut map: HashMap<ExprNode, NodeId> = HashMap::with_capacity(self.nodes.len());
+            for (idx, n) in self.nodes.iter().enumerate() {
+                if let Some(id) = NodeId::from_index(idx) {
+                    map.entry(*n).or_insert(id);
+                }
+            }
+            map
+        });
+        if let Some(&existing) = map.get(&node) {
+            return existing;
+        }
+        let id = alloc_in(&mut self.nodes, node);
+        map.insert(node, id);
+        id
+    }
+
+    // ── Typed `alloc_*` helpers — sugar for `alloc(ExprNode::*)`. ─────
+    //
+    // These mirror the constructors on `ExprNode` 1:1 and exist so
+    // callers don't have to chain `arena.alloc(ExprNode::bin(op, l, r))`
+    // everywhere. They keep the call sites readable now that the node
+    // is opaque-ish (op + 14 bytes).
+
+    /// Allocate a [`crate::expr::ExprOp::Bin`] node.
+    pub fn alloc_bin(&mut self, op: crate::expr::BinOp, lhs: NodeId, rhs: NodeId) -> NodeId {
+        self.alloc(ExprNode::bin(op, lhs, rhs))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Una`] node.
+    pub fn alloc_una(&mut self, op: crate::expr::UnaryOp, operand: NodeId) -> NodeId {
+        self.alloc(ExprNode::una(op, operand))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Field`] node referring to
+    /// `id` in the field-payload pool.
+    pub fn alloc_field_ref(&mut self, id: FieldId) -> NodeId {
+        self.alloc(ExprNode::field(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Param`] node with positional
+    /// index `0` (the legacy unindexed default).
+    pub fn alloc_param(&mut self) -> NodeId {
+        self.alloc(ExprNode::param(0))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Lit`] node.
+    pub fn alloc_lit_ref(&mut self, id: LiteralId) -> NodeId {
+        self.alloc(ExprNode::lit(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Namespace`] node.
+    pub fn alloc_namespace(&mut self, id: StrId) -> NodeId {
+        self.alloc(ExprNode::namespace(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Composite`] reference node.
+    /// `id` points into `ExprArena::composites`.
+    pub fn alloc_composite_ref(&mut self, id: CompositeId) -> NodeId {
+        self.alloc(ExprNode::composite(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Func`] node.
+    pub fn alloc_func_ref(&mut self, id: FuncId) -> NodeId {
+        self.alloc(ExprNode::func(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Agg`] node.
+    pub fn alloc_agg(&mut self, func: StrId, expr: NodeId, distinct: bool) -> NodeId {
+        self.alloc(ExprNode::agg(func, expr, distinct))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Window`] node.
+    pub fn alloc_window_ref(&mut self, id: WindowId) -> NodeId {
+        self.alloc(ExprNode::window(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Cast`] node.
+    pub fn alloc_cast(&mut self, expr: NodeId, to: StrId) -> NodeId {
+        self.alloc(ExprNode::cast(expr, to))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Case`] node.
+    pub fn alloc_case_ref(&mut self, id: CaseId) -> NodeId {
+        self.alloc(ExprNode::case(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Alias`] node.
+    pub fn alloc_alias(&mut self, expr: NodeId, name: StrId) -> NodeId {
+        self.alloc(ExprNode::alias(expr, name))
+    }
+    /// Allocate a [`crate::expr::ExprOp::In`] node. `collection` is a
+    /// [`NodeId`] referring to the right-hand side; its opcode
+    /// discriminates the form (Composite / Query / Param / Field).
+    pub fn alloc_in(&mut self, probe: NodeId, collection: NodeId) -> NodeId {
+        self.alloc(ExprNode::in_(probe, collection))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Exists`] node.
+    pub fn alloc_exists(&mut self, sub: NodeId) -> NodeId {
+        self.alloc(ExprNode::exists(sub))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Between`] node.
+    pub fn alloc_between(&mut self, expr: NodeId, lo: NodeId, hi: NodeId) -> NodeId {
+        self.alloc(ExprNode::between(expr, lo, hi))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Query`] node.
+    pub fn alloc_query_ref(&mut self, id: QueryId) -> NodeId {
+        self.alloc(ExprNode::query(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Insert`] node.
+    pub fn alloc_insert_ref(&mut self, id: InsertId) -> NodeId {
+        self.alloc(ExprNode::insert(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Update`] node.
+    pub fn alloc_update_ref(&mut self, id: UpdateId) -> NodeId {
+        self.alloc(ExprNode::update(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Delete`] node.
+    pub fn alloc_delete_ref(&mut self, id: DeleteId) -> NodeId {
+        self.alloc(ExprNode::delete(id))
+    }
+    /// Allocate a [`crate::expr::ExprOp::Upsert`] node.
+    pub fn alloc_upsert_ref(&mut self, id: UpsertId) -> NodeId {
+        self.alloc(ExprNode::upsert(id))
     }
 
     /// Retrieve an [`ExprNode`] by its [`NodeId`].
@@ -462,14 +665,14 @@ impl ExprArena {
         get_in(&self.funcs, id)
     }
 
-    // ── ObjLitNode pool ───────────────────────────────────────────────────────
+    // ── CompositeNode pool ────────────────────────────────────────────────────
 
-    pub fn alloc_obj_lit(&mut self, obj: ObjLitNode) -> ObjLitId {
-        alloc_in(&mut self.obj_lits, obj)
+    pub fn alloc_composite(&mut self, comp: CompositeNode) -> CompositeId {
+        alloc_in(&mut self.composites, comp)
     }
     #[track_caller]
-    pub fn get_obj_lit(&self, id: ObjLitId) -> &ObjLitNode {
-        get_in(&self.obj_lits, id)
+    pub fn get_composite(&self, id: CompositeId) -> &CompositeNode {
+        get_in(&self.composites, id)
     }
 
     // ── WindowNode pool ───────────────────────────────────────────────────────
@@ -492,15 +695,7 @@ impl ExprArena {
         get_in(&self.cases, id)
     }
 
-    // ── InListNode pool ───────────────────────────────────────────────────────
-
-    pub fn alloc_in_list(&mut self, node: InListNode) -> InListId {
-        alloc_in(&mut self.in_lists, node)
-    }
-    #[track_caller]
-    pub fn get_in_list(&self, id: InListId) -> &InListNode {
-        get_in(&self.in_lists, id)
-    }
+    // ── (Removed: `InListNode` pool — collapsed into `composites` above.) ─────
 
     // ── QueryNode pool ────────────────────────────────────────────────────────
 
@@ -571,17 +766,14 @@ impl ExprArena {
     pub fn funcs_slice(&self) -> &[FuncNode] {
         &self.funcs
     }
-    pub fn obj_lits_slice(&self) -> &[ObjLitNode] {
-        &self.obj_lits
+    pub fn composites_slice(&self) -> &[CompositeNode] {
+        &self.composites
     }
     pub fn windows_slice(&self) -> &[WindowNode] {
         &self.windows
     }
     pub fn cases_slice(&self) -> &[CaseNode] {
         &self.cases
-    }
-    pub fn in_lists_slice(&self) -> &[InListNode] {
-        &self.in_lists
     }
     pub fn queries_slice(&self) -> &[QueryNode] {
         &self.queries
@@ -603,5 +795,80 @@ impl ExprArena {
     }
     pub fn span_table_ref(&self) -> &SpanTable {
         &self.span_table
+    }
+}
+
+#[cfg(test)]
+mod intern_tests {
+    use super::*;
+    use crate::expr::BinOp;
+
+    #[test]
+    fn intern_node_collapses_structurally_equal_nodes() {
+        let mut arena = ExprArena::new();
+        // Build `lit(1)` twice and confirm `intern_node` returns the
+        // same id.
+        let lit = arena.alloc_lit(Literal::Int32(1));
+        let lit_node1 = arena.intern_node(ExprNode::lit(lit));
+        let lit_node2 = arena.intern_node(ExprNode::lit(lit));
+        assert_eq!(lit_node1, lit_node2, "literal-ref nodes dedup");
+
+        // Distinct shape ⇒ distinct id.
+        let lit2 = arena.alloc_lit(Literal::Int32(2));
+        let lit_node3 = arena.intern_node(ExprNode::lit(lit2));
+        assert_ne!(lit_node1, lit_node3);
+    }
+
+    #[test]
+    fn alloc_then_intern_finds_alloc_node() {
+        let mut arena = ExprArena::new();
+        let lit = arena.alloc_lit(Literal::Int32(7));
+        // First allocation goes via the bulk path.
+        let alloc_id = arena.alloc(ExprNode::lit(lit));
+        // The dedup index isn't built yet; calling `intern_node` must
+        // seed the index from the existing pool and return the
+        // already-allocated id rather than appending a new one.
+        let intern_id = arena.intern_node(ExprNode::lit(lit));
+        assert_eq!(alloc_id, intern_id);
+        assert_eq!(arena.len(), 1, "no duplicate node was appended");
+    }
+
+    #[test]
+    fn intern_then_alloc_keeps_index_in_sync() {
+        let mut arena = ExprArena::new();
+        let lit_a = arena.alloc_lit(Literal::Int32(1));
+        let lit_b = arena.alloc_lit(Literal::Int32(2));
+
+        // Force index init via intern.
+        let _seed = arena.intern_node(ExprNode::lit(lit_a));
+        // Now `alloc` should still update the index.
+        let alloc_b = arena.alloc(ExprNode::lit(lit_b));
+        // intern of the same shape should return the alloc'd id.
+        let intern_b = arena.intern_node(ExprNode::lit(lit_b));
+        assert_eq!(alloc_b, intern_b);
+    }
+
+    #[test]
+    fn intern_node_dedups_bin_subtree() {
+        let mut arena = ExprArena::new();
+        // Two structurally-identical `a + 1` subtrees should share
+        // node ids when built through `intern_node`.
+        let lit1 = arena.alloc_lit(Literal::Int32(1));
+        let field_id = arena.alloc_field(FieldNode {
+            namespace: None,
+            name: StrId::from_u32(1).unwrap(),
+            steps: SmallVec::new(),
+        });
+        let a_node = arena.intern_node(ExprNode::field(field_id));
+        let lit_node = arena.intern_node(ExprNode::lit(lit1));
+        let bin1 = arena.intern_node(ExprNode::bin(BinOp::Add, a_node, lit_node));
+
+        let a_node2 = arena.intern_node(ExprNode::field(field_id));
+        let lit_node2 = arena.intern_node(ExprNode::lit(lit1));
+        let bin2 = arena.intern_node(ExprNode::bin(BinOp::Add, a_node2, lit_node2));
+
+        assert_eq!(a_node, a_node2);
+        assert_eq!(lit_node, lit_node2);
+        assert_eq!(bin1, bin2, "structurally-equal `a + 1` collapses");
     }
 }

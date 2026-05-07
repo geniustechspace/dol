@@ -15,8 +15,8 @@ use alloc::{
     vec::Vec,
 };
 
-use crate::arena::{ExprArena, FieldNode, FuncNode, InListNode, ObjLitNode};
-use crate::expr::{BinOp, ExprNode, Order, UnaryOp as ArenaUnaryOp};
+use crate::arena::{CompositeKind, CompositeNode, ExprArena, FieldNode, FuncNode};
+use crate::expr::{BinOp, Order, UnaryOp as ArenaUnaryOp};
 use crate::ids::NodeId;
 use crate::interner::Interner;
 use crate::tree::{Direction, Expr, OrderByExpr};
@@ -184,7 +184,7 @@ fn lower_inner(
             // A bare container address — interned as its dotted form.
             let dotted = path.iter().collect::<Vec<_>>().join(".");
             let id = interner.intern(&dotted);
-            Ok(arena.alloc(ExprNode::Namespace(id)))
+            Ok(arena.alloc_namespace(id))
         }
 
         Expr::Field { base, name, steps } => {
@@ -216,45 +216,101 @@ fn lower_inner(
                 name: leaf_id,
                 steps: arena_steps,
             });
-            Ok(arena.alloc(ExprNode::Field(fid)))
+            Ok(arena.alloc_field_ref(fid))
         }
 
-        Expr::Param => Ok(arena.alloc(ExprNode::Param)),
+        Expr::Param => Ok(arena.alloc_param()),
 
         Expr::Value(lit) => {
             // dol-expr::Literal — clone directly.
             let lid = arena.alloc_lit(lit.clone().into_static());
-            Ok(arena.alloc(ExprNode::Lit(lid)))
+            Ok(arena.alloc_lit_ref(lid))
         }
 
         Expr::Array(elements) => {
-            let mut ids: SmallVec<[NodeId; 4]> = SmallVec::new();
+            let mut items: SmallVec<[(Option<crate::ids::StrId>, NodeId); 4]> = SmallVec::new();
             for e in elements {
-                ids.push(lower_child(e, arena, interner, budget)?);
+                let id = lower_child(e, arena, interner, budget)?;
+                items.push((None, id));
             }
-            Ok(arena.alloc(ExprNode::ArrayLit(ids)))
+            let cid = arena.alloc_composite(CompositeNode {
+                kind: CompositeKind::Array,
+                items,
+            });
+            Ok(arena.alloc_composite_ref(cid))
         }
 
         Expr::Object(fields) => {
-            let mut pairs: SmallVec<[(crate::ids::StrId, NodeId); 4]> = SmallVec::new();
+            let mut items: SmallVec<[(Option<crate::ids::StrId>, NodeId); 4]> = SmallVec::new();
             for (k, v) in fields {
                 let kid = interner.intern(k.as_str());
                 let vid = lower_child(v, arena, interner, budget)?;
-                pairs.push((kid, vid));
+                items.push((Some(kid), vid));
             }
-            let oid = arena.alloc_obj_lit(ObjLitNode(pairs));
-            Ok(arena.alloc(ExprNode::ObjectLit(oid)))
+            let cid = arena.alloc_composite(CompositeNode {
+                kind: CompositeKind::Object,
+                items,
+            });
+            Ok(arena.alloc_composite_ref(cid))
         }
 
-        Expr::BinaryOp { left, op, right } => {
-            let lhs = lower_child(left, arena, interner, budget)?;
-            let rhs = lower_child(right, arena, interner, budget)?;
-            let bin_op = lower_binop(op);
-            Ok(arena.alloc(ExprNode::BinOp {
-                op: bin_op,
-                lhs,
-                rhs,
-            }))
+        Expr::BinaryOp { .. } => {
+            // ── Iterative left-spine walker ──────────────────────────────────
+            // Adversarial inputs (deep `a | b | c | ...` chains) build a
+            // left-recursive `BinaryOp` tree. Recursing through it would
+            // grow the host stack proportionally to chain length. We
+            // unwind the left spine iteratively on the heap so the only
+            // host-stack consumption is the (typically shallow) right
+            // operands plus the bottommost non-BinaryOp left.
+            //
+            // Budget accounting matches the per-AST-node recursive form:
+            // each spine layer pays one `budget.tick(1)` (just like the
+            // top-of-`lower_inner` charge for a recursive call), and the
+            // logical depth of the spine is checked against
+            // [`Limits::max_depth`] explicitly so we keep the same
+            // rejection contract a recursive `budget.descend` chain
+            // would have surfaced.
+            //
+            // The first spine layer's tick was already paid by the
+            // surrounding `lower_inner` entry above, so we charge
+            // `tick(1)` only for *additional* spine layers (matching the
+            // recursive cost of `lower_child → lower_inner`).
+            let max_depth = budget.limits().max_depth;
+            // Inline buffer of 8 covers ~all real-world expressions
+            // (typical SQL filter has ≤ 4 BinaryOp layers); deep
+            // adversarial chains spill onto the heap and that is
+            // exactly the case we care about not blowing the host
+            // stack on.
+            let mut spine: SmallVec<[(BinOp, &Expr<'_>); 8]> = SmallVec::new();
+            let mut cur: &Expr<'_> = expr;
+            while let Expr::BinaryOp { left, op, right } = cur {
+                let bin_op = lower_binop(op);
+                spine.push((bin_op, right.as_ref()));
+                cur = left.as_ref();
+                // Logical depth = spine layers walked + the surrounding
+                // `lower_child` `descend` already counted by `budget`.
+                let logical_depth = budget.depth().saturating_add(spine.len() as u32);
+                if logical_depth > max_depth {
+                    return Err(LowerError::DepthExceeded { depth: max_depth });
+                }
+                // Charge one tick per additional spine layer (the layer
+                // we just consumed). The very first layer was paid for
+                // at the top of `lower_inner`.
+                if spine.len() > 1 {
+                    budget.tick(1).map_err(|_| LowerError::FuelExhausted)?;
+                }
+            }
+            // `cur` is the bottommost non-`BinaryOp` left operand.
+            // Lower it through the normal recursive path — the recursion
+            // here is bounded by *its* depth, not the spine length.
+            let mut acc = lower_child(cur, arena, interner, budget)?;
+            // Build up the bin nodes bottom-up. Each right operand's
+            // recursion is bounded by the right operand's own depth.
+            while let Some((bin_op, right)) = spine.pop() {
+                let rhs = lower_child(right, arena, interner, budget)?;
+                acc = arena.alloc_bin(bin_op, acc, rhs);
+            }
+            Ok(acc)
         }
 
         Expr::UnaryOp { op, expr: inner } => {
@@ -273,10 +329,7 @@ fn lower_inner(
                         interner,
                         budget,
                     )?;
-                    return Ok(arena.alloc(ExprNode::UnaryOp {
-                        op: ArenaUnaryOp::Not,
-                        operand: in_node,
-                    }));
+                    return Ok(arena.alloc_una(ArenaUnaryOp::Not, in_node));
                 }
             }
 
@@ -288,10 +341,7 @@ fn lower_inner(
                 CoreUnaryOp::IsNotNull => ArenaUnaryOp::IsNotNull,
                 CoreUnaryOp::BitNot => ArenaUnaryOp::BitNot,
             };
-            Ok(arena.alloc(ExprNode::UnaryOp {
-                op: arena_op,
-                operand: inner_id,
-            }))
+            Ok(arena.alloc_una(arena_op, inner_id))
         }
 
         Expr::Func { name, args } => {
@@ -304,7 +354,7 @@ fn lower_inner(
                 name: func_name,
                 args: arg_ids,
             });
-            Ok(arena.alloc(ExprNode::Func(fid)))
+            Ok(arena.alloc_func_ref(fid))
         }
 
         Expr::Cast {
@@ -316,10 +366,7 @@ fn lower_inner(
             // rendering so the interned type name is wire-stable across
             // Rust toolchain upgrades.
             let type_name = interner.intern(as_type.type_name());
-            Ok(arena.alloc(ExprNode::Cast {
-                expr: inner_id,
-                to: type_name,
-            }))
+            Ok(arena.alloc_cast(inner_id, type_name))
         }
 
         Expr::Case { whens, else_expr } => {
@@ -337,7 +384,7 @@ fn lower_inner(
                 branches,
                 else_: else_id,
             });
-            Ok(arena.alloc(ExprNode::Case(cid)))
+            Ok(arena.alloc_case_ref(cid))
         }
 
         Expr::Between {
@@ -348,29 +395,31 @@ fn lower_inner(
             let eid = lower_child(inner, arena, interner, budget)?;
             let lo = lower_child(low, arena, interner, budget)?;
             let hi = lower_child(high, arena, interner, budget)?;
-            Ok(arena.alloc(ExprNode::Between { expr: eid, lo, hi }))
+            Ok(arena.alloc_between(eid, lo, hi))
         }
 
         Expr::InList { expr: inner, list } => {
+            // Lower as `In(probe, Composite::Array(list))`. The
+            // collection is a child arena node whose opcode encodes
+            // the form (here: `Composite` with `Array` kind).
             let eid = lower_child(inner, arena, interner, budget)?;
-            let mut ids: SmallVec<[NodeId; 8]> = SmallVec::new();
+            let mut items: SmallVec<[(Option<crate::ids::StrId>, NodeId); 4]> = SmallVec::new();
             for e in list {
-                ids.push(lower_child(e, arena, interner, budget)?);
+                let id = lower_child(e, arena, interner, budget)?;
+                items.push((None, id));
             }
-            let in_id = arena.alloc_in_list(InListNode {
-                expr: eid,
-                list: ids,
+            let cid = arena.alloc_composite(CompositeNode {
+                kind: CompositeKind::Array,
+                items,
             });
-            Ok(arena.alloc(ExprNode::InList(in_id)))
+            let coll = arena.alloc_composite_ref(cid);
+            Ok(arena.alloc_in(eid, coll))
         }
 
         Expr::Alias { expr: inner, alias } => {
             let inner_id = lower_child(inner, arena, interner, budget)?;
             let aid = interner.intern(alias.as_str());
-            Ok(arena.alloc(ExprNode::Alias {
-                expr: inner_id,
-                name: aid,
-            }))
+            Ok(arena.alloc_alias(inner_id, aid))
         }
 
         Expr::Star => {
@@ -380,7 +429,7 @@ fn lower_inner(
                 name: col,
                 steps: SmallVec::new(),
             });
-            Ok(arena.alloc(ExprNode::Field(fid)))
+            Ok(arena.alloc_field_ref(fid))
         }
 
         Expr::CountStar => {
@@ -391,12 +440,8 @@ fn lower_inner(
                 name: star_col,
                 steps: SmallVec::new(),
             });
-            let star_node = arena.alloc(ExprNode::Field(star_fid));
-            Ok(arena.alloc(ExprNode::Agg {
-                func: func_name,
-                expr: star_node,
-                distinct: false,
-            }))
+            let star_node = arena.alloc_field_ref(star_fid);
+            Ok(arena.alloc_agg(func_name, star_node, false))
         }
 
         Expr::Window {
@@ -435,7 +480,7 @@ fn lower_inner(
                 order,
                 frame: frame.clone(),
             });
-            Ok(arena.alloc(ExprNode::Window(wid)))
+            Ok(arena.alloc_window_ref(wid))
         }
     }
 }
@@ -504,11 +549,7 @@ pub fn lower_filters(
     }
     let mut result = ids.remove(0);
     for id in ids {
-        result = arena.alloc(ExprNode::BinOp {
-            op: BinOp::And,
-            lhs: result,
-            rhs: id,
-        });
+        result = arena.alloc_bin(BinOp::And, result, id);
     }
     Ok(Some(result))
 }
@@ -542,6 +583,8 @@ fn lower_binop(op: &crate::tree::OpDef) -> BinOp {
         "BIT_XOR" => BinOp::BitXor,
         "SHIFT_LEFT" => BinOp::Shl,
         "SHIFT_RIGHT" => BinOp::Shr,
+        "IS_DISTINCT_FROM" => BinOp::IsDistinctFrom,
+        "IS_NOT_DISTINCT_FROM" => BinOp::IsNotDistinctFrom,
         _ => BinOp::Eq, // Fallback for unknown operators.
     }
 }
@@ -549,7 +592,6 @@ fn lower_binop(op: &crate::tree::OpDef) -> BinOp {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expr::ExprNode;
     use crate::tree::{field, namespace};
 
     #[test]
@@ -557,15 +599,11 @@ mod tests {
         let mut arena = ExprArena::new();
         let mut interner = Interner::new();
         let id = lower_expr(&field("email"), &mut arena, &mut interner).unwrap();
-        match arena.get(id) {
-            ExprNode::Field(fid) => {
-                let node = arena.get_field(*fid);
-                assert!(node.namespace.is_none());
-                assert_eq!(interner.get(node.name), "email");
-                assert!(node.steps.is_empty());
-            }
-            other => panic!("expected ExprNode::Field, got {:?}", other),
-        }
+        let fid = arena.get(id).as_field().expect("expected Field opcode");
+        let node = arena.get_field(fid);
+        assert!(node.namespace.is_none());
+        assert_eq!(interner.get(node.name), "email");
+        assert!(node.steps.is_empty());
     }
 
     #[test]
@@ -574,15 +612,11 @@ mod tests {
         let mut interner = Interner::new();
         let expr = namespace("users").field("email");
         let id = lower_expr(&expr, &mut arena, &mut interner).unwrap();
-        match arena.get(id) {
-            ExprNode::Field(fid) => {
-                let node = arena.get_field(*fid);
-                let ns = node.namespace.expect("anchored on namespace");
-                assert_eq!(interner.get(ns), "users");
-                assert_eq!(interner.get(node.name), "email");
-            }
-            other => panic!("expected ExprNode::Field, got {:?}", other),
-        }
+        let fid = arena.get(id).as_field().expect("expected Field opcode");
+        let node = arena.get_field(fid);
+        let ns = node.namespace.expect("anchored on namespace");
+        assert_eq!(interner.get(ns), "users");
+        assert_eq!(interner.get(node.name), "email");
     }
 
     #[test]
@@ -590,12 +624,11 @@ mod tests {
         let mut arena = ExprArena::new();
         let mut interner = Interner::new();
         let id = lower_expr(&namespace("schema.users"), &mut arena, &mut interner).unwrap();
-        match arena.get(id) {
-            ExprNode::Namespace(sid) => {
-                assert_eq!(interner.get(*sid), "schema.users");
-            }
-            other => panic!("expected ExprNode::Namespace, got {:?}", other),
-        }
+        let sid = arena
+            .get(id)
+            .as_namespace()
+            .expect("expected Namespace opcode");
+        assert_eq!(interner.get(sid), "schema.users");
     }
 
     #[test]
@@ -605,23 +638,19 @@ mod tests {
         let mut interner = Interner::new();
         let expr = field("profile").get("address").get("city");
         let id = lower_expr(&expr, &mut arena, &mut interner).unwrap();
-        match arena.get(id) {
-            ExprNode::Field(fid) => {
-                let node = arena.get_field(*fid);
-                assert_eq!(interner.get(node.name), "profile");
-                assert_eq!(node.steps.len(), 2);
-                let labels: Vec<&str> = node
-                    .steps
-                    .iter()
-                    .map(|s| match s {
-                        FieldStep::Key(id) => interner.get(*id),
-                        FieldStep::Index(_) => panic!("unexpected index step"),
-                    })
-                    .collect();
-                assert_eq!(labels, ["address", "city"]);
-            }
-            other => panic!("expected ExprNode::Field, got {:?}", other),
-        }
+        let fid = arena.get(id).as_field().expect("expected Field opcode");
+        let node = arena.get_field(fid);
+        assert_eq!(interner.get(node.name), "profile");
+        assert_eq!(node.steps.len(), 2);
+        let labels: Vec<&str> = node
+            .steps
+            .iter()
+            .map(|s| match s {
+                FieldStep::Key(id) => interner.get(*id),
+                FieldStep::Index(_) => panic!("unexpected index step"),
+            })
+            .collect();
+        assert_eq!(labels, ["address", "city"]);
     }
 
     #[test]
@@ -635,10 +664,8 @@ mod tests {
             expr: alloc::boxed::Box::new(inner),
         };
         let id = lower_expr(&expr, &mut arena, &mut interner).unwrap();
-        match arena.get(id) {
-            ExprNode::UnaryOp { op, .. } => assert_eq!(*op, ArenaUnaryOp::BitNot),
-            other => panic!("expected ExprNode::UnaryOp, got {:?}", other),
-        }
+        let (op, _) = arena.get(id).as_una().expect("expected Una opcode");
+        assert_eq!(op, ArenaUnaryOp::BitNot);
     }
 
     #[test]
@@ -652,13 +679,9 @@ mod tests {
             as_type: DataType::Int64,
         };
         let id = lower_expr(&expr, &mut arena, &mut interner).unwrap();
-        match arena.get(id) {
-            ExprNode::Cast { to, .. } => {
-                // `DataType::Int64` has the stable name `"int64"`.
-                assert_eq!(interner.get(*to), "int64");
-            }
-            other => panic!("expected ExprNode::Cast, got {:?}", other),
-        }
+        let (_, to) = arena.get(id).as_cast().expect("expected Cast opcode");
+        // `DataType::Int64` has the stable name `"int64"`.
+        assert_eq!(interner.get(to), "int64");
     }
 
     #[test]
@@ -696,7 +719,7 @@ mod tests {
         // Depth fully restored after the call returns.
         assert_eq!(budget.depth(), 0);
         // And the node is a BinOp.
-        assert!(matches!(arena.get(id), ExprNode::BinOp { .. }));
+        assert!(arena.get(id).as_bin().is_some());
     }
 
     #[test]
@@ -755,5 +778,78 @@ mod tests {
         let expr = field("a").eq(int(1i32)) & field("b").eq(int(2i32));
         let err = sess.lower(&expr).unwrap_err();
         assert!(matches!(err, LowerError::FuelExhausted));
+    }
+
+    /// Companion to `deep_or_chain_does_not_overflow`: the same shape
+    /// of chain **succeeds** when the depth cap is set above the chain
+    /// depth. This pins the `DepthExceeded` rejection to the
+    /// artificial cap rather than a structural problem in the lowerer,
+    /// so a future regression on Budget threading can't pass the
+    /// rejection test by simply failing for the wrong reason.
+    ///
+    /// `BinaryOp` left-spine lowering is iterative (heap-allocated
+    /// spine vector), so the host stack does **not** scale with chain
+    /// depth during *lowering*. We therefore exercise a chain length
+    /// (8 192) two orders of magnitude above the previous recursive
+    /// cap (64) — a regression that reintroduces recursion into the
+    /// spine walk would overflow the default test stack on this input.
+    /// We're still bounded above by the recursive `Drop` of the
+    /// `Box<Expr>` chain at end of test (matching
+    /// `deep_or_chain_does_not_overflow`'s rationale), so we don't go
+    /// to 100 000 here even though the lowerer itself can take it.
+    #[test]
+    fn deep_or_chain_succeeds_with_ample_depth_cap() {
+        use crate::tree::int;
+        let depth = 8_192usize;
+        let mut e = field("a").eq(int(0i32));
+        for _ in 0..depth {
+            e = e | field("b").eq(int(0i32));
+        }
+        let mut arena = ExprArena::new();
+        let mut interner = Interner::new();
+        let mut budget = Budget::new(Limits {
+            max_nodes: usize::MAX,
+            // `depth + epsilon` for the inner field/lit/eq nodes.
+            max_depth: (depth as u32).saturating_add(16),
+            max_bytes: usize::MAX,
+            max_str_bytes: usize::MAX,
+        });
+        let id = lower_expr_with_budget(&e, &mut arena, &mut interner, &mut budget)
+            .expect("ample-depth lowering should succeed");
+        // Root is the outer-most OR.
+        let (op, _, _) = arena.get(id).as_bin().expect("root is Bin");
+        assert_eq!(op, BinOp::Or);
+        // Depth fully restored on success.
+        assert_eq!(budget.depth(), 0);
+    }
+
+    /// Deep-OR-chain regression: lowering must reject via Budget
+    /// (rather than blow the host stack) when the cap is set below the
+    /// chain depth. The chain length here (`8 192`) is well above the
+    /// typical SQL backend's nesting limit yet small enough to keep
+    /// `Box<Expr>`'s recursive `Drop` within the default test stack —
+    /// the production guard is the `Limits::max_depth` cap, not the
+    /// host stack.
+    #[test]
+    fn deep_or_chain_does_not_overflow() {
+        use crate::tree::int;
+        let depth = 8_192usize;
+        let mut e = field("a").eq(int(0i32));
+        for _ in 0..depth {
+            e = e | field("b").eq(int(0i32));
+        }
+        let mut arena = ExprArena::new();
+        let mut interner = Interner::new();
+        // Cap below the chain depth so the lowerer rejects with
+        // DepthExceeded — no host-stack overflow even though the cap is
+        // small enough to cut early.
+        let mut budget = Budget::new(Limits {
+            max_nodes: usize::MAX,
+            max_depth: 128,
+            max_bytes: usize::MAX,
+            max_str_bytes: usize::MAX,
+        });
+        let result = lower_expr_with_budget(&e, &mut arena, &mut interner, &mut budget);
+        assert!(matches!(result, Err(LowerError::DepthExceeded { .. })));
     }
 }

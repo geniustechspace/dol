@@ -4,7 +4,6 @@
 use alloc::{boxed::Box, format, string::String, vec};
 
 use super::*;
-use dol_expr::expr::ExprNode;
 use dol_schema::{DataType, Field};
 
 fn users_entity() -> Entity {
@@ -38,10 +37,8 @@ fn unwrap_query(p: &dol_ir::Program) -> &dol_expr::expr::QueryNode {
     match &p.operations[0] {
         dol_ir::Operation::Query(q) => {
             let body = q.node.expect("Query has arena body");
-            match p.arena.get(body) {
-                ExprNode::Query(qid) => p.arena.get_query(*qid),
-                _ => panic!("expected ExprNode::Query"),
-            }
+            let qid = p.arena.get(body).as_query().expect("expected Query opcode");
+            p.arena.get_query(qid)
         }
         other => panic!("expected Operation::Query, got {other:?}"),
     }
@@ -54,10 +51,12 @@ fn unwrap_insert(p: &dol_ir::Program) -> &dol_expr::expr::InsertNode {
                 dol_ir::operation::InsertSource::Node(n) => n,
                 _ => panic!("expected InsertSource::Node"),
             };
-            match p.arena.get(body) {
-                ExprNode::Insert(iid) => p.arena.get_insert(*iid),
-                _ => panic!("expected ExprNode::Insert"),
-            }
+            let iid = p
+                .arena
+                .get(body)
+                .as_insert()
+                .expect("expected Insert opcode");
+            p.arena.get_insert(iid)
         }
         other => panic!("expected Operation::Insert, got {other:?}"),
     }
@@ -65,30 +64,42 @@ fn unwrap_insert(p: &dol_ir::Program) -> &dol_expr::expr::InsertNode {
 
 fn unwrap_update(p: &dol_ir::Program) -> &dol_expr::expr::UpdateNode {
     match &p.operations[0] {
-        dol_ir::Operation::Update(u) => match p.arena.get(u.node) {
-            ExprNode::Update(uid) => p.arena.get_update(*uid),
-            _ => panic!("expected ExprNode::Update"),
-        },
+        dol_ir::Operation::Update(u) => {
+            let uid = p
+                .arena
+                .get(u.node)
+                .as_update()
+                .expect("expected Update opcode");
+            p.arena.get_update(uid)
+        }
         other => panic!("expected Operation::Update, got {other:?}"),
     }
 }
 
 fn unwrap_delete(p: &dol_ir::Program) -> &dol_expr::expr::DeleteNode {
     match &p.operations[0] {
-        dol_ir::Operation::Delete(d) => match p.arena.get(d.node) {
-            ExprNode::Delete(did) => p.arena.get_delete(*did),
-            _ => panic!("expected ExprNode::Delete"),
-        },
+        dol_ir::Operation::Delete(d) => {
+            let did = p
+                .arena
+                .get(d.node)
+                .as_delete()
+                .expect("expected Delete opcode");
+            p.arena.get_delete(did)
+        }
         other => panic!("expected Operation::Delete, got {other:?}"),
     }
 }
 
 fn unwrap_upsert(p: &dol_ir::Program) -> &dol_expr::expr::UpsertNode {
     match &p.operations[0] {
-        dol_ir::Operation::Upsert(u) => match p.arena.get(u.node) {
-            ExprNode::Upsert(uid) => p.arena.get_upsert(*uid),
-            _ => panic!("expected ExprNode::Upsert"),
-        },
+        dol_ir::Operation::Upsert(u) => {
+            let uid = p
+                .arena
+                .get(u.node)
+                .as_upsert()
+                .expect("expected Upsert opcode");
+            p.arena.get_upsert(uid)
+        }
         other => panic!("expected Operation::Upsert, got {other:?}"),
     }
 }

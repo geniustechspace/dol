@@ -6,17 +6,14 @@ use alloc::vec::Vec;
 
 use dol_core::policy::Budget;
 use dol_expr::arena::{
-    CaseNode, ExprArena, FieldNode, FieldStep, FuncNode, InListNode, ObjLitNode, Span, SpanTable,
-    WindowNode,
+    CaseNode, CompositeKind, CompositeNode, ExprArena, FieldNode, FieldStep, FuncNode, Span,
+    SpanTable, WindowNode,
 };
 use dol_expr::expr::{
-    BinOp, ConflictClause, DeleteNode, ExprNode, InsertNode, JoinNode, JoinType, LockHint, Order,
-    QueryNode, UnaryOp, UpdateNode, UpsertNode,
+    BinOp, ConflictClause, DeleteNode, ExprNode, ExprOp, InsertNode, JoinNode, JoinType, LockHint,
+    Order, QueryNode, UnaryOp, UpdateNode, UpsertNode,
 };
-use dol_expr::ids::{
-    CaseId, DeleteId, FieldId, FuncId, InListId, InsertId, LiteralId, NodeId, ObjLitId, QueryId,
-    StrId, UpdateId, UpsertId, WindowId,
-};
+use dol_expr::ids::{NodeId, StrId};
 use dol_expr::interner::Interner;
 use dol_expr::tree::window::{FrameBound, FrameKind, WindowFrame};
 
@@ -67,13 +64,28 @@ impl Decode for FuncNode {
     }
 }
 
-// ─── ObjLitNode ──────────────────────────────────────────────────────────────
+// ─── CompositeKind / CompositeNode ───────────────────────────────────────────
 
-impl Decode for ObjLitNode {
+impl Decode for CompositeKind {
+    fn decode(reader: &mut Reader<'_>, _b: &mut Budget) -> Result<Self, DecodeError> {
+        let raw = reader.read_varint_u32()?;
+        let tag: u8 = raw.try_into().map_err(|_| DecodeError::InvalidVariant {
+            type_name: "CompositeKind",
+            seen: raw,
+        })?;
+        CompositeKind::from_u8(tag).ok_or(DecodeError::InvalidVariant {
+            type_name: "CompositeKind",
+            seen: raw,
+        })
+    }
+}
+
+impl Decode for CompositeNode {
     fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
-        let inner =
-            budget.descend(|b| smallvec::SmallVec::<[(StrId, NodeId); 4]>::decode(reader, b))??;
-        Ok(ObjLitNode(inner))
+        let kind = budget.descend(|b| CompositeKind::decode(reader, b))??;
+        let items = budget
+            .descend(|b| smallvec::SmallVec::<[(Option<StrId>, NodeId); 4]>::decode(reader, b))??;
+        Ok(CompositeNode { kind, items })
     }
 }
 
@@ -183,15 +195,8 @@ impl Decode for CaseNode {
     }
 }
 
-// ─── InListNode ──────────────────────────────────────────────────────────────
-
-impl Decode for InListNode {
-    fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
-        let expr = budget.descend(|b| NodeId::decode(reader, b))??;
-        let list = budget.descend(|b| smallvec::SmallVec::<[NodeId; 8]>::decode(reader, b))??;
-        Ok(InListNode { expr, list })
-    }
-}
+// ─── (InListNode / ArrayLitNode decoders removed; collapsed into ─────────────
+//      CompositeNode above.)
 
 // ─── Span / SpanTable ────────────────────────────────────────────────────────
 
@@ -407,8 +412,8 @@ impl Decode for BinOp {
             19 => Ok(BinOp::Shl),
             20 => Ok(BinOp::Shr),
             21 => Ok(BinOp::Concat),
-            22 => Ok(BinOp::Arrow),
-            23 => Ok(BinOp::LongArrow),
+            22 => Ok(BinOp::IsDistinctFrom),
+            23 => Ok(BinOp::IsNotDistinctFrom),
             seen => Err(DecodeError::InvalidVariant {
                 type_name: "BinOp",
                 seen,
@@ -437,124 +442,43 @@ impl Decode for UnaryOp {
     }
 }
 
-// ─── ExprNode ────────────────────────────────────────────────────────────────
+// ─── ExprNode (16 B packed POD) ──────────────────────────────────────────────
 
+/// Mirror of the fixed-16-byte LE [`crate::encoder::Encode`] for
+/// [`ExprNode`] in `encode_expr.rs`. Reads `op` (1 B), `flags` (1 B),
+/// `aux` (2 B LE), `a` (4 B LE), `b` (4 B LE), `c` (4 B LE),
+/// validates the opcode byte against [`ExprOp::from_u8`], and stores
+/// ids verbatim — the `ExprArena::decode` pass-2 enforces that they
+/// reference live pool slots.
+///
+/// Unknown opcodes surface as
+/// [`DecodeError::InvalidVariant { type_name: "ExprNode", … }`].
+///
+/// **Budget accounting:** the whole node is one logical
+/// "field-of-its-parent" — the caller's tree-walker descends once for
+/// the `ExprNode::decode` call as a whole, not per scalar.
 impl Decode for ExprNode {
-    fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
-        match reader.read_varint_u32()? {
-            0 => {
-                let id = budget.descend(|b| StrId::decode(reader, b))??;
-                Ok(ExprNode::Namespace(id))
-            }
-            1 => {
-                let id = budget.descend(|b| FieldId::decode(reader, b))??;
-                Ok(ExprNode::Field(id))
-            }
-            2 => Ok(ExprNode::Param),
-            3 => {
-                let id = budget.descend(|b| LiteralId::decode(reader, b))??;
-                Ok(ExprNode::Lit(id))
-            }
-            4 => {
-                let id = budget.descend(|b| ObjLitId::decode(reader, b))??;
-                Ok(ExprNode::ObjectLit(id))
-            }
-            5 => {
-                let v =
-                    budget.descend(|b| smallvec::SmallVec::<[NodeId; 4]>::decode(reader, b))??;
-                Ok(ExprNode::ArrayLit(v))
-            }
-            6 => {
-                let op = budget.descend(|b| BinOp::decode(reader, b))??;
-                let lhs = budget.descend(|b| NodeId::decode(reader, b))??;
-                let rhs = budget.descend(|b| NodeId::decode(reader, b))??;
-                Ok(ExprNode::BinOp { op, lhs, rhs })
-            }
-            7 => {
-                let op = budget.descend(|b| UnaryOp::decode(reader, b))??;
-                let operand = budget.descend(|b| NodeId::decode(reader, b))??;
-                Ok(ExprNode::UnaryOp { op, operand })
-            }
-            8 => {
-                let id = budget.descend(|b| FuncId::decode(reader, b))??;
-                Ok(ExprNode::Func(id))
-            }
-            9 => {
-                let func = budget.descend(|b| StrId::decode(reader, b))??;
-                let expr = budget.descend(|b| NodeId::decode(reader, b))??;
-                let distinct = budget.descend(|b| bool::decode(reader, b))??;
-                Ok(ExprNode::Agg {
-                    func,
-                    expr,
-                    distinct,
-                })
-            }
-            10 => {
-                let id = budget.descend(|b| WindowId::decode(reader, b))??;
-                Ok(ExprNode::Window(id))
-            }
-            11 => {
-                let expr = budget.descend(|b| NodeId::decode(reader, b))??;
-                let to = budget.descend(|b| StrId::decode(reader, b))??;
-                Ok(ExprNode::Cast { expr, to })
-            }
-            12 => {
-                let id = budget.descend(|b| CaseId::decode(reader, b))??;
-                Ok(ExprNode::Case(id))
-            }
-            13 => {
-                let expr = budget.descend(|b| NodeId::decode(reader, b))??;
-                let name = budget.descend(|b| StrId::decode(reader, b))??;
-                Ok(ExprNode::Alias { expr, name })
-            }
-            14 => {
-                let id = budget.descend(|b| InListId::decode(reader, b))??;
-                Ok(ExprNode::InList(id))
-            }
-            15 => {
-                let expr = budget.descend(|b| NodeId::decode(reader, b))??;
-                let sub = budget.descend(|b| NodeId::decode(reader, b))??;
-                Ok(ExprNode::InSub { expr, sub })
-            }
-            16 => {
-                let sub = budget.descend(|b| NodeId::decode(reader, b))??;
-                Ok(ExprNode::Exists { sub })
-            }
-            17 => {
-                let expr = budget.descend(|b| NodeId::decode(reader, b))??;
-                Ok(ExprNode::IsNull { expr })
-            }
-            18 => {
-                let expr = budget.descend(|b| NodeId::decode(reader, b))??;
-                let lo = budget.descend(|b| NodeId::decode(reader, b))??;
-                let hi = budget.descend(|b| NodeId::decode(reader, b))??;
-                Ok(ExprNode::Between { expr, lo, hi })
-            }
-            19 => {
-                let id = budget.descend(|b| QueryId::decode(reader, b))??;
-                Ok(ExprNode::Query(id))
-            }
-            20 => {
-                let id = budget.descend(|b| InsertId::decode(reader, b))??;
-                Ok(ExprNode::Insert(id))
-            }
-            21 => {
-                let id = budget.descend(|b| UpdateId::decode(reader, b))??;
-                Ok(ExprNode::Update(id))
-            }
-            22 => {
-                let id = budget.descend(|b| DeleteId::decode(reader, b))??;
-                Ok(ExprNode::Delete(id))
-            }
-            23 => {
-                let id = budget.descend(|b| UpsertId::decode(reader, b))??;
-                Ok(ExprNode::Upsert(id))
-            }
-            seen => Err(DecodeError::InvalidVariant {
-                type_name: "ExprNode",
-                seen,
-            }),
-        }
+    fn decode(reader: &mut Reader<'_>, _budget: &mut Budget) -> Result<Self, DecodeError> {
+        let op = reader.read_u8()?;
+        // Reject unknown opcodes immediately so a stale build cannot
+        // silently zero-fill a node added by a newer encoder.
+        let _ = ExprOp::from_u8(op).ok_or(DecodeError::InvalidVariant {
+            type_name: "ExprNode",
+            seen: u32::from(op),
+        })?;
+        let flags = reader.read_u8()?;
+        let aux = u16::from_le_bytes(reader.read_array::<2>()?);
+        let a = u32::from_le_bytes(reader.read_array::<4>()?);
+        let b = u32::from_le_bytes(reader.read_array::<4>()?);
+        let c = u32::from_le_bytes(reader.read_array::<4>()?);
+        Ok(ExprNode {
+            op,
+            flags,
+            aux,
+            a,
+            b,
+            c,
+        })
     }
 }
 
@@ -613,10 +537,12 @@ impl Decode for ExprArena {
             arena.alloc_func(func);
         }
 
-        // 5. obj_lits
-        let obj_lits = budget.descend(|b| Vec::<ObjLitNode>::decode(reader, b))??;
-        for obj in obj_lits {
-            arena.alloc_obj_lit(obj);
+        // 5. composites (unified array / object / tuple side-pool;
+        //    replaces the legacy `obj_lits`, `array_lits`, `in_lists`
+        //    pools).
+        let composites = budget.descend(|b| Vec::<CompositeNode>::decode(reader, b))??;
+        for comp in composites {
+            arena.alloc_composite(comp);
         }
 
         // 6. windows
@@ -631,13 +557,7 @@ impl Decode for ExprArena {
             arena.alloc_case(case);
         }
 
-        // 8. in_lists
-        let in_lists = budget.descend(|b| Vec::<InListNode>::decode(reader, b))??;
-        for il in in_lists {
-            arena.alloc_in_list(il);
-        }
-
-        // 9. queries
+        // 8. queries
         let queries = budget.descend(|b| Vec::<QueryNode>::decode(reader, b))??;
         for q in queries {
             arena.alloc_query(q);

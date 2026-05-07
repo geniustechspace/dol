@@ -65,7 +65,7 @@ xtask/      ── workspace task runner (not published)
 | Folder · Crate                                   | Description                                                                  |
 | ------------------------------------------------ | ---------------------------------------------------------------------------- |
 | [`lib/core`](lib/core/README.md) · `dol-core`        | Source spans, structured diagnostics, and the value/type system (`Value`, `Literal`, `DataType`, `Decimal`, …) |
-| [`lib/expr`](lib/expr/README.md) · `dol-expr`        | Composable expression AST (`ExprNode` ≤ 32 B, arena, interner)               |
+| [`lib/expr`](lib/expr/README.md) · `dol-expr`        | Composable expression AST (16 B packed `ExprNode`, arena, interner)          |
 | [`lib/schema`](lib/schema/README.md) · `dol-schema`  | Entities, fields, constraints, relations, lookups, policies                  |
 | [`lib/ir`](lib/ir/README.md) · `dol-ir`              | Canonical IR: `Statement`, `Program`, `Backend` trait, `BackendCapabilities` |
 | [`lib/pipeline`](lib/pipeline/README.md) · `dol-pipeline` | Source → Transform → Sink dataflow IR                                  |

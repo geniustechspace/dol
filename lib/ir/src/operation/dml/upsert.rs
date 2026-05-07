@@ -6,7 +6,7 @@ use crate::target::Target;
 
 /// `Upsert` operation.
 ///
-/// Body lives in an arena [`ExprNode::Upsert`](dol_expr::expr::ExprNode::Upsert)
+/// Body lives in an arena `ExprNode` of opcode [`ExprOp::Upsert`](dol_expr::expr::ExprOp::Upsert)
 /// node; the arena `UpsertNode` carries the columns, values, conflict
 /// clause, and returning list.
 ///
@@ -31,6 +31,6 @@ use crate::target::Target;
 pub struct Upsert {
     /// Target to upsert into.
     pub target: Target,
-    /// Arena `NodeId` of the [`ExprNode::Upsert`](dol_expr::expr::ExprNode::Upsert) body.
+    /// Arena `NodeId` of the `ExprNode` of opcode [`ExprOp::Upsert`](dol_expr::expr::ExprOp::Upsert) body.
     pub node: NodeId,
 }

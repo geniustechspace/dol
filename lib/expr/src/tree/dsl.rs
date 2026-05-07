@@ -6,7 +6,7 @@ use core::ops as std_ops;
 
 use super::ast::Expr;
 use super::compact_name::CompactName;
-use super::func::def::DolOp;
+use super::func::def::{DolFunc, DolOp};
 use super::op::UnaryOp;
 use super::op::meta::OpDef;
 use super::order::{Direction, OrderByExpr};
@@ -158,14 +158,52 @@ impl<'a> Expr<'a> {
         self.binop(super::op::registry::OpSimilarTo::def(), rhs)
     }
 
-    /// `self ~ rhs` (POSIX regex match). Chain `.negate()` for `!~`.
+    /// `regex_match(self, rhs)` — POSIX regex match. Lowers to the
+    /// `REGEX_MATCH` function (not a `BinOp`, because cross-backend
+    /// infix spelling is non-uniform: Postgres `~`, MySQL `REGEXP`,
+    /// SQLite has no native form).
     pub fn regex_match(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(super::op::registry::OpRegexMatch::def(), rhs)
+        Expr::Func {
+            name: super::func::registry::RegexMatch::def(),
+            args: alloc::vec![self, rhs.into()],
+        }
     }
 
-    /// `self ~* rhs` (case-insensitive POSIX regex). Chain `.negate()` for `!~*`.
+    /// `regex_imatch(self, rhs)` — case-insensitive POSIX regex match.
+    /// Lowers to the `REGEX_IMATCH` function (not a `BinOp`).
     pub fn regex_match_insensitive(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
-        self.binop(super::op::registry::OpRegexMatchInsensitive::def(), rhs)
+        Expr::Func {
+            name: super::func::registry::RegexImatch::def(),
+            args: alloc::vec![self, rhs.into()],
+        }
+    }
+
+    /// `glob_match(self, rhs)` — glob-style pattern match. Lowers to
+    /// the `GLOB_MATCH` function.
+    pub fn glob_match(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
+        Expr::Func {
+            name: super::func::registry::GlobMatch::def(),
+            args: alloc::vec![self, rhs.into()],
+        }
+    }
+
+    /// `contains(self, rhs)` — collection / string contains. Lowers to
+    /// the `CONTAINS` function (not a `BinOp`: backends spell it as
+    /// `@>`, `array_contains`, `json_contains`, `ST_Contains`, etc.).
+    pub fn contains(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
+        Expr::Func {
+            name: super::func::registry::Contains::def(),
+            args: alloc::vec![self, rhs.into()],
+        }
+    }
+
+    /// `overlaps(self, rhs)` — symmetric "share at least one element"
+    /// predicate. Lowers to the `OVERLAPS` function.
+    pub fn overlaps(self, rhs: impl Into<Expr<'a>>) -> Expr<'a> {
+        Expr::Func {
+            name: super::func::registry::Overlaps::def(),
+            args: alloc::vec![self, rhs.into()],
+        }
     }
 
     // ── Null checks ──────────────────────────────────────────────────────────

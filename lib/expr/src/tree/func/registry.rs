@@ -114,6 +114,37 @@ define_func!(Contains, "CONTAINS", Arity::Exact(2), FuncKind::Scalar);
 define_func!(ToHex, "TO_HEX", Arity::Exact(1), FuncKind::Scalar);
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Pattern matching functions
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// `REGEX_MATCH`, `REGEX_IMATCH`, `GLOB_MATCH` are functions rather than
+// `BinOp`s because their cross-backend rendering is non-uniform (Postgres
+// `~` / `~*`, MySQL `REGEXP`, SQLite `GLOB`). Backends that support a
+// native infix spelling render the call inline; others emit
+// `regex_match(s, p)` etc.
+
+define_func!(RegexMatch, "REGEX_MATCH", Arity::Exact(2), FuncKind::Scalar);
+define_func!(
+    RegexImatch,
+    "REGEX_IMATCH",
+    Arity::Exact(2),
+    FuncKind::Scalar
+);
+define_func!(GlobMatch, "GLOB_MATCH", Arity::Exact(2), FuncKind::Scalar);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Collection containment / overlap (function form)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// `Contains` (above, in string functions) extends naturally to the
+// collection case `contains(haystack, needle)`. `Overlaps` is the
+// symmetric "share at least one element" predicate; `<@` (`CONTAINED_BY`)
+// is intentionally absent — it is exactly `contains(b, a)` and writing
+// it twice invites the historical conflict with `IN`.
+
+define_func!(Overlaps, "OVERLAPS", Arity::Exact(2), FuncKind::Scalar);
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Numeric / Math functions
 // ═══════════════════════════════════════════════════════════════════════════
 

@@ -118,13 +118,13 @@ impl UpsertQuery {
 
     /// Build the arena-based IR as a [`dol_ir::Program`] containing a
     /// single [`dol_ir::Operation::Upsert`] referencing an arena
-    /// [`ExprNode::Upsert`](dol_expr::expr::ExprNode::Upsert).
+    /// `ExprNode` of opcode [`dol_expr::expr::ExprOp::Upsert`].
     ///
     /// Infallible in current shape (the builder only emits `Param`
     /// placeholders and structural `EXCLUDED.col` field references), but
     /// returns `Result` for API consistency with the other builders.
     pub fn try_build(self) -> Result<dol_ir::Program, crate::BuildError> {
-        use dol_expr::expr::{ConflictClause, ExprNode, UpsertNode};
+        use dol_expr::expr::{ConflictClause, UpsertNode};
         use dol_ir::TargetKind;
         use dol_ir::operation::Upsert;
 
@@ -145,10 +145,8 @@ impl UpsertQuery {
             fields.iter().map(|f| interner.intern(f)).collect();
 
         // One Param per field.
-        let values: smallvec::SmallVec<[dol_expr::ids::NodeId; 8]> = fields
-            .iter()
-            .map(|_| arena.alloc(ExprNode::Param))
-            .collect();
+        let values: smallvec::SmallVec<[dol_expr::ids::NodeId; 8]> =
+            fields.iter().map(|_| arena.alloc_param()).collect();
 
         let returning: smallvec::SmallVec<[dol_expr::ids::NodeId; 4]> = self
             .returning
@@ -160,7 +158,7 @@ impl UpsertQuery {
                     name: col,
                     steps: smallvec::SmallVec::new(),
                 });
-                arena.alloc(ExprNode::Field(fid))
+                arena.alloc_field_ref(fid)
             })
             .collect();
 
@@ -182,7 +180,7 @@ impl UpsertQuery {
                         name: c,
                         steps: smallvec::SmallVec::new(),
                     });
-                    let val_id = arena.alloc(ExprNode::Field(fid));
+                    let val_id = arena.alloc_field_ref(fid);
                     (col_id, val_id)
                 })
                 .collect();
@@ -199,7 +197,7 @@ impl UpsertQuery {
             conflict,
         };
         let uid = arena.alloc_upsert(unode);
-        let body = arena.alloc(ExprNode::Upsert(uid));
+        let body = arena.alloc_upsert_ref(uid);
 
         let target = crate::target::target_from_parts(
             &mut interner,

@@ -412,6 +412,7 @@ dependencies = [
 name = "dol-wire"
 version = "0.2.0"
 dependencies = [
+ "bytemuck",
  "dol-core",
  "dol-expr",
  "dol-ir",

@@ -13,12 +13,12 @@ use crate::target::{Symbol, Target};
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum InsertSource {
     /// Tabular insert body — `NodeId` points to an arena
-    /// [`ExprNode::Insert`](dol_expr::expr::ExprNode::Insert) carrying
+    /// `ExprNode` of opcode [`ExprOp::Insert`](dol_expr::expr::ExprOp::Insert) carrying
     /// columns + values + conflict clause. Used for `Relation`, `Document`,
     /// `KeyValue` targets.
     Node(NodeId),
     /// Insert from a sub-query (arena `NodeId` pointing at
-    /// [`ExprNode::Query`](dol_expr::expr::ExprNode::Query)).
+    /// `ExprNode` of opcode [`ExprOp::Query`](dol_expr::expr::ExprOp::Query)).
     FromQuery(NodeId),
     /// Insert from runtime parameter bindings (engine supplies the bytes /
     /// document body at execution time). Used for `Blob` / `FileTree` /

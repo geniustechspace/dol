@@ -16,7 +16,7 @@
 
 use dol_expr::lower::lower_expr;
 use dol_expr::tree::{field, int, namespace, param, string};
-use dol_expr::{ExprArena, ExprNode, Interner};
+use dol_expr::{ExprArena, Interner};
 
 #[test]
 fn lowering_a_namespace_interns_its_dotted_form() {
@@ -25,10 +25,10 @@ fn lowering_a_namespace_interns_its_dotted_form() {
     let mut interner = Interner::new();
 
     let root = lower_expr(&e, &mut arena, &mut interner).unwrap();
-    let id = match arena.get(root) {
-        ExprNode::Namespace(id) => *id,
-        other => panic!("expected Namespace, got {other:?}"),
-    };
+    let id = arena
+        .get(root)
+        .as_namespace()
+        .expect("expected Namespace opcode");
     assert_eq!(interner.get(id), "public.users");
 }
 
@@ -40,10 +40,7 @@ fn lowering_a_field_uses_a_field_pool_entry() {
     let mut interner = Interner::new();
 
     let root = lower_expr(&e, &mut arena, &mut interner).unwrap();
-    let fid = match arena.get(root) {
-        ExprNode::Field(fid) => *fid,
-        other => panic!("expected Field, got {other:?}"),
-    };
+    let fid = arena.get(root).as_field().expect("expected Field opcode");
     let payload = arena.get_field(fid);
     assert_eq!(interner.get(payload.name), "name");
     assert!(payload.namespace.is_none());
@@ -58,14 +55,10 @@ fn lowering_eq_field_to_param_yields_a_binop() {
     let mut interner = Interner::new();
 
     let root = lower_expr(&e, &mut arena, &mut interner).unwrap();
-    match arena.get(root) {
-        ExprNode::BinOp { op, lhs, rhs } => {
-            assert!(matches!(op, dol_expr::BinOp::Eq));
-            assert!(matches!(arena.get(*lhs), ExprNode::Field(_)));
-            assert!(matches!(arena.get(*rhs), ExprNode::Param));
-        }
-        other => panic!("expected BinOp, got {other:?}"),
-    }
+    let (op, lhs, rhs) = arena.get(root).as_bin().expect("expected Bin opcode");
+    assert!(matches!(op, dol_expr::BinOp::Eq));
+    assert!(arena.get(lhs).as_field().is_some());
+    assert!(arena.get(rhs).as_param().is_some());
 }
 
 #[test]
@@ -95,12 +88,8 @@ fn lowering_a_string_literal_uses_the_lits_pool() {
     let mut interner = Interner::new();
 
     let root = lower_expr(&e, &mut arena, &mut interner).unwrap();
-    match arena.get(root) {
-        ExprNode::Lit(lid) => {
-            // `get_lit` panics on an out-of-bounds id; a successful call
-            // proves the index is valid for the pool.
-            let _ = arena.get_lit(*lid);
-        }
-        other => panic!("expected Lit, got {other:?}"),
-    }
+    let lid = arena.get(root).as_lit().expect("expected Lit opcode");
+    // `get_lit` panics on an out-of-bounds id; a successful call
+    // proves the index is valid for the pool.
+    let _ = arena.get_lit(lid);
 }
