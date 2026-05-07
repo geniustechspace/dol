@@ -11,17 +11,17 @@
 //! | *(default)*  | `dol-core`                     | Spans, diagnostics, and the value/type system (`Value`, `Literal`, `DataType`, …). |
 //! | `expr`       | `dol-expr`                     | Expression arena + tree DSL.                               |
 //! | `schema`     | `dol-schema`                   | Entities, fields, constraints, relations, lookups, policies. |
-//! | `ir`         | `dol-ir`                       | `Operation`, `Program`, `Backend`, `BackendCapabilities`.  |
+//! | `command`    | `dol-command`                  | `Operation`, `Program`, `Backend`, `BackendCapabilities`, plus the DDL/ACL/Tx/storage builders. |
 //! | `wire`       | `dol-wire`                     | Canonical wire envelope + postcard / JSON codec helpers.   |
 //! | `check`      | `dol-check`                    | Static validator (type / schema / capability / lint).      |
 //! | `fmt`        | `dol-fmt`                      | Canonical pretty-printer.                                  |
-//! | `query`      | `dol-query`                    | Fluent builder DSL, plus the streaming / pipeline / IoT IR (formerly the separate `dol-stream` and `dol-pipeline` crates). |
+//! | `query`      | `dol-query`                    | Fluent query builder DSL, plus the streaming / pipeline / IoT IR (formerly the separate `dol-stream` and `dol-pipeline` crates). |
 //!
 //! ## Curated presets
 //!
-//! - `core`    — `expr + schema + ir + query`.
+//! - `core`    — `expr + schema + command + query`.
 //! - `full`    — every layer DOL ships.
-//! - `iot-min` — minimal IoT-edge slice (core + IR + query + postcard wire).
+//! - `iot-min` — minimal IoT-edge slice (core + command + query + postcard wire).
 //!
 //! ## Universal serde
 //!
@@ -49,8 +49,8 @@ pub use dol_expr as expr;
 #[cfg(feature = "schema")]
 pub use dol_schema as schema;
 
-#[cfg(feature = "ir")]
-pub use dol_ir as ir;
+#[cfg(feature = "command")]
+pub use dol_command as command;
 
 #[cfg(feature = "wire")]
 pub use dol_wire as wire;
@@ -74,8 +74,8 @@ pub mod prelude {
     #[cfg(feature = "schema")]
     pub use crate::schema::prelude::*;
 
-    #[cfg(feature = "ir")]
-    pub use crate::ir::prelude::*;
+    #[cfg(feature = "command")]
+    pub use crate::command::prelude::*;
 
     #[cfg(feature = "query")]
     pub use crate::query::prelude::*;

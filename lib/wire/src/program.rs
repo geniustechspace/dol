@@ -1,8 +1,8 @@
-//! Typed [`dol_ir::program::Program`] codecs.
+//! Typed [`dol_command::program::Program`] codecs.
 //!
 //! These helpers wrap the underlying postcard helper in [`crate::postcard`]
 //! and the validating-decode helper [`crate::decoder::Decode`] for
-//! [`dol_ir::program::Program`] directly.
+//! [`dol_command::program::Program`] directly.
 //!
 //! v2 invariant: encode goes through `serde::Serialize` (postcard / JSON),
 //! but **decode goes through [`crate::Decode`] only**. Generic
@@ -14,7 +14,7 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use dol_ir::program::Program;
+use dol_command::program::Program;
 
 use crate::WireError;
 

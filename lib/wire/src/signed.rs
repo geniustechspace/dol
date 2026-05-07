@@ -1,7 +1,7 @@
 //! `Signed<T>` envelope — per `docs/v2_plan.md` §56.
 //!
-//! Every persisted DOL artifact (a [`dol_ir::Program`], a
-//! [`dol_ir::SchemaCatalog`], an expression arena, …) can be wrapped in
+//! Every persisted DOL artifact (a [`dol_command::Program`], a
+//! [`dol_command::SchemaCatalog`], an expression arena, …) can be wrapped in
 //! a [`Signed`] envelope so the decoder can authenticate the bytes
 //! before handing them to the validating IR layer. The envelope is
 //! algorithm-agnostic: signing happens through any [`Signer`] impl,

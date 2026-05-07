@@ -116,17 +116,17 @@ impl UpsertQuery {
         }
     }
 
-    /// Build the arena-based IR as a [`dol_ir::program::Program`] containing a
-    /// single [`dol_ir::operation::Operation::Upsert`] referencing an arena
+    /// Build the arena-based IR as a [`dol_command::program::Program`] containing a
+    /// single [`dol_command::operation::Operation::Upsert`] referencing an arena
     /// `ExprNode` of opcode [`dol_expr::expr::ExprOp::Upsert`].
     ///
     /// Infallible in current shape (the builder only emits `Param`
     /// placeholders and structural `EXCLUDED.col` field references), but
     /// returns `Result` for API consistency with the other builders.
-    pub fn try_build(self) -> Result<dol_ir::program::Program, crate::BuildError> {
+    pub fn try_build(self) -> Result<dol_command::program::Program, crate::BuildError> {
+        use dol_command::operation::Upsert;
+        use dol_command::target::TargetKind;
         use dol_expr::expr::{ConflictClause, UpsertNode};
-        use dol_ir::target::TargetKind;
-        use dol_ir::operation::Upsert;
 
         let mut arena = dol_expr::ExprArena::new();
         let mut interner = dol_expr::Interner::new();
@@ -199,13 +199,13 @@ impl UpsertQuery {
         let uid = arena.alloc_upsert(unode);
         let body = arena.alloc_upsert_ref(uid);
 
-        let target = crate::target::target_from_parts(
+        let target = dol_command::builders::target::target_from_parts(
             &mut interner,
             TargetKind::Relation,
             &self.name,
             self.namespace.as_deref(),
         );
-        let op: dol_ir::operation::Operation = Upsert { target, node: body }.into();
-        Ok(dol_ir::program::Program::new(op, arena, interner))
+        let op: dol_command::operation::Operation = Upsert { target, node: body }.into();
+        Ok(dol_command::program::Program::new(op, arena, interner))
     }
 }

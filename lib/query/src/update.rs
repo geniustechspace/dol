@@ -86,19 +86,19 @@ impl UpdateQuery {
         self
     }
 
-    /// Build the arena-based IR as a [`dol_ir::program::Program`] containing a
-    /// single [`dol_ir::operation::Operation::Update`] referencing an arena
+    /// Build the arena-based IR as a [`dol_command::program::Program`] containing a
+    /// single [`dol_command::operation::Operation::Update`] referencing an arena
     /// `ExprNode` of opcode [`dol_expr::expr::ExprOp::Update`].
     ///
     /// Fallible: returns [`BuildError::SetValue`](crate::BuildError::SetValue) /
     /// [`BuildError::Filter`](crate::BuildError::Filter) when lowering an assignment RHS or the WHERE
     /// clause exhausts the default budget.
-    pub fn try_build(self) -> Result<dol_ir::program::Program, crate::BuildError> {
+    pub fn try_build(self) -> Result<dol_command::program::Program, crate::BuildError> {
+        use dol_command::operation::Update;
+        use dol_command::target::TargetKind;
         use dol_core::policy::{Budget, Limits};
         use dol_expr::expr::UpdateNode;
         use dol_expr::lower::{lower_expr_with_budget, lower_filters};
-        use dol_ir::target::TargetKind;
-        use dol_ir::operation::Update;
 
         let mut arena = dol_expr::ExprArena::new();
         let mut interner = dol_expr::Interner::new();
@@ -148,13 +148,13 @@ impl UpdateQuery {
         let uid = arena.alloc_update(unode);
         let body = arena.alloc_update_ref(uid);
 
-        let target = crate::target::target_from_parts(
+        let target = dol_command::builders::target::target_from_parts(
             &mut interner,
             TargetKind::Relation,
             &self.name,
             self.namespace.as_deref(),
         );
-        let op: dol_ir::operation::Operation = Update { target, node: body }.into();
-        Ok(dol_ir::program::Program::new(op, arena, interner))
+        let op: dol_command::operation::Operation = Update { target, node: body }.into();
+        Ok(dol_command::program::Program::new(op, arena, interner))
     }
 }

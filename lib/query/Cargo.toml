@@ -9,7 +9,7 @@ readme = "README.md"
 [dependencies]
 dol-schema = { workspace = true }
 dol-expr   = { workspace = true }
-dol-ir     = { workspace = true }
+dol-command     = { workspace = true }
 dol-core   = { workspace = true }
 smallvec   = { workspace = true }
 serde      = { workspace = true, optional = true }
@@ -17,13 +17,13 @@ postcard   = { workspace = true, optional = true }
 
 [features]
 default = []
-std = ["dol-core/std", "dol-expr/std", "dol-schema/std", "dol-ir/std"]
+std = ["dol-core/std", "dol-expr/std", "dol-schema/std", "dol-command/std"]
 sql = []
 serde = [
     "dep:serde",
     "dep:postcard",
     "dol-schema/serde",
-    "dol-ir/serde",
+    "dol-command/serde",
     "dol-core/serde",
     "dol-expr/serde",
     "smallvec/serde",

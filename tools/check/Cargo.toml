@@ -11,7 +11,7 @@ readme = "README.md"
 dol-core   = { workspace = true }
 dol-expr   = { workspace = true }
 dol-schema = { workspace = true }
-dol-ir     = { workspace = true }
+dol-command     = { workspace = true }
 serde      = { workspace = true, optional = true }
 
 [features]
@@ -21,7 +21,7 @@ serde   = [
     "dol-core/serde",
     "dol-expr/serde",
     "dol-schema/serde",
-    "dol-ir/serde",
+    "dol-command/serde",
 ]
 
 [lints]

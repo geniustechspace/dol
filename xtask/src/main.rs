@@ -120,8 +120,8 @@ fn size_report() -> bool {
         size_of::<dol_expr::ExprNode>()
     );
     println!(
-        "size_of::<dol_ir::operation::Operation>()               = {}",
-        size_of::<dol_ir::operation::Operation>()
+        "size_of::<dol_command::operation::Operation>()               = {}",
+        size_of::<dol_command::operation::Operation>()
     );
 
     let mut ok = true;
@@ -147,7 +147,7 @@ fn size_report() -> bool {
     budget!(dol_expr::ExprNode, 16);
     // Boxing every heavy payload (DDL bodies, DML arena handles, governance
     // structs) keeps `Operation` comfortably under its 64-byte budget.
-    budget!(dol_ir::operation::Operation, 64);
+    budget!(dol_command::operation::Operation, 64);
     ok
 }
 
@@ -158,7 +158,7 @@ fn size_report() -> bool {
 /// from `alloc` are missing under `--no-default-features`.
 fn nostd_check() -> bool {
     // dol-core and dol-expr must build *and* pass tests under
-    // `--no-default-features`. dol-ir must build under
+    // `--no-default-features`. dol-command must build under
     // `--no-default-features` (it has no dev-deps that work without std,
     // so we settle for `cargo check`).
     let test_crates = ["dol-core", "dol-expr"];
@@ -169,7 +169,7 @@ fn nostd_check() -> bool {
             return false;
         }
     }
-    let check_crates = ["dol-ir", "dol-schema"];
+    let check_crates = ["dol-command", "dol-schema"];
     for c in check_crates {
         let ok = run_cargo(&["check", "-p", c, "--no-default-features"], &[]);
         if !ok {
@@ -214,7 +214,7 @@ fn mcu_check(extra: &[String]) -> bool {
     // The set of crates known to be `no_std + alloc`-clean. Matches the
     // crates flagged with `#![cfg_attr(not(feature = "std"), no_std)]` and
     // exercised by `nostd_check` plus `dol-schema`.
-    let crates = ["dol-core", "dol-expr", "dol-ir", "dol-schema"];
+    let crates = ["dol-core", "dol-expr", "dol-command", "dol-schema"];
     for target in &targets {
         let mut args: Vec<&str> = Vec::with_capacity(2 * crates.len() + 4);
         args.push("check");

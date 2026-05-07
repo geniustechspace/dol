@@ -63,9 +63,9 @@ extern crate alloc;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::node::{Node, Source};
     use super::super::schema::RowSchema;
+    use super::*;
 
     #[test]
     fn graph_grows() {

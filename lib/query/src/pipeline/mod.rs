@@ -11,11 +11,11 @@
 //! Pipelines are **descriptive only** — this module provides type inference
 //! over their node schemas; execution is a backend concern.
 //!
-//! Pipelines compose with [`dol_ir::operation::Operation`] via the
-//! [`Operation::Extension`](dol_ir::operation::Operation::Extension) seam:
+//! Pipelines compose with [`dol_command::operation::Operation`] via the
+//! [`Operation::Extension`](dol_command::operation::Operation::Extension) seam:
 //! a [`Graph`] is wrapped in a [`PipelinePayload`] (a typed
-//! [`ExtensionPayload`](dol_ir::operation::ExtensionPayload)) and embedded
-//! into a [`dol_ir::program::Program`].
+//! [`ExtensionPayload`](dol_command::operation::ExtensionPayload)) and embedded
+//! into a [`dol_command::program::Program`].
 
 #![allow(clippy::large_enum_variant)]
 

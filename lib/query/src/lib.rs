@@ -4,8 +4,8 @@
 //! for DOL. Builders accept an [`Entity`] reference *or*
 //! a plain entity-name string; runtime-known names are first-class.
 //!
-//! Every `.try_build()` returns a [`dol_ir::program::Program`] containing one or more
-//! [`dol_ir::operation::Operation`]s.
+//! Every `.try_build()` returns a [`dol_command::program::Program`] containing one or more
+//! [`dol_command::operation::Operation`]s.
 //!
 //! # Quick Start
 //!
@@ -25,7 +25,7 @@
 //!     .filter(field("id").eq(param()))
 //!     .try_build()
 //!     .expect("doc example: trivial filter must lower");
-//! assert_eq!(program.operations[0].kind(), dol_ir::operation::OpKind::Query);
+//! assert_eq!(program.operations[0].kind(), dol_command::operation::OpKind::Query);
 //!
 //! // From a plain string — no field metadata needed.
 //! let program = Query::from("users")
@@ -33,7 +33,7 @@
 //!     .fields(&["id", "email"])
 //!     .try_build()
 //!     .expect("doc example: trivial projection must lower");
-//! assert_eq!(program.operations[0].kind(), dol_ir::operation::OpKind::Query);
+//! assert_eq!(program.operations[0].kind(), dol_command::operation::OpKind::Query);
 //! ```
 
 #![forbid(unsafe_code)]
@@ -52,33 +52,20 @@
 
 extern crate alloc;
 
-pub mod control;
-pub mod ddl;
 mod delete;
 mod error;
 mod get;
 mod insert;
 pub mod pipeline;
 pub mod prelude;
-pub mod storage;
 pub mod stream;
-mod target;
 mod update;
 mod upsert;
 
-pub use control::{define_policy, grant, revoke, tx_atomic, tx_begin, tx_commit, tx_rollback};
-pub use ddl::{
-    define_entity, define_entity_inferred, define_from_entity, define_index, define_lookup,
-    drop_entity, drop_field, drop_lookup, rename_field,
-};
 pub use delete::DeleteQuery;
 pub use error::BuildError;
 pub use get::GetQuery;
 pub use insert::InsertQuery;
-pub use storage::{
-    get_blob, list_blobs, move_file, put_blob, put_blob_from_path, read_file, write_file,
-    write_file_from_path,
-};
 pub use update::UpdateQuery;
 pub use upsert::UpsertQuery;
 

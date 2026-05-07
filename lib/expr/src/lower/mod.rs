@@ -3,7 +3,7 @@
 //!
 //! This module bridges the gap between the tree-based expression AST (with
 //! lifetime-parameterised `Expr<'a>`) and the arena-based IR used by
-//! `dol-ir::Operation`.
+//! `dol-command::Operation`.
 //!
 //! Lowering is fallible: shapes that have no faithful arena representation
 //! (e.g. `Window` over a non-`Func` head) surface as a [`LowerError`] rather

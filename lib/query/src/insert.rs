@@ -78,18 +78,18 @@ impl InsertQuery {
         field_count * self.row_count
     }
 
-    /// Build the arena-based IR as a [`dol_ir::program::Program`] containing a
-    /// single [`dol_ir::operation::Operation::Insert`] referencing an arena
+    /// Build the arena-based IR as a [`dol_command::program::Program`] containing a
+    /// single [`dol_command::operation::Operation::Insert`] referencing an arena
     /// `ExprNode` of opcode [`dol_expr::expr::ExprOp::Insert`].
     ///
     /// Infallible in current shape (the builder only allocates `Param`
     /// placeholders), but returns `Result` for API consistency with the
     /// other builders. Will gain real failure modes once user-supplied
     /// VALUES expressions are supported.
-    pub fn try_build(self) -> Result<dol_ir::program::Program, crate::BuildError> {
+    pub fn try_build(self) -> Result<dol_command::program::Program, crate::BuildError> {
+        use dol_command::operation::{Insert, InsertSource};
+        use dol_command::target::TargetKind;
         use dol_expr::expr::InsertNode;
-        use dol_ir::target::TargetKind;
-        use dol_ir::operation::{Insert, InsertSource};
 
         let mut arena = dol_expr::ExprArena::new();
         let mut interner = dol_expr::Interner::new();
@@ -141,18 +141,18 @@ impl InsertQuery {
         let iid = arena.alloc_insert(inode);
         let body = arena.alloc_insert_ref(iid);
 
-        let target = crate::target::target_from_parts(
+        let target = dol_command::builders::target::target_from_parts(
             &mut interner,
             TargetKind::Relation,
             &self.name,
             self.namespace.as_deref(),
         );
-        let op: dol_ir::operation::Operation = Insert {
+        let op: dol_command::operation::Operation = Insert {
             target,
             source: InsertSource::Node(body),
             returning: None,
         }
         .into();
-        Ok(dol_ir::program::Program::new(op, arena, interner))
+        Ok(dol_command::program::Program::new(op, arena, interner))
     }
 }

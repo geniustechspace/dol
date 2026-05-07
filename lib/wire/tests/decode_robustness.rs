@@ -102,17 +102,17 @@ fn unframe_arbitrary_bytes_never_panic() {
 
 #[test]
 fn decode_truncated_body_returns_clean_error() {
+    use dol_command::operation::{Insert, InsertSource};
+    use dol_command::program::Program;
+    use dol_command::target::{Locator, Symbol, Target, TargetKind};
     use dol_core::policy::{Budget, Limits};
     use dol_expr::{ExprArena, Interner};
-    use dol_ir::operation::{Insert, InsertSource};
-    use dol_ir::program::Program;
-    use dol_ir::target::{Locator, Symbol, Target, TargetKind};
     use dol_wire::encoder::encode_to_vec;
 
     // A real, encodable program — anything tiny will do.
     let mut interner = Interner::new();
     let users = Symbol::new(interner.intern("users"));
-    let op: dol_ir::operation::Operation = Insert {
+    let op: dol_command::operation::Operation = Insert {
         target: Target::new(TargetKind::Relation, Locator::new(users)),
         source: InsertSource::Bindings,
         returning: None,

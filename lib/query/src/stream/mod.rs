@@ -10,8 +10,8 @@
 //! - **Telemetry / IoT vocabulary**: sensors, actuators, samples, retention
 //!   policies, store-and-forward intent, QoS hints, payload codecs.
 //!
-//! These types are pure data; they hook into [`dol_ir::operation::Operation`]
-//! via the [`Operation::Extension`](dol_ir::operation::Operation::Extension)
+//! These types are pure data; they hook into [`dol_command::operation::Operation`]
+//! via the [`Operation::Extension`](dol_command::operation::Operation::Extension)
 //! seam through the typed payloads in [`extension`] (`WindowPayload`,
 //! `TimeSeriesPayload`, `SamplePayload`) and are validated by `dol-check`.
 

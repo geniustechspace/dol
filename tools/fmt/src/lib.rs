@@ -1,6 +1,6 @@
 //! # `dol-fmt` — canonical pretty-printer
 //!
-//! Renders an IR [`dol_ir::program::Program`] into a stable, human-readable text form.
+//! Renders an IR [`dol_command::program::Program`] into a stable, human-readable text form.
 //! The output is **not** a parser surface; it exists for debugging,
 //! `insta`-style golden tests, and round-trip checks against `dol-wire`.
 //!
@@ -37,11 +37,11 @@ extern crate alloc;
 use alloc::string::String;
 use core::fmt::Write;
 
+use dol_command::operation::tx::TxOp;
+use dol_command::operation::{OpKind, Operation};
+use dol_command::program::Program;
+use dol_command::target::{Target, TargetKind};
 use dol_expr::Interner;
-use dol_ir::operation::tx::TxOp;
-use dol_ir::operation::{OpKind, Operation};
-use dol_ir::program::Program;
-use dol_ir::target::{Target, TargetKind};
 
 /// Pretty-print a [`Program`] to a `String`.
 pub fn print(program: &Program) -> String {
@@ -87,7 +87,7 @@ fn write_target(w: &mut String, t: &Target, interner: &Interner) -> core::fmt::R
 
 /// Resolve `id` against `interner`, falling back to a stable `#<id>`
 /// placeholder when the symbol came from a different interner (e.g. test
-/// fixtures that build a [`Symbol`](dol_ir::Symbol) from a literal).
+/// fixtures that build a [`Symbol`](dol_command::Symbol) from a literal).
 ///
 /// With content-addressed [`StrId`](dol_expr::ids::StrId)s a known id can
 /// land anywhere in `u32` space, so we ask the interner directly via
@@ -127,7 +127,7 @@ fn verb_token(k: OpKind) -> &'static str {
         OpKind::Revoke => "revoke",
         OpKind::Tx => "tx",
         OpKind::Extension => "extension",
-        // `OpKind::Raw` is feature-gated on `dol-ir/raw`; this catch-all
+        // `OpKind::Raw` is feature-gated on `dol-command/raw`; this catch-all
         // covers it without leaking the feature flag into `dol-fmt`'s
         // public surface.
         #[allow(unreachable_patterns)]
@@ -164,16 +164,16 @@ fn tx_subverb(tx: &TxOp) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use dol_command::operation::{Insert, InsertSource, TxBegin, TxOp, TxOptions};
+    use dol_command::program::Program;
+    use dol_command::target::{Locator, Symbol, Target, TargetKind};
     use dol_expr::{ExprArena, Interner};
-    use dol_ir::operation::{Insert, InsertSource, TxBegin, TxOp, TxOptions};
-    use dol_ir::program::Program;
-    use dol_ir::target::{Locator, Symbol, Target, TargetKind};
 
     #[test]
     fn renders_lowercase_verb_and_locator_name() {
         let mut interner = Interner::new();
         let users = Symbol::new(interner.intern("users"));
-        let op: dol_ir::operation::Operation = Insert {
+        let op: dol_command::operation::Operation = Insert {
             target: Target::new(TargetKind::Relation, Locator::new(users)),
             source: InsertSource::Bindings,
             returning: None,
@@ -190,8 +190,8 @@ mod tests {
     #[test]
     fn renders_tx_subverb() {
         let interner = Interner::new();
-        let op: dol_ir::operation::Operation =
-            dol_ir::operation::Operation::Tx(alloc::boxed::Box::new(TxOp::Begin(TxBegin {
+        let op: dol_command::operation::Operation =
+            dol_command::operation::Operation::Tx(alloc::boxed::Box::new(TxOp::Begin(TxBegin {
                 opts: TxOptions::default(),
             })));
         let p = Program::new(op, ExprArena::new(), interner);

@@ -313,8 +313,8 @@ impl GetQuery {
 
     // ── Build to IR ─────────────────────────────────────────────────────
 
-    /// Consume the builder and produce a [`dol_ir::program::Program`] holding a
-    /// single [`dol_ir::operation::Operation::Query`] that references an arena
+    /// Consume the builder and produce a [`dol_command::program::Program`] holding a
+    /// single [`dol_command::operation::Operation::Query`] that references an arena
     /// `ExprNode` of opcode [`dol_expr::expr::ExprOp::Query`] carrying
     /// the SELECT body.
     ///
@@ -324,13 +324,13 @@ impl GetQuery {
     /// Fallible: returns the matching [`BuildError`](crate::BuildError) variant when lowering
     /// any of the projection / WHERE / GROUP BY / HAVING / ORDER BY
     /// expressions exhausts the default budget.
-    pub fn try_build(self) -> Result<dol_ir::program::Program, crate::BuildError> {
+    pub fn try_build(self) -> Result<dol_command::program::Program, crate::BuildError> {
+        use dol_command::operation::Query as OpQuery;
+        use dol_command::target::TargetKind;
         use dol_core::policy::{Budget, Limits};
         use dol_expr::expr::{JoinNode, JoinType as ArenaJoinType, QueryNode};
         use dol_expr::ids::NodeId;
         use dol_expr::lower::{lower_expr_with_budget, lower_exprs, lower_filters, lower_order_by};
-        use dol_ir::target::TargetKind;
-        use dol_ir::operation::Query as OpQuery;
         use smallvec::SmallVec;
 
         let mut arena = dol_expr::ExprArena::new();
@@ -480,18 +480,18 @@ impl GetQuery {
         let qid = arena.alloc_query(qnode);
         let body = arena.alloc_query_ref(qid);
 
-        let target = crate::target::target_from_parts(
+        let target = dol_command::builders::target::target_from_parts(
             &mut interner,
             TargetKind::Relation,
             &self.name,
             self.namespace.as_deref(),
         );
-        let op: dol_ir::operation::Operation = OpQuery {
+        let op: dol_command::operation::Operation = OpQuery {
             target,
             node: Some(body),
         }
         .into();
-        Ok(dol_ir::program::Program::new(op, arena, interner))
+        Ok(dol_command::program::Program::new(op, arena, interner))
     }
 }
 

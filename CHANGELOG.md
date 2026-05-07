@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Crate rename: `dol-ir` → `dol-command`
+
+The IR crate has been renamed to **`dol-command`** to better reflect its
+scope: it is the universal command-language layer (Operation, Program,
+Backend, capability checks, plus the DDL/ACL/Tx/storage builders), not
+just an "intermediate representation".
+
+The directory moved from `lib/ir/` to `lib/command/`. The umbrella's
+`ir` feature has been renamed to `command`, and the umbrella now
+re-exports the crate as `dol::command`.
+
+#### Migration
+
+- `dol_ir::*` → `dol_command::*` everywhere.
+- `dol::ir::*` (umbrella) → `dol::command::*`.
+- `dol = { features = ["ir"] }` → `dol = { features = ["command"] }`.
+- `Cargo.toml`: `dol-ir = { workspace = true }` → `dol-command = { workspace = true }`.
+
+### Builder helpers moved: `dol-query` → `dol-command::builders`
+
+The DDL (`define_entity`, `define_index`, …), ACL/Tx (`grant`, `revoke`,
+`define_policy`, `tx_begin`, `tx_atomic`, …), and storage (`get_blob`,
+`put_blob`, `read_file`, `write_file`, …) helpers have been moved from
+`dol-query` into the new `dol_command::builders` module.
+
+These helpers construct IR directly without using the fluent query DSL,
+so they belong with the IR layer; `dol-query` keeps only the actual
+query builders (`GetQuery`, `InsertQuery`, `UpdateQuery`,
+`DeleteQuery`, `UpsertQuery`) plus the streaming / pipeline submodules.
+
+The `dol_query::prelude` re-exports the moved builders from
+`dol_command::builders` so existing `use dol_query::prelude::*;` call
+sites keep compiling.
+
+#### Migration
+
+- `dol_query::define_entity` → `dol_command::builders::define_entity`
+  (or `dol_query::prelude::define_entity` via the prelude shim).
+- `dol_query::ddl::*` / `dol_query::control::*` / `dol_query::storage::*`
+  modules — removed; import from `dol_command::builders::{ddl, control,
+  storage}` (or use the flat re-exports in `dol_command::builders`).
+
 ### Crate consolidation: `dol-stream` + `dol-pipeline` → `dol-query`
 
 The standalone `dol-stream` and `dol-pipeline` crates are absorbed into
@@ -30,20 +72,22 @@ across separate crates added build-graph complexity without payoff.
 
 - **`dol-stream`** and **`dol-pipeline`** workspace members — content
   rehomed into `dol-query` (see above).
-- **`dol_ir::schema_ref`** and **`dol_ir::schema_catalog`** modules —
-  moved to `dol_schema` (`SchemaRef`, `SchemaId`, `CatalogId`,
-  `SchemaCatalog`, `CatalogEntry`, `TypeEntry`, `TypeBody`).
-- **`dol_ir`'s flat `pub use` re-exports** at the crate root —
+- **`dol_command::schema_ref`** and **`dol_command::schema_catalog`**
+  modules (formerly under `dol_ir`) — moved to `dol_schema`
+  (`SchemaRef`, `SchemaId`, `CatalogId`, `SchemaCatalog`,
+  `CatalogEntry`, `TypeEntry`, `TypeBody`).
+- **`dol_command`'s flat `pub use` re-exports** at the crate root —
   callers now import from the source module (e.g.
-  `dol_ir::operation::Operation` instead of `dol_ir::Operation`,
-  `dol_ir::target::Symbol` instead of `dol_ir::Symbol`,
-  `dol_schema::EntityConstraint` instead of `dol_ir::EntityConstraint`).
-  The `dol_ir::prelude` re-export is unchanged for callers who want
-  the flat surface.
-- **`dol_ir::store` module** (`KvStore`, `Catalog`, `KvError`) — premature
-  abstraction: the KV-specific trait shape does not apply to all backend
-  families (SQL, graph, document, …). Will be reintroduced when a concrete
-  backend lands and the trait surface is informed by real usage.
+  `dol_command::operation::Operation` instead of
+  `dol_command::Operation`, `dol_command::target::Symbol` instead of
+  `dol_command::Symbol`, `dol_schema::EntityConstraint` instead of
+  `dol_command::EntityConstraint`). The `dol_command::prelude`
+  re-export is unchanged for callers who want the flat surface.
+- **`dol_command::store` module** (`KvStore`, `Catalog`, `KvError`) —
+  premature abstraction: the KV-specific trait shape does not apply to
+  all backend families (SQL, graph, document, …). Will be reintroduced
+  when a concrete backend lands and the trait surface is informed by
+  real usage.
 
 ### Operator / expression tier lock-down
 

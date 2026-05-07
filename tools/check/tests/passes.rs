@@ -9,12 +9,12 @@
 #![allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
 
 use dol_check::{capability_check, check_all, check_all_for, lint, schema_check, type_check};
+use dol_command::capabilities::{CapabilitySet, CapabilityTag};
+use dol_command::operation::meta::ExtensionId;
+use dol_command::operation::{OperationExtension, SchemaOp};
+use dol_command::program::Program;
+use dol_command::target::{Locator, Symbol, Target, TargetKind};
 use dol_core::diag::Diagnostic;
-use dol_ir::capabilities::{CapabilitySet, CapabilityTag};
-use dol_ir::operation::{OperationExtension, SchemaOp};
-use dol_ir::operation::meta::ExtensionId;
-use dol_ir::program::Program;
-use dol_ir::target::{Locator, Symbol, Target, TargetKind};
 use dol_schema::SchemaRef;
 
 fn empty_program() -> Program {

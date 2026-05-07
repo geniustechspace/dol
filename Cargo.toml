@@ -5,19 +5,19 @@
 # package names keep it.
 #
 #   lib/core ──┬──► lib/expr ──┐
-#              ├──► lib/schema ┴──► lib/ir ──┬──► lib/wire
-#              └──────────────────┘          ├──► lib/query  (absorbs former
-#                                            │                lib/stream + lib/pipeline)
-#                                            ├──► tools/check
-#                                            ├──► tools/fmt
-#                                            └──► backends/<store>
+#              ├──► lib/schema ┴──► lib/command ──┬──► lib/wire
+#              └──────────────────┘               ├──► lib/query  (absorbs former
+#                                                 │                lib/stream + lib/pipeline)
+#                                                 ├──► tools/check
+#                                                 ├──► tools/fmt
+#                                                 └──► backends/<store>
 #
 #   lib/dol  (umbrella; depends on the layers above; no crate depends on it)
 #
 # Invariants enforced by `cargo deny` and the xtask gates:
 #   * Nothing in `lib/`  may depend on `tools/` or `backends/`.
 #   * `tools/*`  may depend on `lib/*` but not on each other or `backends/`.
-#   * `backends/*` depend only on `lib/ir` (+ optionally `lib/wire`).
+#   * `backends/*` depend only on `lib/command` (+ optionally `lib/wire`).
 #   * No crate depends on `lib/dol`.
 
 [workspace]
@@ -103,7 +103,7 @@ defmt        = { version = "0.3", default-features = false }
 dol-core     = { path = "lib/core", default-features = false }
 dol-expr     = { path = "lib/expr" }
 dol-schema   = { path = "lib/schema" }
-dol-ir       = { path = "lib/ir" }
+dol-command  = { path = "lib/command" }
 dol-wire     = { path = "lib/wire" }
 dol-query    = { path = "lib/query" }
 dol-check    = { path = "tools/check" }

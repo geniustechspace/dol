@@ -1,5 +1,5 @@
 //! Integration tests for `dol-query` builders against the
-//! [`Operation`](dol_ir::operation::Operation) IR.
+//! [`Operation`](dol_command::operation::Operation) IR.
 
 use alloc::{boxed::Box, format, string::String, vec};
 
@@ -17,7 +17,7 @@ fn users_entity() -> Entity {
     )
 }
 
-fn target_name(p: &dol_ir::program::Program) -> &str {
+fn target_name(p: &dol_command::program::Program) -> &str {
     let op = &p.operations[0];
     let target = op.primary_target().expect("operation has a target");
     let name = p.interner.get(target.locator.name.0);
@@ -33,9 +33,9 @@ fn target_name(p: &dol_ir::program::Program) -> &str {
 
 /// Pull the inner arena `QueryNode` out of a `Program` whose first
 /// operation is `Operation::Query`.
-fn unwrap_query(p: &dol_ir::program::Program) -> &dol_expr::expr::QueryNode {
+fn unwrap_query(p: &dol_command::program::Program) -> &dol_expr::expr::QueryNode {
     match &p.operations[0] {
-        dol_ir::operation::Operation::Query(q) => {
+        dol_command::operation::Operation::Query(q) => {
             let body = q.node.expect("Query has arena body");
             let qid = p.arena.get(body).as_query().expect("expected Query opcode");
             p.arena.get_query(qid)
@@ -44,11 +44,11 @@ fn unwrap_query(p: &dol_ir::program::Program) -> &dol_expr::expr::QueryNode {
     }
 }
 
-fn unwrap_insert(p: &dol_ir::program::Program) -> &dol_expr::expr::InsertNode {
+fn unwrap_insert(p: &dol_command::program::Program) -> &dol_expr::expr::InsertNode {
     match &p.operations[0] {
-        dol_ir::operation::Operation::Insert(ins) => {
+        dol_command::operation::Operation::Insert(ins) => {
             let body = match ins.source {
-                dol_ir::operation::InsertSource::Node(n) => n,
+                dol_command::operation::InsertSource::Node(n) => n,
                 _ => panic!("expected InsertSource::Node"),
             };
             let iid = p
@@ -62,9 +62,9 @@ fn unwrap_insert(p: &dol_ir::program::Program) -> &dol_expr::expr::InsertNode {
     }
 }
 
-fn unwrap_update(p: &dol_ir::program::Program) -> &dol_expr::expr::UpdateNode {
+fn unwrap_update(p: &dol_command::program::Program) -> &dol_expr::expr::UpdateNode {
     match &p.operations[0] {
-        dol_ir::operation::Operation::Update(u) => {
+        dol_command::operation::Operation::Update(u) => {
             let uid = p
                 .arena
                 .get(u.node)
@@ -76,9 +76,9 @@ fn unwrap_update(p: &dol_ir::program::Program) -> &dol_expr::expr::UpdateNode {
     }
 }
 
-fn unwrap_delete(p: &dol_ir::program::Program) -> &dol_expr::expr::DeleteNode {
+fn unwrap_delete(p: &dol_command::program::Program) -> &dol_expr::expr::DeleteNode {
     match &p.operations[0] {
-        dol_ir::operation::Operation::Delete(d) => {
+        dol_command::operation::Operation::Delete(d) => {
             let did = p
                 .arena
                 .get(d.node)
@@ -90,9 +90,9 @@ fn unwrap_delete(p: &dol_ir::program::Program) -> &dol_expr::expr::DeleteNode {
     }
 }
 
-fn unwrap_upsert(p: &dol_ir::program::Program) -> &dol_expr::expr::UpsertNode {
+fn unwrap_upsert(p: &dol_command::program::Program) -> &dol_expr::expr::UpsertNode {
     match &p.operations[0] {
-        dol_ir::operation::Operation::Upsert(u) => {
+        dol_command::operation::Operation::Upsert(u) => {
             let uid = p
                 .arena
                 .get(u.node)
@@ -404,8 +404,14 @@ fn get_emits_query_operation() {
         .fields(&["id"])
         .try_build()
         .expect("test fixture: builder must succeed");
-    assert_eq!(p.operations[0].kind(), dol_ir::operation::OpKind::Query);
-    assert_eq!(p.operations[0].category(), dol_ir::operation::Category::DQL);
+    assert_eq!(
+        p.operations[0].kind(),
+        dol_command::operation::OpKind::Query
+    );
+    assert_eq!(
+        p.operations[0].category(),
+        dol_command::operation::Category::DQL
+    );
 }
 
 #[test]
@@ -415,8 +421,14 @@ fn insert_emits_insert_operation() {
         .fields(&["id"])
         .try_build()
         .expect("test fixture: builder must succeed");
-    assert_eq!(p.operations[0].kind(), dol_ir::operation::OpKind::Insert);
-    assert_eq!(p.operations[0].category(), dol_ir::operation::Category::DML);
+    assert_eq!(
+        p.operations[0].kind(),
+        dol_command::operation::OpKind::Insert
+    );
+    assert_eq!(
+        p.operations[0].category(),
+        dol_command::operation::Category::DML
+    );
 }
 
 #[test]
@@ -428,10 +440,13 @@ fn upsert_emits_upsert_operation_and_merge_capability() {
         .then_skip()
         .try_build()
         .expect("test fixture: builder must succeed");
-    assert_eq!(p.operations[0].kind(), dol_ir::operation::OpKind::Upsert);
+    assert_eq!(
+        p.operations[0].kind(),
+        dol_command::operation::OpKind::Upsert
+    );
     assert!(
         p.operations[0]
             .required_capabilities()
-            .contains(&dol_ir::capabilities::CapabilityTag::MERGE)
+            .contains(&dol_command::capabilities::CapabilityTag::MERGE)
     );
 }

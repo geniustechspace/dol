@@ -4,7 +4,7 @@
 //! the data-model layer. They use owned strings (`Arc<str>`) so they can
 //! implement `Deserialize` and survive round-trips through serde.
 //!
-//! `dol-schema` is the single owner of constraint types; `dol-ir` re-exports
+//! `dol-schema` is the single owner of constraint types; `dol-command` re-exports
 //! the names it needs to embed in DDL `Statement` variants.
 
 extern crate alloc;
