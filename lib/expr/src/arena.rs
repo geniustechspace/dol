@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
 
+use hashbrown::HashMap;
 use smallvec::SmallVec;
 
 use crate::expr::{DeleteNode, ExprNode, InsertNode, Order, QueryNode, UpdateNode, UpsertNode};
@@ -354,6 +355,14 @@ pub struct ExprArena {
     upserts: Vec<UpsertNode>,
     /// Pooled field-reference payloads — lookup by [`FieldId`].
     fields: Vec<FieldNode>,
+    /// Optional structural-dedup index for [`Self::intern_node`].
+    ///
+    /// `None` until the first `intern_node` call. Lazily initialised so
+    /// the bulk single-shot `alloc` path on a one-off lowering does not
+    /// pay for the hash table. Skipped by `Serialize` because it is
+    /// recoverable from the `nodes` slice.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    node_index: Option<HashMap<ExprNode, NodeId>>,
 }
 
 impl ExprArena {
@@ -383,6 +392,7 @@ impl ExprArena {
             deletes: Vec::with_capacity(cap.deletes),
             upserts: Vec::with_capacity(cap.upserts),
             fields: Vec::with_capacity(cap.fields),
+            node_index: None,
         }
     }
 
@@ -422,7 +432,63 @@ impl ExprArena {
     /// constructors on [`ExprNode`] (e.g. [`ExprNode::bin`]) to keep
     /// the raw `a`/`b`/`c` layout out of consumer code.
     pub fn alloc(&mut self, node: ExprNode) -> NodeId {
-        alloc_in(&mut self.nodes, node)
+        let id = alloc_in(&mut self.nodes, node);
+        // Keep the optional dedup index in sync so a later
+        // `intern_node` for the same shape can find this entry. We
+        // record on first-seen — duplicates that arrive via `alloc`
+        // are intentionally kept distinct because the caller chose
+        // the non-dedup entry point.
+        if let Some(map) = self.node_index.as_mut() {
+            map.entry(node).or_insert(id);
+        }
+        id
+    }
+
+    /// Allocate `node` if no structurally-equal node already exists in
+    /// the hot pool, otherwise return the existing [`NodeId`].
+    ///
+    /// This is the **opt-in** dedup path. Bulk lowering uses
+    /// [`Self::alloc`] (no hash cost); rewrites and CSE-style passes
+    /// use this entry point so that common subexpressions collapse
+    /// onto shared `NodeId`s.
+    ///
+    /// Structural equality is byte-for-byte over the 16-byte packed
+    /// node. Two nodes are equal iff their `(op, flags, aux, a, b, c)`
+    /// tuples match — which is the right semantics because side-pool
+    /// referents (`FieldId`, `LiteralId`, …) are themselves keyed by
+    /// content via their own pools.
+    ///
+    /// The dedup index is built lazily on first call and grows
+    /// alongside the `nodes` pool from there. Calling [`Self::alloc`]
+    /// after `intern_node` keeps the index in sync (the
+    /// newly-allocated node is recorded so a subsequent `intern_node`
+    /// can dedup against it).
+    pub fn intern_node(&mut self, node: ExprNode) -> NodeId {
+        // Lazily seed the dedup index from the existing `nodes` pool
+        // so any nodes already allocated via the bulk path participate
+        // in dedup from this point onward.
+        if self.node_index.is_none() {
+            let mut map: HashMap<ExprNode, NodeId> =
+                HashMap::with_capacity(self.nodes.len());
+            for (idx, n) in self.nodes.iter().enumerate() {
+                if let Some(id) = NodeId::from_index(idx) {
+                    map.entry(*n).or_insert(id);
+                }
+            }
+            self.node_index = Some(map);
+        }
+        // SAFETY: we just initialised `node_index` if it was `None`.
+        #[allow(clippy::expect_used)]
+        let map = self
+            .node_index
+            .as_mut()
+            .expect("node_index initialised above");
+        if let Some(&existing) = map.get(&node) {
+            return existing;
+        }
+        let id = alloc_in(&mut self.nodes, node);
+        map.insert(node, id);
+        id
     }
 
     // ── Typed `alloc_*` helpers — sugar for `alloc(ExprNode::*)`. ─────
@@ -744,5 +810,80 @@ impl ExprArena {
     }
     pub fn span_table_ref(&self) -> &SpanTable {
         &self.span_table
+    }
+}
+
+#[cfg(test)]
+mod intern_tests {
+    use super::*;
+    use crate::expr::BinOp;
+
+    #[test]
+    fn intern_node_collapses_structurally_equal_nodes() {
+        let mut arena = ExprArena::new();
+        // Build `lit(1)` twice and confirm `intern_node` returns the
+        // same id.
+        let lit = arena.alloc_lit(Literal::Int32(1));
+        let lit_node1 = arena.intern_node(ExprNode::lit(lit));
+        let lit_node2 = arena.intern_node(ExprNode::lit(lit));
+        assert_eq!(lit_node1, lit_node2, "literal-ref nodes dedup");
+
+        // Distinct shape ⇒ distinct id.
+        let lit2 = arena.alloc_lit(Literal::Int32(2));
+        let lit_node3 = arena.intern_node(ExprNode::lit(lit2));
+        assert_ne!(lit_node1, lit_node3);
+    }
+
+    #[test]
+    fn alloc_then_intern_finds_alloc_node() {
+        let mut arena = ExprArena::new();
+        let lit = arena.alloc_lit(Literal::Int32(7));
+        // First allocation goes via the bulk path.
+        let alloc_id = arena.alloc(ExprNode::lit(lit));
+        // The dedup index isn't built yet; calling `intern_node` must
+        // seed the index from the existing pool and return the
+        // already-allocated id rather than appending a new one.
+        let intern_id = arena.intern_node(ExprNode::lit(lit));
+        assert_eq!(alloc_id, intern_id);
+        assert_eq!(arena.len(), 1, "no duplicate node was appended");
+    }
+
+    #[test]
+    fn intern_then_alloc_keeps_index_in_sync() {
+        let mut arena = ExprArena::new();
+        let lit_a = arena.alloc_lit(Literal::Int32(1));
+        let lit_b = arena.alloc_lit(Literal::Int32(2));
+
+        // Force index init via intern.
+        let _seed = arena.intern_node(ExprNode::lit(lit_a));
+        // Now `alloc` should still update the index.
+        let alloc_b = arena.alloc(ExprNode::lit(lit_b));
+        // intern of the same shape should return the alloc'd id.
+        let intern_b = arena.intern_node(ExprNode::lit(lit_b));
+        assert_eq!(alloc_b, intern_b);
+    }
+
+    #[test]
+    fn intern_node_dedups_bin_subtree() {
+        let mut arena = ExprArena::new();
+        // Two structurally-identical `a + 1` subtrees should share
+        // node ids when built through `intern_node`.
+        let lit1 = arena.alloc_lit(Literal::Int32(1));
+        let field_id = arena.alloc_field(FieldNode {
+            namespace: None,
+            name: StrId::from_u32(1).unwrap(),
+            steps: SmallVec::new(),
+        });
+        let a_node = arena.intern_node(ExprNode::field(field_id));
+        let lit_node = arena.intern_node(ExprNode::lit(lit1));
+        let bin1 = arena.intern_node(ExprNode::bin(BinOp::Add, a_node, lit_node));
+
+        let a_node2 = arena.intern_node(ExprNode::field(field_id));
+        let lit_node2 = arena.intern_node(ExprNode::lit(lit1));
+        let bin2 = arena.intern_node(ExprNode::bin(BinOp::Add, a_node2, lit_node2));
+
+        assert_eq!(a_node, a_node2);
+        assert_eq!(lit_node, lit_node2);
+        assert_eq!(bin1, bin2, "structurally-equal `a + 1` collapses");
     }
 }
