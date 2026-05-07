@@ -13,7 +13,7 @@ use dol_ir::operation::{ExtensionId, ExtensionPayload};
 use dol_ir::operation::Operation;
 use dol_ir::target::Symbol;
 
-use crate::Graph;
+use super::Graph;
 
 /// Stable extension name.
 pub const EXTENSION_NAME: &str = "dol.pipeline/graph";

@@ -105,7 +105,6 @@ fn decode_truncated_body_returns_clean_error() {
     use dol_core::policy::{Budget, Limits};
     use dol_expr::{ExprArena, Interner};
     use dol_ir::operation::{Insert, InsertSource};
-    use dol_ir::operation::Operation;
     use dol_ir::program::Program;
     use dol_ir::target::{Locator, Symbol, Target, TargetKind};
     use dol_wire::encoder::encode_to_vec;

@@ -15,8 +15,6 @@ dol-core = { workspace = true }
 dol-expr     = { workspace = true, optional = true }
 dol-schema   = { workspace = true, optional = true }
 dol-ir       = { workspace = true, optional = true }
-dol-pipeline = { workspace = true, optional = true }
-dol-stream   = { workspace = true, optional = true }
 dol-wire     = { workspace = true, optional = true }
 dol-check    = { workspace = true, optional = true }
 dol-fmt      = { workspace = true, optional = true }
@@ -34,8 +32,6 @@ std = [
     "dol-expr?/std",
     "dol-schema?/std",
     "dol-ir?/std",
-    "dol-pipeline?/std",
-    "dol-stream?/std",
     "dol-wire?/std",
     "dol-query?/std",
 ]
@@ -44,8 +40,6 @@ std = [
 expr     = ["dep:dol-expr"]
 schema   = ["dep:dol-schema", "expr"]
 ir       = ["dep:dol-ir", "expr", "schema"]
-pipeline = ["dep:dol-pipeline", "ir"]
-stream   = ["dep:dol-stream", "ir"]
 wire     = ["dep:dol-wire", "ir"]
 check    = ["dep:dol-check", "ir"]
 fmt      = ["dep:dol-fmt", "ir"]
@@ -68,20 +62,20 @@ core     = ["expr", "schema", "ir", "query"]
 # Everything DOL ships today.
 full     = [
     "expr", "schema", "ir",
-    "pipeline", "stream",
     "wire", "check", "fmt",
     "query",
     "geo", "network", "datetime", "numeric",
 ]
 
-# Minimal IoT-edge slice: types, IR, streaming verbs, postcard wire. No
-# diagnostics renderer, no JSON codec, no pretty-printer. Designed to fit
-# inside a `thumbv7em` binary budget. Keeps `numeric` + `datetime` (sensors
-# typically report `Decimal` readings with timestamps) but drops `geo` +
-# `network` to actively exercise the granular dol-core gates.
+# Minimal IoT-edge slice: types, IR, streaming verbs (now in dol-query),
+# postcard wire. No diagnostics renderer, no JSON codec, no pretty-printer.
+# Designed to fit inside a `thumbv7em` binary budget. Keeps `numeric` +
+# `datetime` (sensors typically report `Decimal` readings with timestamps)
+# but drops `geo` + `network` to actively exercise the granular dol-core
+# gates.
 iot-min  = [
     "expr", "schema", "ir",
-    "stream",
+    "query",
     "wire",
     "dol-wire/postcard",
     "dol-wire/serde",
@@ -94,8 +88,6 @@ serde    = [
     "dol-expr?/serde",
     "dol-schema?/serde",
     "dol-ir?/serde",
-    "dol-pipeline?/serde",
-    "dol-stream?/serde",
     "dol-wire?/serde",
     "dol-check?/serde",
     "dol-query?/serde",

@@ -22,7 +22,7 @@ use dol_ir::operation::{ExtensionId, ExtensionPayload, OperationExtension};
 use dol_ir::operation::Operation;
 use dol_ir::target::Symbol;
 
-use crate::{Sample, TimeSeriesOp, WindowSpec};
+use super::{Sample, TimeSeriesOp, WindowSpec};
 
 /// Stable extension name for the windowing payload.
 pub const WINDOW_NAME: &str = "dol.stream/window";

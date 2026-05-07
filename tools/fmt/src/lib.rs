@@ -39,7 +39,7 @@ use core::fmt::Write;
 
 use dol_expr::Interner;
 use dol_ir::operation::tx::TxOp;
-use dol_ir::operation::{Category, OpKind, Operation};
+use dol_ir::operation::{OpKind, Operation};
 use dol_ir::program::Program;
 use dol_ir::target::{Target, TargetKind};
 
@@ -166,7 +166,6 @@ mod tests {
     use super::*;
     use dol_expr::{ExprArena, Interner};
     use dol_ir::operation::{Insert, InsertSource, TxBegin, TxOp, TxOptions};
-    use dol_ir::operation::Operation;
     use dol_ir::program::Program;
     use dol_ir::target::{Locator, Symbol, Target, TargetKind};
 

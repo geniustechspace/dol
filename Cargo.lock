@@ -296,10 +296,8 @@ dependencies = [
  "dol-expr",
  "dol-fmt",
  "dol-ir",
- "dol-pipeline",
  "dol-query",
  "dol-schema",
- "dol-stream",
  "dol-wire",
 ]
 
@@ -363,19 +361,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dol-pipeline"
-version = "0.2.0"
-dependencies = [
- "dol-core",
- "dol-expr",
- "dol-ir",
- "dol-schema",
- "postcard",
- "serde",
- "smallvec",
-]
-
-[[package]]
 name = "dol-query"
 version = "0.2.0"
 dependencies = [
@@ -383,6 +368,7 @@ dependencies = [
  "dol-expr",
  "dol-ir",
  "dol-schema",
+ "postcard",
  "serde",
  "smallvec",
 ]
@@ -393,19 +379,6 @@ version = "0.2.0"
 dependencies = [
  "dol-core",
  "dol-expr",
- "serde",
- "smallvec",
-]
-
-[[package]]
-name = "dol-stream"
-version = "0.2.0"
-dependencies = [
- "dol-core",
- "dol-expr",
- "dol-ir",
- "dol-schema",
- "postcard",
  "serde",
  "smallvec",
 ]

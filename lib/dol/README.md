@@ -12,12 +12,10 @@ need without pulling in the full dependency tree.
 | `expr`       | `dol-expr`     | Expression arena + tree DSL.                               |
 | `schema`     | `dol-schema`   | Entities, fields, constraints, relations, lookups.         |
 | `ir`         | `dol-ir`       | `Statement`, `Program`, `Backend`, `BackendCapabilities`.  |
-| `pipeline`   | `dol-pipeline` | Source → Transform → Sink dataflow IR.                     |
-| `stream`     | `dol-stream`   | Windows, watermarks, time-series, IoT vocabulary.          |
 | `wire`       | `dol-wire`     | Canonical wire envelope + postcard / JSON codec helpers.   |
 | `check`      | `dol-check`    | Static validator (type / schema / capability / lint).      |
 | `fmt`        | `dol-fmt`      | Canonical pretty-printer.                                  |
-| `query`      | `dol-query`    | Fluent builder DSL.                                        |
+| `query`      | `dol-query`    | Fluent builder DSL, plus the streaming / pipeline / IoT IR (formerly the separate `dol-stream` and `dol-pipeline` crates). |
 
 ## Curated presets
 
@@ -25,7 +23,7 @@ need without pulling in the full dependency tree.
 | --------- | --------------------------------------------- | ----------------------------------------------- |
 | `core`    | `expr + schema + ir + query`                  | "Full programs" build, no codecs / streaming    |
 | `full`    | every layer DOL ships                         | Library / tooling consumers                     |
-| `iot-min` | `expr + schema + ir + stream + wire/postcard` | Minimal IoT-edge slice (fits `thumbv7em` budget) |
+| `iot-min` | `expr + schema + ir + query + wire/postcard` | Minimal IoT-edge slice (fits `thumbv7em` budget) |
 
 The `iot-min` preset and the `no_std` leaves are verified in CI:
 

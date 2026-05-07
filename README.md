@@ -68,10 +68,8 @@ xtask/      ── workspace task runner (not published)
 | [`lib/expr`](lib/expr/README.md) · `dol-expr`        | Composable expression AST (16 B packed `ExprNode`, arena, interner)          |
 | [`lib/schema`](lib/schema/README.md) · `dol-schema`  | Entities, fields, constraints, relations, lookups, policies                  |
 | [`lib/ir`](lib/ir/README.md) · `dol-ir`              | Canonical IR: `Statement`, `Program`, `Backend` trait, `BackendCapabilities` |
-| [`lib/pipeline`](lib/pipeline/README.md) · `dol-pipeline` | Source → Transform → Sink dataflow IR                                  |
-| [`lib/stream`](lib/stream/README.md) · `dol-stream`  | Streaming windows, watermarks, time-series, IoT/telemetry vocabulary         |
 | [`lib/wire`](lib/wire/README.md) · `dol-wire`        | Canonical wire envelope, postcard / JSON codec helpers, BLAKE3 content hash  |
-| [`lib/query`](lib/query/README.md) · `dol-query`     | Fluent builder DSL → produces `dol-ir::Statement`                            |
+| [`lib/query`](lib/query/README.md) · `dol-query`     | Fluent builder DSL → produces `dol-ir::Statement`; also hosts the streaming / pipeline / IoT IR (formerly `dol-stream` and `dol-pipeline`) |
 | [`lib/dol`](lib/dol/README.md) · `dol`               | Umbrella facade with `core`, `full`, `iot-min` presets                       |
 | [`tools/check`](tools/check/README.md) · `dol-check` | Static validator (type / schema / capability / lint passes)                  |
 | [`tools/fmt`](tools/fmt/README.md) · `dol-fmt`       | Canonical pretty-printer for IR programs                                     |
@@ -80,10 +78,9 @@ xtask/      ── workspace task runner (not published)
 
 ```
 lib/core ─┬─► lib/expr ────┐
-          ├─► lib/schema ──┴─► lib/ir ─┬─► lib/pipeline
-          └────────────────┘           ├─► lib/stream
-                                       ├─► lib/wire
-                                       ├─► lib/query
+          ├─► lib/schema ──┴─► lib/ir ─┬─► lib/wire
+          └────────────────┘           ├─► lib/query  (absorbs former
+                                       │              lib/stream + lib/pipeline)
                                        ├─► tools/check
                                        ├─► tools/fmt
                                        └─► backends/<store>

@@ -44,7 +44,7 @@ pub mod sarif;
 
 use dol_core::diag::Diagnostic;
 use dol_ir::capabilities::{CapabilityCheck, CapabilitySet, CapabilityTag};
-use dol_ir::operation::{Category, OpKind, Operation};
+use dol_ir::operation::{OpKind, Operation};
 use dol_ir::program::Program;
 
 /// Run the backend-agnostic passes ([`type_check`], [`schema_check`],

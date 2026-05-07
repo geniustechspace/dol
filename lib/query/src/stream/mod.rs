@@ -1,4 +1,4 @@
-//! # `dol-stream` — streaming / time-series / IoT IR
+//! Streaming / time-series / IoT IR (formerly `dol-stream`).
 //!
 //! Extends the core IR with a handful of operators that don't fit cleanly
 //! into batch SQL semantics:
@@ -10,26 +10,10 @@
 //! - **Telemetry / IoT vocabulary**: sensors, actuators, samples, retention
 //!   policies, store-and-forward intent, QoS hints, payload codecs.
 //!
-//! These types are pure data; they hook into [`dol_ir::Operation`] via the
-//! [`Operation::Extension`](dol_ir::Operation::Extension) seam through the
-//! typed payloads in [`extension`] (`WindowPayload`, `TimeSeriesPayload`,
-//! `SamplePayload`) and are validated by `dol-check`.
-
-#![forbid(unsafe_code)]
-#![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(
-    test,
-    allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        clippy::panic,
-        clippy::indexing_slicing,
-        clippy::arithmetic_side_effects
-    )
-)]
-#![warn(missing_docs)]
-
-extern crate alloc;
+//! These types are pure data; they hook into [`dol_ir::operation::Operation`]
+//! via the [`Operation::Extension`](dol_ir::operation::Operation::Extension)
+//! seam through the typed payloads in [`extension`] (`WindowPayload`,
+//! `TimeSeriesPayload`, `SamplePayload`) and are validated by `dol-check`.
 
 pub mod extension;
 pub mod iot;

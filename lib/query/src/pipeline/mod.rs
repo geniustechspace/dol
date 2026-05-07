@@ -1,4 +1,4 @@
-//! # `dol-pipeline` — declarative dataflow IR
+//! Declarative dataflow IR (formerly `dol-pipeline`).
 //!
 //! A pipeline is a typed DAG of nodes joined by typed edges:
 //!
@@ -8,37 +8,16 @@
 //!               `unpivot`, `gap_fill`, `asof_join`, `tdigest`, `approx_*`)
 //!   `Sink`      consumes rows out of the graph
 //!
-//! Pipelines are **descriptive only** — this crate provides type inference
+//! Pipelines are **descriptive only** — this module provides type inference
 //! over their node schemas; execution is a backend concern.
 //!
-//! Pipelines compose with [`dol_ir::Operation`] via the
-//! [`dol_ir::Operation::Extension`] seam: a [`Graph`] is wrapped in a
-//! [`PipelinePayload`] (a typed
+//! Pipelines compose with [`dol_ir::operation::Operation`] via the
+//! [`Operation::Extension`](dol_ir::operation::Operation::Extension) seam:
+//! a [`Graph`] is wrapped in a [`PipelinePayload`] (a typed
 //! [`ExtensionPayload`](dol_ir::operation::ExtensionPayload)) and embedded
-//! into a [`dol_ir::Program`].
-//!
-//! ## Status
-//!
-//! This crate currently models the IR; schema inference is intentionally
-//! conservative (passes through known field lists) and is expected to grow
-//! alongside `dol-check`.
+//! into a [`dol_ir::program::Program`].
 
-#![forbid(unsafe_code)]
-#![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(
-    test,
-    allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        clippy::panic,
-        clippy::indexing_slicing,
-        clippy::arithmetic_side_effects
-    )
-)]
-#![warn(missing_docs)]
 #![allow(clippy::large_enum_variant)]
-
-extern crate alloc;
 
 pub mod extension;
 pub mod graph;

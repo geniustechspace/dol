@@ -7,8 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Crate consolidation: `dol-stream` + `dol-pipeline` → `dol-query`
+
+The standalone `dol-stream` and `dol-pipeline` crates are absorbed into
+`dol-query` as the `dol_query::stream` and `dol_query::pipeline`
+submodules. A pipeline *is* a declarative query, and streaming /
+time-series / IoT verbs are query-time constructs — splitting them
+across separate crates added build-graph complexity without payoff.
+
+#### Migration
+
+- `dol_stream::WindowSpec` → `dol_query::stream::WindowSpec` (and
+  similarly for every other type).
+- `dol_pipeline::Graph` → `dol_query::pipeline::Graph`.
+- The `dol::stream` and `dol::pipeline` umbrella aliases are removed;
+  enable the umbrella's `query` feature and use `dol::query::stream`
+  / `dol::query::pipeline` instead.
+- The umbrella's `pipeline` and `stream` features are removed; the
+  `iot-min` preset now pulls `query` instead of `stream`.
+
 ### Removed
 
+- **`dol-stream`** and **`dol-pipeline`** workspace members — content
+  rehomed into `dol-query` (see above).
+- **`dol_ir::schema_ref`** and **`dol_ir::schema_catalog`** modules —
+  moved to `dol_schema` (`SchemaRef`, `SchemaId`, `CatalogId`,
+  `SchemaCatalog`, `CatalogEntry`, `TypeEntry`, `TypeBody`).
+- **`dol_ir`'s flat `pub use` re-exports** at the crate root —
+  callers now import from the source module (e.g.
+  `dol_ir::operation::Operation` instead of `dol_ir::Operation`,
+  `dol_ir::target::Symbol` instead of `dol_ir::Symbol`,
+  `dol_schema::EntityConstraint` instead of `dol_ir::EntityConstraint`).
+  The `dol_ir::prelude` re-export is unchanged for callers who want
+  the flat surface.
 - **`dol_ir::store` module** (`KvStore`, `Catalog`, `KvError`) — premature
   abstraction: the KV-specific trait shape does not apply to all backend
   families (SQL, graph, document, …). Will be reintroduced when a concrete

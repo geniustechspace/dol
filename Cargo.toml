@@ -5,10 +5,9 @@
 # package names keep it.
 #
 #   lib/core ──┬──► lib/expr ──┐
-#              ├──► lib/schema ┴──► lib/ir ──┬──► lib/pipeline
-#              └──────────────────┘          ├──► lib/stream
-#                                            ├──► lib/wire
-#                                            ├──► lib/query
+#              ├──► lib/schema ┴──► lib/ir ──┬──► lib/wire
+#              └──────────────────┘          ├──► lib/query  (absorbs former
+#                                            │                lib/stream + lib/pipeline)
 #                                            ├──► tools/check
 #                                            ├──► tools/fmt
 #                                            └──► backends/<store>
@@ -105,8 +104,6 @@ dol-core     = { path = "lib/core", default-features = false }
 dol-expr     = { path = "lib/expr" }
 dol-schema   = { path = "lib/schema" }
 dol-ir       = { path = "lib/ir" }
-dol-pipeline = { path = "lib/pipeline" }
-dol-stream   = { path = "lib/stream" }
 dol-wire     = { path = "lib/wire" }
 dol-query    = { path = "lib/query" }
 dol-check    = { path = "tools/check" }

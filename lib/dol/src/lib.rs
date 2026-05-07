@@ -12,18 +12,16 @@
 //! | `expr`       | `dol-expr`                     | Expression arena + tree DSL.                               |
 //! | `schema`     | `dol-schema`                   | Entities, fields, constraints, relations, lookups, policies. |
 //! | `ir`         | `dol-ir`                       | `Operation`, `Program`, `Backend`, `BackendCapabilities`.  |
-//! | `pipeline`   | `dol-pipeline`                 | Source → Transform → Sink dataflow IR.                     |
-//! | `stream`     | `dol-stream`                   | Windows, watermarks, time-series, IoT vocabulary.          |
 //! | `wire`       | `dol-wire`                     | Canonical wire envelope + postcard / JSON codec helpers.   |
 //! | `check`      | `dol-check`                    | Static validator (type / schema / capability / lint).      |
 //! | `fmt`        | `dol-fmt`                      | Canonical pretty-printer.                                  |
-//! | `query`      | `dol-query`                    | Fluent builder DSL.                                        |
+//! | `query`      | `dol-query`                    | Fluent builder DSL, plus the streaming / pipeline / IoT IR (formerly the separate `dol-stream` and `dol-pipeline` crates). |
 //!
 //! ## Curated presets
 //!
 //! - `core`    — `expr + schema + ir + query`.
 //! - `full`    — every layer DOL ships.
-//! - `iot-min` — minimal IoT-edge slice (core + IR + stream + postcard wire).
+//! - `iot-min` — minimal IoT-edge slice (core + IR + query + postcard wire).
 //!
 //! ## Universal serde
 //!
@@ -53,12 +51,6 @@ pub use dol_schema as schema;
 
 #[cfg(feature = "ir")]
 pub use dol_ir as ir;
-
-#[cfg(feature = "pipeline")]
-pub use dol_pipeline as pipeline;
-
-#[cfg(feature = "stream")]
-pub use dol_stream as stream;
 
 #[cfg(feature = "wire")]
 pub use dol_wire as wire;

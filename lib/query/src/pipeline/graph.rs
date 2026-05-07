@@ -2,7 +2,7 @@
 
 use smallvec::SmallVec;
 
-use crate::node::Node;
+use super::node::Node;
 
 /// Index of a node within a [`Graph`].
 #[repr(transparent)]
@@ -64,8 +64,8 @@ extern crate alloc;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::node::{Node, Source};
-    use crate::schema::RowSchema;
+    use super::super::node::{Node, Source};
+    use super::super::schema::RowSchema;
 
     #[test]
     fn graph_grows() {
