@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **`dol_ir::store` module** (`KvStore`, `Catalog`, `KvError`) — premature
+  abstraction: the KV-specific trait shape does not apply to all backend
+  families (SQL, graph, document, …). Will be reintroduced when a concrete
+  backend lands and the trait surface is informed by real usage.
+
 ### Operator / expression tier lock-down
 
 A principled cut of what earns a slot in `BinOp` / `UnaryOp` / `ExprOp`
