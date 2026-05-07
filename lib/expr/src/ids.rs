@@ -60,8 +60,8 @@ pub type CaseId = Id<CaseTag>;
 pub enum CompositeTag {}
 /// Index into `ExprArena::composites` — identifies a pooled
 /// [`crate::CompositeNode`] (the unified array / object / tuple
-/// container introduced when [`crate::expr::ExprOp::ObjectLit`] and
-/// [`crate::expr::ExprOp::ArrayLit`] were collapsed onto a single
+/// container introduced when the legacy `ObjectLit` and
+/// `ArrayLit` opcodes were collapsed onto a single
 /// [`crate::expr::ExprOp::Composite`] opcode).
 ///
 /// The same pool also backs the row form of `IN (a, b, c)` via

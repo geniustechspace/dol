@@ -117,9 +117,8 @@ fn check_binop(name: &str, tag: u16) -> Result<(), String> {
 }
 
 fn check_unary(name: &str, tag: u16) -> Result<(), String> {
-    let live = UnaryOp::try_from_u16(tag).ok_or_else(|| {
-        format!("UnaryOp::try_from_u16({tag}) returned None (expected `{name}`)")
-    })?;
+    let live = UnaryOp::try_from_u16(tag)
+        .ok_or_else(|| format!("UnaryOp::try_from_u16({tag}) returned None (expected `{name}`)"))?;
     let live_name = unary_variant_name(live);
     if live_name != name {
         return Err(format!(

@@ -9,7 +9,7 @@
 //! - **[`ExprNode`]** — a flat, 16-byte packed POD node. Tree
 //!   expressions are lowered into this form before rendering. The
 //!   layout is `op + flags + aux + a + b + c`; see the
-//!   [`expr`](crate::expr) module for the opcode menu, typed
+//!   [`expr`] module for the opcode menu, typed
 //!   constructors, and `as_*` accessors.
 //!
 //! # Cargo features

@@ -37,11 +37,7 @@ fn unwrap_query(p: &dol_ir::Program) -> &dol_expr::expr::QueryNode {
     match &p.operations[0] {
         dol_ir::Operation::Query(q) => {
             let body = q.node.expect("Query has arena body");
-            let qid = p
-                .arena
-                .get(body)
-                .as_query()
-                .expect("expected Query opcode");
+            let qid = p.arena.get(body).as_query().expect("expected Query opcode");
             p.arena.get_query(qid)
         }
         other => panic!("expected Operation::Query, got {other:?}"),

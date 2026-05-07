@@ -288,5 +288,11 @@ fn decode_rejects_unknown_opcode() {
     let mut reader = Reader::new(&buf);
     let mut budget = Budget::new(Limits::host());
     let err = ExprNode::decode(&mut reader, &mut budget).expect_err("invalid op must fail");
-    assert!(matches!(err, DecodeError::InvalidVariant { type_name: "ExprNode", .. }));
+    assert!(matches!(
+        err,
+        DecodeError::InvalidVariant {
+            type_name: "ExprNode",
+            ..
+        }
+    ));
 }

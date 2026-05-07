@@ -489,8 +489,7 @@ impl ExprArena {
         // so any nodes already allocated via the bulk path participate
         // in dedup from this point onward.
         let map = self.node_index.get_or_insert_with(|| {
-            let mut map: HashMap<ExprNode, NodeId> =
-                HashMap::with_capacity(self.nodes.len());
+            let mut map: HashMap<ExprNode, NodeId> = HashMap::with_capacity(self.nodes.len());
             for (idx, n) in self.nodes.iter().enumerate() {
                 if let Some(id) = NodeId::from_index(idx) {
                     map.entry(*n).or_insert(id);

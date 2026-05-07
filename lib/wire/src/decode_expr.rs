@@ -83,9 +83,8 @@ impl Decode for CompositeKind {
 impl Decode for CompositeNode {
     fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
         let kind = budget.descend(|b| CompositeKind::decode(reader, b))??;
-        let items = budget.descend(|b| {
-            smallvec::SmallVec::<[(Option<StrId>, NodeId); 4]>::decode(reader, b)
-        })??;
+        let items = budget
+            .descend(|b| smallvec::SmallVec::<[(Option<StrId>, NodeId); 4]>::decode(reader, b))??;
         Ok(CompositeNode { kind, items })
     }
 }
@@ -445,12 +444,12 @@ impl Decode for UnaryOp {
 
 // ─── ExprNode (16 B packed POD) ──────────────────────────────────────────────
 
-/// Mirror of the fixed-16-byte LE [`Encode`] for [`ExprNode`] in
-/// `encode_expr.rs`. Reads `op` (1 B), `flags` (1 B), `aux` (2 B LE),
-/// `a` (4 B LE), `b` (4 B LE), `c` (4 B LE), validates the opcode
-/// byte against [`ExprOp::from_u8`], and stores ids verbatim — the
-/// `ExprArena::decode` pass-2 enforces that they reference live pool
-/// slots.
+/// Mirror of the fixed-16-byte LE [`crate::encoder::Encode`] for
+/// [`ExprNode`] in `encode_expr.rs`. Reads `op` (1 B), `flags` (1 B),
+/// `aux` (2 B LE), `a` (4 B LE), `b` (4 B LE), `c` (4 B LE),
+/// validates the opcode byte against [`ExprOp::from_u8`], and stores
+/// ids verbatim — the `ExprArena::decode` pass-2 enforces that they
+/// reference live pool slots.
 ///
 /// Unknown opcodes surface as
 /// [`DecodeError::InvalidVariant { type_name: "ExprNode", … }`].

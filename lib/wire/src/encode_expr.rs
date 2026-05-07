@@ -389,8 +389,7 @@ impl Encode for ExprNode {
     fn encode(&self, w: &mut Writer<'_>, _b: &mut Budget) -> Result<(), EncodeError> {
         // Reject unknown opcodes at encode time so a corrupted
         // in-memory arena cannot quietly produce undecodable bytes.
-        let _ = ExprOp::from_u8(self.op)
-            .ok_or(EncodeError::Custom("ExprNode: unknown opcode"))?;
+        let _ = ExprOp::from_u8(self.op).ok_or(EncodeError::Custom("ExprNode: unknown opcode"))?;
         w.write_u8(self.op)?;
         w.write_u8(self.flags)?;
         w.write_bytes(&self.aux.to_le_bytes())?;
