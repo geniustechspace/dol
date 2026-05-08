@@ -10,17 +10,29 @@ readme = "README.md"
 # Hand-rolled (not `workspace = true`) so we can opt out of `dol-core`'s
 # default features and stay `no_std + alloc`-clean for embedded targets.
 dol-core = { path = "../core", default-features = false }
+# `dol-expr` is gated behind the `expr` feature: the catalog's `TypeEntry`
+# and `CatalogEntry::{Type,Extension}` variants intern their names as
+# `dol_expr::ids::StrId`. Schemas without backend-specific named types
+# (the common embedded case) can build without pulling in `dol-expr`.
+# `expr` is on by default to preserve the full catalog API.
+dol-expr = { path = "../expr", default-features = false, optional = true }
 serde    = { workspace = true, optional = true }
+smallvec = { workspace = true }
 
 [features]
-# `serde` is on by default: schema definitions are almost always serialized
-# (config files, wire envelopes, golden tests). Embedded users can opt out
-# with `default-features = false`.
-default = ["serde"]
-serde = ["dep:serde", "dol-core/serde"]
+# `serde` and `expr` are on by default: schema definitions are almost
+# always serialized (config files, wire envelopes, golden tests) and the
+# full catalog (named types + extensions) is the common shape. Embedded
+# users can opt out of either with `default-features = false`.
+default = ["serde", "expr"]
+# Reference `dol-expr` types from the catalog. Without this feature the
+# `TypeEntry` struct and the `CatalogEntry::{Type,Extension}` variants
+# are gated out; only `CatalogEntry::Entity` remains.
+expr = ["dep:dol-expr"]
+serde = ["dep:serde", "dol-core/serde", "dol-expr?/serde"]
 # `std`-aware build. The crate is `no_std + alloc` clean by default; this
 # feature only forwards `std` to `dol-core` for parity with `dol-expr`.
-std = ["dol-core/std"]
+std = ["dol-core/std", "dol-expr?/std"]
 
 [lints]
 workspace = true

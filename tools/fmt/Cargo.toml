@@ -8,7 +8,7 @@ description = "DOL — canonical pretty-printer for IR programs."
 readme = "README.md"
 
 [dependencies]
-dol-ir     = { workspace = true }
+dol-command     = { workspace = true }
 dol-schema = { workspace = true }
 dol-core   = { workspace = true }
 dol-expr   = { workspace = true }
@@ -16,7 +16,7 @@ dol-expr   = { workspace = true }
 [features]
 default = []
 serde   = [
-    "dol-ir/serde",
+    "dol-command/serde",
     "dol-schema/serde",
     "dol-core/serde",
     "dol-expr/serde",

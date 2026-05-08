@@ -58,7 +58,7 @@ DAG. Folder names drop the `dol-` prefix; **published package names keep it**.
 ```
 lib/        ── reusable libraries (depend only on each other)
 tools/      ── developer tools that consume the libraries
-backends/   ── concrete `dol_ir::Backend` implementations
+backends/   ── concrete `dol_command::backend::Backend` implementations
 xtask/      ── workspace task runner (not published)
 ```
 
@@ -66,12 +66,12 @@ xtask/      ── workspace task runner (not published)
 | ------------------------------------------------ | ---------------------------------------------------------------------------- |
 | [`lib/core`](lib/core/README.md) · `dol-core`        | Source spans, structured diagnostics, and the value/type system (`Value`, `Literal`, `DataType`, `Decimal`, …) |
 | [`lib/expr`](lib/expr/README.md) · `dol-expr`        | Composable expression AST (16 B packed `ExprNode`, arena, interner)          |
-| [`lib/schema`](lib/schema/README.md) · `dol-schema`  | Entities, fields, constraints, relations, lookups, policies                  |
-| [`lib/ir`](lib/ir/README.md) · `dol-ir`              | Canonical IR: `Statement`, `Program`, `Backend` trait, `BackendCapabilities` |
-| [`lib/pipeline`](lib/pipeline/README.md) · `dol-pipeline` | Source → Transform → Sink dataflow IR                                  |
-| [`lib/stream`](lib/stream/README.md) · `dol-stream`  | Streaming windows, watermarks, time-series, IoT/telemetry vocabulary         |
+| [`lib/schema`](lib/schema/README.md) · `dol-schema`  | Entities, fields, constraints, relations, lookups, policies, and the schema catalog (`SchemaRef`, `SchemaCatalog`, `TypeBody`) |
+| [`lib/command`](lib/command/README.md) · `dol-command` | Canonical IR: `Operation`, `Program`, `Backend` trait, `BackendCapabilities`, plus the DDL/ACL/Tx/storage builders |
 | [`lib/wire`](lib/wire/README.md) · `dol-wire`        | Canonical wire envelope, postcard / JSON codec helpers, BLAKE3 content hash  |
-| [`lib/query`](lib/query/README.md) · `dol-query`     | Fluent builder DSL → produces `dol-ir::Statement`                            |
+| [`lib/query`](lib/query/README.md) · `dol-query`     | Fluent query builder DSL → produces `dol_command::program::Program` |
+| [`lib/stream`](lib/stream/README.md) · `dol-stream`  | Streaming / time-series / IoT IR data types |
+| [`lib/pipeline`](lib/pipeline/README.md) · `dol-pipeline` | Declarative dataflow graph IR |
 | [`lib/dol`](lib/dol/README.md) · `dol`               | Umbrella facade with `core`, `full`, `iot-min` presets                       |
 | [`tools/check`](tools/check/README.md) · `dol-check` | Static validator (type / schema / capability / lint passes)                  |
 | [`tools/fmt`](tools/fmt/README.md) · `dol-fmt`       | Canonical pretty-printer for IR programs                                     |
@@ -79,22 +79,19 @@ xtask/      ── workspace task runner (not published)
 | [`xtask`](xtask/README.md)                           | Workspace task runner (size report, `no_std` check, doc build, README check) |
 
 ```
-lib/core ─┬─► lib/expr ────┐
-          ├─► lib/schema ──┴─► lib/ir ─┬─► lib/pipeline
-          └────────────────┘           ├─► lib/stream
-                                       ├─► lib/wire
-                                       ├─► lib/query
-                                       ├─► tools/check
-                                       ├─► tools/fmt
-                                       └─► backends/<store>
-                                              lib/dol  (umbrella)
+lib/core ─┬─► lib/expr ─────┬─► lib/query
+          ├─► lib/schema ───┴─► lib/command ─┬─► lib/wire
+          └─────────────────┬─► lib/stream   ├─► tools/check
+                            └─► lib/pipeline ├─► tools/fmt
+                                             └─► backends/<store>
+                                                    lib/dol (umbrella)
 ```
 
 Invariants enforced by the workspace structure:
 
 - Nothing under `lib/` may depend on `tools/` or `backends/`.
 - `tools/*` may depend on `lib/*` but not on each other or `backends/`.
-- `backends/*` depend only on `lib/ir` (+ optionally `lib/wire`).
+- `backends/*` depend only on `lib/command` (+ optionally `lib/wire`).
 - No crate depends on `lib/dol`; the umbrella is leaf consumer surface.
 
 ## Building
@@ -133,8 +130,8 @@ cargo run -p xtask -- readme
 | Topic                         | Document                                          |
 | ----------------------------- | ------------------------------------------------- |
 | Stability policy              | [`docs/STABILITY.md`](docs/STABILITY.md)          |
-| `dol-ir` reference            | [`docs/IR.md`](docs/IR.md)                        |
-| `dol-ir` design RFC           | [`docs/rfcs/0001-ir.md`](docs/rfcs/0001-ir.md)    |
+| `dol-command` reference       | [`docs/IR.md`](docs/IR.md)                        |
+| `dol-command` design RFC      | [`docs/rfcs/0001-ir.md`](docs/rfcs/0001-ir.md)    |
 | Expression / arena layer      | [`docs/expr.md`](docs/expr.md)                    |
 | Release notes                 | [`CHANGELOG.md`](CHANGELOG.md)                    |
 

@@ -7,23 +7,42 @@ description = "DOL Query — backend-neutral query entry point for any data sour
 readme = "README.md"
 
 [dependencies]
-dol-schema = { workspace = true }
+# `dol-schema` is gated behind the `schema` feature: queries can be built
+# from plain entity-name strings without any schema knowledge. The feature
+# is on by default to preserve the field-aware `Query::from(&Entity)` API.
+dol-schema = { workspace = true, optional = true }
 dol-expr   = { workspace = true }
-dol-ir     = { workspace = true }
 dol-core   = { workspace = true }
-smallvec   = { workspace = true }
 serde      = { workspace = true, optional = true }
 
+[dev-dependencies]
+# `dol-command` is a *dev*-only dep so the `dol-query` crate itself stays
+# independent of the IR layer in its consumer-facing surface (this is the
+# v2 DAG: `query` sits *below* `command`, not above it). The lowering that
+# turns the DSL builders into `Program`s lives in `dol_command::lower_query`,
+# and integration tests in `tests/` exercise that path. The `query` feature
+# pulls dol-query back in on dol-command's side.
+dol-command = { workspace = true, features = ["query"] }
+dol-schema  = { workspace = true }
+postcard    = { workspace = true }
+
 [features]
-default = []
-std = ["dol-core/std", "dol-expr/std", "dol-schema/std", "dol-ir/std"]
+default = ["schema"]
+# Reference `dol-schema` types (e.g. `Query::from(&Entity)`). Without this
+# feature `Query` is constructed from `&str` only and the crate does not
+# pull in `dol-schema`.
+schema = ["dep:dol-schema"]
+std = [
+    "dol-core/std",
+    "dol-expr/std",
+    "dol-schema?/std",
+]
 sql = []
 serde = [
     "dep:serde",
-    "dol-schema/serde",
-    "dol-ir/serde",
     "dol-core/serde",
     "dol-expr/serde",
+    "dol-schema?/serde",
 ]
 
 [lints]

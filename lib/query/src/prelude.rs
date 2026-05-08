@@ -1,26 +1,15 @@
 //! Curated re-exports for `dol-query`.
 //!
-//! This prelude includes the IR types accepted by `dol-query` public
-//! functions (`Privilege`, `IsolationLevel`, `PolicyScope`, `SchemaBinding`),
-//! so `use dol_query::prelude::*;` is sufficient for the documented examples
-//! without having to also import from `dol_ir`.
+//! `dol-query` is now a pure data crate and no longer re-exports from
+//! `dol-command`. The previously-available IR helpers (`define_entity`,
+//! `grant`, `tx_begin`, `read_file`, …) and IR types (`IsolationLevel`,
+//! `PolicyScope`, `Privilege`, `SchemaBinding`) live in
+//! `dol_command::builders` and `dol_command::prelude` respectively;
+//! import them directly from there. The lowering trait
+//! `dol_command::lower_query::BuildProgram` — which
+//! re-creates the historical chained `builder.try_build()` ergonomics —
+//! also lives in `dol-command`.
 
-pub use crate::control::{
-    define_policy, grant, revoke, tx_atomic, tx_begin, tx_commit, tx_rollback,
-};
-pub use crate::ddl::{
-    define_entity, define_entity_inferred, define_from_entity, define_lookup, drop_entity,
-    drop_field, drop_lookup, rename_field,
-};
-pub use crate::storage::{
-    get_blob, list_blobs, move_file, put_blob, put_blob_from_path, read_file, write_file,
-    write_file_from_path,
-};
-pub use crate::{DeleteQuery, GetQuery, InsertQuery, JoinKind, Query, UpdateQuery, UpsertQuery};
-
-// IR types referenced by the public `dol-query` surface.
-pub use dol_ir::{
-    operation::{IsolationLevel, PolicyScope},
-    privilege::Privilege,
-    target::SchemaBinding,
+pub use crate::{
+    DeleteQuery, GetQuery, InsertQuery, JoinClause, JoinKind, Query, UpdateQuery, UpsertQuery,
 };

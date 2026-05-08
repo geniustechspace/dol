@@ -1,4 +1,8 @@
 //! UPDATE query builder for `dol-query`.
+//!
+//! Pure data: lowering to a `dol_command::program::Program` is handled
+//! by [`dol_command::lower_query::lower_update`] (or via the
+//! [`BuildProgram`](dol_command::lower_query::BuildProgram) trait).
 
 use alloc::{
     string::{String, ToString},
@@ -15,14 +19,23 @@ use dol_expr::tree::{Expr, field_dyn};
 /// A composable UPDATE builder that works with any entity source.
 ///
 /// Construct via [`Query::from(...).update()`](crate::Query::update).
+///
+/// All fields are `pub` so the lowering host crate (`dol-command` with the
+/// `query` feature, default-on) can read them without going through
+/// accessors.
 #[derive(Debug, Clone)]
-#[must_use = "builders do nothing until .try_build() is called"]
+#[must_use = "builders do nothing until lowered to a Program"]
 pub struct UpdateQuery {
-    name: String,
-    namespace: Option<String>,
-    assignments: Vec<(String, Expr<'static>)>,
-    filters: Vec<Expr<'static>>,
-    returning: Vec<String>,
+    /// Target entity name (last dotted segment).
+    pub name: String,
+    /// Optional namespace prefix.
+    pub namespace: Option<String>,
+    /// Column-name → assignment-expression pairs.
+    pub assignments: Vec<(String, Expr<'static>)>,
+    /// Filter expressions; AND-joined when lowered.
+    pub filters: Vec<Expr<'static>>,
+    /// Column names to return (`*` for all).
+    pub returning: Vec<String>,
 }
 
 impl UpdateQuery {
@@ -84,77 +97,5 @@ impl UpdateQuery {
     pub fn returning(mut self, cols: &[&str]) -> Self {
         self.returning = cols.iter().map(|s| s.to_string()).collect();
         self
-    }
-
-    /// Build the arena-based IR as a [`dol_ir::Program`] containing a
-    /// single [`dol_ir::Operation::Update`] referencing an arena
-    /// `ExprNode` of opcode [`dol_expr::expr::ExprOp::Update`].
-    ///
-    /// Fallible: returns [`BuildError::SetValue`](crate::BuildError::SetValue) /
-    /// [`BuildError::Filter`](crate::BuildError::Filter) when lowering an assignment RHS or the WHERE
-    /// clause exhausts the default budget.
-    pub fn try_build(self) -> Result<dol_ir::Program, crate::BuildError> {
-        use dol_core::policy::{Budget, Limits};
-        use dol_expr::expr::UpdateNode;
-        use dol_expr::lower::{lower_expr_with_budget, lower_filters};
-        use dol_ir::TargetKind;
-        use dol_ir::operation::Update;
-
-        let mut arena = dol_expr::ExprArena::new();
-        let mut interner = dol_expr::Interner::new();
-        let mut budget = Budget::new(Limits::host());
-
-        let target_str = interner.intern(&dol_expr::lower::qualified_name(
-            &self.name,
-            &self.namespace,
-        ));
-
-        let mut columns: smallvec::SmallVec<[dol_expr::ids::StrId; 8]> = smallvec::SmallVec::new();
-        let mut values: smallvec::SmallVec<[dol_expr::ids::NodeId; 8]> = smallvec::SmallVec::new();
-        for (col, expr) in &self.assignments {
-            columns.push(interner.intern(col));
-            let nid = lower_expr_with_budget(expr, &mut arena, &mut interner, &mut budget)
-                .map_err(|cause| crate::BuildError::SetValue {
-                    column: col.clone(),
-                    cause,
-                })?;
-            values.push(nid);
-        }
-
-        let filter = lower_filters(&self.filters, &mut arena, &mut interner, &mut budget)
-            .map_err(crate::BuildError::Filter)?;
-
-        let returning: smallvec::SmallVec<[dol_expr::ids::NodeId; 4]> = self
-            .returning
-            .iter()
-            .map(|r| {
-                let col = interner.intern(r);
-                let fid = arena.alloc_field(dol_expr::FieldNode {
-                    namespace: None,
-                    name: col,
-                    steps: smallvec::SmallVec::new(),
-                });
-                arena.alloc_field_ref(fid)
-            })
-            .collect();
-
-        let unode = UpdateNode {
-            target: target_str,
-            columns,
-            values,
-            filter,
-            returning,
-        };
-        let uid = arena.alloc_update(unode);
-        let body = arena.alloc_update_ref(uid);
-
-        let target = crate::target::target_from_parts(
-            &mut interner,
-            TargetKind::Relation,
-            &self.name,
-            self.namespace.as_deref(),
-        );
-        let op: dol_ir::Operation = Update { target, node: body }.into();
-        Ok(dol_ir::Program::new(op, arena, interner))
     }
 }

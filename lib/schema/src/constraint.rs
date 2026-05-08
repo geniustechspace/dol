@@ -1,44 +1,23 @@
-//! Owned, serde-friendly schema constraint types.
-//!
-//! These types are the canonical home for `Entity` / `Field` constraints in
-//! the data-model layer. They use owned strings (`Arc<str>`) so they can
-//! implement `Deserialize` and survive round-trips through serde.
-//!
-//! `dol-schema` is the single owner of constraint types; `dol-ir` re-exports
-//! the names it needs to embed in DDL `Statement` variants.
+//! Schema-level field and entity constraint primitives.
 
 extern crate alloc;
+
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 /// Action to take when a referenced record is deleted or updated.
-///
-/// Each variant has a backend-by-backend mapping:
-///
-/// | Variant       | SQL                  | Document store          | Graph             |
-/// |---------------|----------------------|-------------------------|-------------------|
-/// | `Forbid`      | `NO ACTION`          | reject mutation         | reject deletion   |
-/// | `Cascade`     | `CASCADE`            | cascade write/delete    | cascade traversal |
-/// | `Detach`      | `SET NULL`           | clear referencing field | drop edge         |
-/// | `Reject`      | `RESTRICT`           | refuse mutation         | refuse deletion   |
-/// | `UseDefault`  | `SET DEFAULT`        | reset to schema default | reset to default  |
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum RefAction {
-    /// Reject the mutation outright; the reference is treated as a hard
-    /// invariant. Equivalent to `NO ACTION` in SQL.
+    /// Reject the mutation outright; equivalent to `NO ACTION` in SQL.
     Forbid,
     /// Propagate the mutation to all referencing records.
     Cascade,
-    /// Clear the referencing field on the dependent record. Equivalent to
-    /// `SET NULL` in SQL.
+    /// Clear the referencing field; equivalent to `SET NULL` in SQL.
     Detach,
-    /// Refuse the mutation if any referencing record exists. Equivalent to
-    /// `RESTRICT` in SQL — semantically narrower than [`Forbid`](Self::Forbid)
-    /// in that it forbids the mutation immediately rather than at commit time.
+    /// Refuse the mutation if any referencing record exists.
     Reject,
-    /// Reset the referencing field to its declared default. Equivalent to
-    /// `SET DEFAULT` in SQL.
+    /// Reset the referencing field to its declared default.
     UseDefault,
 }
 
@@ -46,16 +25,13 @@ pub enum RefAction {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum ComputedKind {
-    /// Materialized on write — the value is stored alongside the record and
-    /// recomputed only when its inputs change.
+    /// Materialized on write.
     Materialized,
-    /// Computed on demand — the value is recomputed every read; the field
-    /// occupies no storage of its own.
+    /// Computed on demand.
     OnDemand,
 }
 
-/// An inline relation reference on a single field — the dependent side of a
-/// directed link to another entity.
+/// An inline relation reference on a single field.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct RelationRef {
@@ -63,11 +39,14 @@ pub struct RelationRef {
     pub entity: Arc<str>,
     /// Target field within `entity`.
     pub field: Arc<str>,
+    /// Action to take when the referenced record is deleted.
     pub on_delete: RefAction,
+    /// Action to take when the referenced record is updated.
     pub on_update: RefAction,
 }
 
 impl RelationRef {
+    /// Build a `RelationRef` defaulted to `RefAction::Forbid`.
     pub fn new(entity: impl Into<Arc<str>>, field: impl Into<Arc<str>>) -> Self {
         Self {
             entity: entity.into(),
@@ -77,19 +56,20 @@ impl RelationRef {
         }
     }
 
+    /// Set the `on_delete` action.
     pub fn on_delete(mut self, action: RefAction) -> Self {
         self.on_delete = action;
         self
     }
 
+    /// Set the `on_update` action.
     pub fn on_update(mut self, action: RefAction) -> Self {
         self.on_update = action;
         self
     }
 }
 
-/// An entity-level constraint (composite uniqueness, multi-field relation,
-/// invariant expression, composite identity).
+/// An entity-level constraint.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum EntityConstraint {
@@ -97,15 +77,18 @@ pub enum EntityConstraint {
     Unique(Vec<Arc<str>>),
     /// A multi-field relation to another entity.
     Relation {
+        /// Local fields participating in the relation.
         fields: Vec<Arc<str>>,
+        /// Target entity name.
         ref_entity: Arc<str>,
+        /// Target fields within `ref_entity`.
         ref_fields: Vec<Arc<str>>,
+        /// Action to take when the referenced record is deleted.
         on_delete: RefAction,
     },
-    /// A boolean invariant expressed as text — every record must satisfy it.
+    /// A boolean invariant expressed as text.
     Invariant(Arc<str>),
-    /// Composite identity constraint — these fields uniquely identify an
-    /// entity instance.
+    /// Composite identity constraint.
     Identity(Vec<Arc<str>>),
 }
 
@@ -119,8 +102,7 @@ impl EntityConstraint {
         Self::Unique(fields.into_iter().map(Into::into).collect())
     }
 
-    /// Build an `Identity` constraint — the fields that uniquely identify an
-    /// entity instance.
+    /// Build an `Identity` constraint.
     pub fn identity<I, S>(fields: I) -> Self
     where
         I: IntoIterator<Item = S>,
@@ -129,8 +111,7 @@ impl EntityConstraint {
         Self::Identity(fields.into_iter().map(Into::into).collect())
     }
 
-    /// Build an `Invariant` constraint — a boolean expression every record
-    /// must satisfy.
+    /// Build an `Invariant` constraint.
     pub fn invariant(expr: impl Into<Arc<str>>) -> Self {
         Self::Invariant(expr.into())
     }
@@ -154,5 +135,21 @@ impl EntityConstraint {
             ref_fields: ref_fields.into_iter().map(Into::into).collect(),
             on_delete,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn relation_ref_builders() {
+        let r = RelationRef::new("users", "id")
+            .on_delete(RefAction::Cascade)
+            .on_update(RefAction::Detach);
+        assert_eq!(&*r.entity, "users");
+        assert_eq!(&*r.field, "id");
+        assert_eq!(r.on_delete, RefAction::Cascade);
+        assert_eq!(r.on_update, RefAction::Detach);
     }
 }

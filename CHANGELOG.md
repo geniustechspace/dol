@@ -7,6 +7,225 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Crate-boundary review follow-up (PR 11)
+
+- Re-extracted **`dol-stream`** and **`dol-pipeline`** as standalone crates.
+  `dol-query` is now only the fluent query DSL builders.
+- `dol-command::query_extensions::{stream,pipeline}` now depend on
+  `dol-stream` and `dol-pipeline` directly (instead of
+  `dol-query::{stream,pipeline}`).
+- Moved schema handle/constraint primitives (`SchemaRef`, `SchemaId`,
+  `CatalogId`, `TypeBody`, `ComputedKind`, `RefAction`, `RelationRef`,
+  `EntityConstraint`) out of `dol-core` and back into `dol-schema`.
+- Removed `dol-command`'s `schema` feature gate; `dol-schema` is now a
+  normal dependency of `dol-command`.
+- The `dol` umbrella now exposes `stream` and `pipeline` features/crate
+  re-exports again, and `query` includes them for compatibility.
+
+### Dependency-graph alignment (PR 7 + PR 8a + PR 9 + PR 10)
+
+All four DAG violations identified in the v2-layout audit are now fixed.
+The workspace dependency graph matches what's documented at the top of
+the root `Cargo.toml`: `core` ← `expr` ← `schema` ← `command`,
+`query` ← `core`/`expr`/gated `schema` (no `command` edge), and
+`command` ← gated `query` (replacing the historical reverse edge).
+
+#### `dol-query → dol-command` edge inverted (PR 10)
+
+The honest path described in the previous CHANGELOG entry — design a
+query-native plan that `dol-command` adapts — turned out not to be the
+cleanest option. The *invert-the-dependency* path is simpler and ends
+up at the same v2 DAG shape with fewer moving pieces:
+
+- `dol-query` is now a **pure data crate**. It owns the DSL builder
+  structs (`GetQuery`, `InsertQuery`, `UpdateQuery`, `DeleteQuery`,
+  `UpsertQuery`), the `JoinClause`/`JoinKind` types, and the streaming
+  / pipeline data (`WindowSpec`, `TimeSeriesOp`, `Sample`, `Graph`,
+  `Node`, …). The builder structs' fields and `Query.{name, namespace,
+  field_names}` are now `pub` so cross-crate lowering can read them
+  without going through accessors.
+- The lowering that turns a builder into a `dol_command::Program`
+  (formerly `try_build` methods on each builder) now lives in
+  `dol_command::lower_query`, behind a new default-on `query` feature
+  on `dol-command`. Free functions: `lower_get`, `lower_insert`,
+  `lower_update`, `lower_delete`, `lower_upsert`. A `BuildProgram`
+  trait re-creates the historical chained `builder.try_build()`
+  ergonomics — callers add `use dol_command::lower_query::BuildProgram;`
+  and the old call patterns work unchanged.
+- `BuildError` (formerly `dol_query::BuildError`) moved to
+  `dol_command::lower_query::BuildError`. The variants are unchanged
+  (`Filter`, `Having`, `Projection`, `GroupBy`, `OrderBy`, `SetValue`,
+  `JoinOn`).
+- The typed `OperationExtension` payload wrappers
+  (`WindowPayload`, `TimeSeriesPayload`, `SamplePayload`,
+  `PipelinePayload`) and their stable `Symbol` constants
+  (`WINDOW_SYMBOL`, `TIMESERIES_SYMBOL`, `IOT_SAMPLE_SYMBOL`,
+  pipeline `EXTENSION_SYMBOL`) moved to
+  `dol_command::query_extensions::{stream, pipeline}`. The wrappers
+  `impl ExtensionPayload` natively (the trait lives in `dol-command`),
+  so `OperationExtension::from_payload(&p).into_operation()` works
+  without any back-edge from `dol-query`.
+- `dol-query`'s prelude no longer re-exports anything from
+  `dol-command`. Consumers of the IR helpers and types
+  (`define_entity`, `tx_begin`, `IsolationLevel`, `PolicyScope`,
+  `Privilege`, `SchemaBinding`, …) import directly from
+  `dol_command::builders` and `dol_command::prelude`, where they
+  always lived.
+- `dol-query`'s `dol-command` runtime dep is gone; it's now a
+  *dev-dependency* with the `query` feature, used by the integration
+  tests in `lib/query/tests/integration.rs` (moved out of
+  `lib/query/src/tests.rs`; an inner `#[cfg(test)] mod tests;` would
+  have given the test binary a different `dol_query::GetQuery` type
+  than the one `dol-command`'s `BuildProgram` impl was compiled
+  against).
+- `cargo tree -p dol-query --edges normal` confirms zero
+  `dol-command` references. With the new `dol-command --features
+  query`, the graph is `command → query` only.
+- `dol`'s `query` feature now forwards `dol-command/query` so umbrella
+  consumers see the lowering surface.
+
+### Done previously in this cycle
+
+#### `dol-command`: `dol-schema` is now a default-on `schema` feature (PR 9)
+
+The blocker called out in the previous PR ("`SchemaRef` is everywhere in
+every Operation, and `Program.schema_catalog: SchemaCatalog` is a hard
+field — gating it would cascade through every backend/wire/check") is
+resolved by **relocating the small handle types into `dol-core`**:
+
+- New `dol_core::schema` module hosts the zero-dep handle / classifier
+  types: `SchemaRef`, `SchemaId`, `CatalogId`, `TypeBody`,
+  `ComputedKind`, `RefAction`, `RelationRef`, `EntityConstraint`. These
+  are pure newtypes and small enums — they don't pull in any of the
+  catalog *storage* (`SchemaCatalog`, `Entity`, `Field`, `DataType`)
+  that justifies `dol-schema` existing as a separate crate.
+- `dol-schema`'s `schema_ref.rs`, `type_body.rs`, and `constraint.rs`
+  are now thin re-export shims over `dol_core::schema`. The names
+  `dol_schema::SchemaRef` / `TypeBody` / `RefAction` / etc. continue to
+  resolve, so downstream callers see no change.
+- `dol-command` imports the handles from `dol-core::schema` everywhere
+  they appear in the IR (`Target`, `SchemaOp`, `FieldDef`,
+  `prelude.rs`). With handles relocated, the *only* remaining
+  `dol-schema` usages in `dol-command` are the catalog *storage*
+  (`Program.schema_catalog`, `define_from_entity` builder) and the
+  prelude re-exports of `SchemaCatalog`/`CatalogEntry`/`TypeEntry`.
+- `dol-schema` is now an optional `schema` feature on `dol-command`,
+  default-on. Without it: `Program.schema_catalog` field, the
+  `Program::with_catalog` constructor, the `ProgramRef.schema_catalog`
+  field, the `ExtendError::CatalogConflict` variant, the
+  `define_from_entity` builder, and the prelude re-exports of catalog
+  storage types are all `#[cfg]`-gated out.
+- `cargo tree -p dol-command --no-default-features` confirms
+  `dol-schema` is no longer in the dependency graph; only `dol-core`,
+  `dol-expr`, and `smallvec`.
+
+#### `dol-schema`: `dol-expr` is now a default-on `expr` feature (PR 7)
+
+- `dol-schema` previously hard-depended on `dol-expr` for the
+  `dol_expr::ids::StrId` type used in `TypeEntry` and
+  `CatalogEntry::{Type, Extension}`. The dep is now optional and gated
+  by a new `expr` feature (on by default).
+- With `--no-default-features`, `dol-schema` builds without
+  `dol-expr` in its dep tree (verified with `cargo tree`). The
+  `TypeEntry` struct and the `CatalogEntry::{Type, Extension}` variants
+  are gated out; only `CatalogEntry::Entity` remains.
+- `dol-wire` and `dol-command` opt into `dol-schema`'s `expr` feature
+  explicitly (they already depend on `dol-expr` directly), so the API
+  surface they see is unchanged.
+- The `dol` umbrella's `schema` feature now forwards `dol-schema?/expr`
+  so umbrella consumers also see the full catalog API.
+
+#### `dol-query`: `dol-schema` is now a default-on `schema` feature (PR 8a)
+
+- `dol-query` previously hard-depended on `dol-schema` for
+  `Query::from(&Entity)`. The dep is now optional and gated by a new
+  `schema` feature (on by default).
+- With `--no-default-features`, `dol-query` builds without referencing
+  `dol-schema` directly. `Query::from(&str)` works unconditionally;
+  `Query::from(&Entity)` requires the `schema` feature.
+- The doctest in `dol_query::lib`'s top-level docs is now split: the
+  `&str` half is unconditional, the `&Entity` half is gated behind
+  `#[cfg(feature = "schema")]`.
+
+### Crate rename: `dol-ir` → `dol-command`
+
+The IR crate has been renamed to **`dol-command`** to better reflect its
+scope: it is the universal command-language layer (Operation, Program,
+Backend, capability checks, plus the DDL/ACL/Tx/storage builders), not
+just an "intermediate representation".
+
+The directory moved from `lib/ir/` to `lib/command/`. The umbrella's
+`ir` feature has been renamed to `command`, and the umbrella now
+re-exports the crate as `dol::command`.
+
+#### Migration
+
+- `dol_ir::*` → `dol_command::*` everywhere.
+- `dol::ir::*` (umbrella) → `dol::command::*`.
+- `dol = { features = ["ir"] }` → `dol = { features = ["command"] }`.
+- `Cargo.toml`: `dol-ir = { workspace = true }` → `dol-command = { workspace = true }`.
+
+### Builder helpers moved: `dol-query` → `dol-command::builders`
+
+The DDL (`define_entity`, `define_index`, …), ACL/Tx (`grant`, `revoke`,
+`define_policy`, `tx_begin`, `tx_atomic`, …), and storage (`get_blob`,
+`put_blob`, `read_file`, `write_file`, …) helpers have been moved from
+`dol-query` into the new `dol_command::builders` module.
+
+These helpers construct IR directly without using the fluent query DSL,
+so they belong with the IR layer; `dol-query` keeps only the actual
+query builders (`GetQuery`, `InsertQuery`, `UpdateQuery`,
+`DeleteQuery`, `UpsertQuery`).
+
+**Note:** `dol_query::prelude` no longer re-exports builders from
+`dol-command`. Import them directly from `dol_command::builders`.
+
+#### Migration
+
+- `dol_query::define_entity` → `dol_command::builders::define_entity`.
+- `dol_query::ddl::*` / `dol_query::control::*` / `dol_query::storage::*`
+  modules — removed; import from `dol_command::builders::{ddl, control,
+  storage}` (or use the flat re-exports in `dol_command::builders`).
+
+### Crate re-extraction: `dol-stream` + `dol-pipeline` (standalone again)
+
+`dol-stream` and `dol-pipeline` are once again standalone workspace
+crates (they were briefly absorbed into `dol-query` and have now been
+re-extracted). Streaming / time-series / IoT types live in `dol-stream`;
+pipeline DAG types live in `dol-pipeline`. Both integrate with
+`dol_command::operation::Operation` via the `Extension` seam through
+typed payloads in `dol_command::query_extensions`.
+
+#### Migration
+
+- `dol_query::stream::WindowSpec` → `dol_stream::WindowSpec` (and
+  similarly for every other type).
+- `dol_query::pipeline::Graph` → `dol_pipeline::Graph`.
+- The `dol` umbrella re-exports `dol::stream` and `dol::pipeline`
+  behind the `stream` and `pipeline` features respectively.
+- The `iot-min` preset now pulls `stream` instead of `query`.
+
+### Removed
+
+- **`dol-stream`** and **`dol-pipeline`** workspace members — content
+  rehomed into `dol-query` (see above).
+- **`dol_command::schema_ref`** and **`dol_command::schema_catalog`**
+  modules (formerly under `dol_ir`) — moved to `dol_schema`
+  (`SchemaRef`, `SchemaId`, `CatalogId`, `SchemaCatalog`,
+  `CatalogEntry`, `TypeEntry`, `TypeBody`).
+- **`dol_command`'s flat `pub use` re-exports** at the crate root —
+  callers now import from the source module (e.g.
+  `dol_command::operation::Operation` instead of
+  `dol_command::Operation`, `dol_command::target::Symbol` instead of
+  `dol_command::Symbol`, `dol_schema::EntityConstraint` instead of
+  `dol_command::EntityConstraint`). The `dol_command::prelude`
+  re-export is unchanged for callers who want the flat surface.
+- **`dol_command::store` module** (`KvStore`, `Catalog`, `KvError`) —
+  premature abstraction: the KV-specific trait shape does not apply to
+  all backend families (SQL, graph, document, …). Will be reintroduced
+  when a concrete backend lands and the trait surface is informed by
+  real usage.
+
 ### Operator / expression tier lock-down
 
 A principled cut of what earns a slot in `BinOp` / `UnaryOp` / `ExprOp`

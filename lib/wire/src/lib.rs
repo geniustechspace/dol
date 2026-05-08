@@ -17,7 +17,7 @@
 //!
 //! With the `program` feature (auto-enabled by `postcard` and `json`), this
 //! crate exposes typed helpers in [`mod@program`] that target
-//! [`dol_ir::Program`] directly:
+//! [`dol_command::program::Program`] directly:
 //!
 //! - [`program::encode_postcard`] — postcard encode with wire envelope.
 //! - [`program::encode_json`] — JSON encode with wire envelope.

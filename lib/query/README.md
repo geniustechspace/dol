@@ -1,7 +1,7 @@
 # `dol-query`
 
-Backend-neutral fluent builder DSL for DOL. Produces `dol_ir::Statement`
-values that any `dol_ir::Backend` can compile.
+Backend-neutral fluent builder DSL for DOL. Produces query builder data
+that can be lowered to `dol_command::program::Program`.
 
 Unlike a low-level builder that requires a static `&Entity` reference,
 `dol-query` accepts **both** `Entity` references and plain entity-name
@@ -20,13 +20,13 @@ at runtime and no static schema definition exists.
 - `.upsert()` — DML upsert (with conflict resolution)
 
 Each verb returns a builder that exposes the relevant predicates,
-projections, joins, and limits, and terminates with `.try_build() -> Result<Program, BuildError>`.
+projections, joins, and limits.
 
 ## Features
 
 | feature | default | effect                                                         |
 | ------- | :-----: | -------------------------------------------------------------- |
-| `serde` |         | forwards `serde` to `dol-ir`, `dol-expr`, `dol-schema`, `dol-core` |
+| `serde` |         | forwards `serde` to `dol-expr`, `dol-schema`, `dol-core` |
 | `sql`   |         | reserved for future SQL-dialect-aware helpers                  |
 
 ## Example
@@ -35,16 +35,18 @@ projections, joins, and limits, and terminates with `.try_build() -> Result<Prog
 use dol_query::Query;
 use dol_schema::{Entity, Field, DataType};
 use dol_expr::tree::{field, param};
+use dol_command::lower_query::BuildProgram;
 
 let users = Entity::new("users", vec![
     Field::new("id", DataType::Uuid).identity(),
     Field::new("email", DataType::unbounded_string()),
 ]);
 
-let dol_ir::Program { stmt, interner, .. } = Query::from(&users)
+let program = Query::from(&users)
     .get()
     .filter(field("id").eq(param()))
-    .build();
+    .try_build()
+    .expect("example lowers");
 ```
 
 See the rustdoc for the full API.

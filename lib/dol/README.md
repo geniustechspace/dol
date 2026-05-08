@@ -11,21 +11,21 @@ need without pulling in the full dependency tree.
 | *(default)*  | `dol-core`     | Spans, diagnostics, and the value/type system (`Value`, `Literal`, `DataType`, …). |
 | `expr`       | `dol-expr`     | Expression arena + tree DSL.                               |
 | `schema`     | `dol-schema`   | Entities, fields, constraints, relations, lookups.         |
-| `ir`         | `dol-ir`       | `Statement`, `Program`, `Backend`, `BackendCapabilities`.  |
-| `pipeline`   | `dol-pipeline` | Source → Transform → Sink dataflow IR.                     |
-| `stream`     | `dol-stream`   | Windows, watermarks, time-series, IoT vocabulary.          |
+| `command`    | `dol-command`  | `Operation`, `Program`, `Backend`, `BackendCapabilities`, plus the DDL/ACL/Tx/storage builders. |
 | `wire`       | `dol-wire`     | Canonical wire envelope + postcard / JSON codec helpers.   |
 | `check`      | `dol-check`    | Static validator (type / schema / capability / lint).      |
 | `fmt`        | `dol-fmt`      | Canonical pretty-printer.                                  |
-| `query`      | `dol-query`    | Fluent builder DSL.                                        |
+| `query`      | `dol-query`    | Fluent query builder DSL. |
+| `stream`     | `dol-stream`   | Streaming / time-series / IoT IR data types. |
+| `pipeline`   | `dol-pipeline` | Declarative dataflow DAG IR. |
 
 ## Curated presets
 
-| Preset    | Layers                                        | Use case                                        |
-| --------- | --------------------------------------------- | ----------------------------------------------- |
-| `core`    | `expr + schema + ir + query`                  | "Full programs" build, no codecs / streaming    |
-| `full`    | every layer DOL ships                         | Library / tooling consumers                     |
-| `iot-min` | `expr + schema + ir + stream + wire/postcard` | Minimal IoT-edge slice (fits `thumbv7em` budget) |
+| Preset    | Layers                                            | Use case                                        |
+| --------- | ------------------------------------------------- | ----------------------------------------------- |
+| `core`    | `expr + schema + command + query + stream + pipeline` | "Full programs" build, no codecs |
+| `full`    | every layer DOL ships                             | Library / tooling consumers                     |
+| `iot-min` | `expr + schema + command + query + stream + pipeline + wire/postcard` | Minimal IoT-edge slice (fits `thumbv7em` budget) |
 
 The `iot-min` preset and the `no_std` leaves are verified in CI:
 

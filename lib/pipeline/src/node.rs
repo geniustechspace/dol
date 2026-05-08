@@ -3,7 +3,7 @@
 use dol_expr::ids::NodeId;
 use smallvec::SmallVec;
 
-use crate::schema::RowSchema;
+use super::schema::RowSchema;
 
 /// A node in the dataflow graph.
 #[derive(Debug, Clone, PartialEq)]

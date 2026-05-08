@@ -1,6 +1,6 @@
 //! Wire-format round-trip gate for `dol-wire`.
 //!
-//! `dol-wire` exposes typed [`dol_ir::Program`] codecs on top of the
+//! `dol-wire` exposes typed [`dol_command::program::Program`] codecs on top of the
 //! canonical wire envelope. v2 encode is `serde::Serialize`-based
 //! (postcard binary, JSON for human inspection); v2 decode is
 //! [`dol_wire::Decode`]-based (no `serde::Deserialize` involvement).
@@ -17,9 +17,11 @@
     clippy::arithmetic_side_effects
 )]
 
+use dol_command::operation::Operation;
+use dol_command::operation::{Insert, InsertSource};
+use dol_command::program::Program;
+use dol_command::target::{Locator, Symbol, Target, TargetKind};
 use dol_expr::{ExprArena, Interner};
-use dol_ir::operation::{Insert, InsertSource};
-use dol_ir::{Locator, Operation, Program, Symbol, Target, TargetKind};
 use dol_wire::program;
 
 fn sample_program() -> Program {

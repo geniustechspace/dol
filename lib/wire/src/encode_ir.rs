@@ -1,29 +1,29 @@
-//! [`Encode`] impls for `dol-ir`, `dol-schema`, and the top-level [`Program`].
+//! [`Encode`] impls for `dol-command`, `dol-schema`, and the top-level [`Program`].
 
 extern crate alloc;
 
-use dol_core::policy::Budget;
-use dol_ir::Program;
-use dol_ir::operation::acl::{
+use dol_command::operation::acl::{
     AuditEvent, AuditOp, AuditSink, Grant, MaskOp, PolicyOp, PolicyScope, QuotaKind, QuotaOp,
     Revoke,
 };
-use dol_ir::operation::ddl::{
+use dol_command::operation::ddl::{
     FieldDef, FieldOp, IndexDirection, IndexKey, IndexMethod, IndexOp, LookupMethod, LookupOp,
-    SchemaBody, SchemaOp, TypeBody,
+    SchemaBody, SchemaOp,
 };
-use dol_ir::operation::dml::{
+use dol_command::operation::dml::{
     Append, Delete, Insert, InsertSource, Replace, ReplaceBody, Update, Upsert,
 };
-use dol_ir::operation::dql::{Describe, DescribeFacet, Probe, Query};
-use dol_ir::operation::meta::{ExtensionId, OperationExtension};
-use dol_ir::operation::tx::{IsolationLevel, TxBegin, TxOp, TxOptions};
-use dol_ir::operation::{Operation, StructuralVerb};
-use dol_ir::privilege::Privilege;
-use dol_ir::schema_catalog::{CatalogEntry, SchemaCatalog, TypeEntry};
-use dol_ir::schema_ref::{CatalogId, SchemaId, SchemaRef};
-use dol_ir::target::{Locator, SchemaBinding, Symbol, Target, TargetKind};
+use dol_command::operation::dql::{Describe, DescribeFacet, Probe, Query};
+use dol_command::operation::meta::{ExtensionId, OperationExtension};
+use dol_command::operation::tx::{IsolationLevel, TxBegin, TxOp, TxOptions};
+use dol_command::operation::{Operation, StructuralVerb};
+use dol_command::privilege::Privilege;
+use dol_command::program::Program;
+use dol_command::target::{Locator, SchemaBinding, Symbol, Target, TargetKind};
+use dol_core::policy::Budget;
+use dol_schema::TypeBody;
 use dol_schema::constraint::{ComputedKind, EntityConstraint, RefAction, RelationRef};
+use dol_schema::{CatalogEntry, CatalogId, SchemaCatalog, SchemaId, SchemaRef, TypeEntry};
 use dol_schema::{Entity, Field};
 
 use crate::encoder::{Encode, EncodeError, Writer, encode_slice};
@@ -925,7 +925,7 @@ impl Encode for SchemaCatalog {
 // ─── Program ─────────────────────────────────────────────────────────────────
 
 #[cfg(feature = "raw")]
-impl Encode for dol_ir::operation::meta::RawOp {
+impl Encode for dol_command::operation::meta::RawOp {
     fn encode(&self, w: &mut Writer<'_>, b: &mut Budget) -> Result<(), EncodeError> {
         b.descend(|b| self.dialect.encode(w, b))??;
         b.descend(|b| self.body.encode(w, b))??;

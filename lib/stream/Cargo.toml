@@ -2,32 +2,19 @@
 name = "dol-stream"
 version.workspace = true
 edition.workspace = true
-rust-version.workspace = true
 publish = false
-description = "DOL — streaming, time-series, and IoT/telemetry IR extensions."
+description = "DOL stream/time-series/IoT IR data types"
 readme = "README.md"
 
 [dependencies]
-dol-core   = { workspace = true }
-dol-expr   = { workspace = true }
-dol-schema = { workspace = true }
-dol-ir     = { workspace = true }
-smallvec   = { workspace = true }
-serde      = { workspace = true, optional = true }
-postcard   = { workspace = true, optional = true }
+dol-core = { workspace = true }
+dol-expr = { workspace = true }
+serde = { workspace = true, optional = true }
 
 [features]
 default = []
-std     = ["dol-core/std", "dol-expr/std", "dol-schema/std", "dol-ir/std"]
-serde   = [
-    "dep:serde",
-    "dep:postcard",
-    "dol-core/serde",
-    "dol-expr/serde",
-    "dol-schema/serde",
-    "dol-ir/serde",
-    "smallvec/serde",
-]
+std = ["dol-core/std", "dol-expr/std"]
+serde = ["dep:serde", "dol-core/serde", "dol-expr/serde"]
 
 [lints]
 workspace = true

@@ -292,10 +292,10 @@ name = "dol"
 version = "0.2.0"
 dependencies = [
  "dol-check",
+ "dol-command",
  "dol-core",
  "dol-expr",
  "dol-fmt",
- "dol-ir",
  "dol-pipeline",
  "dol-query",
  "dol-schema",
@@ -307,11 +307,27 @@ dependencies = [
 name = "dol-check"
 version = "0.2.0"
 dependencies = [
+ "dol-command",
  "dol-core",
  "dol-expr",
- "dol-ir",
  "dol-schema",
  "serde",
+]
+
+[[package]]
+name = "dol-command"
+version = "0.2.0"
+dependencies = [
+ "dol-core",
+ "dol-expr",
+ "dol-pipeline",
+ "dol-query",
+ "dol-schema",
+ "dol-stream",
+ "postcard",
+ "serde",
+ "serde_json",
+ "smallvec",
 ]
 
 [[package]]
@@ -344,22 +360,10 @@ dependencies = [
 name = "dol-fmt"
 version = "0.2.0"
 dependencies = [
- "dol-core",
- "dol-expr",
- "dol-ir",
- "dol-schema",
-]
-
-[[package]]
-name = "dol-ir"
-version = "0.2.0"
-dependencies = [
+ "dol-command",
  "dol-core",
  "dol-expr",
  "dol-schema",
- "serde",
- "serde_json",
- "smallvec",
 ]
 
 [[package]]
@@ -368,9 +372,6 @@ version = "0.2.0"
 dependencies = [
  "dol-core",
  "dol-expr",
- "dol-ir",
- "dol-schema",
- "postcard",
  "serde",
  "smallvec",
 ]
@@ -379,12 +380,12 @@ dependencies = [
 name = "dol-query"
 version = "0.2.0"
 dependencies = [
+ "dol-command",
  "dol-core",
  "dol-expr",
- "dol-ir",
  "dol-schema",
+ "postcard",
  "serde",
- "smallvec",
 ]
 
 [[package]]
@@ -392,7 +393,9 @@ name = "dol-schema"
 version = "0.2.0"
 dependencies = [
  "dol-core",
+ "dol-expr",
  "serde",
+ "smallvec",
 ]
 
 [[package]]
@@ -401,11 +404,7 @@ version = "0.2.0"
 dependencies = [
  "dol-core",
  "dol-expr",
- "dol-ir",
- "dol-schema",
- "postcard",
  "serde",
- "smallvec",
 ]
 
 [[package]]
@@ -413,9 +412,9 @@ name = "dol-wire"
 version = "0.2.0"
 dependencies = [
  "bytemuck",
+ "dol-command",
  "dol-core",
  "dol-expr",
- "dol-ir",
  "dol-schema",
  "postcard",
  "serde",
@@ -1177,9 +1176,9 @@ dependencies = [
 name = "xtask"
 version = "0.2.0"
 dependencies = [
+ "dol-command",
  "dol-core",
  "dol-expr",
- "dol-ir",
 ]
 
 [[package]]

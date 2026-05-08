@@ -1,4 +1,8 @@
 //! INSERT query builder for `dol-query`.
+//!
+//! Pure data: lowering to a `dol_command::program::Program` is handled
+//! by [`dol_command::lower_query::lower_insert`] (or via the
+//! [`BuildProgram`](dol_command::lower_query::BuildProgram) trait).
 
 use alloc::{
     string::{String, ToString},
@@ -13,15 +17,28 @@ use alloc::{
 /// A composable INSERT builder that works with any entity source.
 ///
 /// Construct via [`Query::from(...).insert()`](crate::Query::insert).
+///
+/// All fields are `pub` so the lowering host crate (`dol-command` with the
+/// `query` feature, default-on) can read them without going through
+/// accessors.
 #[derive(Debug, Clone)]
-#[must_use = "builders do nothing until .try_build() is called"]
+#[must_use = "builders do nothing until lowered to a Program"]
 pub struct InsertQuery {
-    name: String,
-    namespace: Option<String>,
-    field_names: Option<Vec<String>>,
-    fields: Vec<String>,
-    row_count: usize,
-    returning: Vec<String>,
+    /// Target entity name (last dotted segment).
+    pub name: String,
+    /// Optional namespace prefix.
+    pub namespace: Option<String>,
+    /// Optional list of all field names (used as a default when
+    /// `fields` is empty).
+    pub field_names: Option<Vec<String>>,
+    /// Explicit columns to insert. When empty, falls back to
+    /// `field_names`.
+    pub fields: Vec<String>,
+    /// Number of value-tuples to emit (each tuple binds one
+    /// `Param` per field).
+    pub row_count: usize,
+    /// Column names to return (`*` for all).
+    pub returning: Vec<String>,
 }
 
 impl InsertQuery {
@@ -76,83 +93,5 @@ impl InsertQuery {
             self.fields.len()
         };
         field_count * self.row_count
-    }
-
-    /// Build the arena-based IR as a [`dol_ir::Program`] containing a
-    /// single [`dol_ir::Operation::Insert`] referencing an arena
-    /// `ExprNode` of opcode [`dol_expr::expr::ExprOp::Insert`].
-    ///
-    /// Infallible in current shape (the builder only allocates `Param`
-    /// placeholders), but returns `Result` for API consistency with the
-    /// other builders. Will gain real failure modes once user-supplied
-    /// VALUES expressions are supported.
-    pub fn try_build(self) -> Result<dol_ir::Program, crate::BuildError> {
-        use dol_expr::expr::InsertNode;
-        use dol_ir::TargetKind;
-        use dol_ir::operation::{Insert, InsertSource};
-
-        let mut arena = dol_expr::ExprArena::new();
-        let mut interner = dol_expr::Interner::new();
-
-        let fields = if self.fields.is_empty() {
-            self.field_names.unwrap_or_default()
-        } else {
-            self.fields
-        };
-
-        let target_str = interner.intern(&dol_expr::lower::qualified_name(
-            &self.name,
-            &self.namespace,
-        ));
-        let columns: smallvec::SmallVec<[dol_expr::ids::StrId; 8]> =
-            fields.iter().map(|f| interner.intern(f)).collect();
-
-        // Generate one Param node per field per row.
-        let mut values: smallvec::SmallVec<[dol_expr::ids::NodeId; 8]> = smallvec::SmallVec::new();
-        // `row_count * fields.len()` is bounded by the same constraints as
-        // `param_count`; not representable as overflow on 64-bit `usize`.
-        #[allow(clippy::arithmetic_side_effects)]
-        for _ in 0..(self.row_count * fields.len()) {
-            values.push(arena.alloc_param());
-        }
-
-        // Returning columns as field-reference expressions.
-        let returning: smallvec::SmallVec<[dol_expr::ids::NodeId; 4]> = self
-            .returning
-            .iter()
-            .map(|r| {
-                let col = interner.intern(r);
-                let fid = arena.alloc_field(dol_expr::FieldNode {
-                    namespace: None,
-                    name: col,
-                    steps: smallvec::SmallVec::new(),
-                });
-                arena.alloc_field_ref(fid)
-            })
-            .collect();
-
-        let inode = InsertNode {
-            target: target_str,
-            columns,
-            values,
-            returning,
-            conflict: None,
-        };
-        let iid = arena.alloc_insert(inode);
-        let body = arena.alloc_insert_ref(iid);
-
-        let target = crate::target::target_from_parts(
-            &mut interner,
-            TargetKind::Relation,
-            &self.name,
-            self.namespace.as_deref(),
-        );
-        let op: dol_ir::Operation = Insert {
-            target,
-            source: InsertSource::Node(body),
-            returning: None,
-        }
-        .into();
-        Ok(dol_ir::Program::new(op, arena, interner))
     }
 }

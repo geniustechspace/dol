@@ -4,36 +4,44 @@
 //! for DOL. Builders accept an [`Entity`] reference *or*
 //! a plain entity-name string; runtime-known names are first-class.
 //!
-//! Every `.try_build()` returns a [`dol_ir::Program`] containing one or more
-//! [`dol_ir::Operation`]s.
+//! `dol-query` is a **pure data** crate: it owns the fluent query DSL
+//! builder structs ([`GetQuery`], [`InsertQuery`], [`UpdateQuery`],
+//! [`DeleteQuery`], [`UpsertQuery`]). The lowering that turns those
+//! builders into a `dol_command::program::Program` lives in
+//! `dol_command::lower_query` (with `dol-command`'s default-on `query`
+//! feature). This split inverts the v1 `dol-query → dol-command` edge so
+//! that the workspace DAG (`command → query`, never the reverse) holds.
+//! Streaming / time-series / pipeline data lives in `dol-stream` and
+//! `dol-pipeline`.
 //!
 //! # Quick Start
 //!
 //! ```
+//! use dol_command::lower_query::{BuildProgram, lower_get};
 //! use dol_query::Query;
-//! use dol_schema::{DataType, Entity, Field};
 //! use dol_expr::tree::{field, param};
+//!
+//! # #[cfg(feature = "schema")]
+//! # {
+//! use dol_schema::{DataType, Entity, Field};
 //!
 //! let users = Entity::new("users", vec![
 //!     Field::new("id", DataType::Uuid).identity(),
 //!     Field::new("email", DataType::unbounded_string()),
 //! ]);
 //!
-//! // From an Entity — full field-aware API.
-//! let program = Query::from(&users)
+//! // From an Entity — full field-aware API (requires the `schema` feature).
+//! let q = Query::from(&users)
 //!     .get()
-//!     .filter(field("id").eq(param()))
-//!     .try_build()
-//!     .expect("doc example: trivial filter must lower");
-//! assert_eq!(program.operations[0].kind(), dol_ir::OpKind::Query);
+//!     .filter(field("id").eq(param()));
+//! let program = q.try_build().expect("doc example: trivial filter must lower");
+//! assert_eq!(program.operations[0].kind(), dol_command::operation::OpKind::Query);
+//! # }
 //!
-//! // From a plain string — no field metadata needed.
-//! let program = Query::from("users")
-//!     .get()
-//!     .fields(&["id", "email"])
-//!     .try_build()
-//!     .expect("doc example: trivial projection must lower");
-//! assert_eq!(program.operations[0].kind(), dol_ir::OpKind::Query);
+//! // From a plain string — no field metadata or `schema` feature needed.
+//! let q = Query::from("users").get().fields(&["id", "email"]);
+//! let program = lower_get(q).expect("doc example: trivial projection must lower");
+//! assert_eq!(program.operations[0].kind(), dol_command::operation::OpKind::Query);
 //! ```
 
 #![forbid(unsafe_code)]
@@ -51,40 +59,25 @@
 #![warn(missing_docs)]
 
 extern crate alloc;
-
-pub mod control;
-pub mod ddl;
-mod delete;
-mod error;
-mod get;
-mod insert;
-pub mod prelude;
-pub mod storage;
-mod target;
-mod update;
-mod upsert;
-
-pub use control::{define_policy, grant, revoke, tx_atomic, tx_begin, tx_commit, tx_rollback};
-pub use ddl::{
-    define_entity, define_entity_inferred, define_from_entity, define_index, define_lookup,
-    drop_entity, drop_field, drop_lookup, rename_field,
-};
-pub use delete::DeleteQuery;
-pub use error::BuildError;
-pub use get::GetQuery;
-pub use insert::InsertQuery;
-pub use storage::{
-    get_blob, list_blobs, move_file, put_blob, put_blob_from_path, read_file, write_file,
-    write_file_from_path,
-};
-pub use update::UpdateQuery;
-pub use upsert::UpsertQuery;
-
-use dol_schema::Entity;
-
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+
+mod delete;
+mod get;
+mod insert;
+pub mod prelude;
+mod update;
+mod upsert;
+
+pub use delete::DeleteQuery;
+pub use get::{GetQuery, JoinClause};
+pub use insert::InsertQuery;
+pub use update::UpdateQuery;
+pub use upsert::UpsertQuery;
+
+#[cfg(feature = "schema")]
+use dol_schema::Entity;
 
 // ---------------------------------------------------------------------------
 // Query — the universal entry point
@@ -95,11 +88,18 @@ use alloc::vec::Vec;
 /// Construct via `Query::from(&entity)` or `Query::from("entity_name")`.
 /// Then call `.get()`, `.insert()`, `.update()`, `.delete()`, or `.upsert()`
 /// to begin building a specific operation.
+///
+/// All fields are `pub` so the lowering host crate (`dol-command` with the
+/// `query` feature, default-on) and integration tests can read them.
 #[derive(Debug, Clone)]
 pub struct Query {
-    pub(crate) name: String,
-    pub(crate) namespace: Option<String>,
-    pub(crate) field_names: Option<Vec<String>>,
+    /// Last dotted segment of the source string (the entity name).
+    pub name: String,
+    /// Optional namespace prefix (everything before the last dotted segment).
+    pub namespace: Option<String>,
+    /// Optional list of all field names, populated when the `Query`
+    /// originated from an `Entity` (with the `schema` feature).
+    pub field_names: Option<Vec<String>>,
 }
 
 impl Query {
@@ -143,6 +143,7 @@ impl Query {
     }
 }
 
+#[cfg(feature = "schema")]
 impl From<&Entity> for Query {
     fn from(entity: &Entity) -> Self {
         Self {
@@ -190,6 +191,3 @@ pub enum JoinKind {
     /// `CROSS JOIN` — Cartesian product; no `ON` clause.
     Cross,
 }
-
-#[cfg(test)]
-mod tests;

@@ -11,19 +11,19 @@
 //! | *(default)*  | `dol-core`                     | Spans, diagnostics, and the value/type system (`Value`, `Literal`, `DataType`, …). |
 //! | `expr`       | `dol-expr`                     | Expression arena + tree DSL.                               |
 //! | `schema`     | `dol-schema`                   | Entities, fields, constraints, relations, lookups, policies. |
-//! | `ir`         | `dol-ir`                       | `Operation`, `Program`, `Backend`, `BackendCapabilities`.  |
-//! | `pipeline`   | `dol-pipeline`                 | Source → Transform → Sink dataflow IR.                     |
-//! | `stream`     | `dol-stream`                   | Windows, watermarks, time-series, IoT vocabulary.          |
+//! | `command`    | `dol-command`                  | `Operation`, `Program`, `Backend`, `BackendCapabilities`, plus the DDL/ACL/Tx/storage builders. |
 //! | `wire`       | `dol-wire`                     | Canonical wire envelope + postcard / JSON codec helpers.   |
 //! | `check`      | `dol-check`                    | Static validator (type / schema / capability / lint).      |
 //! | `fmt`        | `dol-fmt`                      | Canonical pretty-printer.                                  |
-//! | `query`      | `dol-query`                    | Fluent builder DSL.                                        |
+//! | `query`      | `dol-query`                    | Fluent query builder DSL. |
+//! | `stream`     | `dol-stream`                   | Streaming / time-series / IoT IR data types. |
+//! | `pipeline`   | `dol-pipeline`                 | Declarative dataflow DAG IR. |
 //!
 //! ## Curated presets
 //!
-//! - `core`    — `expr + schema + ir + query`.
+//! - `core`    — `expr + schema + command + query`.
 //! - `full`    — every layer DOL ships.
-//! - `iot-min` — minimal IoT-edge slice (core + IR + stream + postcard wire).
+//! - `iot-min` — minimal IoT-edge slice (core + command + query + postcard wire).
 //!
 //! ## Universal serde
 //!
@@ -51,14 +51,8 @@ pub use dol_expr as expr;
 #[cfg(feature = "schema")]
 pub use dol_schema as schema;
 
-#[cfg(feature = "ir")]
-pub use dol_ir as ir;
-
-#[cfg(feature = "pipeline")]
-pub use dol_pipeline as pipeline;
-
-#[cfg(feature = "stream")]
-pub use dol_stream as stream;
+#[cfg(feature = "command")]
+pub use dol_command as command;
 
 #[cfg(feature = "wire")]
 pub use dol_wire as wire;
@@ -72,6 +66,12 @@ pub use dol_fmt as fmt;
 #[cfg(feature = "query")]
 pub use dol_query as query;
 
+#[cfg(feature = "stream")]
+pub use dol_stream as stream;
+
+#[cfg(feature = "pipeline")]
+pub use dol_pipeline as pipeline;
+
 /// Curated re-export of the most commonly used items from every active layer.
 pub mod prelude {
     pub use crate::core::prelude::*;
@@ -82,9 +82,15 @@ pub mod prelude {
     #[cfg(feature = "schema")]
     pub use crate::schema::prelude::*;
 
-    #[cfg(feature = "ir")]
-    pub use crate::ir::prelude::*;
+    #[cfg(feature = "command")]
+    pub use crate::command::prelude::*;
 
     #[cfg(feature = "query")]
     pub use crate::query::prelude::*;
+
+    #[cfg(feature = "stream")]
+    pub use crate::stream::*;
+
+    #[cfg(feature = "pipeline")]
+    pub use crate::pipeline::*;
 }

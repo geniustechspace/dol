@@ -1,4 +1,4 @@
-//! [`Decode`] impls for `dol-ir`, `dol-schema`, and the top-level [`Program`].
+//! [`Decode`] impls for `dol-command`, `dol-schema`, and the top-level [`Program`].
 
 extern crate alloc;
 
@@ -6,29 +6,29 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use dol_core::policy::Budget;
-use dol_expr::ids::NodeId;
-use dol_ir::Program;
-use dol_ir::operation::acl::{
+use dol_command::operation::acl::{
     AuditEvent, AuditOp, AuditSink, Grant, MaskOp, PolicyOp, PolicyScope, QuotaKind, QuotaOp,
     Revoke,
 };
-use dol_ir::operation::ddl::{
+use dol_command::operation::ddl::{
     FieldDef, FieldOp, IndexDirection, IndexKey, IndexMethod, IndexOp, LookupMethod, LookupOp,
-    SchemaBody, SchemaOp, TypeBody,
+    SchemaBody, SchemaOp,
 };
-use dol_ir::operation::dml::{
+use dol_command::operation::dml::{
     Append, Delete, Insert, InsertSource, Replace, ReplaceBody, Update, Upsert,
 };
-use dol_ir::operation::dql::{Describe, DescribeFacet, Probe, Query};
-use dol_ir::operation::meta::{ExtensionId, OperationExtension};
-use dol_ir::operation::tx::{IsolationLevel, TxBegin, TxOp, TxOptions};
-use dol_ir::operation::{Operation, StructuralVerb};
-use dol_ir::privilege::Privilege;
-use dol_ir::schema_catalog::{CatalogEntry, SchemaCatalog, TypeEntry};
-use dol_ir::schema_ref::{CatalogId, SchemaId, SchemaRef};
-use dol_ir::target::{Locator, SchemaBinding, Symbol, Target, TargetKind};
+use dol_command::operation::dql::{Describe, DescribeFacet, Probe, Query};
+use dol_command::operation::meta::{ExtensionId, OperationExtension};
+use dol_command::operation::tx::{IsolationLevel, TxBegin, TxOp, TxOptions};
+use dol_command::operation::{Operation, StructuralVerb};
+use dol_command::privilege::Privilege;
+use dol_command::program::Program;
+use dol_command::target::{Locator, SchemaBinding, Symbol, Target, TargetKind};
+use dol_core::policy::Budget;
+use dol_expr::ids::NodeId;
+use dol_schema::TypeBody;
 use dol_schema::constraint::{ComputedKind, EntityConstraint, RefAction, RelationRef};
+use dol_schema::{CatalogEntry, CatalogId, SchemaCatalog, SchemaId, SchemaRef, TypeEntry};
 use dol_schema::{Entity, Field};
 
 use crate::decoder::{Decode, DecodeError, Reader};
@@ -1006,8 +1006,8 @@ impl Decode for Operation {
             }
             #[cfg(feature = "raw")]
             21 => {
-                let op =
-                    budget.descend(|b| dol_ir::operation::meta::RawOp::decode(reader, b))??;
+                let op = budget
+                    .descend(|b| dol_command::operation::meta::RawOp::decode(reader, b))??;
                 Ok(Operation::Raw(Box::new(op)))
             }
             seen => Err(DecodeError::InvalidVariant {
@@ -1021,12 +1021,12 @@ impl Decode for Operation {
 // ─── RawOp ───────────────────────────────────────────────────────────────────
 
 #[cfg(feature = "raw")]
-impl Decode for dol_ir::operation::meta::RawOp {
+impl Decode for dol_command::operation::meta::RawOp {
     fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
         let dialect = budget.descend(|b| Option::<Symbol>::decode(reader, b))??;
         let body = budget.descend(|b| String::decode(reader, b))??;
         let params = budget.descend(|b| smallvec::SmallVec::<[NodeId; 4]>::decode(reader, b))??;
-        Ok(dol_ir::operation::meta::RawOp {
+        Ok(dol_command::operation::meta::RawOp {
             dialect,
             body,
             params,
@@ -1126,10 +1126,10 @@ impl Decode for Entity {
 
 impl Decode for TypeEntry {
     fn decode(reader: &mut Reader<'_>, budget: &mut Budget) -> Result<Self, DecodeError> {
-        let name = budget.descend(|b| Symbol::decode(reader, b))??;
+        let name = budget.descend(|b| dol_expr::ids::StrId::decode(reader, b))??;
         let kind = budget.descend(|b| TypeBody::decode(reader, b))??;
-        let members =
-            budget.descend(|b| smallvec::SmallVec::<[Symbol; 4]>::decode(reader, b))??;
+        let members = budget
+            .descend(|b| smallvec::SmallVec::<[dol_expr::ids::StrId; 4]>::decode(reader, b))??;
         Ok(TypeEntry {
             name,
             kind,
@@ -1150,7 +1150,7 @@ impl Decode for CatalogEntry {
                 Ok(CatalogEntry::Type(type_entry))
             }
             2 => {
-                let kind = budget.descend(|b| Symbol::decode(reader, b))??;
+                let kind = budget.descend(|b| dol_expr::ids::StrId::decode(reader, b))??;
                 let payload = budget.descend(|b| Vec::<u8>::decode(reader, b))??;
                 Ok(CatalogEntry::Extension { kind, payload })
             }

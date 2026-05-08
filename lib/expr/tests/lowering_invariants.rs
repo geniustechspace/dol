@@ -3,7 +3,7 @@
 //! the public API.
 //!
 //! These complement (not replace) the larger end-to-end tests that live
-//! in `dol-ir` and downstream backends, by isolating regressions to the
+//! in `dol-command` and downstream backends, by isolating regressions to the
 //! specific lowering rule that fired.
 
 #![allow(
