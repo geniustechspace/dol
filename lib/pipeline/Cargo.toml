@@ -1,0 +1,21 @@
+[package]
+name = "dol-pipeline"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "DOL declarative dataflow pipeline IR"
+readme = "README.md"
+
+[dependencies]
+dol-core = { workspace = true }
+dol-expr = { workspace = true }
+smallvec = { workspace = true }
+serde = { workspace = true, optional = true }
+
+[features]
+default = []
+std = ["dol-core/std", "dol-expr/std"]
+serde = ["dep:serde", "dol-core/serde", "dol-expr/serde", "smallvec/serde"]
+
+[lints]
+workspace = true

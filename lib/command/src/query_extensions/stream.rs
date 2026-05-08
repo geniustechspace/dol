@@ -1,6 +1,6 @@
-//! Typed [`ExtensionPayload`] wrappers for `dol_query::stream`.
+//! Typed [`ExtensionPayload`] wrappers for `dol_stream`.
 //!
-//! `dol_query::stream` exposes three streaming verbs through the
+//! `dol_stream` exposes three streaming verbs through the
 //! `Operation::Extension` seam, each as its own typed payload:
 //!
 //! | Identifier               | Payload struct            | Carries        |
@@ -21,7 +21,7 @@ use alloc::vec::Vec;
 use crate::operation::{ExtensionId, ExtensionPayload, Operation, OperationExtension};
 use crate::target::Symbol;
 
-use dol_query::stream::{Sample, TimeSeriesOp, WindowSpec};
+use dol_stream::{Sample, TimeSeriesOp, WindowSpec};
 
 /// Stable extension name for the windowing payload.
 pub const WINDOW_NAME: &str = "dol.stream/window";

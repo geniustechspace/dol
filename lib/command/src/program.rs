@@ -1,10 +1,9 @@
 //! [`Program`] — a sequence of [`Operation`]s paired with the expression
-//! arena, interner, and (optional) schema catalog.
+//! arena, interner, and schema catalog.
 
 extern crate alloc;
 
 use crate::operation::Operation;
-#[cfg(feature = "schema")]
 use dol_schema::SchemaCatalog;
 
 /// A compiled DOL program: a sequence of [`Operation`]s plus the expression
@@ -37,12 +36,6 @@ pub struct Program {
     pub interner: dol_expr::Interner,
     /// Optional schema catalog. `None` means schemas are addressed solely
     /// through `SchemaBinding::Inferred` / `Opaque`.
-    ///
-    /// Only present when the crate is built with `feature = "schema"`.
-    /// Without it, programs cannot embed a catalog body and must address
-    /// schemas via [`SchemaBinding::Inferred`](crate::target::SchemaBinding::Inferred)
-    /// or [`SchemaBinding::Opaque`](crate::target::SchemaBinding::Opaque).
-    #[cfg(feature = "schema")]
     pub schema_catalog: Option<SchemaCatalog>,
 }
 
@@ -54,7 +47,6 @@ impl Program {
             operations: alloc::vec![op],
             arena,
             interner,
-            #[cfg(feature = "schema")]
             schema_catalog: None,
         }
     }
@@ -75,15 +67,11 @@ impl Program {
             operations: ops,
             arena,
             interner,
-            #[cfg(feature = "schema")]
             schema_catalog: None,
         }
     }
 
     /// Replace / set the schema catalog.
-    ///
-    /// Only available with `feature = "schema"`.
-    #[cfg(feature = "schema")]
     pub fn with_catalog(mut self, catalog: SchemaCatalog) -> Self {
         self.schema_catalog = Some(catalog);
         self
@@ -104,7 +92,7 @@ impl Program {
     ///
     /// At least one side must be **arena/interner-empty** — i.e. its
     /// `arena.len() == 0` and `interner.len() == 0`. This covers every
-    /// helper in `dol_query::control` that produces a control-only
+    /// helper in `dol_command::builders::control` that produces a control-only
     /// `Program` (`tx_begin`, `tx_commit`, plain `tx_rollback` whose
     /// interner stays empty when the catalog supplies no savepoint label).
     ///
@@ -113,7 +101,7 @@ impl Program {
     /// `Operation` variant); when the IR shape lands as a unified `WriteBody`
     /// (Stage 2 follow-up PR) we can lift that restriction. Until then,
     /// prefer [`crate::operation::TxOp::Atomic`] (composed via
-    /// `dol_query::control::tx_atomic`) for combining DML payloads.
+    /// `dol_command::builders::control::tx_atomic`) for combining DML payloads.
     ///
     /// At most one side may carry a [`SchemaCatalog`]. Merging two populated
     /// catalogs would require entry-level conflict resolution that is out of
@@ -166,7 +154,6 @@ impl Program {
             mut operations,
             arena,
             interner,
-            #[cfg(feature = "schema")]
             schema_catalog,
         } = other;
         if self_empty {
@@ -174,14 +161,11 @@ impl Program {
             self.arena = arena;
             self.interner = interner;
         }
-        #[cfg(feature = "schema")]
-        {
-            if self.schema_catalog.is_some() && schema_catalog.is_some() {
-                return Err(ExtendError::CatalogConflict);
-            }
-            if self.schema_catalog.is_none() {
-                self.schema_catalog = schema_catalog;
-            }
+        if self.schema_catalog.is_some() && schema_catalog.is_some() {
+            return Err(ExtendError::CatalogConflict);
+        }
+        if self.schema_catalog.is_none() {
+            self.schema_catalog = schema_catalog;
         }
         self.operations.append(&mut operations);
         Ok(self)
@@ -199,7 +183,7 @@ impl Program {
 pub enum ExtendError {
     /// Both programs carry arena nodes or interned strings; id remapping
     /// is not yet implemented. Use [`crate::operation::TxOp::Atomic`]
-    /// (composed via `dol_query::control::tx_atomic`) for combining DML
+    /// (composed via `dol_command::builders::control::tx_atomic`) for combining DML
     /// payloads.
     ArenaConflict {
         /// `self.arena.len()` at the time of the failed call.
@@ -214,9 +198,6 @@ pub enum ExtendError {
     /// Both programs carry a populated `schema_catalog`; merging two
     /// catalogs would require entry-level conflict resolution that is out
     /// of scope for this composition primitive.
-    ///
-    /// Only emitted when the crate is built with `feature = "schema"`.
-    #[cfg(feature = "schema")]
     CatalogConflict,
 }
 
@@ -235,7 +216,6 @@ impl core::fmt::Display for ExtendError {
                  other.arena={other_arena}, other.interner={other_interner}); id \
                  remapping is not yet implemented"
             ),
-            #[cfg(feature = "schema")]
             Self::CatalogConflict => {
                 f.write_str("Program::extend: both programs carry a populated schema_catalog")
             }

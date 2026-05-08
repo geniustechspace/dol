@@ -15,15 +15,17 @@ need without pulling in the full dependency tree.
 | `wire`       | `dol-wire`     | Canonical wire envelope + postcard / JSON codec helpers.   |
 | `check`      | `dol-check`    | Static validator (type / schema / capability / lint).      |
 | `fmt`        | `dol-fmt`      | Canonical pretty-printer.                                  |
-| `query`      | `dol-query`    | Fluent query builder DSL, plus the streaming / pipeline / IoT IR (formerly the separate `dol-stream` and `dol-pipeline` crates). |
+| `query`      | `dol-query`    | Fluent query builder DSL. |
+| `stream`     | `dol-stream`   | Streaming / time-series / IoT IR data types. |
+| `pipeline`   | `dol-pipeline` | Declarative dataflow DAG IR. |
 
 ## Curated presets
 
 | Preset    | Layers                                            | Use case                                        |
 | --------- | ------------------------------------------------- | ----------------------------------------------- |
-| `core`    | `expr + schema + command + query`                 | "Full programs" build, no codecs / streaming    |
+| `core`    | `expr + schema + command + query + stream + pipeline` | "Full programs" build, no codecs |
 | `full`    | every layer DOL ships                             | Library / tooling consumers                     |
-| `iot-min` | `expr + schema + command + query + wire/postcard` | Minimal IoT-edge slice (fits `thumbv7em` budget) |
+| `iot-min` | `expr + schema + command + query + stream + pipeline + wire/postcard` | Minimal IoT-edge slice (fits `thumbv7em` budget) |
 
 The `iot-min` preset and the `no_std` leaves are verified in CI:
 

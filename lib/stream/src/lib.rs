@@ -15,8 +15,20 @@
 //! seam through the typed payloads in
 //! `dol_command::query_extensions::stream` (`WindowPayload`,
 //! `TimeSeriesPayload`, `SamplePayload`) and are validated by `dol-check`.
-//! Hosting the payload wrappers on the `dol-command` side preserves the
-//! v2 dependency graph (`command → query`, never the reverse).
+
+#![cfg_attr(not(feature = "std"), no_std)]
+#![forbid(unsafe_code)]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::arithmetic_side_effects
+    )
+)]
+#![warn(missing_docs)]
 
 pub mod iot;
 pub mod timeseries;

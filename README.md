@@ -69,7 +69,9 @@ xtask/      ── workspace task runner (not published)
 | [`lib/schema`](lib/schema/README.md) · `dol-schema`  | Entities, fields, constraints, relations, lookups, policies, and the schema catalog (`SchemaRef`, `SchemaCatalog`, `TypeBody`) |
 | [`lib/command`](lib/command/README.md) · `dol-command` | Canonical IR: `Operation`, `Program`, `Backend` trait, `BackendCapabilities`, plus the DDL/ACL/Tx/storage builders |
 | [`lib/wire`](lib/wire/README.md) · `dol-wire`        | Canonical wire envelope, postcard / JSON codec helpers, BLAKE3 content hash  |
-| [`lib/query`](lib/query/README.md) · `dol-query`     | Fluent query builder DSL → produces `dol_command::program::Program`; also hosts the streaming / pipeline / IoT IR (formerly `dol-stream` and `dol-pipeline`) |
+| [`lib/query`](lib/query/README.md) · `dol-query`     | Fluent query builder DSL → produces `dol_command::program::Program` |
+| [`lib/stream`](lib/stream/README.md) · `dol-stream`  | Streaming / time-series / IoT IR data types |
+| [`lib/pipeline`](lib/pipeline/README.md) · `dol-pipeline` | Declarative dataflow graph IR |
 | [`lib/dol`](lib/dol/README.md) · `dol`               | Umbrella facade with `core`, `full`, `iot-min` presets                       |
 | [`tools/check`](tools/check/README.md) · `dol-check` | Static validator (type / schema / capability / lint passes)                  |
 | [`tools/fmt`](tools/fmt/README.md) · `dol-fmt`       | Canonical pretty-printer for IR programs                                     |
@@ -77,14 +79,12 @@ xtask/      ── workspace task runner (not published)
 | [`xtask`](xtask/README.md)                           | Workspace task runner (size report, `no_std` check, doc build, README check) |
 
 ```
-lib/core ─┬─► lib/expr ─────┐
+lib/core ─┬─► lib/expr ─────┬─► lib/query
           ├─► lib/schema ───┴─► lib/command ─┬─► lib/wire
-          └─────────────────┘                ├─► lib/query  (absorbs former
-                                             │              lib/stream + lib/pipeline)
-                                             ├─► tools/check
-                                             ├─► tools/fmt
+          └─────────────────┬─► lib/stream   ├─► tools/check
+                            └─► lib/pipeline ├─► tools/fmt
                                              └─► backends/<store>
-                                                    lib/dol  (umbrella)
+                                                    lib/dol (umbrella)
 ```
 
 Invariants enforced by the workspace structure:

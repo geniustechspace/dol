@@ -15,7 +15,9 @@
 //! | `wire`       | `dol-wire`                     | Canonical wire envelope + postcard / JSON codec helpers.   |
 //! | `check`      | `dol-check`                    | Static validator (type / schema / capability / lint).      |
 //! | `fmt`        | `dol-fmt`                      | Canonical pretty-printer.                                  |
-//! | `query`      | `dol-query`                    | Fluent query builder DSL, plus the streaming / pipeline / IoT IR (formerly the separate `dol-stream` and `dol-pipeline` crates). |
+//! | `query`      | `dol-query`                    | Fluent query builder DSL. |
+//! | `stream`     | `dol-stream`                   | Streaming / time-series / IoT IR data types. |
+//! | `pipeline`   | `dol-pipeline`                 | Declarative dataflow DAG IR. |
 //!
 //! ## Curated presets
 //!
@@ -64,6 +66,12 @@ pub use dol_fmt as fmt;
 #[cfg(feature = "query")]
 pub use dol_query as query;
 
+#[cfg(feature = "stream")]
+pub use dol_stream as stream;
+
+#[cfg(feature = "pipeline")]
+pub use dol_pipeline as pipeline;
+
 /// Curated re-export of the most commonly used items from every active layer.
 pub mod prelude {
     pub use crate::core::prelude::*;
@@ -79,4 +87,10 @@ pub mod prelude {
 
     #[cfg(feature = "query")]
     pub use crate::query::prelude::*;
+
+    #[cfg(feature = "stream")]
+    pub use crate::stream::*;
+
+    #[cfg(feature = "pipeline")]
+    pub use crate::pipeline::*;
 }

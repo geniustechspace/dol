@@ -4,12 +4,10 @@
 # DAG. The folder layout intentionally drops the `dol-` prefix; published
 # package names keep it.
 #
-#   lib/core ──┬──► lib/expr ──┐
+#   lib/core ──┬──► lib/expr ──┬──► lib/query
 #              ├──► lib/schema ┴──► lib/command ──┬──► lib/wire
-#              └──────────────────┘               ├──► lib/query  (absorbs former
-#                                                 │                lib/stream + lib/pipeline)
-#                                                 ├──► tools/check
-#                                                 ├──► tools/fmt
+#              └──────────────────┬──► lib/stream ├──► tools/check
+#                                 └──► lib/pipeline│   tools/fmt
 #                                                 └──► backends/<store>
 #
 #   lib/dol  (umbrella; depends on the layers above; no crate depends on it)
@@ -106,6 +104,8 @@ dol-schema   = { path = "lib/schema" }
 dol-command  = { path = "lib/command" }
 dol-wire     = { path = "lib/wire" }
 dol-query    = { path = "lib/query" }
+dol-stream   = { path = "lib/stream" }
+dol-pipeline = { path = "lib/pipeline" }
 dol-check    = { path = "tools/check" }
 dol-fmt      = { path = "tools/fmt" }
 dol          = { path = "lib/dol" }

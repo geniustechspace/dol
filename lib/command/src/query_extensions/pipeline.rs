@@ -1,4 +1,4 @@
-//! Typed [`ExtensionPayload`] wrapper for `dol_query::pipeline`.
+//! Typed [`ExtensionPayload`] wrapper for `dol_pipeline`.
 //!
 //! Wraps a [`Graph`] into an [`OperationExtension`](crate::operation::OperationExtension)
 //! under the stable identifier `dol.pipeline/graph` (version 1). Encoded
@@ -12,7 +12,7 @@ use alloc::vec::Vec;
 use crate::operation::{ExtensionId, ExtensionPayload, Operation};
 use crate::target::Symbol;
 
-use dol_query::pipeline::Graph;
+use dol_pipeline::Graph;
 
 /// Stable extension name.
 pub const EXTENSION_NAME: &str = "dol.pipeline/graph";

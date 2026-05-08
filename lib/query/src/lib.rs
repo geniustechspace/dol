@@ -4,14 +4,15 @@
 //! for DOL. Builders accept an [`Entity`] reference *or*
 //! a plain entity-name string; runtime-known names are first-class.
 //!
-//! `dol-query` is a **pure data** crate: it owns the DSL builder structs
-//! ([`GetQuery`], [`InsertQuery`], [`UpdateQuery`], [`DeleteQuery`],
-//! [`UpsertQuery`]) and the streaming / pipeline data types under
-//! [`stream`] and [`pipeline`]. The lowering that turns those builders
-//! into a `dol_command::program::Program` lives in
+//! `dol-query` is a **pure data** crate: it owns the fluent query DSL
+//! builder structs ([`GetQuery`], [`InsertQuery`], [`UpdateQuery`],
+//! [`DeleteQuery`], [`UpsertQuery`]). The lowering that turns those
+//! builders into a `dol_command::program::Program` lives in
 //! `dol_command::lower_query` (with `dol-command`'s default-on `query`
 //! feature). This split inverts the v1 `dol-query → dol-command` edge so
 //! that the workspace DAG (`command → query`, never the reverse) holds.
+//! Streaming / time-series / pipeline data lives in `dol-stream` and
+//! `dol-pipeline`.
 //!
 //! # Quick Start
 //!
@@ -65,9 +66,7 @@ use alloc::vec::Vec;
 mod delete;
 mod get;
 mod insert;
-pub mod pipeline;
 pub mod prelude;
-pub mod stream;
 mod update;
 mod upsert;
 

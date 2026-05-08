@@ -19,6 +19,8 @@ dol-wire     = { workspace = true, optional = true }
 dol-check    = { workspace = true, optional = true }
 dol-fmt      = { workspace = true, optional = true }
 dol-query    = { workspace = true, optional = true }
+dol-stream   = { workspace = true, optional = true }
+dol-pipeline = { workspace = true, optional = true }
 
 [features]
 default = []
@@ -34,16 +36,20 @@ std = [
     "dol-command?/std",
     "dol-wire?/std",
     "dol-query?/std",
+    "dol-stream?/std",
+    "dol-pipeline?/std",
 ]
 
 # ── Individual layers ────────────────────────────────────────────────────────
 expr     = ["dep:dol-expr"]
 schema   = ["dep:dol-schema", "expr", "dol-schema?/expr"]
-command  = ["dep:dol-command", "expr", "schema", "dol-command?/schema"]
+command  = ["dep:dol-command", "expr", "schema"]
 wire     = ["dep:dol-wire", "command"]
 check    = ["dep:dol-check", "command"]
 fmt      = ["dep:dol-fmt", "command"]
-query    = ["dep:dol-query", "command", "dol-command?/query"]
+query    = ["dep:dol-query", "command", "dol-command?/query", "stream", "pipeline"]
+stream   = ["dep:dol-stream", "expr"]
+pipeline = ["dep:dol-pipeline", "expr"]
 
 # ── Granular dol-core features (default-on in dol-core itself) ───────────────
 # These pass-throughs let umbrella consumers add or omit dol-core variant
@@ -58,13 +64,13 @@ numeric  = ["dol-core/numeric"]
 # Just the language: types + expr + schema + command + builders. No
 # streaming, no codecs, no diagnostics renderer. Smallest sensible "full
 # programs" build.
-core     = ["expr", "schema", "command", "query"]
+core     = ["expr", "schema", "command", "query", "stream", "pipeline"]
 
 # Everything DOL ships today.
 full     = [
     "expr", "schema", "command",
     "wire", "check", "fmt",
-    "query",
+    "query", "stream", "pipeline",
     "geo", "network", "datetime", "numeric",
 ]
 
@@ -76,7 +82,7 @@ full     = [
 # exercise the granular dol-core gates.
 iot-min  = [
     "expr", "schema", "command",
-    "query",
+    "query", "stream", "pipeline",
     "wire",
     "dol-wire/postcard",
     "dol-wire/serde",
@@ -92,6 +98,8 @@ serde    = [
     "dol-wire?/serde",
     "dol-check?/serde",
     "dol-query?/serde",
+    "dol-stream?/serde",
+    "dol-pipeline?/serde",
 ]
 
 [lints]

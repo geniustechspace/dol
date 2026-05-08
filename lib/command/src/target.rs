@@ -9,7 +9,7 @@
 
 use smallvec::SmallVec;
 
-use dol_core::schema::SchemaRef;
+use dol_schema::SchemaRef;
 
 /// Interned name handle.
 ///

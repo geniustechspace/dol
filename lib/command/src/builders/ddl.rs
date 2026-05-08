@@ -9,10 +9,8 @@ use crate::operation::Operation;
 use crate::operation::{FieldOp, IndexOp, LookupOp, SchemaOp};
 use crate::program::Program;
 use crate::target::TargetKind;
-use dol_core::schema::SchemaRef;
 use dol_expr::{ExprArena, Interner};
-#[cfg(feature = "schema")]
-use dol_schema::Entity;
+use dol_schema::{Entity, SchemaRef};
 
 use super::target::target_from_parts;
 
@@ -52,8 +50,6 @@ pub fn drop_entity(name: &str, namespace: Option<&str>) -> Program {
 /// expected to live in the catalog; this helper only emits the structural
 /// operation that points at it.
 ///
-/// Only available with `feature = "schema"`.
-#[cfg(feature = "schema")]
 pub fn define_from_entity(entity: &Entity, schema: SchemaRef, if_not_exists: bool) -> Program {
     define_entity(
         entity.name.as_ref(),

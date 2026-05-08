@@ -13,7 +13,7 @@ use crate::operation::shared::StructuralVerb;
 use crate::target::{Symbol, Target};
 
 // Import handle types from dol-core (canonical home).
-use dol_core::schema::{SchemaRef, TypeBody};
+use dol_schema::{SchemaRef, TypeBody};
 
 /// Body kind of a [`SchemaOp`] payload.
 ///

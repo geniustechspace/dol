@@ -11,12 +11,7 @@ readme = "README.md"
 # `dol-schema`'s default features and stay `no_std + alloc`-clean. The paths
 # mirror the workspace deps.
 dol-expr   = { path = "../expr",   default-features = false }
-# `dol-schema` is gated behind the `schema` feature: only the catalog
-# *storage* types (`SchemaCatalog`, `Entity`, `CatalogEntry`, `TypeEntry`)
-# require it. The catalog *handle* types (`SchemaRef`, `SchemaId`,
-# `CatalogId`, `TypeBody`, `ComputedKind`, `RefAction`, `RelationRef`) live
-# in `dol-core::schema` and are always available.
-dol-schema = { path = "../schema", default-features = false, features = ["expr"], optional = true }
+dol-schema = { path = "../schema", default-features = false, features = ["expr"] }
 # `dol-query` is gated behind the `query` feature: it pulls in the fluent
 # DSL builder structs (`GetQuery`, `InsertQuery`, …) and the streaming /
 # pipeline data types so that `dol-command` can host their `Program`
@@ -24,6 +19,8 @@ dol-schema = { path = "../schema", default-features = false, features = ["expr"]
 # (`query_extensions::*`) without forcing every consumer to take the
 # DSL dep.
 dol-query  = { path = "../query",  default-features = false, optional = true }
+dol-stream = { path = "../stream", default-features = false, optional = true }
+dol-pipeline = { path = "../pipeline", default-features = false, optional = true }
 dol-core   = { path = "../core",   default-features = false }
 smallvec   = { workspace = true }
 serde      = { workspace = true, optional = true }
@@ -33,26 +30,21 @@ postcard   = { workspace = true, optional = true }
 serde_json = { workspace = true }
 
 [features]
-# `default = ["schema", "query"]` keeps the historical surface: programs
-# that embed a `SchemaCatalog`, the `define_from_entity` builder, the
-# prelude re-exports of storage types, the fluent query lowering
-# (`lower_query::lower_get`, …), and the typed `Operation::Extension`
-# payloads for stream/pipeline. Disable to drop the corresponding deps.
-default = ["schema", "query"]
-# Pull in `dol-schema` for the catalog *storage* surface.
-schema = ["dep:dol-schema"]
+default = ["query"]
 # Pull in `dol-query` for the fluent DSL types and host their lowering
 # (`lower_query::*`) plus typed `OperationExtension` wrappers
 # (`query_extensions::*`). The streaming / pipeline payload encoders also
 # need `serde + postcard` to round-trip via `dol-wire::Decode`.
-query = ["dep:dol-query", "dep:postcard"]
-std = ["dol-core/std", "dol-expr/std", "dol-schema?/std", "dol-query?/std"]
+query = ["dep:dol-query", "dep:dol-stream", "dep:dol-pipeline", "dep:postcard"]
+std = ["dol-core/std", "dol-expr/std", "dol-schema/std", "dol-query?/std", "dol-stream?/std", "dol-pipeline?/std"]
 serde = [
     "dep:serde",
     "dol-expr/serde",
-    "dol-schema?/serde",
+    "dol-schema/serde",
     "dol-core/serde",
     "dol-query?/serde",
+    "dol-stream?/serde",
+    "dol-pipeline?/serde",
     "smallvec/serde",
 ]
 raw = []

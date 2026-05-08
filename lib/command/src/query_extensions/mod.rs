@@ -1,5 +1,5 @@
 //! Typed [`OperationExtension`](crate::operation::OperationExtension)
-//! wrappers for [`dol_query`]'s streaming and pipeline data types.
+//! wrappers for [`dol_stream`] and [`dol_pipeline`] data types.
 //!
 //! These wrappers were previously hosted inside `dol-query`'s own
 //! `stream::extension` and `pipeline::extension` modules. Hosting them
@@ -10,9 +10,8 @@
 //! restoring the documented `command → query` dependency direction.
 //!
 //! - [`stream::WindowPayload`] / [`stream::TimeSeriesPayload`] /
-//!   [`stream::SamplePayload`] wrap the matching `dol_query::stream`
-//!   data types.
-//! - [`pipeline::PipelinePayload`] wraps a `dol_query::pipeline::Graph`.
+//!   [`stream::SamplePayload`] wrap the matching `dol_stream` data types.
+//! - [`pipeline::PipelinePayload`] wraps a `dol_pipeline::Graph`.
 //!
 //! All [`crate::target::Symbol`] identifiers (`WINDOW_SYMBOL`,
 //! `TIMESERIES_SYMBOL`, `IOT_SAMPLE_SYMBOL`, `EXTENSION_SYMBOL`) are

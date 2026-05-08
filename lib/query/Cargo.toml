@@ -13,7 +13,6 @@ readme = "README.md"
 dol-schema = { workspace = true, optional = true }
 dol-expr   = { workspace = true }
 dol-core   = { workspace = true }
-smallvec   = { workspace = true }
 serde      = { workspace = true, optional = true }
 
 [dev-dependencies]
@@ -43,7 +42,6 @@ serde = [
     "dol-core/serde",
     "dol-expr/serde",
     "dol-schema?/serde",
-    "smallvec/serde",
 ]
 
 [lints]

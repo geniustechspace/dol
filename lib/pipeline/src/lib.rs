@@ -15,10 +15,21 @@
 //! `Operation::Extension` seam: a [`Graph`] is wrapped in a
 //! `dol_command::query_extensions::pipeline::PipelinePayload` (a typed
 //! `dol_command::operation::ExtensionPayload`) and embedded into a
-//! `dol_command::program::Program`. Hosting the payload wrapper on the
-//! `dol-command` side preserves the v2 dependency graph
-//! (`command → query`, never the reverse).
+//! `dol_command::program::Program`.
 
+#![cfg_attr(not(feature = "std"), no_std)]
+#![forbid(unsafe_code)]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::arithmetic_side_effects
+    )
+)]
+#![warn(missing_docs)]
 #![allow(clippy::large_enum_variant)]
 
 pub mod graph;

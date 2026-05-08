@@ -55,7 +55,7 @@ pub mod target;
 pub mod lower_query;
 
 /// Typed [`operation::OperationExtension`] payloads wrapping
-/// [`dol_query`]'s streaming and pipeline data into
+/// [`dol_stream`] and [`dol_pipeline`] data into
 /// [`operation::Operation::Extension`]. Only available with
 /// `feature = "query"`.
 #[cfg(feature = "query")]

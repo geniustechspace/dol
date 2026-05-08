@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Crate-boundary review follow-up (PR 11)
+
+- Re-extracted **`dol-stream`** and **`dol-pipeline`** as standalone crates.
+  `dol-query` is now only the fluent query DSL builders.
+- `dol-command::query_extensions::{stream,pipeline}` now depend on
+  `dol-stream` and `dol-pipeline` directly (instead of
+  `dol-query::{stream,pipeline}`).
+- Moved schema handle/constraint primitives (`SchemaRef`, `SchemaId`,
+  `CatalogId`, `TypeBody`, `ComputedKind`, `RefAction`, `RelationRef`,
+  `EntityConstraint`) out of `dol-core` and back into `dol-schema`.
+- Removed `dol-command`'s `schema` feature gate; `dol-schema` is now a
+  normal dependency of `dol-command`.
+- The `dol` umbrella now exposes `stream` and `pipeline` features/crate
+  re-exports again, and `query` includes them for compatibility.
+
 ### Dependency-graph alignment (PR 7 + PR 8a + PR 9 + PR 10)
 
 All four DAG violations identified in the v2-layout audit are now fixed.
