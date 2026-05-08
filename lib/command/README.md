@@ -36,17 +36,20 @@ let op: dol_command::operation::Operation = my_insert.into();
 
 | feature | default | effect                                                                    |
 | ------- | :-----: | ------------------------------------------------------------------------- |
-| `serde` |         | `Serialize` / `Deserialize` for `Statement`, `Program`, `Transaction`, …  |
+| `serde` |         | `Serialize` for `Operation`, `Program`, etc. (no `Deserialize` — wire-in uses `dol-wire::Decode`) |
 
 Enabling `serde` turns on `dol-expr/serde` and `smallvec/serde` transitively.
 
 ## Example
 
 ```rust,ignore
-use dol_ir::{Program, Statement};
-// `Program` is what every `Backend::compile` consumes.
-fn run<B: dol_ir::Backend>(b: &B, p: &Program) -> Result<B::Output, _> {
-    b.compile(p)
+use dol_command::program::Program;
+use dol_command::program_ref::ProgramRef;
+use dol_command::backend::Backend;
+
+// `ProgramRef` is what every `Backend::compile` consumes.
+fn run<B: Backend>(b: &B, p: &Program) -> Result<B::Output, B::Error> {
+    b.compile(p.as_ref())
 }
 ```
 

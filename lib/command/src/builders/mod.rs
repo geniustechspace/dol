@@ -9,7 +9,9 @@
 //! down into `dol-command` because they construct IR directly without using
 //! the fluent query DSL. `dol-query` keeps only the actual query
 //! builders (`GetQuery`, `InsertQuery`, `UpdateQuery`, `DeleteQuery`,
-//! `UpsertQuery`) plus the streaming / pipeline submodules.
+//! `UpsertQuery`). Streaming/pipeline types live in their own crates
+//! (`dol-stream`, `dol-pipeline`) and integrate via the typed payloads
+//! in [`crate::query_extensions`].
 
 extern crate alloc;
 

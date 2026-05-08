@@ -87,7 +87,7 @@ fn write_target(w: &mut String, t: &Target, interner: &Interner) -> core::fmt::R
 
 /// Resolve `id` against `interner`, falling back to a stable `#<id>`
 /// placeholder when the symbol came from a different interner (e.g. test
-/// fixtures that build a [`Symbol`](dol_command::Symbol) from a literal).
+/// fixtures that build a [`Symbol`](dol_command::target::Symbol) from a literal).
 ///
 /// With content-addressed [`StrId`](dol_expr::ids::StrId)s a known id can
 /// land anywhere in `u32` space, so we ask the interner directly via

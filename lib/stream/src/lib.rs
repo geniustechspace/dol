@@ -1,4 +1,4 @@
-//! Streaming / time-series / IoT IR (formerly `dol-stream`).
+//! Streaming / time-series / IoT IR (formerly `dol_query::stream`).
 //!
 //! Extends the core IR with a handful of operators that don't fit cleanly
 //! into batch SQL semantics:

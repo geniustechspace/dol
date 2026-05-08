@@ -1,4 +1,4 @@
-//! Declarative dataflow IR (formerly `dol-pipeline`).
+//! Declarative dataflow IR (formerly `dol_query::pipeline`).
 //!
 //! A pipeline is a typed DAG of nodes joined by typed edges:
 //!

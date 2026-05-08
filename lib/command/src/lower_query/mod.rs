@@ -1,4 +1,4 @@
-//! Lower the fluent [`dol_query`] DSL builders into [`crate::Program`]s.
+//! Lower the fluent [`dol_query`] DSL builders into [`crate::program::Program`]s.
 //!
 //! Every `try_build`-style call site previously hosted on the
 //! `dol-query` builders themselves now lives here. This inverts the

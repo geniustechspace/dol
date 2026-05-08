@@ -175,38 +175,35 @@ The DDL (`define_entity`, `define_index`, …), ACL/Tx (`grant`, `revoke`,
 These helpers construct IR directly without using the fluent query DSL,
 so they belong with the IR layer; `dol-query` keeps only the actual
 query builders (`GetQuery`, `InsertQuery`, `UpdateQuery`,
-`DeleteQuery`, `UpsertQuery`) plus the streaming / pipeline submodules.
+`DeleteQuery`, `UpsertQuery`).
 
-The `dol_query::prelude` re-exports the moved builders from
-`dol_command::builders` so existing `use dol_query::prelude::*;` call
-sites keep compiling.
+**Note:** `dol_query::prelude` no longer re-exports builders from
+`dol-command`. Import them directly from `dol_command::builders`.
 
 #### Migration
 
-- `dol_query::define_entity` → `dol_command::builders::define_entity`
-  (or `dol_query::prelude::define_entity` via the prelude shim).
+- `dol_query::define_entity` → `dol_command::builders::define_entity`.
 - `dol_query::ddl::*` / `dol_query::control::*` / `dol_query::storage::*`
   modules — removed; import from `dol_command::builders::{ddl, control,
   storage}` (or use the flat re-exports in `dol_command::builders`).
 
-### Crate consolidation: `dol-stream` + `dol-pipeline` → `dol-query`
+### Crate re-extraction: `dol-stream` + `dol-pipeline` (standalone again)
 
-The standalone `dol-stream` and `dol-pipeline` crates are absorbed into
-`dol-query` as the `dol_query::stream` and `dol_query::pipeline`
-submodules. A pipeline *is* a declarative query, and streaming /
-time-series / IoT verbs are query-time constructs — splitting them
-across separate crates added build-graph complexity without payoff.
+`dol-stream` and `dol-pipeline` are once again standalone workspace
+crates (they were briefly absorbed into `dol-query` and have now been
+re-extracted). Streaming / time-series / IoT types live in `dol-stream`;
+pipeline DAG types live in `dol-pipeline`. Both integrate with
+`dol_command::operation::Operation` via the `Extension` seam through
+typed payloads in `dol_command::query_extensions`.
 
 #### Migration
 
-- `dol_stream::WindowSpec` → `dol_query::stream::WindowSpec` (and
+- `dol_query::stream::WindowSpec` → `dol_stream::WindowSpec` (and
   similarly for every other type).
-- `dol_pipeline::Graph` → `dol_query::pipeline::Graph`.
-- The `dol::stream` and `dol::pipeline` umbrella aliases are removed;
-  enable the umbrella's `query` feature and use `dol::query::stream`
-  / `dol::query::pipeline` instead.
-- The umbrella's `pipeline` and `stream` features are removed; the
-  `iot-min` preset now pulls `query` instead of `stream`.
+- `dol_query::pipeline::Graph` → `dol_pipeline::Graph`.
+- The `dol` umbrella re-exports `dol::stream` and `dol::pipeline`
+  behind the `stream` and `pipeline` features respectively.
+- The `iot-min` preset now pulls `stream` instead of `query`.
 
 ### Removed
 
