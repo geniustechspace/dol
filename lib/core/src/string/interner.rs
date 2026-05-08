@@ -1,3 +1,17 @@
+//! Content-addressed UTF-8 string interner.
+//!
+//! The interner stores each distinct string once and returns a compact
+//! [`StrId`](super::StrId) handle for later references.
+//!
+//! Unlike a purely process-local string pool, this interner is
+//! content-addressed: ids are derived from the string bytes using DOL's
+//! canonical hash chokepoint. This makes string ids deterministic across
+//! insertion order, processes, and machines.
+//!
+//! Collision handling is explicit. If two different strings produce the same
+//! `StrId`, the fallible APIs return [`InternError::Collision`] rather than
+//! silently aliasing distinct strings.
+
 use alloc::vec::Vec;
 use core::num::NonZeroU32;
 use hashbrown::HashMap;

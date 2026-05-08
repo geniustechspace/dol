@@ -10,7 +10,7 @@
 
 use alloc::string::String;
 
-use dol_core::diag::Diagnostic;
+use dol_core::diagnostic::Diagnostic;
 use dol_core::span::Span;
 
 use crate::capabilities::CapabilityCheck;
@@ -87,7 +87,7 @@ impl BackendError {
     pub fn unsupported(msg: impl Into<String>) -> Self {
         BackendError::Unsupported {
             diag: Diagnostic::error(
-                dol_core::diag::code::UNSUPPORTED_BY_BACKEND,
+                dol_core::diagnostic::code::UNSUPPORTED_BY_BACKEND,
                 Span::NONE,
                 msg.into(),
             ),
@@ -104,7 +104,7 @@ impl BackendError {
     /// the variant rather than the code for this error.
     pub fn missing_value(msg: impl Into<String>) -> Self {
         BackendError::MissingValue {
-            diag: Diagnostic::error(dol_core::diag::code::INTERNAL_ERROR, Span::NONE, msg.into()),
+            diag: Diagnostic::error(dol_core::diagnostic::code::INTERNAL_ERROR, Span::NONE, msg.into()),
             span: None,
         }
     }
@@ -112,7 +112,7 @@ impl BackendError {
     /// Construct a `Render` error.
     pub fn render(msg: impl Into<String>) -> Self {
         BackendError::Render {
-            diag: Diagnostic::error(dol_core::diag::code::INTERNAL_ERROR, Span::NONE, msg.into()),
+            diag: Diagnostic::error(dol_core::diagnostic::code::INTERNAL_ERROR, Span::NONE, msg.into()),
             span: None,
         }
     }
@@ -122,7 +122,7 @@ impl BackendError {
         BackendError::Capability {
             check,
             diag: Diagnostic::error(
-                dol_core::diag::code::MISSING_CAPABILITY,
+                dol_core::diagnostic::code::MISSING_CAPABILITY,
                 Span::NONE,
                 msg.into(),
             ),

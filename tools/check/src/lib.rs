@@ -45,7 +45,7 @@ pub mod sarif;
 use dol_command::capabilities::{CapabilityCheck, CapabilitySet, CapabilityTag};
 use dol_command::operation::{OpKind, Operation};
 use dol_command::program::Program;
-use dol_core::diag::Diagnostic;
+use dol_core::diagnostic::Diagnostic;
 
 /// Run the backend-agnostic passes ([`type_check`], [`schema_check`],
 /// [`lint`]) in order.
@@ -110,7 +110,7 @@ fn check_op_recursive(
         let check = capability_check_for(op, &missing);
         let msg = render_capability_message(&check, &missing);
         out.push(Diagnostic::error(
-            dol_core::diag::code::MISSING_CAPABILITY,
+            dol_core::diagnostic::code::MISSING_CAPABILITY,
             dol_core::span::Span::NONE,
             msg,
         ));

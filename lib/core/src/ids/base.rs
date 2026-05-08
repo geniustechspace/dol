@@ -1,41 +1,4 @@
-//! # `id` — typed, niche-optimised arena identifiers.
-//!
-//! A great deal of `dol-*` data is stored in arenas: AST nodes, IR
-//! operations, schema fields, interned strings. Each arena needs its own
-//! id type so a node-id cannot be confused with a field-id at compile
-//! time, and so the type system can enforce arena lookups.
-//!
-//! Rather than every crate inventing its own newtype, `dol-core` exposes
-//! a single generic [`Id<Tag>`] parameterised by a phantom `Tag` marker.
-//! Different arenas pick different tags:
-//!
-//! ```
-//! use dol_core::id::Id;
-//!
-//! /// Tag for AST node ids in `dol-expr`.
-//! pub struct NodeTag;
-//! pub type NodeId = Id<NodeTag>;
-//!
-//! /// Tag for interned string ids.
-//! pub struct StrTag;
-//! pub type StrId = Id<StrTag>;
-//!
-//! // Different tags produce structurally distinct types — this would
-//! // not compile:
-//! //   let n: NodeId = some_str_id; // ✗ type mismatch
-//! ```
-//!
-//! ## Niche
-//!
-//! `Id<T>` wraps [`NonZeroU32`], so `Option<Id<T>>` is exactly four
-//! bytes — the same niche optimisation Rust applies to `Option<&T>`. The
-//! id range is `1..=u32::MAX`, leaving plenty of room for any realistic
-//! arena (≈4 G entries). Code that wants a "missing" id should use
-//! `Option<Id<T>>` rather than reserving a sentinel.
-//!
-//! ## `no_std`
-//!
-//! `Id<T>` is `Copy`, contains no allocation, and is `no_std`-clean.
+//! Generic typed arena identifiers.
 
 use core::{fmt, hash::Hash, marker::PhantomData, num::NonZeroU32};
 
@@ -81,7 +44,7 @@ impl<Tag: ?Sized> Id<Tag> {
     ///
     /// Use this when materialising ids for a freshly pushed entry:
     /// ```
-    /// use dol_core::id::Id;
+    /// use dol_core::ids::Id;
     /// struct Frob;
     /// let v: Vec<u8> = vec![10, 20, 30];
     /// // The element at index 2 has id 3 (one-based).

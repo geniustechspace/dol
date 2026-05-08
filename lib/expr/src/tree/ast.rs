@@ -9,7 +9,7 @@ use super::op::UnaryOp;
 use super::op::meta::OpDef;
 use super::order::OrderByExpr;
 use super::path::PathExpr;
-use super::window::WindowFrame;
+use super::window::ContextFrame;
 
 /// A composable expression node, the core AST type for DOL.
 ///
@@ -154,6 +154,6 @@ pub enum Expr<'a> {
         func: Box<Expr<'a>>,
         partition_by: Vec<Expr<'a>>,
         order_by: Vec<OrderByExpr<'a>>,
-        frame: Option<WindowFrame>,
+        frame: Option<ContextFrame>,
     },
 }

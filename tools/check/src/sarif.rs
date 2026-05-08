@@ -31,7 +31,7 @@
 use alloc::string::String;
 use core::fmt::Write as _;
 
-use dol_core::diag::{Diagnostic, Severity};
+use dol_core::diagnostic::{Diagnostic, Severity};
 use dol_core::span::Span;
 
 /// Render a slice of diagnostics as a SARIF v2.1.0 log document.
@@ -154,7 +154,7 @@ fn escape_json_into(out: &mut String, s: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dol_core::diag::code;
+    use dol_core::diagnostic::code;
 
     #[test]
     fn empty_results_array_is_valid_sarif() {

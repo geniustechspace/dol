@@ -91,15 +91,16 @@ extern crate alloc;
 
 // ─── Namespaced infrastructure ───────────────────────────────────────────────
 
-pub mod diag;
+pub mod diagnostic;
 #[cfg(feature = "hash")]
 pub mod hash;
-pub mod id;
+pub mod ids;
 pub mod policy;
 pub mod raw;
 pub mod signing;
 pub mod span;
 pub mod storage;
+pub mod string;
 
 // ─── Type system sub-namespaces ──────────────────────────────────────────────
 
@@ -148,10 +149,10 @@ pub use literal::{Literal, LiteralRange};
 pub use value::{Value, ValueRange};
 
 // span / diag flat re-exports — the headline boundary items.
-pub use diag::{Diagnostic, ErrorCode, Severity};
+pub use diagnostic::{Diagnostic, ErrorCode, Severity};
 pub use span::{FileId, Span};
 
 // policy / id flat re-exports — the load-bearing foundation primitives
 // every recursive or arena-bearing path threads.
-pub use id::Id;
+pub use ids::Id;
 pub use policy::{Budget, BudgetError, Limits};

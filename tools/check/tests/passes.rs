@@ -14,7 +14,7 @@ use dol_command::operation::meta::ExtensionId;
 use dol_command::operation::{OperationExtension, SchemaOp};
 use dol_command::program::Program;
 use dol_command::target::{Locator, Symbol, Target, TargetKind};
-use dol_core::diag::Diagnostic;
+use dol_core::diagnostic::Diagnostic;
 use dol_schema::SchemaRef;
 
 fn empty_program() -> Program {
@@ -75,7 +75,7 @@ fn type_check_is_pure_and_append_only() {
     let prog = empty_program();
     let mut diags: Vec<Diagnostic> = Vec::new();
     let seed = Diagnostic::error(
-        dol_core::diag::code::MISSING_CAPABILITY,
+        dol_core::diagnostic::code::MISSING_CAPABILITY,
         dol_core::span::Span::NONE,
         "seed".to_string(),
     );
@@ -120,7 +120,7 @@ fn capability_check_flags_missing_capabilities() {
     assert!(
         diags
             .iter()
-            .all(|d| d.code == dol_core::diag::code::MISSING_CAPABILITY)
+            .all(|d| d.code == dol_core::diagnostic::code::MISSING_CAPABILITY)
     );
 }
 
