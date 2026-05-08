@@ -8,7 +8,11 @@
 //! the test binary sees the same `dol_query::GetQuery` type that
 //! `dol-command` was compiled against. An inner `mod tests;` would
 //! re-compile `dol-query` with `#[cfg(test)]` and break that identity.
+//!
+//! Gated on `feature = "schema"` because the entity-driven builders
+//! (`Query::from(&Entity)`) only exist when `dol-schema` is wired in.
 
+#![cfg(feature = "schema")]
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,

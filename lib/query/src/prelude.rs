@@ -6,7 +6,7 @@
 //! `PolicyScope`, `Privilege`, `SchemaBinding`) live in
 //! `dol_command::builders` and `dol_command::prelude` respectively;
 //! import them directly from there. The lowering trait
-//! [`BuildProgram`](dol_command::lower_query::BuildProgram) — which
+//! `dol_command::lower_query::BuildProgram` — which
 //! re-creates the historical chained `builder.try_build()` ergonomics —
 //! also lives in `dol-command`.
 

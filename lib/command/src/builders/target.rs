@@ -1,6 +1,6 @@
 //! Small helpers shared across `dol-query` builders for building
-//! [`Target`](crate::target::Target)s, [`Symbol`](crate::target::Symbol)s, and
-//! [`Locator`](crate::target::Locator)s from owned name/namespace strings.
+//! [`Target`]s, [`Symbol`]s, and
+//! [`Locator`]s from owned name/namespace strings.
 
 use crate::target::{Locator, SchemaBinding, Symbol, Target, TargetKind};
 use dol_expr::Interner;

@@ -20,9 +20,12 @@
 //!
 //! Two equivalent forms are exposed:
 //!
-//! - **Free functions** [`lower_get`], [`lower_insert`], [`lower_update`],
-//!   [`lower_delete`], [`lower_upsert`] — explicit, no trait import needed.
-//! - **The [`BuildProgram`] trait** — with a single `try_build` method,
+//! - **Free functions** [`lower_get`](crate::lower_query::lower_get),
+//!   [`lower_insert`](crate::lower_query::lower_insert),
+//!   [`lower_update`](crate::lower_query::lower_update),
+//!   [`lower_delete`](crate::lower_query::lower_delete),
+//!   [`lower_upsert`](crate::lower_query::lower_upsert) — explicit, no trait import needed.
+//! - **The [`BuildProgram`](crate::lower_query::BuildProgram) trait** — with a single `try_build` method,
 //!   re-creating the chained builder ergonomics of the old API. Callers
 //!   that want `query.get().filter(...).try_build()` only need
 //!   `use dol_command::lower_query::BuildProgram;` in scope.

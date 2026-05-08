@@ -9,9 +9,10 @@
 //! (default-on), preserving the public symbols on the wire while
 //! restoring the documented `command → query` dependency direction.
 //!
-//! - [`stream::WindowPayload`] / [`stream::TimeSeriesPayload`] /
-//!   [`stream::SamplePayload`] wrap the matching `dol_stream` data types.
-//! - [`pipeline::PipelinePayload`] wraps a `dol_pipeline::Graph`.
+//! - [`stream::WindowPayload`](crate::query_extensions::stream::WindowPayload) /
+//!   [`stream::TimeSeriesPayload`](crate::query_extensions::stream::TimeSeriesPayload) /
+//!   [`stream::SamplePayload`](crate::query_extensions::stream::SamplePayload) wrap the matching `dol_stream` data types.
+//! - [`pipeline::PipelinePayload`](crate::query_extensions::pipeline::PipelinePayload) wraps a `dol_pipeline::Graph`.
 //!
 //! All [`crate::target::Symbol`] identifiers (`WINDOW_SYMBOL`,
 //! `TIMESERIES_SYMBOL`, `IOT_SAMPLE_SYMBOL`, `EXTENSION_SYMBOL`) are

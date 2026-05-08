@@ -1,7 +1,7 @@
 //! `Grant` — bestow privileges on a target to a role.
 //!
-//! Generalises [`crate::Privilege`] over any [`crate::target::TargetKind`].
-//! The [`crate::Privilege`] enum is reused verbatim from the privilege module.
+//! Generalises [`crate::privilege::Privilege`] over any [`crate::target::TargetKind`].
+//! The [`crate::privilege::Privilege`] enum is reused verbatim from the privilege module.
 
 use smallvec::SmallVec;
 

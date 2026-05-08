@@ -107,7 +107,7 @@ impl Program {
     /// catalogs would require entry-level conflict resolution that is out of
     /// scope for this composition primitive.
     ///
-    /// [`SchemaCatalog`]: crate::SchemaCatalog
+    /// [`SchemaCatalog`]: dol_schema::SchemaCatalog
     ///
     /// # Errors
     ///

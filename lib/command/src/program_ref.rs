@@ -1,4 +1,4 @@
-//! [`ProgramRef`] — borrowed view into a [`crate::Program`].
+//! [`ProgramRef`] — borrowed view into a [`crate::program::Program`].
 //!
 //! `ProgramRef` is what backends receive. It carries borrowed references to
 //! the operations, expression arena, interner, and schema catalog so backends

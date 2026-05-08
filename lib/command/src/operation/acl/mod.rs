@@ -2,7 +2,7 @@
 //!
 //! Lifecycle objects (nouns: `Policy`, `Mask`, `Quota`, `Audit`) carry a
 //! [`StructuralVerb`](super::shared::StructuralVerb). Lifecycle actions
-//! (verbs: `Grant`, `Revoke`) carry the [`Privilege`](crate::Privilege) set
+//! (verbs: `Grant`, `Revoke`) carry the [`Privilege`](crate::privilege::Privilege) set
 //! they bestow / withdraw.
 
 pub mod audit;
