@@ -23,6 +23,7 @@ serde      = { workspace = true, optional = true }
 # and integration tests in `tests/` exercise that path. The `query` feature
 # pulls dol-query back in on dol-command's side.
 dol-command = { workspace = true, features = ["query"] }
+dol-schema  = { workspace = true }
 postcard    = { workspace = true }
 
 [features]

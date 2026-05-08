@@ -2,7 +2,7 @@
 //!
 //! Schemas live in a catalog rather than being embedded inline in every
 //! operation. Each catalog entry is keyed by [`SchemaId`] and resolved
-//! through a [`SchemaRef`].
+//! through a [`crate::SchemaRef`].
 //!
 //! The catalog stores [`crate::Entity`] for entity bodies and a small
 //! [`TypeEntry`] for named-type bodies; backends can extend the catalog
