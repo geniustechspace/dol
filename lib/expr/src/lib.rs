@@ -44,6 +44,8 @@ pub mod arena;
 pub mod expr;
 pub mod ids;
 #[allow(missing_docs)] // tracking: docs follow-up
+pub mod internable;
+#[allow(missing_docs)] // tracking: docs follow-up
 pub mod interner;
 #[allow(missing_docs)] // tracking: docs follow-up
 pub mod lower;

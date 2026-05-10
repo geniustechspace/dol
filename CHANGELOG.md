@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Unified `Internable` contract for arena pools
+
+- Added `dol_core::intern::Internable` trait + `id_from_digest32` helper
+  (gated on the existing `hash` feature). Single one-method contract
+  (`feed(&mut Hasher)`) that any arena-pool payload type implements to
+  declare its canonical byte form; the provided `content_id::<Tag>()`
+  derives a typed, niche-folded `Id<Tag>` from the BLAKE3-prefix digest
+  using the same convention as `dol_expr::Interner`'s `StrId`s.
+- Implemented `Internable` for `dol_core::Literal<'a>` and the leaf
+  building blocks it nests (`BitString`, `Decimal`, `IpAddr`,
+  `MacAddr`, `Date`, `Time`, `DateTime`, `TimestampTz`, `Offset`,
+  `Interval`, `Point`, `Line`, `Segment`, `Rect`, `Circle`, `Path`,
+  `Polygon`). Each variant gets a tag byte; floats normalise
+  `-0.0 → 0.0` and any NaN payload to a canonical NaN; `String`/
+  `Bytes`/composite variants prepend a `u64` length to prevent
+  framing collisions; nested children feed themselves so per-type
+  canonicalisation lives in one place per type.
+- Implemented `Internable` for `dol_expr::FieldStep` and
+  `dol_expr::FieldNode` (in the new `dol_expr::internable` module).
+- Added `ExprArena::intern_lit` and `ExprArena::intern_field` —
+  additive opt-in dedup paths alongside `alloc_lit` / `alloc_field`,
+  mirroring the existing `alloc` / `intern_node` precedent. Two
+  structurally-equal `Literal::Int64(1)`s now collapse onto one
+  `LiteralId`, two identical `FieldNode { namespace: None, name:
+  "email", steps: [] }`s now collapse onto one `FieldId`, and
+  identical content produces matching content-ids across independent
+  arenas.
+- The dedup index is built lazily on first `intern_*` call and
+  back-fills against entries already pushed via `alloc_*`, so the
+  bulk single-shot `alloc` path on a one-off lowering still pays no
+  hash cost. Indices are skipped by `Serialize` (recoverable from
+  the underlying pool).
+- Tests: `lib/core/src/{intern,intern_literal}.rs::tests` cover the
+  trait contract, NaN/-0.0 canonicalisation, length-prefix framing,
+  and per-variant tag disambiguation; `lib/expr/tests/intern_pools.rs`
+  verifies the two examples called out by the prototype design
+  discussion (identical `Int64(1)` → one `LiteralId`; identical
+  `FieldNode` → one `FieldId`) and cross-arena content-id
+  determinism.
+- Migration of the remaining payload pools (`CompositeNode`,
+  `FuncNode`, `WindowNode`, `CaseNode`) follows the same
+  `Internable` + `intern_*` template and is left as a follow-up so
+  this change stays additive — no existing `alloc_*` call site
+  changes shape.
+
 ### Crate-boundary review follow-up (PR 11)
 
 - Re-extracted **`dol-stream`** and **`dol-pipeline`** as standalone crates.

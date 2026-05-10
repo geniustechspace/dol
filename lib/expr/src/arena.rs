@@ -9,6 +9,7 @@ use crate::ids::{
     SpanId, StrId, UpdateId, UpsertId, WindowId,
 };
 use crate::types::value::Literal;
+use dol_core::intern::Internable;
 
 /// Allocate `item` in `vec` and return its [`Id<Tag>`].
 ///
@@ -388,6 +389,20 @@ pub struct ExprArena {
     /// recoverable from the `nodes` slice.
     #[cfg_attr(feature = "serde", serde(skip))]
     node_index: Option<HashMap<ExprNode, NodeId>>,
+    /// Optional content-addressed dedup index for [`Self::intern_lit`].
+    ///
+    /// Maps the [`Internable::content_id`] of a [`Literal`] (under a
+    /// [`LiteralTag`](crate::ids::LiteralTag) tag — note this is *not*
+    /// the assigned arena id, just a content fingerprint) to the
+    /// arena's chosen sequential [`LiteralId`]. `None` until the first
+    /// `intern_lit` call; skipped by `Serialize` because it is
+    /// recoverable from `lits`.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    lit_index: Option<HashMap<LiteralId, LiteralId>>,
+    /// Optional content-addressed dedup index for [`Self::intern_field`].
+    /// See [`Self::lit_index`] for the convention.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    field_index: Option<HashMap<FieldId, FieldId>>,
 }
 
 impl ExprArena {
@@ -416,6 +431,8 @@ impl ExprArena {
             upserts: Vec::with_capacity(cap.upserts),
             fields: Vec::with_capacity(cap.fields),
             node_index: None,
+            lit_index: None,
+            field_index: None,
         }
     }
 
@@ -655,6 +672,44 @@ impl ExprArena {
         get_in(&self.lits, id)
     }
 
+    /// Allocate `lit` if no structurally-equal literal already exists in
+    /// the pool, otherwise return the existing [`LiteralId`].
+    ///
+    /// **Opt-in dedup path** — analogous to [`Self::intern_node`] for
+    /// the [`ExprNode`] pool, but driven by
+    /// [`dol_core::intern::Internable`] so the canonical byte form of
+    /// each literal variant lives in one place
+    /// (`dol_core::intern_literal`). Two `Literal::Int64(1)` values
+    /// therefore deduplicate to the same `LiteralId`, two `Literal::Null`s
+    /// share an id, and `-0.0`/`0.0` collapse onto one entry.
+    ///
+    /// Bulk lowering keeps using [`Self::alloc_lit`] (no hash cost);
+    /// rewrite passes / CSE / cache-key construction reach for this
+    /// entry point so identical literals collapse onto shared ids.
+    pub fn intern_lit(&mut self, lit: Literal<'static>) -> LiteralId {
+        // Lazily seed the dedup index from the existing `lits` pool so
+        // any literals already allocated via the bulk path participate
+        // in dedup from this point onward.
+        let lits = &self.lits;
+        let map = self.lit_index.get_or_insert_with(|| {
+            let mut map: HashMap<LiteralId, LiteralId> = HashMap::with_capacity(lits.len());
+            for (idx, l) in lits.iter().enumerate() {
+                if let Some(arena_id) = LiteralId::from_index(idx) {
+                    let key: LiteralId = l.content_id();
+                    map.entry(key).or_insert(arena_id);
+                }
+            }
+            map
+        });
+        let key: LiteralId = lit.content_id();
+        if let Some(&existing) = map.get(&key) {
+            return existing;
+        }
+        let id = alloc_in(&mut self.lits, lit);
+        map.insert(key, id);
+        id
+    }
+
     // ── FuncNode pool ─────────────────────────────────────────────────────────
 
     pub fn alloc_func(&mut self, func: FuncNode) -> FuncId {
@@ -755,6 +810,34 @@ impl ExprArena {
     #[track_caller]
     pub fn get_field(&self, id: FieldId) -> &FieldNode {
         get_in(&self.fields, id)
+    }
+
+    /// Allocate `field` if no structurally-equal field already exists
+    /// in the pool, otherwise return the existing [`FieldId`].
+    ///
+    /// Counterpart of [`Self::intern_lit`] for the field-payload pool.
+    /// Two `FieldNode { namespace: None, name: "email", steps: [] }`
+    /// values therefore deduplicate to one [`FieldId`]; the canonical
+    /// byte form lives in [`crate::internable`].
+    pub fn intern_field(&mut self, field: FieldNode) -> FieldId {
+        let fields = &self.fields;
+        let map = self.field_index.get_or_insert_with(|| {
+            let mut map: HashMap<FieldId, FieldId> = HashMap::with_capacity(fields.len());
+            for (idx, f) in fields.iter().enumerate() {
+                if let Some(arena_id) = FieldId::from_index(idx) {
+                    let key: FieldId = f.content_id();
+                    map.entry(key).or_insert(arena_id);
+                }
+            }
+            map
+        });
+        let key: FieldId = field.content_id();
+        if let Some(&existing) = map.get(&key) {
+            return existing;
+        }
+        let id = alloc_in(&mut self.fields, field);
+        map.insert(key, id);
+        id
     }
 
     pub fn nodes_slice(&self) -> &[ExprNode] {

@@ -95,6 +95,10 @@ pub mod diag;
 #[cfg(feature = "hash")]
 pub mod hash;
 pub mod id;
+#[cfg(feature = "hash")]
+pub mod intern;
+#[cfg(feature = "hash")]
+mod intern_literal;
 pub mod policy;
 pub mod raw;
 pub mod signing;
