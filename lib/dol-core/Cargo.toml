@@ -19,6 +19,11 @@ rustdoc-args = ["--cfg", "docsrs"]
 smallvec = { workspace = true }
 serde = { workspace = true, optional = true }
 blake3 = { workspace = true, optional = true }
+# xxHash3 is the fast, non-cryptographic hash for in-process dedup
+# (Lid keying, Pool bucketing). Cryptographic hashing — Cid / Gid /
+# wire-frame `payload_hash` — uses `blake3`. The `hash` module is the
+# single chokepoint for both, per `dol-rewrite-plan-v2.md` §6.3.
+xxhash-rust = { workspace = true, optional = true }
 defmt = { workspace = true, optional = true }
 hashbrown = { workspace = true }
 
@@ -53,7 +58,7 @@ numeric = []
 # in the workspace allowed to call `blake3` directly. Off by default to
 # preserve the minimal `no_std + alloc` shape; opt-in for crates that
 # need content-hashing (`dol-wire`, future `Signed<T>` envelopes).
-hash = ["dep:blake3"]
+hash = ["dep:blake3", "dep:xxhash-rust"]
 # `defmt` opts the embedded-friendly `defmt::Format` impls in on
 # `ErrorCode` and `Span`. Replaces `core::fmt::Display` for ~10× smaller
 # log code on Cortex-M (per `docs/v2_plan.md` §32). Off by default —

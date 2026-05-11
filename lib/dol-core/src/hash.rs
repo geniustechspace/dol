@@ -232,6 +232,81 @@ pub fn hash256(domain: &[u8], bytes: &[u8]) -> [u8; 32] {
     hasher.finalize_32()
 }
 
+// ──────────────────────────────────────────────────────────────────────────
+// Canonical v2 API (per `dol-rewrite-plan-v2.md` §6.3).
+//
+// The names below are the single chokepoint that every other crate is
+// expected to call. They split cleanly into two families:
+//
+// | family   | backing       | property                                  |
+// |----------|---------------|-------------------------------------------|
+// | `fast*`  | xxHash3       | non-cryptographic; in-process dedup only  |
+// | `content*`| BLAKE3       | cryptographic; cross-process stable       |
+//
+// The legacy `hash32` / `hash128` / `hash256` and `Digest{32,128,256}`
+// type aliases above are kept until M2 migrates the remaining caller
+// (`strings::interner`) to `content128`. After that they are removed.
+// ──────────────────────────────────────────────────────────────────────────
+
+/// Fast non-cryptographic 64-bit hash. xxHash3 with seed `0`.
+///
+/// **In-process dedup only.** Two different processes may compute
+/// different values for the same input (xxHash3 itself is deterministic
+/// across processes today, but callers must not rely on that — the
+/// strategy is allowed to change to a seeded variant by configuration).
+/// Do **not** use this as a wire-stable identifier.
+#[must_use]
+#[inline]
+pub fn fast64(bytes: &[u8]) -> u64 {
+    xxhash_rust::xxh3::xxh3_64(bytes)
+}
+
+/// Fast non-cryptographic 64-bit hash with caller-supplied seed.
+///
+/// The seed is the same value stored in [`crate::config::PoolConfig::hash_seed`]
+/// — picking a random seed per process is the standard defence against
+/// algorithmic-complexity attacks on the pool's hash buckets.
+#[must_use]
+#[inline]
+pub fn fast64_seeded(bytes: &[u8], seed: u64) -> u64 {
+    xxhash_rust::xxh3::xxh3_64_with_seed(bytes, seed)
+}
+
+/// Fast non-cryptographic 128-bit hash. xxHash3 with seed `0`.
+///
+/// Same caveats as [`fast64`]. Used internally by [`crate::config::PoolConfig`]
+/// sharding when 64 bits of fingerprint are insufficient.
+#[must_use]
+#[inline]
+pub fn fast128(bytes: &[u8]) -> u128 {
+    xxhash_rust::xxh3::xxh3_128(bytes)
+}
+
+/// Cryptographic 128-bit content address. BLAKE3 truncated to its
+/// leading 16 bytes. **Cross-process stable.**
+///
+/// This is the canonical Cid backing in v2: identical inputs produce
+/// identical bytes on every machine, every build of every crate, every
+/// process. Suitable for `Cid` / `StringPool` content addressing.
+#[must_use]
+#[inline]
+pub fn content128(bytes: &[u8]) -> [u8; 16] {
+    let full = *blake3::hash(bytes).as_bytes();
+    let mut out = [0u8; 16];
+    out.copy_from_slice(&full[..16]);
+    out
+}
+
+/// Cryptographic 256-bit content address. Full BLAKE3 output.
+///
+/// Used for `Gid`, signed manifests, and tamper-evident wire envelope
+/// `payload_hash` per the v2 wire spec. Cross-process stable.
+#[must_use]
+#[inline]
+pub fn content256(bytes: &[u8]) -> [u8; 32] {
+    *blake3::hash(bytes).as_bytes()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -285,5 +360,56 @@ mod tests {
         // (Spot-check first 8 bytes of the spec's IV digest.)
         let d = hash256(b"");
         assert_eq!(d[..4], [0xaf, 0x13, 0x49, 0xb9]);
+    }
+
+    // ── v2 canonical API tests (per `dol-rewrite-plan-v2.md` §6.8). ──
+
+    #[test]
+    fn fast64_same_input_same_output() {
+        let a = fast64(b"hello");
+        let b = fast64(b"hello");
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn fast64_different_inputs_different_output() {
+        let a = fast64(b"hello");
+        let b = fast64(b"world");
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn fast64_seeded_changes_with_seed() {
+        let a = fast64_seeded(b"hello", 0);
+        let b = fast64_seeded(b"hello", 1);
+        assert_ne!(a, b);
+        // Same seed → same output.
+        assert_eq!(fast64_seeded(b"hello", 42), fast64_seeded(b"hello", 42));
+    }
+
+    #[test]
+    fn fast128_same_input_same_output() {
+        assert_eq!(fast128(b"abc"), fast128(b"abc"));
+        assert_ne!(fast128(b"abc"), fast128(b"abd"));
+    }
+
+    #[test]
+    fn content128_same_input_same_output() {
+        assert_eq!(content128(b"hello"), content128(b"hello"));
+        assert_ne!(content128(b"hello"), content128(b"world"));
+    }
+
+    #[test]
+    fn content128_is_prefix_of_content256() {
+        let body = b"the quick brown fox";
+        let d128 = content128(body);
+        let d256 = content256(body);
+        assert_eq!(&d256[..16], &d128[..]);
+    }
+
+    #[test]
+    fn content256_matches_blake3_iv_for_empty() {
+        // Cross-checks with the legacy hash256 helper.
+        assert_eq!(content256(b""), hash256(b""));
     }
 }

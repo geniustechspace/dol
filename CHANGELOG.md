@@ -7,6 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### v2 rewrite — Phase 1: `dol-core` foundation (`dol-rewrite-plan-v2.md` §6)
+
+**M1 adds the new configuration / budget / hash chokepoints `dol-core`
+provides to every other crate. The existing `path` and `strings::Name`
+surfaces already match plan §6.4–§6.5; this PR layers the missing
+pieces on top non-destructively.**
+
+- **New `config` module** (`lib/dol-core/src/config.rs`) per plan §6.1.
+  - `Config` bundles `BudgetConfig` + `PoolConfig` + `HashConfig` + `Profile`.
+  - Three presets: `Config::standard()`, `Config::embedded()`, `Config::iot_min()`.
+  - `Profile { Standard, Embedded, IotMin }` is the deployment-shape tag
+    M2 will key `Pool` / `StaticStringPool` selection off of.
+  - `PoolConfig::is_valid()` validates that `shard_count` is a non-zero
+    power of two so the fast-modulo `hash & (shard_count - 1)` is correct.
+  - `HashStrategy { Fast { seed }, Crypto, CryptoFull }` lets callers
+    pick xxHash3 (in-process dedup) vs BLAKE3-128 / BLAKE3-256
+    (cross-process stable) per call site.
+
+- **New `budget` module** (`lib/dol-core/src/budget.rs`) per plan §6.2.
+  - `Budget { depth, nodes, bytes }` is a flat `Copy` counter struct
+    seeded from `BudgetConfig::from_config(&cfg)`.
+  - `Budget::depth()` / `node()` / `bytes(n)` return `Result<(), BudgetExceeded>`
+    with `checked_sub` so overflow is impossible.
+  - `BudgetExceeded { Depth, Nodes, Bytes }` is the first-violation enum
+    (impl `Display`, `core::error::Error` under `std`).
+  - `Budget::leave_depth()` (saturating credit) lets symmetric tracers
+    pair depth charge/credit; most monotonic traversals will ignore it.
+  - Coexists with the legacy `policy::Budget` for the M0–M3 transition;
+    the budget-gate `xtask` accepts either.
+
+- **Extended `hash` module** per plan §6.3.
+  - `fast64(bytes)`, `fast64_seeded(bytes, seed)`, `fast128(bytes)` —
+    xxHash3-backed, non-cryptographic, in-process dedup only.
+  - `content128(bytes)`, `content256(bytes)` — BLAKE3-backed,
+    cross-process stable. `content128` is byte-prefix-consistent with
+    `content256` (same property as the existing `hash128`/`hash256`).
+  - Adds `xxhash-rust` to `dol-core` deps (gated behind the existing
+    `hash` feature).
+  - The legacy `hash32` / `hash128` / `hash256` / `Digest{32,128,256}`
+    surface stays in place until M2 migrates `strings::interner` to
+    `content128`.
+
+- **Extended `PathSegment` trait** per plan §6.5.
+  - New default method `content_id(&self, _: &Self::Resolver) -> Option<[u8; 16]>`
+    returns `None` for inline segments (`Name`, etc.) and `None` for the
+    existing `StrId` impl. M2's `Lid<StrTag>` impl will override it to
+    return the cross-process stable BLAKE3-128 content address computed
+    at intern time. Backward-compatible: existing impls do not need
+    changes.
+
+- **Phase 1 acceptance tests** (per plan §6.8) added inline:
+  - `Config::{standard,embedded,iot_min}` presets produce non-zero
+    budget/pool values and a valid (power-of-two) `shard_count`.
+  - `Budget::depth()` / `node()` / `bytes(n)` return the matching
+    `BudgetExceeded` variant exactly when the corresponding cap is hit.
+  - `fast64`, `fast64_seeded`, `fast128`, `content128`, `content256`:
+    same input → same output; different inputs → different output (with
+    cryptographic / probabilistic confidence as appropriate). `content128`
+    is verified to be a strict prefix of `content256`.
+  - 19 new unit tests; total `dol-core` test count rises from 67 → 86.
+
+- **Cargo metadata.**
+  - `dol-core` `hash` feature now turns on both `blake3` and `xxhash-rust`.
+
+### Explicitly NOT in this PR
+
+The §6.6 `types` reshape (consolidating `data_type` + `literal` + `value`
+into a single `types` module with `Literal<'a>` lifetime-borrowed
+variants) and the §6.7 `span` / `diagnostic` trim. The existing modules
+already implement compatible surfaces and downstream crates (`dol-cas`,
+`dol-ir`) do not need the consolidation to land; reshaping is deferred
+to a follow-up so PR #2 stays surgically scoped to the foundation
+additions that M2 / M3 *do* need.
+
 ### v2 rewrite — Phase 0: workspace scaffolding (`dol-rewrite-plan-v2.md` §5)
 
 **M0 sets the v2 workspace skeleton; M1+ content lands in subsequent PRs.**

@@ -25,6 +25,14 @@ use crate::strings::{Interner, StrId};
 ///
 /// This prevents code from accidentally resolving an interned path without the
 /// resolver needed to make its IDs meaningful.
+///
+/// # Content identity
+///
+/// [`PathSegment::content_id`] returns the cross-process stable BLAKE3
+/// content address of the segment, when one is available. `Name`
+/// segments return `None` — they carry no stable identity. Pool-backed
+/// segments (e.g. `Lid<StrTag>` in M2) override the default to return
+/// the address lazily computed at intern time.
 pub trait PathSegment: Clone + Eq + Hash + fmt::Debug {
     /// Context required to resolve this segment to a string.
     ///
@@ -36,6 +44,20 @@ pub trait PathSegment: Clone + Eq + Hash + fmt::Debug {
     /// The returned string is tied to both `self` and `resolver`, which supports
     /// both inline segments and resolver-owned storage.
     fn resolve<'a>(&'a self, resolver: &'a Self::Resolver) -> &'a str;
+
+    /// Returns the cross-process stable BLAKE3-128 content address of
+    /// this segment, if available.
+    ///
+    /// `Name` segments and other inline string types return `None` —
+    /// they carry no stable identity beyond the bytes themselves.
+    /// Pool-backed segments (e.g. `Lid<StrTag>` in M2) override this
+    /// default to return the address lazily computed at intern time.
+    ///
+    /// The default impl is `None`, so existing segment types remain
+    /// source-compatible.
+    fn content_id(&self, _resolver: &Self::Resolver) -> Option<[u8; 16]> {
+        None
+    }
 }
 
 impl PathSegment for Name {

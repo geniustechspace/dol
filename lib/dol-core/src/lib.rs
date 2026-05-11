@@ -97,6 +97,8 @@ extern crate alloc;
 // (`[u8; BITS/8]`) that require nightly. The M3 `dol-ir` content index will
 // supersede it.
 // pub mod content_addressing;
+pub mod budget;
+pub mod config;
 pub mod diagnostic;
 #[cfg(feature = "hash")]
 pub mod hash;
