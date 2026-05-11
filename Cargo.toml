@@ -1,31 +1,46 @@
 # ── Workspace ──────────────────────────────────────────────────────────────────
 #
-# DOL is structured as a three-tier workspace with a strict, acyclic dependency
-# DAG. The folder layout intentionally drops the `dol-` prefix; published
-# package names keep it.
+# DOL v2 workspace skeleton (per `dol-rewrite-plan-v2.md` §5.1).
 #
-#   lib/core ──┬──► lib/expr ──┬──► lib/query
-#              ├──► lib/schema ┴──► lib/command ──┬──► lib/wire
-#              └──────────────────┬──► lib/stream ├──► tools/check
-#                                 └──► lib/pipeline│   tools/fmt
-#                                                 └──► backends/<store>
+#   lib/dol-core ──► lib/dol-cas ──► lib/dol-ir ──┬──► lib/dol-wire
+#                                                  └──► lib/dol-query
+#                                                            │
+#                                                            ▼
+#                                                          dol (umbrella)
 #
-#   lib/dol  (umbrella; depends on the layers above; no crate depends on it)
-#
-# Invariants enforced by `cargo deny` and the xtask gates:
+# Invariants enforced by the xtask gates:
 #   * Nothing in `lib/`  may depend on `tools/` or `backends/`.
-#   * `tools/*`  may depend on `lib/*` but not on each other or `backends/`.
-#   * `backends/*` depend only on `lib/command` (+ optionally `lib/wire`).
-#   * No crate depends on `lib/dol`.
+#   * `dol-core` has zero workspace dependencies.
+#   * `dol-cas`  depends only on `dol-core`.
+#   * `dol-ir`   depends only on `dol-cas`, `dol-core`.
+#   * `dol-wire` depends only on `dol-ir`, `dol-core`.
+#   * `dol-query` depends only on `dol-ir`, `dol-core`.
+#   * Backends depend only on `dol-ir` (+ optionally `dol-wire`).
+#
+# The legacy `lib/expr`, `lib/schema`, `lib/command`, `lib/stream`,
+# `lib/pipeline` directories remain on disk as a reference to mine from
+# during M1–M5; they are excluded from the workspace below.
 
 [workspace]
 resolver = "2"
-members  = [
-    "lib/*",
-    "tools/*",
-    # "backends/*"  — re-add when the first backend lands; cargo workspace
-    # globs error out when they match zero crates.
+members = [
+    "lib/dol-core",
+    "lib/dol-cas",
+    "lib/dol-ir",
+    "lib/dol-wire",
+    "lib/dol-query",
+    "dol",
+    "tools/check",
+    "tools/fmt",
     "xtask",
+]
+exclude = [
+    "lib/expr",
+    "lib/schema",
+    "lib/command",
+    "lib/stream",
+    "lib/pipeline",
+    "lib/dol-wire/fuzz",
 ]
 
 [workspace.package]
@@ -35,77 +50,58 @@ rust-version = "1.85"
 publish = false
 
 # ── Workspace-wide lints ─────────────────────────────────────────────────────
-#
-# v2 invariants enforced from the workspace level so every crate inherits them
-# uniformly (each crate root opts in via `[lints] workspace = true`).
-#
-#   * `unsafe_code = "forbid"` is already declared per-crate; reasserted here
-#     so a future crate added without the per-crate attribute still fails
-#     closed.
-#   * The five clippy lints below are workspace-wide `deny`s in v2. Tests carry
-#     the `#![cfg_attr(test, allow(...))]` exemption at every crate root and
-#     standalone test binaries (`tests/*.rs`) use `#![allow(...)]`. Production
-#     call-sites that genuinely cannot panic/overflow (calendar arithmetic,
-#     hashing inner loops, `Vec` capacity hints, post-length-check slice
-#     indexing) carry function-level or block-level `#[allow]` attributes with
-#     a one-line prose justification.
 [workspace.lints.rust]
 unsafe_code = "forbid"
 
 [workspace.lints.clippy]
 # v2 invariant: zero panic-paths in production code. Tests carry the
-# `#![cfg_attr(test, allow(...))]` exemption at every crate root, so these
-# `deny` levels apply only to non-test compilation. Documented invariant
-# panics (e.g. `Interner::intern`'s collision panic, `Symbol::from_hash`'s
-# unreachable arm, the arena overflow guards) carry per-fn `#[allow]`
-# attributes with a prose justification.
+# `#![cfg_attr(test, allow(...))]` exemption at every crate root.
 unwrap_used             = "deny"
 expect_used             = "deny"
 panic                   = "deny"
-# Phase 2 deny-flip: every production call-site has been audited. Sites that
-# legitimately cannot panic/overflow (calendar arithmetic, hashing inner
-# loops, post-length-check slice indexing, `Vec` capacity hints) carry a
-# scoped `#[allow]` with a one-line prose justification at the call-site;
-# everything else has been rewritten to `.get(...).ok_or(...)?` /
-# `checked_*().ok_or(...)?` against the function's existing error type.
 indexing_slicing        = "deny"
 arithmetic_side_effects = "deny"
 
+# ── Workspace-wide dependency pins ───────────────────────────────────────────
+#
+# Pinned per `dol-rewrite-plan-v2.md` §5.1. The plan calls out:
+#
+#   blake3, xxhash-rust, smallvec, serde, postcard      (runtime / codec)
+#   proptest, criterion, insta                          (dev / bench / snapshot)
+#
+# `hashbrown`, `bytemuck`, `serde_json`, `defmt` were used by legacy crates
+# and are kept here so the still-on-disk `lib/{expr,schema,command,…}`
+# directories can be revived under a fresh workspace during M1–M3 reads
+# without a manifest scramble. Survivors should *not* depend on them.
 [workspace.dependencies]
-# ── Collections / utility ────────────────────────────────────────────────────
-smallvec   = { version = "1", features = ["union", "serde"] }
-hashbrown  = { version = "0.15", default-features = false, features = ["default-hasher", "inline-more"] }
-bytemuck   = { version = "1", features = ["derive"] }
+# Hash layer — only dol-core may depend on these directly.
+blake3      = { version = "1", default-features = false }
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
 
-# ── Serialisation ────────────────────────────────────────────────────────────
-serde        = { version = "1", features = ["derive", "rc"] }
-serde_json   = "1"
-postcard     = { version = "1", default-features = false, features = ["alloc"] }
+# Compact inline vec — only dol-core (Path field chain).
+smallvec    = { version = "1", default-features = false }
 
-# ── Hashing ──────────────────────────────────────────────────────────────────
-blake3       = { version = "1", default-features = false }
+# Serialisation — only dol-wire may use full serde derive.
+serde       = { version = "1", default-features = false, features = ["derive", "alloc"] }
+postcard    = { version = "1", default-features = false }
+serde_json  = "1"
 
-# ── Embedded logging ─────────────────────────────────────────────────────────
-# `defmt` is `core`-friendly (no `alloc`) and gives ~10× smaller log code on
-# Cortex-M than `core::fmt::Display` formatters. Pinned to the latest 0.3
-# minor; v2 only emits `defmt::Format` impls under the `defmt` feature.
-defmt        = { version = "0.3", default-features = false }
+# Legacy pins kept for the on-disk reference crates (M1–M3 source).
+hashbrown   = { version = "0.15", default-features = false, features = ["default-hasher", "inline-more"] }
+bytemuck    = { version = "1", features = ["derive"] }
+defmt       = { version = "0.3", default-features = false }
 
-# ── Internal crates ──────────────────────────────────────────────────────────
-# `dol-core` carries `default-features = false` at the workspace level so
-# every consumer that says `dol-core = { workspace = true }` inherits the
-# minimal `no_std + alloc` shape. Crates that need `serde`, `std`, `geo`,
-# `network`, `datetime`, or `numeric` from `dol-core` must forward those
-# explicitly through their own feature flags. This locks v2's "no_std + alloc
-# is default; std is opt-in" invariant in at the workspace edge.
-dol-core     = { path = "lib/core", default-features = false }
-dol-expr     = { path = "lib/expr" }
-dol-schema   = { path = "lib/schema" }
-dol-command  = { path = "lib/command" }
-dol-wire     = { path = "lib/wire" }
-dol-query    = { path = "lib/query" }
-dol-stream   = { path = "lib/stream" }
-dol-pipeline = { path = "lib/pipeline" }
-dol-check    = { path = "tools/check" }
-dol-fmt      = { path = "tools/fmt" }
-dol          = { path = "lib/dol" }
+# Testing
+proptest    = "1"
+criterion   = "0.5"
+insta       = "1"
+
+# ── Internal crates (v2) ─────────────────────────────────────────────────────
+dol-core    = { path = "lib/dol-core", default-features = false }
+dol-cas     = { path = "lib/dol-cas",  default-features = false }
+dol-ir      = { path = "lib/dol-ir",   default-features = false }
+dol-wire    = { path = "lib/dol-wire" }
+dol-query   = { path = "lib/dol-query" }
+dol-check   = { path = "tools/check" }
+dol-fmt     = { path = "tools/fmt" }
+dol         = { path = "dol" }

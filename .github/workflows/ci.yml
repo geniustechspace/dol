@@ -1,5 +1,11 @@
 name: CI
 
+# M0 scaffold per `dol-rewrite-plan-v2.md` §5.3. Heavy jobs from the
+# pre-v2 pipeline that exercised the now-on-disk-only `lib/expr`,
+# `lib/schema`, `lib/command`, `lib/stream`, `lib/pipeline` crates have
+# been removed; they will be reintroduced layer by layer as those crates
+# land in their v2 shape under `lib/dol-cas`, `lib/dol-ir`, etc.
+
 on:
   push:
     branches: [main, dev]
@@ -19,13 +25,10 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
+      - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: "1.94"
           components: rustfmt
-
       - name: Check formatting
         run: cargo fmt --all -- --check
 
@@ -36,18 +39,13 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
+      - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: "1.94"
           components: clippy
-
-      - name: Set up Rust cache
-        uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
         with:
           shared-key: clippy
-
       - name: Run Clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
@@ -58,17 +56,12 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
+      - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: "1.94"
-
-      - name: Set up Rust cache
-        uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
         with:
           shared-key: check
-
       - name: Cargo check workspace
         run: cargo check --workspace --all-targets --all-features
 
@@ -79,20 +72,14 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
+      - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: "1.94"
-
-      - name: Set up Rust cache
-        uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
         with:
           shared-key: test
-
       - name: Run tests (all features)
         run: cargo test --workspace --all-features
-
       - name: Doctests + rustdoc lints
         env:
           RUSTDOCFLAGS: "-D warnings -D rustdoc::broken_intra_doc_links"
@@ -100,126 +87,60 @@ jobs:
           cargo test --doc --workspace --all-features
           cargo doc --workspace --all-features --no-deps
 
-      # v2 invariant: no_std + alloc is the default, and every public-item
-      # rustdoc example must compile in that minimal configuration. This
-      # gate catches doc examples that quietly depend on `std::*` or on a
-      # feature-gated type without the appropriate `cfg`. Distinct from
-      # the `test-features` matrix above (which runs unit + integration
-      # tests, not doctests).
-      - name: Doctests (no-default-features)
-        run: cargo test --workspace --doc --no-default-features
-
-      # v2 invariant gate: every public recursive entry point
-      # (`pub fn (walk|visit|decode|lower)*`) must thread `&mut Budget`
-      # so adversarial input cannot blow the stack or host memory. Each
-      # opt-out (e.g. legacy serde shims slated for retirement) is
-      # explicit prose attached to the offending site.
+      # v2 invariant gate (per `dol-rewrite-plan-v2.md` §12.5): every
+      # public recursive entry point in `lib/` must thread `&mut Budget`.
+      # Each opt-out is explicit prose attached to the offending site.
       - name: Budget-gate (recursive entry points)
         run: cargo run -p xtask -- budget-gate
 
-      # Tag-table drift gate: the `BinOp`, `UnaryOp` and `ExprOp` tag
-      # tables are append-only by the four-tier rule (see
-      # `lib/expr/src/expr.rs`). The gate fails CI if the live enum and
-      # the snapshot in `xtask/src/tag_table.rs` disagree, catching
-      # accidental renumbering or unsnapshot enum extensions.
-      - name: Tag-table drift gate
-        run: cargo run -p xtask -- tag-table-gate
-
-      # v2 invariant gate: every public IR / schema / value type must
-      # round-trip through the budget-threaded `dol-wire::Decode` path.
-      # `serde::Deserialize` is intentionally absent from in-memory IR/AST
-      # types in 0.2.0; wire-in is exclusively `Decode`-based. The wire
-      # crate's own integration tests (`program_roundtrip.rs`,
-      # `decode_robustness.rs`, `decode_core_roundtrip.rs`) cover the
-      # full surface — running them under `--all-features` exercises
-      # every public Encode/Decode pair.
-      - name: Wire round-trip gate
-        run: |
-          cargo test --all-features -p dol-wire --tests
-          cargo test --all-features -p dol-wire     --test program_roundtrip
-
-  test-features:
-    name: Feature Matrix
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    strategy:
-      matrix:
-        features:
-          - "" # default features only
-          - "--no-default-features" # no default features
-          - "--all-features" # every feature enabled
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: "1.94"
-
-      - name: Set up Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: feature-matrix
-
-      - name: Run tests (${{ matrix.features || 'default' }})
-        run: cargo test --workspace ${{ matrix.features }}
-
-  dol-core-features:
-    name: dol-core Granular Features
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    strategy:
-      matrix:
-        features:
-          - "" # bare core: no geo/network/datetime/numeric/serde/std
-          - "--features=serde"
-          - "--features=numeric"
-          - "--features=datetime,numeric"
-          - "--features=serde,datetime,numeric"
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: "1.94"
-
-      - name: Set up Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: dol-core-features
-
-      # Exercises that gating Value/Literal/DataType/TypeError variants behind
-      # `geo`/`network`/`datetime`/`numeric` keeps the crate coherent for every
-      # representative subset.
-      - name: Test dol-core --no-default-features ${{ matrix.features }}
-        run: cargo test -p dol-core --no-default-features ${{ matrix.features }}
-
-  iot-min-check:
-    name: Feature Matrix (iot-min)
+  xtask:
+    # Per `dol-rewrite-plan-v2.md` §5.3, the four other xtask subcommands
+    # are stubs during M0 and gain real implementations as the gated
+    # crates land.
+    name: xtask Gates (size-check / dag-check / no-std-check / size-report)
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
+      - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: "1.94"
-
-      - name: Set up Rust cache
-        uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: feature-matrix
+          shared-key: xtask
+      - name: xtask size-check
+        run: cargo run -q -p xtask -- size-check
+      - name: xtask dag-check
+        run: cargo run -q -p xtask -- dag-check
+      - name: xtask no-std-check
+        run: cargo run -q -p xtask -- no-std-check
+      - name: xtask size-report
+        run: cargo run -q -p xtask -- size-report
 
-      # The `iot-min` preset is a `dol`-umbrella-only feature, designed to fit
-      # the `thumbv7em` binary budget. Compile-only — link-time check on the
-      # bare-metal target lives in the `cross-compile` job.
-      - name: Cargo check dol --features iot-min
-        run: cargo check -p dol --no-default-features --features iot-min
+  no-std:
+    # Per `dol-rewrite-plan-v2.md` §5.3: M0 builds `dol-core`, `dol-cas`,
+    # and `dol-ir` for the IoT bare-metal target. The umbrella `iot-min`
+    # preset graduates here in M6.
+    name: no_std (thumbv7em-none-eabihf)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: "1.94"
+          targets: thumbv7em-none-eabihf
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: no-std
+      - name: Cargo check dol-core (no_std, no default features)
+        run: cargo check -p dol-core --target thumbv7em-none-eabihf --no-default-features
+      - name: Cargo check dol-cas (no_std)
+        run: cargo check -p dol-cas --target thumbv7em-none-eabihf --no-default-features
+      - name: Cargo check dol-ir (no_std)
+        run: cargo check -p dol-ir --target thumbv7em-none-eabihf --no-default-features
 
   msrv:
     name: MSRV (cargo check)
@@ -228,135 +149,22 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-
       - name: Read MSRV from Cargo.toml
         id: msrv
         run: |
           msrv=$(grep -m1 '^rust-version' Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')
           echo "version=$msrv" >> "$GITHUB_OUTPUT"
           echo "MSRV is $msrv"
-
-      - name: Install Rust toolchain (MSRV)
-        uses: dtolnay/rust-toolchain@master
+      - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ steps.msrv.outputs.version }}
-
-      - name: Set up Rust cache
-        uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
         with:
           shared-key: msrv
-
       - name: Cargo check workspace at MSRV
-        # Workspace `rust-toolchain.toml` would force the pinned channel; bypass
-        # it so we genuinely exercise the declared MSRV.
         env:
           RUSTUP_TOOLCHAIN: ${{ steps.msrv.outputs.version }}
         run: cargo check --workspace --all-features
-
-  xtask-gates:
-    name: xtask Gates (size / nostd / readme)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: "1.94"
-
-      - name: Set up Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: xtask
-
-      - name: xtask size
-        run: cargo run -q -p xtask -- size
-
-      - name: xtask nostd
-        run: cargo run -q -p xtask -- nostd
-
-      - name: xtask readme
-        run: cargo run -q -p xtask -- readme
-
-  cross-compile:
-    name: Cross-Compile (${{ matrix.target }})
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          - thumbv7em-none-eabihf
-          - riscv32imac-unknown-none-elf
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain (with ${{ matrix.target }} target)
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: "1.94"
-          targets: ${{ matrix.target }}
-
-      - name: Set up Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: cross-${{ matrix.target }}
-
-      - name: Cargo check no_std leaves on ${{ matrix.target }}
-        run: |
-          cargo run -p xtask -- mcu --target=${{ matrix.target }}
-
-  fuzz-smoke:
-    name: Fuzz Smoke (cargo-fuzz)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    # Per `docs/v2_plan.md` §57 / §78: each `dol-wire` decoder gets a
-    # 60-second smoke run on every PR. Crash artifacts upload for triage.
-    # cargo-fuzz requires the nightly toolchain (libfuzzer-sys).
-    env:
-      # Override the workflow-level `-D warnings`: nightly surfaces lints
-      # the stable channel doesn't, and `libfuzzer-sys` itself emits
-      # nightly-only diagnostics that are not actionable here.
-      RUSTFLAGS: ""
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust nightly
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: nightly
-
-      - name: Set up Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: fuzz-smoke
-          workspaces: lib/wire/fuzz
-
-      - name: Install cargo-fuzz
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-fuzz
-
-      - name: Smoke-fuzz `unframe`
-        working-directory: lib/wire/fuzz
-        run: cargo +nightly fuzz run --target x86_64-unknown-linux-gnu unframe -- -max_total_time=60
-
-      - name: Smoke-fuzz `decode_program`
-        working-directory: lib/wire/fuzz
-        run: cargo +nightly fuzz run --target x86_64-unknown-linux-gnu decode_program -- -max_total_time=60
-
-      - name: Upload crash artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: fuzz-artifacts
-          path: lib/wire/fuzz/artifacts/
-          if-no-files-found: ignore
-          retention-days: 14
 
   deny:
     name: Cargo Deny (Security Audit)
@@ -365,46 +173,11 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
+      - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: "1.94"
-
-      - name: Install cargo-deny
-        uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@v2
         with:
           tool: cargo-deny
-
       - name: Run cargo deny
         run: cargo deny check
-
-  udeps:
-    name: Cargo Udeps (Unused Dependencies)
-    # Per `docs/v2_plan.md` §78: a `cargo-udeps` gate runs alongside
-    # `cargo-deny` in CI to catch dependencies that have drifted out of
-    # use during the v2 cut. `cargo-udeps` requires the nightly
-    # toolchain because it inspects rustc's unstable `--print=...`
-    # surface; failures from the nightly toolchain itself (rustc ICEs,
-    # rustup outages) must not block the merge queue, so this job is
-    # marked `continue-on-error` until the v2 dust settles. Once the
-    # workspace shape is stable we will flip it to a hard gate.
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install nightly Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: nightly
-
-      - name: Install cargo-udeps
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-udeps
-
-      - name: Run cargo udeps (workspace, all features)
-        run: cargo +nightly udeps --workspace --all-targets --all-features

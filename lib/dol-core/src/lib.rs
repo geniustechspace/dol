@@ -5,9 +5,9 @@
 //!
 //! - **Source spans** ([`span`]) — compact `(file, start, length)` triples
 //!   used by every diagnostic and AST node table.
-//! - **Diagnostics** ([`diag`]) — structured, code-driven error reports with
+//! - **Diagnostics** ([`diagnostic`]) — structured, code-driven error reports with
 //!   labels, notes, and fix-its. Used in lieu of panics by every validator.
-//! - **Foundation primitives** ([`policy`], [`id`], [`storage`]) — [`Limits`]
+//! - **Foundation primitives** ([`policy`], [`ids`], [`storage`]) — [`policy::Limits`]
 //!   and [`Budget`] for bounded recursive traversals, [`Id`] for typed
 //!   niche-optimised arena handles (`Option<Id<T>>` is 4 bytes), and the
 //!   [`storage::Storage`] trait that lets future arenas swap their backing
@@ -91,7 +91,12 @@ extern crate alloc;
 
 // ─── Namespaced infrastructure ───────────────────────────────────────────────
 
-pub mod content_addressing;
+// `content_addressing` is preserved on disk as the v1 reference but is not
+// re-exported during the M0 v2 scaffold: it relied on `crate::budget` /
+// `crate::id` paths that no longer exist and on const-generic expressions
+// (`[u8; BITS/8]`) that require nightly. The M3 `dol-ir` content index will
+// supersede it.
+// pub mod content_addressing;
 pub mod diagnostic;
 #[cfg(feature = "hash")]
 pub mod hash;

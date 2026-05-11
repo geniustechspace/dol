@@ -1,0 +1,18 @@
+[package]
+name = "dol-ir"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+description = "DOL — intermediate representation: ExprArena, schema catalog, Operation, Program, Backend. M0 scaffold only."
+
+[dependencies]
+dol-core = { workspace = true }
+dol-cas  = { workspace = true }
+
+[features]
+default = []
+std = ["dol-core/std"]
+
+[lints]
+workspace = true

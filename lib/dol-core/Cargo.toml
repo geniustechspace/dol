@@ -42,7 +42,7 @@ hashbrown = { workspace = true }
 #
 # `core::error::Error` impls on `TypeError` and `ParseMacAddrError` are
 # always available regardless of features (stable since Rust 1.81).
-default = []
+default = ["hash"]
 serde = ["dep:serde", "smallvec/serde"]
 std = ["datetime"]
 geo = []

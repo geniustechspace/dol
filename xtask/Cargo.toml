@@ -4,13 +4,9 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 publish = false
-description = "DOL — workspace task runner (size, nostd, doc, audit)."
-readme = "README.md"
+description = "DOL — workspace task runner (M0 scaffold)."
 
 [dependencies]
-dol-core = { workspace = true }
-dol-expr  = { workspace = true }
-dol-command    = { workspace = true }
 
 [lints]
 workspace = true

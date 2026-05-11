@@ -164,10 +164,12 @@ const fn nibble(n: u8) -> char {
 /// Domain-separated BLAKE3 hasher used by DOL content addressing.
 ///
 /// All BLAKE3 usage stays inside `dol_core::hash`.
+#[allow(missing_docs)] // M0: doc backfill follows in M1 hash-module rewrite.
 pub struct DomainSeparatedHasher {
     inner: blake3::Hasher,
 }
 
+#[allow(missing_docs)] // M0: doc backfill follows in M1 hash-module rewrite.
 impl DomainSeparatedHasher {
     pub fn new(domain: &[u8]) -> Self {
         let mut inner = blake3::Hasher::new();
@@ -198,6 +200,7 @@ impl DomainSeparatedHasher {
     }
 }
 
+#[allow(missing_docs)] // M0: doc backfill follows in M1 hash-module rewrite.
 pub fn hash64(domain: &[u8], bytes: &[u8]) -> [u8; 8] {
     let mut hasher = DomainSeparatedHasher::new(domain);
     hasher.update(bytes);
@@ -207,6 +210,12 @@ pub fn hash64(domain: &[u8], bytes: &[u8]) -> [u8; 8] {
     out
 }
 
+// The previous `hash128`/`hash256` domain-separated helpers below
+// collided in name with the un-domain-separated truncations defined
+// earlier in this file (lines ~95/101). They were never simultaneously
+// callable. Gated out during the M0 scaffold; the M1 rewrite will pick
+// the canonical names per `dol-rewrite-plan-v2.md` §6.3.
+#[cfg(any())]
 pub fn hash128(domain: &[u8], bytes: &[u8]) -> [u8; 16] {
     let mut hasher = DomainSeparatedHasher::new(domain);
     hasher.update(bytes);
@@ -216,6 +225,7 @@ pub fn hash128(domain: &[u8], bytes: &[u8]) -> [u8; 16] {
     out
 }
 
+#[cfg(any())]
 pub fn hash256(domain: &[u8], bytes: &[u8]) -> [u8; 32] {
     let mut hasher = DomainSeparatedHasher::new(domain);
     hasher.update(bytes);

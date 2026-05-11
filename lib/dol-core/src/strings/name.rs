@@ -33,7 +33,7 @@ use core::{borrow::Borrow, cmp::Ordering, fmt, hash::Hash};
 /// Comparison and hashing operate on string content, so these are equivalent:
 ///
 /// ```rust
-/// use dol_core::name::Name;
+/// use dol_core::strings::Name;
 ///
 /// let a = Name::Static("email");
 /// let b = Name::owned("email");

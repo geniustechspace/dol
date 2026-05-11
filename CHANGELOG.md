@@ -7,6 +7,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### v2 rewrite — Phase 0: workspace scaffolding (`dol-rewrite-plan-v2.md` §5)
+
+**M0 sets the v2 workspace skeleton; M1+ content lands in subsequent PRs.**
+
+- **Workspace restructure.** The 9-crate v1 layout collapses to a 5-crate
+  library workspace plus an umbrella per `dol-rewrite-plan-v2.md` §3:
+
+  | Before                                      | After                             |
+  |---------------------------------------------|-----------------------------------|
+  | `lib/core` · `dol-core`                     | `lib/dol-core` · `dol-core`       |
+  | *(none)*                                    | `lib/dol-cas` · `dol-cas` (empty) |
+  | `lib/expr` + `lib/schema` + `lib/command`   | `lib/dol-ir` · `dol-ir` (empty)   |
+  | `lib/wire` · `dol-wire`                     | `lib/dol-wire` · `dol-wire` (thinned) |
+  | `lib/query` · `dol-query`                   | `lib/dol-query` · `dol-query` (thinned) |
+  | `lib/stream` + `lib/pipeline`               | absorbed into `dol-ir` (M3+, plan §3.3) |
+  | `lib/dol` · `dol`                           | `dol/` · `dol` (thinned)          |
+  | `tools/check`, `tools/fmt`                  | thinned stubs against `dol-core`  |
+
+- **Crates excluded from the workspace** but preserved on disk as a
+  reference to mine from during M1–M5: `lib/expr`, `lib/schema`,
+  `lib/command`, `lib/stream`, `lib/pipeline`. Likewise the legacy source
+  of the thinned crates is preserved under `_legacy_src/` and
+  `_legacy_tests/` subfolders in each survivor.
+
+- **New empty scaffold crates.** `lib/dol-cas` (M2 target — content
+  addressing, handles, pools, `StringPool`) and `lib/dol-ir` (M3 target —
+  `ExprArena`, schema catalog, `Operation`, `Program`, `Backend`) are
+  `#![no_std]` placeholders that compile clean today.
+
+- **Workspace dependency pins** added per `dol-rewrite-plan-v2.md` §5.1:
+  `xxhash-rust`, `proptest`, `criterion`, `insta`. The pre-existing
+  `blake3`, `smallvec`, `serde`, `postcard`, `serde_json`, `hashbrown`,
+  `bytemuck`, `defmt` pins are kept; legacy entries are retained so the
+  on-disk reference crates remain build-able under a temporary
+  side-workspace during M1–M3 reads.
+
+- **`xtask` rewritten** to the five subcommands listed in
+  `dol-rewrite-plan-v2.md` §5.2:
+
+  | command         | M0 status                                         |
+  |-----------------|---------------------------------------------------|
+  | `budget-gate`   | Real impl carried over from v1; scans every `pub fn (walk|visit|decode|lower|content_hash)_*` in `lib/`. |
+  | `size-check`    | Exit-0 stub; real impl in M3 once `ExprNode` exists. |
+  | `dag-check`     | Exit-0 stub; real impl when more than scaffold crates have content. |
+  | `no-std-check`  | Exit-0 stub; CI invokes `cargo check --target thumbv7em-none-eabihf` directly. |
+  | `size-report`   | Exit-0 stub; real impl in M6 with the IoT preset. |
+
+- **CI** (`.github/workflows/ci.yml`) trimmed of jobs that depended on
+  excluded crates and re-shaped around M0:
+  - **kept:** `fmt`, `clippy`, `check`, `test` (with budget-gate step),
+    `msrv`, `deny`.
+  - **added:** `xtask` job runs the four new M0 stub commands;
+    `no-std` job builds `dol-core` / `dol-cas` / `dol-ir` for
+    `thumbv7em-none-eabihf` per `dol-rewrite-plan-v2.md` §5.3.
+  - **removed:** `test-features`, `dol-core-features`, `iot-min-check`,
+    `xtask-gates`, `cross-compile`, `fuzz-smoke`, `udeps`, and the wire
+    round-trip / tag-table gates — all depended on excluded crates or
+    feature surfaces that no longer exist. They graduate back layer by
+    layer as the v2 content lands.
+
+- **Pre-existing dol-core bugs** uncovered by the workspace cleanup and
+  patched minimally to get a green M0 build (M1 rewrites the module
+  anyway):
+  - `pub mod content_addressing` removed from `lib/dol-core/src/lib.rs`
+    (referenced `crate::budget`/`crate::id` paths that never existed,
+    plus const-generic expressions that require nightly).
+  - Duplicate `hash128`/`hash256` definitions in `lib/dol-core/src/hash.rs`
+    gated out with `#[cfg(any())]`.
+  - `strings::interner` and the `PathSegment for StrId` impl gated behind
+    the existing `hash` feature.
+  - Broken intra-doc links in `lib/dol-core/src/lib.rs` (`diag`, `id`)
+    redirected to their real module paths.
+  - `hash` is now a default feature of `dol-core` (matches what every
+    pre-PR consumer was already enabling).
+
+- **Workspace serde pin** changed to
+  `serde = { default-features = false, features = ["derive", "alloc"] }`
+  (was: default features on). Adding `alloc` is the no_std-friendly
+  equivalent and unblocks dol-core's `String: Serialize` usage.
+
+### Explicitly NOT in this PR
+
+No M1+ content: no `Name`, no `PathSegment`, no `StringPool`, no
+`ExprArena` reshape, no backends. Those land in PR #2 onwards as M1
+(`dol-core`), M2 (`dol-cas`), M3 (`dol-ir` + first backend), and so on.
+
 ### Crate-boundary review follow-up (PR 11)
 
 - Re-extracted **`dol-stream`** and **`dol-pipeline`** as standalone crates.

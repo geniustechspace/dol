@@ -4,25 +4,10 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 publish = false
-description = "DOL — static validator: type, schema, capability, and lint checks."
-readme = "README.md"
+description = "DOL — static validator. M0 scaffold only; rebuilds atop dol-ir during M3+."
 
 [dependencies]
-dol-core   = { workspace = true }
-dol-expr   = { workspace = true }
-dol-schema = { workspace = true }
-dol-command     = { workspace = true }
-serde      = { workspace = true, optional = true }
-
-[features]
-default = []
-serde   = [
-    "dep:serde",
-    "dol-core/serde",
-    "dol-expr/serde",
-    "dol-schema/serde",
-    "dol-command/serde",
-]
+dol-core = { workspace = true }
 
 [lints]
 workspace = true

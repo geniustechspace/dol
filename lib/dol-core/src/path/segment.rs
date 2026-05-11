@@ -9,7 +9,9 @@
 
 use core::{fmt, hash::Hash};
 
-use crate::strings::{Interner, Name, StrId};
+use crate::strings::Name;
+#[cfg(feature = "hash")]
+use crate::strings::{Interner, StrId};
 
 /// A value that can be stored as a segment inside a [`Path`](super::Path).
 ///
@@ -45,6 +47,7 @@ impl PathSegment for Name {
     }
 }
 
+#[cfg(feature = "hash")]
 impl PathSegment for StrId {
     type Resolver = Interner;
 

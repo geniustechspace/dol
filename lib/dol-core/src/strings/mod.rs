@@ -10,9 +10,11 @@
 //! non-string payloads should live in their own arenas or pools.
 
 mod ids;
+#[cfg(feature = "hash")]
 mod interner;
 mod name;
 
 pub use ids::{StrId, StrTag};
+#[cfg(feature = "hash")]
 pub use interner::{InternError, Interner};
 pub use name::Name;

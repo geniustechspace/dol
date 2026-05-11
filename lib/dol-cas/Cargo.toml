@@ -1,13 +1,17 @@
 [package]
-name = "dol-fmt"
+name = "dol-cas"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 publish = false
-description = "DOL — canonical pretty-printer. M0 scaffold only; rebuilds atop dol-ir during M3+."
+description = "DOL — content addressing system. Lid / Cid / Gid handles, pools, StringPool. M0 scaffold only."
 
 [dependencies]
 dol-core = { workspace = true }
+
+[features]
+default = []
+std = ["dol-core/std"]
 
 [lints]
 workspace = true
