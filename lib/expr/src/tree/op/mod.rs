@@ -1,7 +1,7 @@
 //! Operators for DOL expressions.
 //!
 //! Submodules:
-//! - [`meta`]     — operator metadata: kind, arity, symbol
+//! - [`meta`]     — operator metadata: name and category
 //! - [`registry`] — built-in operator registry
 
 pub mod meta;

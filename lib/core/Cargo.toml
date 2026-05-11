@@ -17,9 +17,10 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 smallvec = { workspace = true }
-serde    = { workspace = true, optional = true }
-blake3   = { workspace = true, optional = true }
-defmt    = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+blake3 = { workspace = true, optional = true }
+defmt = { workspace = true, optional = true }
+hashbrown = { workspace = true }
 
 [features]
 # ── Cargo features ───────────────────────────────────────────────────────────
@@ -41,23 +42,23 @@ defmt    = { workspace = true, optional = true }
 #
 # `core::error::Error` impls on `TypeError` and `ParseMacAddrError` are
 # always available regardless of features (stable since Rust 1.81).
-default  = []
-serde    = ["dep:serde", "smallvec/serde"]
-std      = ["datetime"]
-geo      = []
-network  = []
+default = []
+serde = ["dep:serde", "smallvec/serde"]
+std = ["datetime"]
+geo = []
+network = []
 datetime = []
-numeric  = []
+numeric = []
 # `hash` enables the `dol_core::hash` chokepoint module — the only place
 # in the workspace allowed to call `blake3` directly. Off by default to
 # preserve the minimal `no_std + alloc` shape; opt-in for crates that
 # need content-hashing (`dol-wire`, future `Signed<T>` envelopes).
-hash     = ["dep:blake3"]
+hash = ["dep:blake3"]
 # `defmt` opts the embedded-friendly `defmt::Format` impls in on
 # `ErrorCode` and `Span`. Replaces `core::fmt::Display` for ~10× smaller
 # log code on Cortex-M (per `docs/v2_plan.md` §32). Off by default —
 # only embedded users (RTIC, Embassy, …) opt in.
-defmt    = ["dep:defmt"]
+defmt = ["dep:defmt"]
 
 [dev-dependencies]
 serde_json = { workspace = true }

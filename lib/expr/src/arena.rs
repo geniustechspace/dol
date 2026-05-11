@@ -3,12 +3,14 @@ use alloc::vec::Vec;
 use hashbrown::HashMap;
 use smallvec::SmallVec;
 
+use dol_core::strings::StrId;
+use dol_core::{Id, Literal};
+
 use crate::expr::{DeleteNode, ExprNode, InsertNode, Order, QueryNode, UpdateNode, UpsertNode};
 use crate::ids::{
-    CaseId, CompositeId, DeleteId, FieldId, FuncId, Id, InsertId, LiteralId, NodeId, QueryId,
-    SpanId, StrId, UpdateId, UpsertId, WindowId,
+    CaseId, CompositeId, DeleteId, FieldId, FuncId, InsertId, LiteralId, NodeId, QueryId, SpanId,
+    UpdateId, UpsertId, WindowId,
 };
-use crate::types::value::Literal;
 
 /// Allocate `item` in `vec` and return its [`Id<Tag>`].
 ///
@@ -194,12 +196,6 @@ pub struct CaseNode {
     pub branches: SmallVec<[(NodeId, NodeId); 4]>,
     pub else_: Option<NodeId>,
 }
-
-// ─── ArrayLitNode (removed) ──────────────────────────────────────────────────
-// `ArrayLitNode` and `InListNode` were collapsed into `CompositeNode`
-// (see above) when `ExprOp::ArrayLit` and `ExprOp::InList`/
-// `ExprOp::InSub` were collapsed onto `ExprOp::Composite` and
-// `ExprOp::In`.
 
 // ─── SpanTable ────────────────────────────────────────────────────────────────
 

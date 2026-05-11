@@ -9,18 +9,12 @@
 //! There is **no** `NULL_NODE` sentinel; "missing" ids are encoded as
 //! `Option<…Id>`, which costs the same four bytes thanks to the niche.
 
-pub use dol_core::id::Id;
+pub use dol_core::ids::Id;
 
 /// Tag for `ExprArena::nodes` ids. Phantom marker; never instantiated.
 pub enum NodeTag {}
 /// Index into `ExprArena::nodes`.
 pub type NodeId = Id<NodeTag>;
-
-/// Tag for [`crate::Interner`] string ids. Phantom marker.
-pub enum StrTag {}
-/// Content-addressed id for an interned string (leading 32 bits of
-/// BLAKE3, stored one-based to fit the `NonZeroU32` niche).
-pub type StrId = Id<StrTag>;
 
 /// Tag for `TypeArena::types` ids. Phantom marker.
 pub enum TypeTag {}

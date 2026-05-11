@@ -1,35 +1,48 @@
-//! Function metadata and traits for well-known DOL functions.
+//! Function metadata: [`Arity`], [`FuncKind`], [`FuncDef`], the [`DolFunc`]
+//! trait, and the [`define_func!`] macro.
+//!
+//! This module is the single source of truth for what a DOL function *is*.
+//! It deliberately contains no string-constant catalogue — that lives in
+//! [`super::registry`], where each entry is a zero-sized struct that implements
+//! [`DolFunc`].
 
 use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 use core::fmt;
 
-use super::super::compact_name::CompactName;
+use dol_core::strings::Name;
 
-/// Describes the expected argument count for a function.
+use super::super::Expr;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Arity
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Describes the expected argument count for a DOL function.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum Arity {
     /// Exactly `n` arguments required.
     Exact(u8),
-    /// At least `n` arguments required (variadic).
+    /// At least `n` arguments required (variadic tail).
     AtLeast(u8),
-    /// Between `lo` and `hi` arguments (inclusive).
+    /// Between `low` and `high` arguments inclusive.
     Range(u8, u8),
-    /// Any number of arguments (no validation).
+    /// Any number of arguments accepted (no validation).
     Any,
 }
 
-/// Error from arity validation.
+/// Error returned by [`FuncDef::validate_arity`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArityError {
-    /// The function name that failed validation.
+    /// The name of the function that failed validation.
     pub func_name: String,
-    /// The arity constraint.
+    /// The constraint declared for this function.
     pub expected: Arity,
-    /// The actual number of arguments provided.
+    /// The number of arguments actually supplied.
     pub actual: usize,
 }
 
@@ -42,7 +55,7 @@ impl fmt::Display for ArityError {
             match self.expected {
                 Arity::Exact(n) => format!("exactly {n}"),
                 Arity::AtLeast(n) => format!("at least {n}"),
-                Arity::Range(lo, hi) => format!("{lo}..={hi}"),
+                Arity::Range(low, high) => format!("{low}..={high}"),
                 Arity::Any => "any number of".to_string(),
             },
             self.actual,
@@ -50,7 +63,11 @@ impl fmt::Display for ArityError {
     }
 }
 
-/// Classification of a DOL function.
+// ─────────────────────────────────────────────────────────────────────────────
+// FuncKind
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Broad category of a DOL function.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
@@ -59,70 +76,82 @@ pub enum FuncKind {
     Scalar,
     /// An aggregate function (e.g. `COUNT`, `SUM`, `AVG`).
     Aggregate,
-    /// A window/ranking function (e.g. `ROW_NUMBER`, `RANK`).
+    /// A window / ranking function (e.g. `ROW_NUMBER`, `RANK`).
     Window,
 }
 
-/// A rich function definition: name + arity + kind.
+// ─────────────────────────────────────────────────────────────────────────────
+// FuncDef
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Runtime carrier for a function definition: name + arity + kind.
+///
+/// For well-known functions, prefer constructing via [`DolFunc::def()`] — it
+/// is allocation-free and always in sync with the registry.  Use
+/// [`FuncDef::custom`] / [`FuncDef::custom_with`] only for user-defined or
+/// backend-specific functions that have no registry entry.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct FuncDef {
-    name: CompactName,
+    name: Name,
     arity: Arity,
     kind: FuncKind,
 }
 
 impl FuncDef {
-    /// Create a new function definition (used by the `DolFunc` trait).
+    /// Construct from compile-time-known constants.  Zero allocation.
+    ///
+    /// Prefer [`DolFunc::def()`] over calling this directly.
     pub const fn new_static(name: &'static str, arity: Arity, kind: FuncKind) -> Self {
         Self {
-            name: CompactName::Static(name),
+            name: Name::Static(name),
             arity,
             kind,
         }
     }
 
-    /// Create a custom function definition.
+    /// Construct a custom function definition.
     ///
-    /// Custom functions default to `Arity::Any` and `FuncKind::Scalar`.
+    /// Defaults to [`Arity::Any`] and [`FuncKind::Scalar`].
     pub fn custom(name: impl Into<Box<str>>) -> Self {
         Self {
-            name: CompactName::Owned(name.into()),
+            name: Name::Owned(name.into()),
             arity: Arity::Any,
             kind: FuncKind::Scalar,
         }
     }
 
-    /// Create a custom function with explicit arity and kind.
+    /// Construct a custom function with explicit arity and kind.
     pub fn custom_with(name: impl Into<Box<str>>, arity: Arity, kind: FuncKind) -> Self {
         Self {
-            name: CompactName::Owned(name.into()),
+            name: Name::Owned(name.into()),
             arity,
             kind,
         }
     }
 
-    /// Return the function name as a string.
+    /// The function name.
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
 
-    /// Return the arity constraint.
+    /// The arity constraint.
     pub fn arity(&self) -> Arity {
         self.arity
     }
 
-    /// Return the function kind.
+    /// The function category.
     pub fn kind(&self) -> FuncKind {
         self.kind
     }
 
-    /// Validate argument count against the arity constraint.
+    /// Returns `Ok(())` when `arg_count` satisfies the arity constraint, or an
+    /// [`ArityError`] otherwise.
     pub fn validate_arity(&self, arg_count: usize) -> Result<(), ArityError> {
         let ok = match self.arity {
             Arity::Exact(n) => arg_count == n as usize,
             Arity::AtLeast(n) => arg_count >= n as usize,
-            Arity::Range(lo, hi) => arg_count >= lo as usize && arg_count <= hi as usize,
+            Arity::Range(low, high) => arg_count >= low as usize && arg_count <= high as usize,
             Arity::Any => true,
         };
         if ok {
@@ -135,232 +164,6 @@ impl FuncDef {
             })
         }
     }
-
-    /// Returns `true` if this is a well-known no-parens SQL keyword
-    /// (e.g. `CURRENT_DATE`).
-    pub fn is_no_parens_keyword(&self) -> bool {
-        matches!(
-            self.name(),
-            "CURRENT_DATE" | "CURRENT_TIME" | "CURRENT_TIMESTAMP"
-        )
-    }
-
-    // Aggregate
-    pub const COUNT: &str = "COUNT";
-    pub const COUNT_DISTINCT: &str = "COUNT_DISTINCT";
-    pub const SUM: &str = "SUM";
-    pub const AVG: &str = "AVG";
-    pub const MIN: &str = "MIN";
-    pub const MAX: &str = "MAX";
-    pub const MEDIAN: &str = "MEDIAN";
-    pub const STDDEV: &str = "STDDEV";
-    pub const VARIANCE: &str = "VARIANCE";
-    pub const ARRAY_AGG: &str = "ARRAY_AGG";
-    pub const STRING_AGG: &str = "STRING_AGG";
-    pub const JSON_AGG: &str = "JSON_AGG";
-    pub const BOOL_AND: &str = "BOOL_AND";
-    pub const BOOL_OR: &str = "BOOL_OR";
-    pub const FIRST: &str = "FIRST";
-    pub const LAST: &str = "LAST";
-
-    // String
-    pub const LOWER: &str = "LOWER";
-    pub const UPPER: &str = "UPPER";
-    pub const TRIM: &str = "TRIM";
-    pub const LTRIM: &str = "LTRIM";
-    pub const RTRIM: &str = "RTRIM";
-    pub const LENGTH: &str = "LENGTH";
-    pub const CHAR_LENGTH: &str = "CHAR_LENGTH";
-    pub const OCTET_LENGTH: &str = "OCTET_LENGTH";
-    pub const SUBSTR: &str = "SUBSTR";
-    pub const LEFT: &str = "LEFT";
-    pub const RIGHT: &str = "RIGHT";
-    pub const CONCAT: &str = "CONCAT";
-    pub const CONCAT_WS: &str = "CONCAT_WS";
-    pub const REPLACE: &str = "REPLACE";
-    pub const REVERSE: &str = "REVERSE";
-    pub const REPEAT: &str = "REPEAT";
-    pub const PAD_LEFT: &str = "PAD_LEFT";
-    pub const PAD_RIGHT: &str = "PAD_RIGHT";
-    pub const POSITION: &str = "POSITION";
-    pub const INITCAP: &str = "INITCAP";
-    pub const ASCII: &str = "ASCII";
-    pub const CHR: &str = "CHR";
-    pub const MD5: &str = "MD5";
-    pub const SHA256: &str = "SHA256";
-    pub const BASE64_ENCODE: &str = "BASE64_ENCODE";
-    pub const BASE64_DECODE: &str = "BASE64_DECODE";
-    pub const REGEX_REPLACE: &str = "REGEX_REPLACE";
-    pub const REGEX_EXTRACT: &str = "REGEX_EXTRACT";
-    pub const SPLIT: &str = "SPLIT";
-    pub const SPLIT_PART: &str = "SPLIT_PART";
-    pub const FORMAT: &str = "FORMAT";
-    pub const STARTS_WITH: &str = "STARTS_WITH";
-    pub const CONTAINS: &str = "CONTAINS";
-    pub const TO_HEX: &str = "TO_HEX";
-
-    // Numeric / Math
-    pub const ABS: &str = "ABS";
-    pub const CEIL: &str = "CEIL";
-    pub const FLOOR: &str = "FLOOR";
-    pub const ROUND: &str = "ROUND";
-    pub const TRUNC: &str = "TRUNC";
-    pub const SIGN: &str = "SIGN";
-    pub const POWER: &str = "POWER";
-    pub const SQRT: &str = "SQRT";
-    pub const CBRT: &str = "CBRT";
-    pub const EXP: &str = "EXP";
-    pub const LN: &str = "LN";
-    pub const LOG: &str = "LOG";
-    pub const LOG2: &str = "LOG2";
-    pub const LOG10: &str = "LOG10";
-    pub const PI: &str = "PI";
-    pub const DEGREES: &str = "DEGREES";
-    pub const RADIANS: &str = "RADIANS";
-    pub const SIN: &str = "SIN";
-    pub const COS: &str = "COS";
-    pub const TAN: &str = "TAN";
-    pub const ASIN: &str = "ASIN";
-    pub const ACOS: &str = "ACOS";
-    pub const ATAN: &str = "ATAN";
-    pub const ATAN2: &str = "ATAN2";
-    pub const SINH: &str = "SINH";
-    pub const COSH: &str = "COSH";
-    pub const TANH: &str = "TANH";
-    pub const FACTORIAL: &str = "FACTORIAL";
-    pub const GCD: &str = "GCD";
-    pub const LCM: &str = "LCM";
-    pub const RANDOM: &str = "RANDOM";
-    pub const GREATEST: &str = "GREATEST";
-    pub const LEAST: &str = "LEAST";
-
-    // Date / Time
-    pub const NOW: &str = "NOW";
-    pub const CURRENT_DATE: &str = "CURRENT_DATE";
-    pub const CURRENT_TIME: &str = "CURRENT_TIME";
-    pub const CURRENT_TIMESTAMP: &str = "CURRENT_TIMESTAMP";
-    pub const DATE_PART: &str = "DATE_PART";
-    pub const DATE_TRUNC: &str = "DATE_TRUNC";
-    pub const EXTRACT: &str = "EXTRACT";
-    pub const DATE_ADD: &str = "DATE_ADD";
-    pub const DATE_SUB: &str = "DATE_SUB";
-    pub const DATE_DIFF: &str = "DATE_DIFF";
-    pub const AGE: &str = "AGE";
-    pub const TO_DATE: &str = "TO_DATE";
-    pub const TO_TIMESTAMP: &str = "TO_TIMESTAMP";
-    pub const YEAR: &str = "YEAR";
-    pub const MONTH: &str = "MONTH";
-    pub const DAY: &str = "DAY";
-    pub const HOUR: &str = "HOUR";
-    pub const MINUTE: &str = "MINUTE";
-    pub const SECOND: &str = "SECOND";
-    pub const DAY_OF_WEEK: &str = "DAY_OF_WEEK";
-    pub const DAY_OF_YEAR: &str = "DAY_OF_YEAR";
-    pub const WEEK_OF_YEAR: &str = "WEEK_OF_YEAR";
-    pub const QUARTER: &str = "QUARTER";
-    pub const MAKE_DATE: &str = "MAKE_DATE";
-    pub const MAKE_TIME: &str = "MAKE_TIME";
-    pub const MAKE_TIMESTAMP: &str = "MAKE_TIMESTAMP";
-    pub const EPOCH_TO_TIMESTAMP: &str = "EPOCH_TO_TIMESTAMP";
-    pub const TIMESTAMP_TO_EPOCH: &str = "TIMESTAMP_TO_EPOCH";
-
-    // Null-handling
-    pub const COALESCE: &str = "COALESCE";
-    pub const NULLIF: &str = "NULLIF";
-    pub const IFNULL: &str = "IFNULL";
-
-    // Type conversion
-    pub const TYPEOF: &str = "TYPEOF";
-    pub const TO_TEXT: &str = "TO_TEXT";
-    pub const TO_INT: &str = "TO_INT";
-    pub const TO_FLOAT: &str = "TO_FLOAT";
-    pub const TO_BOOL: &str = "TO_BOOL";
-
-    // JSON / Document
-    pub const JSON_GET: &str = "JSON_GET";
-    pub const JSON_GET_TEXT: &str = "JSON_GET_TEXT";
-    pub const JSON_PATH: &str = "JSON_PATH";
-    pub const JSON_PATH_TEXT: &str = "JSON_PATH_TEXT";
-    pub const JSON_HAS_KEY: &str = "JSON_HAS_KEY";
-    pub const JSON_HAS_ANY_KEY: &str = "JSON_HAS_ANY_KEY";
-    pub const JSON_HAS_ALL_KEYS: &str = "JSON_HAS_ALL_KEYS";
-    pub const JSON_SET: &str = "JSON_SET";
-    pub const JSON_INSERT: &str = "JSON_INSERT";
-    pub const JSON_REMOVE: &str = "JSON_REMOVE";
-    pub const JSON_REPLACE: &str = "JSON_REPLACE";
-    pub const JSON_MERGE_PATCH: &str = "JSON_MERGE_PATCH";
-    pub const JSON_ARRAY: &str = "JSON_ARRAY";
-    pub const JSON_OBJECT: &str = "JSON_OBJECT";
-    pub const JSON_ARRAY_LENGTH: &str = "JSON_ARRAY_LENGTH";
-    pub const JSON_KEYS: &str = "JSON_KEYS";
-    pub const JSON_VALUES: &str = "JSON_VALUES";
-    pub const JSON_TYPEOF: &str = "JSON_TYPEOF";
-
-    // Array / Collection
-    pub const ARRAY_LENGTH: &str = "ARRAY_LENGTH";
-    pub const ARRAY_POSITION: &str = "ARRAY_POSITION";
-    pub const ARRAY_APPEND: &str = "ARRAY_APPEND";
-    pub const ARRAY_PREPEND: &str = "ARRAY_PREPEND";
-    pub const ARRAY_REMOVE: &str = "ARRAY_REMOVE";
-    pub const ARRAY_CAT: &str = "ARRAY_CAT";
-    pub const ARRAY_DISTINCT: &str = "ARRAY_DISTINCT";
-    pub const ARRAY_SORT: &str = "ARRAY_SORT";
-    pub const ARRAY_REVERSE: &str = "ARRAY_REVERSE";
-    pub const ARRAY_SLICE: &str = "ARRAY_SLICE";
-    pub const ARRAY_FLATTEN: &str = "ARRAY_FLATTEN";
-    pub const UNNEST: &str = "UNNEST";
-    pub const ARRAY_TO_STRING: &str = "ARRAY_TO_STRING";
-    pub const STRING_TO_ARRAY: &str = "STRING_TO_ARRAY";
-
-    // Object / Map
-    pub const MAP_MERGE: &str = "MAP_MERGE";
-    pub const MAP_GET: &str = "MAP_GET";
-    pub const MAP_KEYS: &str = "MAP_KEYS";
-    pub const MAP_VALUES: &str = "MAP_VALUES";
-    pub const MAP_CONTAINS_KEY: &str = "MAP_CONTAINS_KEY";
-    pub const MAP_REMOVE_KEY: &str = "MAP_REMOVE_KEY";
-
-    // Range operations
-    pub const RANGE_CONTAINS: &str = "RANGE_CONTAINS";
-    pub const RANGE_CONTAINED_BY: &str = "RANGE_CONTAINED_BY";
-    pub const RANGE_OVERLAP: &str = "RANGE_OVERLAP";
-    pub const RANGE_LOWER: &str = "RANGE_LOWER";
-    pub const RANGE_UPPER: &str = "RANGE_UPPER";
-    pub const RANGE_IS_EMPTY: &str = "RANGE_IS_EMPTY";
-
-    // Window / Ranking
-    pub const ROW_NUMBER: &str = "ROW_NUMBER";
-    pub const RANK: &str = "RANK";
-    pub const DENSE_RANK: &str = "DENSE_RANK";
-    pub const NTILE: &str = "NTILE";
-    pub const LAG: &str = "LAG";
-    pub const LEAD: &str = "LEAD";
-    pub const FIRST_VALUE: &str = "FIRST_VALUE";
-    pub const LAST_VALUE: &str = "LAST_VALUE";
-    pub const NTH_VALUE: &str = "NTH_VALUE";
-    pub const CUME_DIST: &str = "CUME_DIST";
-    pub const PERCENT_RANK: &str = "PERCENT_RANK";
-
-    // UUID
-    pub const GEN_RANDOM_UUID: &str = "GEN_RANDOM_UUID";
-
-    // Geo / Spatial
-    pub const ST_CONTAINS: &str = "ST_CONTAINS";
-    pub const ST_INTERSECTS: &str = "ST_INTERSECTS";
-    pub const ST_WITHIN: &str = "ST_WITHIN";
-    pub const ST_AREA: &str = "ST_AREA";
-    pub const ST_LENGTH: &str = "ST_LENGTH";
-    pub const ST_DISTANCE: &str = "ST_DISTANCE";
-    pub const ST_BUFFER: &str = "ST_BUFFER";
-    pub const ST_CENTROID: &str = "ST_CENTROID";
-    pub const ST_AS_TEXT: &str = "ST_AS_TEXT";
-    pub const ST_GEOM_FROM_TEXT: &str = "ST_GEOM_FROM_TEXT";
-
-    // Hashing / Encoding
-    pub const HASH: &str = "HASH";
-    pub const CRC32: &str = "CRC32";
-    pub const HEX_ENCODE: &str = "HEX_ENCODE";
-    pub const HEX_DECODE: &str = "HEX_DECODE";
 }
 
 impl fmt::Display for FuncDef {
@@ -387,32 +190,145 @@ impl From<&FuncDef> for Cow<'_, str> {
     }
 }
 
-/// Trait implemented by zero-sized structs representing well-known DOL functions.
+// ─────────────────────────────────────────────────────────────────────────────
+// DolFunc trait
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Implemented by zero-sized structs representing well-known DOL functions.
+///
+/// Use [`define_func!`] to generate the implementation.  Backends extend
+/// individual registry structs with additional backend-specific traits:
+///
+/// ```ignore
+/// // in the postgres backend crate
+/// pub trait PostgresFunc: DolFunc {
+///     fn pg_name() -> &'static str { Self::NAME }
+/// }
+/// impl PostgresFunc for dol_expr::tree::func::registry::PadLeft {
+///     fn pg_name() -> &'static str { "LPAD" }
+/// }
+/// ```
 pub trait DolFunc: Sized + 'static {
-    /// The canonical DOL name for this function.
+    /// Canonical DOL name (e.g. `"LOWER"`).
     const NAME: &'static str;
-    /// The arity constraint.
+    /// Arity constraint.
     const ARITY: Arity;
-    /// The function category.
+    /// Function category.
     const KIND: FuncKind;
 
-    /// Build a [`FuncDef`] from the trait constants.
+    /// Build the [`FuncDef`] runtime carrier from trait constants.
+    ///
+    /// Allocation-free; suitable for `const` contexts via
+    /// [`FuncDef::new_static`].
     fn def() -> FuncDef {
         FuncDef::new_static(Self::NAME, Self::ARITY, Self::KIND)
     }
+
+    /// Build a function-call [`Expr`] node with the given arguments.
+    ///
+    /// Arity is **not** validated here; call [`FuncDef::validate_arity`]
+    /// explicitly on the result's `name` field when you need a checked path
+    /// (e.g. in `try_build`).
+    fn call<'a>(args: Vec<Expr<'a>>) -> Expr<'a> {
+        Expr::Func {
+            name: Self::def(),
+            args,
+        }
+    }
 }
 
-/// Declare a zero-sized struct implementing [`DolFunc`].
+// ─────────────────────────────────────────────────────────────────────────────
+// define_func! macro
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Declare a zero-sized struct that implements [`DolFunc`].
+///
+/// # Forms
+///
+/// **Base** — struct + `DolFunc` impl only.  Use `Foo::call(args)` to build
+/// an [`Expr`] node.
+/// ```ignore
+/// define_func!(Lower, "LOWER", Arity::Exact(1), FuncKind::Scalar);
+/// ```
+///
+/// **Zero-arg builder** — also emits `pub fn now<'a>() -> Expr<'a>`.
+/// ```ignore
+/// define_func!(Now, "NOW", Arity::Exact(0), FuncKind::Scalar,
+///     builder = now());
+/// ```
+///
+/// **Fixed-arity builder** — emits a typed free function with one `impl
+/// Into<Expr<'a>>` parameter per argument name.
+/// ```ignore
+/// define_func!(Upper, "UPPER", Arity::Exact(1), FuncKind::Scalar,
+///     builder = upper(s));
+///
+/// define_func!(Nullif, "NULLIF", Arity::Exact(2), FuncKind::Scalar,
+///     builder = nullif(a, b));
+/// ```
+///
+/// **Variadic builder** — emits a free function taking `Vec<Expr<'a>>`.
+/// ```ignore
+/// define_func!(Concat, "CONCAT", Arity::AtLeast(1), FuncKind::Scalar,
+///     builder = concat(*));
+/// ```
+///
+/// # Notes
+///
+/// - Builder functions are emitted in the same module as the `define_func!`
+///   invocation; re-export them from `func::mod` as needed.
+/// - For functions with optional trailing arguments (e.g. `LAG`, `ROUND`),
+///   write a hand-rolled builder in `func::mod` rather than forcing an
+///   optional-arg pattern through the macro.
+/// - Backends receive no builder — they use `registry::Foo::call(args)` or
+///   impl their own extension trait on the zero-sized struct.
 #[macro_export]
 macro_rules! define_func {
+    // ── base: struct + DolFunc impl only ─────────────────────────────────
     ($struct_name:ident, $name:expr, $arity:expr, $kind:expr) => {
-        #[derive(Debug, Clone, Copy)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         pub struct $struct_name;
 
-        impl $crate::tree::func::def::DolFunc for $struct_name {
+        impl $crate::tree::func::meta::DolFunc for $struct_name {
             const NAME: &'static str = $name;
-            const ARITY: $crate::tree::func::def::Arity = $arity;
-            const KIND: $crate::tree::func::def::FuncKind = $kind;
+            const ARITY: $crate::tree::func::meta::Arity = $arity;
+            const KIND: $crate::tree::func::meta::FuncKind = $kind;
+        }
+    };
+
+    // ── zero-arg builder ──────────────────────────────────────────────────
+    ($struct_name:ident, $name:expr, $arity:expr, $kind:expr,
+     builder = $fn_name:ident()) => {
+        $crate::define_func!($struct_name, $name, $arity, $kind);
+
+        pub fn $fn_name<'a>() -> $crate::tree::Expr<'a> {
+            <$struct_name as $crate::tree::func::meta::DolFunc>::call(::alloc::vec![])
+        }
+    };
+
+    // ── fixed-arity builder (1 … N positional args) ───────────────────────
+    ($struct_name:ident, $name:expr, $arity:expr, $kind:expr,
+     builder = $fn_name:ident($($arg:ident),+)) => {
+        $crate::define_func!($struct_name, $name, $arity, $kind);
+
+        pub fn $fn_name<'a>(
+            $($arg: impl Into<$crate::tree::Expr<'a>>),+
+        ) -> $crate::tree::Expr<'a> {
+            <$struct_name as $crate::tree::func::meta::DolFunc>::call(
+                ::alloc::vec![$($arg.into()),+],
+            )
+        }
+    };
+
+    // ── variadic builder (Vec<Expr>) ──────────────────────────────────────
+    ($struct_name:ident, $name:expr, $arity:expr, $kind:expr,
+     builder = $fn_name:ident(*)) => {
+        $crate::define_func!($struct_name, $name, $arity, $kind);
+
+        pub fn $fn_name<'a>(
+            args: ::alloc::vec::Vec<$crate::tree::Expr<'a>>,
+        ) -> $crate::tree::Expr<'a> {
+            <$struct_name as $crate::tree::func::meta::DolFunc>::call(args)
         }
     };
 }

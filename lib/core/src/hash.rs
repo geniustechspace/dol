@@ -161,6 +161,67 @@ const fn nibble(n: u8) -> char {
     }
 }
 
+/// Domain-separated BLAKE3 hasher used by DOL content addressing.
+///
+/// All BLAKE3 usage stays inside `dol_core::hash`.
+pub struct DomainSeparatedHasher {
+    inner: blake3::Hasher,
+}
+
+impl DomainSeparatedHasher {
+    pub fn new(domain: &[u8]) -> Self {
+        let mut inner = blake3::Hasher::new();
+        inner.update(b"DOL-HASH-DOMAIN");
+        inner.update(&(domain.len() as u64).to_le_bytes());
+        inner.update(domain);
+        Self { inner }
+    }
+
+    pub fn update(&mut self, bytes: &[u8]) {
+        self.inner.update(bytes);
+    }
+
+    pub fn update_u16(&mut self, value: u16) {
+        self.update(&value.to_le_bytes());
+    }
+
+    pub fn update_u32(&mut self, value: u32) {
+        self.update(&value.to_le_bytes());
+    }
+
+    pub fn update_u64(&mut self, value: u64) {
+        self.update(&value.to_le_bytes());
+    }
+
+    pub fn finalize_32(self) -> [u8; 32] {
+        *self.inner.finalize().as_bytes()
+    }
+}
+
+pub fn hash64(domain: &[u8], bytes: &[u8]) -> [u8; 8] {
+    let mut hasher = DomainSeparatedHasher::new(domain);
+    hasher.update(bytes);
+    let digest = hasher.finalize_32();
+    let mut out = [0u8; 8];
+    out.copy_from_slice(&digest[..8]);
+    out
+}
+
+pub fn hash128(domain: &[u8], bytes: &[u8]) -> [u8; 16] {
+    let mut hasher = DomainSeparatedHasher::new(domain);
+    hasher.update(bytes);
+    let digest = hasher.finalize_32();
+    let mut out = [0u8; 16];
+    out.copy_from_slice(&digest[..16]);
+    out
+}
+
+pub fn hash256(domain: &[u8], bytes: &[u8]) -> [u8; 32] {
+    let mut hasher = DomainSeparatedHasher::new(domain);
+    hasher.update(bytes);
+    hasher.finalize_32()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

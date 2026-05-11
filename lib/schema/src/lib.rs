@@ -34,10 +34,12 @@
 
 extern crate alloc;
 
+pub mod attribute;
 pub mod constraint;
 pub mod field;
 pub mod field_type;
 pub mod prelude;
+pub mod reference;
 pub mod schema_catalog;
 pub mod schema_ref;
 pub mod type_body;

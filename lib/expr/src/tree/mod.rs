@@ -19,19 +19,20 @@
 mod ast;
 pub mod compact_name;
 mod constructors;
+pub mod context;
 mod dsl;
 pub mod func;
 mod literal;
 pub mod op;
 pub mod order;
 mod path;
-pub mod window;
 
 pub use ast::Expr;
 pub use constructors::{
     IntoFloatLiteral, IntoIntLiteral, arr, bool_expr, case, field, field_dyn, float, int,
     namespace, namespace_dyn, null, obj, param, qualified, string,
 };
+pub use context::{Boundary, ContextBuilder, ContextFrame, ContextMode, Extent};
 pub use func::def::{
     Arity, ArityError, CompactName, DolFunc, DolOp, FuncDef, FuncKind, OpCategory, OpDef,
 };
@@ -39,4 +40,3 @@ pub use literal::{Literal, TypeError, Value};
 pub use op::UnaryOp;
 pub use order::{Direction, NullsPosition, OrderByExpr};
 pub use path::PathExpr;
-pub use window::{CaseBuilder, FrameBound, FrameKind, WindowBuilder, WindowFrame};

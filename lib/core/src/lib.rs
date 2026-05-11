@@ -91,16 +91,18 @@ extern crate alloc;
 
 // ─── Namespaced infrastructure ───────────────────────────────────────────────
 
+pub mod content_addressing;
 pub mod diagnostic;
 #[cfg(feature = "hash")]
 pub mod hash;
 pub mod ids;
+pub mod path;
 pub mod policy;
 pub mod raw;
 pub mod signing;
 pub mod span;
 pub mod storage;
-pub mod string;
+pub mod strings;
 
 // ─── Type system sub-namespaces ──────────────────────────────────────────────
 
@@ -137,7 +139,7 @@ pub use binary::BitString;
 #[cfg(feature = "datetime")]
 pub use datetime::{Date, DateTime, Interval, Offset, Time, TimestampTz};
 #[cfg(feature = "geo")]
-pub use geo::{Circle, Line, Path, Point, Polygon, Rect, Segment};
+pub use geo::{Circle, Line, Path as GeoPath, Point, Polygon, Rect, Segment};
 #[cfg(feature = "network")]
 pub use network::{IpAddr, MacAddr};
 #[cfg(feature = "numeric")]
@@ -156,3 +158,5 @@ pub use span::{FileId, Span};
 // every recursive or arena-bearing path threads.
 pub use ids::Id;
 pub use policy::{Budget, BudgetError, Limits};
+
+pub use path::{Path, PathSegment};

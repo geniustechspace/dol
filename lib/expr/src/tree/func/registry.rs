@@ -1,12 +1,16 @@
 //! Registry of all well-known DOL functions as zero-sized structs.
 //!
-//! Each struct implements [`DolFunc`](super::meta::DolFunc) via the
-//! [`define_func!`](crate::define_func) macro, providing a canonical name,
-//! arity constraint, and function kind.
+//! Every struct implements [`DolFunc`](super::meta::DolFunc) via
+//! [`define_func!`](crate::define_func).  The macro also emits a typed free
+//! builder function for the most commonly used functions; everything else is
+//! reachable through the universal `Foo::call(args)` path.
 //!
-//! Backends can extend any struct with additional traits:
+//! # Extending for a backend
 //!
 //! ```ignore
+//! // in the postgres backend crate
+//! use dol_expr::tree::func::registry::PadLeft;
+//!
 //! pub trait PostgresFunc: DolFunc {
 //!     fn pg_name() -> &'static str { Self::NAME }
 //! }
@@ -14,6 +18,14 @@
 //!     fn pg_name() -> &'static str { "LPAD" }
 //! }
 //! ```
+//!
+//! # Adding a new function
+//!
+//! 1. Pick the appropriate section below.
+//! 2. Add a `define_func!` invocation — base form if the function is rarely
+//!    called from the DSL layer, `builder = fn(args)` form if it is common.
+//! 3. No other file needs touching: the struct, the `DolFunc` impl, and
+//!    (optionally) the builder are all emitted by the single macro call.
 
 use super::meta::{Arity, FuncKind};
 use crate::define_func;
@@ -22,17 +34,47 @@ use crate::define_func;
 // Aggregate functions
 // ═══════════════════════════════════════════════════════════════════════════
 
-define_func!(Count, "COUNT", Arity::Exact(1), FuncKind::Aggregate);
+define_func!(
+    Count,
+    "COUNT",
+    Arity::Exact(1),
+    FuncKind::Aggregate,
+    builder = count(expr)
+);
 define_func!(
     CountDistinct,
     "COUNT_DISTINCT",
     Arity::Exact(1),
     FuncKind::Aggregate
 );
-define_func!(Sum, "SUM", Arity::Exact(1), FuncKind::Aggregate);
-define_func!(Avg, "AVG", Arity::Exact(1), FuncKind::Aggregate);
-define_func!(Min, "MIN", Arity::Exact(1), FuncKind::Aggregate);
-define_func!(Max, "MAX", Arity::Exact(1), FuncKind::Aggregate);
+define_func!(
+    Sum,
+    "SUM",
+    Arity::Exact(1),
+    FuncKind::Aggregate,
+    builder = sum(expr)
+);
+define_func!(
+    Avg,
+    "AVG",
+    Arity::Exact(1),
+    FuncKind::Aggregate,
+    builder = avg(expr)
+);
+define_func!(
+    Min,
+    "MIN",
+    Arity::Exact(1),
+    FuncKind::Aggregate,
+    builder = min(expr)
+);
+define_func!(
+    Max,
+    "MAX",
+    Arity::Exact(1),
+    FuncKind::Aggregate,
+    builder = max(expr)
+);
 define_func!(Median, "MEDIAN", Arity::Exact(1), FuncKind::Aggregate);
 define_func!(Stddev, "STDDEV", Arity::Exact(1), FuncKind::Aggregate);
 define_func!(Variance, "VARIANCE", Arity::Exact(1), FuncKind::Aggregate);
@@ -41,7 +83,8 @@ define_func!(
     StringAgg,
     "STRING_AGG",
     Arity::Exact(2),
-    FuncKind::Aggregate
+    FuncKind::Aggregate,
+    builder = string_agg(expr, sep)
 );
 define_func!(JsonAgg, "JSON_AGG", Arity::Exact(1), FuncKind::Aggregate);
 define_func!(BoolAnd, "BOOL_AND", Arity::Exact(1), FuncKind::Aggregate);
@@ -53,12 +96,36 @@ define_func!(Last, "LAST", Arity::Exact(1), FuncKind::Aggregate);
 // String functions
 // ═══════════════════════════════════════════════════════════════════════════
 
-define_func!(Lower, "LOWER", Arity::Exact(1), FuncKind::Scalar);
-define_func!(Upper, "UPPER", Arity::Exact(1), FuncKind::Scalar);
-define_func!(Trim, "TRIM", Arity::Exact(1), FuncKind::Scalar);
+define_func!(
+    Lower,
+    "LOWER",
+    Arity::Exact(1),
+    FuncKind::Scalar,
+    builder = lower(s)
+);
+define_func!(
+    Upper,
+    "UPPER",
+    Arity::Exact(1),
+    FuncKind::Scalar,
+    builder = upper(s)
+);
+define_func!(
+    Trim,
+    "TRIM",
+    Arity::Exact(1),
+    FuncKind::Scalar,
+    builder = trim(s)
+);
 define_func!(Ltrim, "LTRIM", Arity::Range(1, 2), FuncKind::Scalar);
 define_func!(Rtrim, "RTRIM", Arity::Range(1, 2), FuncKind::Scalar);
-define_func!(Length, "LENGTH", Arity::Exact(1), FuncKind::Scalar);
+define_func!(
+    Length,
+    "LENGTH",
+    Arity::Exact(1),
+    FuncKind::Scalar,
+    builder = length(s)
+);
 define_func!(CharLength, "CHAR_LENGTH", Arity::Exact(1), FuncKind::Scalar);
 define_func!(
     OctetLength,
@@ -66,17 +133,61 @@ define_func!(
     Arity::Exact(1),
     FuncKind::Scalar
 );
-define_func!(Substr, "SUBSTR", Arity::Range(2, 3), FuncKind::Scalar);
-define_func!(Left, "LEFT", Arity::Exact(2), FuncKind::Scalar);
-define_func!(Right, "RIGHT", Arity::Exact(2), FuncKind::Scalar);
-define_func!(Concat, "CONCAT", Arity::AtLeast(1), FuncKind::Scalar);
+// substr(s, start, len) — 3-arg builder covers the full form.
+// For the 2-arg form use `Substr::call(vec![s, start])` directly.
+define_func!(
+    Substr,
+    "SUBSTR",
+    Arity::Range(2, 3),
+    FuncKind::Scalar,
+    builder = substr(s, start, len)
+);
+define_func!(
+    Left,
+    "LEFT",
+    Arity::Exact(2),
+    FuncKind::Scalar,
+    builder = left(s, n)
+);
+define_func!(
+    Right,
+    "RIGHT",
+    Arity::Exact(2),
+    FuncKind::Scalar,
+    builder = right(s, n)
+);
+define_func!(Concat,       "CONCAT",        Arity::AtLeast(1),  FuncKind::Scalar, builder = concat(*));
 define_func!(ConcatWs, "CONCAT_WS", Arity::AtLeast(2), FuncKind::Scalar);
-define_func!(Replace, "REPLACE", Arity::Exact(3), FuncKind::Scalar);
-define_func!(Reverse, "REVERSE", Arity::Exact(1), FuncKind::Scalar);
-define_func!(Repeat, "REPEAT", Arity::Exact(2), FuncKind::Scalar);
+define_func!(
+    Replace,
+    "REPLACE",
+    Arity::Exact(3),
+    FuncKind::Scalar,
+    builder = replace(s, from, to)
+);
+define_func!(
+    Reverse,
+    "REVERSE",
+    Arity::Exact(1),
+    FuncKind::Scalar,
+    builder = reverse(s)
+);
+define_func!(
+    Repeat,
+    "REPEAT",
+    Arity::Exact(2),
+    FuncKind::Scalar,
+    builder = repeat(s, n)
+);
 define_func!(PadLeft, "PAD_LEFT", Arity::Range(2, 3), FuncKind::Scalar);
 define_func!(PadRight, "PAD_RIGHT", Arity::Range(2, 3), FuncKind::Scalar);
-define_func!(Position, "POSITION", Arity::Exact(2), FuncKind::Scalar);
+define_func!(
+    Position,
+    "POSITION",
+    Arity::Exact(2),
+    FuncKind::Scalar,
+    builder = position(needle, haystack)
+);
 define_func!(Initcap, "INITCAP", Arity::Exact(1), FuncKind::Scalar);
 define_func!(Ascii, "ASCII", Arity::Exact(1), FuncKind::Scalar);
 define_func!(Chr, "CHR", Arity::Exact(1), FuncKind::Scalar);
@@ -106,22 +217,43 @@ define_func!(
     Arity::Exact(2),
     FuncKind::Scalar
 );
-define_func!(Split, "SPLIT", Arity::Exact(2), FuncKind::Scalar);
-define_func!(SplitPart, "SPLIT_PART", Arity::Exact(3), FuncKind::Scalar);
+define_func!(
+    Split,
+    "SPLIT",
+    Arity::Exact(2),
+    FuncKind::Scalar,
+    builder = split(s, delim)
+);
+define_func!(
+    SplitPart,
+    "SPLIT_PART",
+    Arity::Exact(3),
+    FuncKind::Scalar,
+    builder = split_part(s, delim, n)
+);
 define_func!(Format, "FORMAT", Arity::AtLeast(1), FuncKind::Scalar);
-define_func!(StartsWith, "STARTS_WITH", Arity::Exact(2), FuncKind::Scalar);
-define_func!(Contains, "CONTAINS", Arity::Exact(2), FuncKind::Scalar);
+define_func!(
+    StartsWith,
+    "STARTS_WITH",
+    Arity::Exact(2),
+    FuncKind::Scalar,
+    builder = starts_with(s, prefix)
+);
+define_func!(
+    Contains,
+    "CONTAINS",
+    Arity::Exact(2),
+    FuncKind::Scalar,
+    builder = contains(haystack, needle)
+);
 define_func!(ToHex, "TO_HEX", Arity::Exact(1), FuncKind::Scalar);
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Pattern matching functions
-// ═══════════════════════════════════════════════════════════════════════════
+// Pattern matching
 //
-// `REGEX_MATCH`, `REGEX_IMATCH`, `GLOB_MATCH` are functions rather than
-// `BinOp`s because their cross-backend rendering is non-uniform (Postgres
-// `~` / `~*`, MySQL `REGEXP`, SQLite `GLOB`). Backends that support a
-// native infix spelling render the call inline; others emit
-// `regex_match(s, p)` etc.
+// Kept as functions rather than BinOps because cross-backend rendering is
+// non-uniform (Postgres `~`/`~*`, MySQL `REGEXP`, SQLite `GLOB`).
+// ═══════════════════════════════════════════════════════════════════════════
 
 define_func!(RegexMatch, "REGEX_MATCH", Arity::Exact(2), FuncKind::Scalar);
 define_func!(
@@ -133,36 +265,69 @@ define_func!(
 define_func!(GlobMatch, "GLOB_MATCH", Arity::Exact(2), FuncKind::Scalar);
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Collection containment / overlap (function form)
+// Collection containment / overlap
 // ═══════════════════════════════════════════════════════════════════════════
-//
-// `Contains` (above, in string functions) extends naturally to the
-// collection case `contains(haystack, needle)`. `Overlaps` is the
-// symmetric "share at least one element" predicate; `<@` (`CONTAINED_BY`)
-// is intentionally absent — it is exactly `contains(b, a)` and writing
-// it twice invites the historical conflict with `IN`.
 
+// `Contains` (string section above) covers the collection case too.
+// `Overlaps` is the symmetric "share at least one element" predicate.
 define_func!(Overlaps, "OVERLAPS", Arity::Exact(2), FuncKind::Scalar);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Numeric / Math functions
 // ═══════════════════════════════════════════════════════════════════════════
 
-define_func!(Abs, "ABS", Arity::Exact(1), FuncKind::Scalar);
-define_func!(Ceil, "CEIL", Arity::Exact(1), FuncKind::Scalar);
-define_func!(Floor, "FLOOR", Arity::Exact(1), FuncKind::Scalar);
+define_func!(
+    Abs,
+    "ABS",
+    Arity::Exact(1),
+    FuncKind::Scalar,
+    builder = abs(expr)
+);
+define_func!(
+    Ceil,
+    "CEIL",
+    Arity::Exact(1),
+    FuncKind::Scalar,
+    builder = ceil(expr)
+);
+define_func!(
+    Floor,
+    "FLOOR",
+    Arity::Exact(1),
+    FuncKind::Scalar,
+    builder = floor(expr)
+);
+// round has an optional precision arg — see `func::round` in mod.rs.
 define_func!(Round, "ROUND", Arity::Range(1, 2), FuncKind::Scalar);
 define_func!(Trunc, "TRUNC", Arity::Range(1, 2), FuncKind::Scalar);
 define_func!(Sign, "SIGN", Arity::Exact(1), FuncKind::Scalar);
-define_func!(Power, "POWER", Arity::Exact(2), FuncKind::Scalar);
-define_func!(Sqrt, "SQRT", Arity::Exact(1), FuncKind::Scalar);
-define_func!(Cbrt, "CBRT", Arity::Exact(1), FuncKind::Scalar);
+define_func!(
+    Power,
+    "POWER",
+    Arity::Exact(2),
+    FuncKind::Scalar,
+    builder = power(base, exp)
+);
+define_func!(
+    Sqrt,
+    "SQRT",
+    Arity::Exact(1),
+    FuncKind::Scalar,
+    builder = sqrt(expr)
+);
+define_func!(
+    Cbrt,
+    "CBRT",
+    Arity::Exact(1),
+    FuncKind::Scalar,
+    builder = cbrt(expr)
+);
 define_func!(Exp, "EXP", Arity::Exact(1), FuncKind::Scalar);
 define_func!(Ln, "LN", Arity::Exact(1), FuncKind::Scalar);
 define_func!(Log, "LOG", Arity::Range(1, 2), FuncKind::Scalar);
 define_func!(Log2, "LOG2", Arity::Exact(1), FuncKind::Scalar);
 define_func!(Log10, "LOG10", Arity::Exact(1), FuncKind::Scalar);
-define_func!(Pi, "PI", Arity::Exact(0), FuncKind::Scalar);
+define_func!(Pi, "PI", Arity::Exact(0), FuncKind::Scalar, builder = pi());
 define_func!(Degrees, "DEGREES", Arity::Exact(1), FuncKind::Scalar);
 define_func!(Radians, "RADIANS", Arity::Exact(1), FuncKind::Scalar);
 define_func!(Sin, "SIN", Arity::Exact(1), FuncKind::Scalar);
@@ -175,39 +340,78 @@ define_func!(Atan2, "ATAN2", Arity::Exact(2), FuncKind::Scalar);
 define_func!(Sinh, "SINH", Arity::Exact(1), FuncKind::Scalar);
 define_func!(Cosh, "COSH", Arity::Exact(1), FuncKind::Scalar);
 define_func!(Tanh, "TANH", Arity::Exact(1), FuncKind::Scalar);
-define_func!(Factorial, "FACTORIAL", Arity::Exact(1), FuncKind::Scalar);
+define_func!(
+    Factorial,
+    "FACTORIAL",
+    Arity::Exact(1),
+    FuncKind::Scalar,
+    builder = factorial(expr)
+);
 define_func!(Gcd, "GCD", Arity::Exact(2), FuncKind::Scalar);
 define_func!(Lcm, "LCM", Arity::Exact(2), FuncKind::Scalar);
-define_func!(Random, "RANDOM", Arity::Exact(0), FuncKind::Scalar);
-define_func!(Greatest, "GREATEST", Arity::AtLeast(1), FuncKind::Scalar);
-define_func!(Least, "LEAST", Arity::AtLeast(1), FuncKind::Scalar);
+define_func!(
+    Random,
+    "RANDOM",
+    Arity::Exact(0),
+    FuncKind::Scalar,
+    builder = random()
+);
+define_func!(Greatest,  "GREATEST",  Arity::AtLeast(1),  FuncKind::Scalar, builder = greatest(*));
+define_func!(Least,     "LEAST",     Arity::AtLeast(1),  FuncKind::Scalar, builder = least(*));
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Date / Time functions
 // ═══════════════════════════════════════════════════════════════════════════
 
-define_func!(Now, "NOW", Arity::Exact(0), FuncKind::Scalar);
+define_func!(
+    Now,
+    "NOW",
+    Arity::Exact(0),
+    FuncKind::Scalar,
+    builder = now()
+);
 define_func!(
     CurrentDate,
     "CURRENT_DATE",
     Arity::Exact(0),
-    FuncKind::Scalar
+    FuncKind::Scalar,
+    builder = current_date()
 );
 define_func!(
     CurrentTime,
     "CURRENT_TIME",
     Arity::Exact(0),
-    FuncKind::Scalar
+    FuncKind::Scalar,
+    builder = current_time()
 );
 define_func!(
     CurrentTimestamp,
     "CURRENT_TIMESTAMP",
     Arity::Exact(0),
-    FuncKind::Scalar
+    FuncKind::Scalar,
+    builder = current_timestamp()
 );
-define_func!(DatePart, "DATE_PART", Arity::Exact(2), FuncKind::Scalar);
-define_func!(DateTrunc, "DATE_TRUNC", Arity::Exact(2), FuncKind::Scalar);
-define_func!(Extract, "EXTRACT", Arity::Exact(2), FuncKind::Scalar);
+define_func!(
+    DatePart,
+    "DATE_PART",
+    Arity::Exact(2),
+    FuncKind::Scalar,
+    builder = date_part(part, expr)
+);
+define_func!(
+    DateTrunc,
+    "DATE_TRUNC",
+    Arity::Exact(2),
+    FuncKind::Scalar,
+    builder = date_trunc(part, expr)
+);
+define_func!(
+    Extract,
+    "EXTRACT",
+    Arity::Exact(2),
+    FuncKind::Scalar,
+    builder = extract(field, expr)
+);
 define_func!(DateAdd, "DATE_ADD", Arity::Range(2, 3), FuncKind::Scalar);
 define_func!(DateSub, "DATE_SUB", Arity::Range(2, 3), FuncKind::Scalar);
 define_func!(DateDiff, "DATE_DIFF", Arity::Range(2, 3), FuncKind::Scalar);
@@ -219,12 +423,48 @@ define_func!(
     Arity::Range(1, 2),
     FuncKind::Scalar
 );
-define_func!(Year, "YEAR", Arity::Exact(1), FuncKind::Scalar);
-define_func!(Month, "MONTH", Arity::Exact(1), FuncKind::Scalar);
-define_func!(Day, "DAY", Arity::Exact(1), FuncKind::Scalar);
-define_func!(Hour, "HOUR", Arity::Exact(1), FuncKind::Scalar);
-define_func!(Minute, "MINUTE", Arity::Exact(1), FuncKind::Scalar);
-define_func!(Second, "SECOND", Arity::Exact(1), FuncKind::Scalar);
+define_func!(
+    Year,
+    "YEAR",
+    Arity::Exact(1),
+    FuncKind::Scalar,
+    builder = year(expr)
+);
+define_func!(
+    Month,
+    "MONTH",
+    Arity::Exact(1),
+    FuncKind::Scalar,
+    builder = month(expr)
+);
+define_func!(
+    Day,
+    "DAY",
+    Arity::Exact(1),
+    FuncKind::Scalar,
+    builder = day(expr)
+);
+define_func!(
+    Hour,
+    "HOUR",
+    Arity::Exact(1),
+    FuncKind::Scalar,
+    builder = hour(expr)
+);
+define_func!(
+    Minute,
+    "MINUTE",
+    Arity::Exact(1),
+    FuncKind::Scalar,
+    builder = minute(expr)
+);
+define_func!(
+    Second,
+    "SECOND",
+    Arity::Exact(1),
+    FuncKind::Scalar,
+    builder = second(expr)
+);
 define_func!(DayOfWeek, "DAY_OF_WEEK", Arity::Exact(1), FuncKind::Scalar);
 define_func!(DayOfYear, "DAY_OF_YEAR", Arity::Exact(1), FuncKind::Scalar);
 define_func!(
@@ -259,30 +499,73 @@ define_func!(
 // Null-handling functions
 // ═══════════════════════════════════════════════════════════════════════════
 
-define_func!(Coalesce, "COALESCE", Arity::AtLeast(1), FuncKind::Scalar);
-define_func!(Nullif, "NULLIF", Arity::Exact(2), FuncKind::Scalar);
-define_func!(Ifnull, "IFNULL", Arity::Exact(2), FuncKind::Scalar);
+define_func!(Coalesce, "COALESCE", Arity::AtLeast(1), FuncKind::Scalar, builder = coalesce(*));
+define_func!(
+    Nullif,
+    "NULLIF",
+    Arity::Exact(2),
+    FuncKind::Scalar,
+    builder = nullif(a, b)
+);
+define_func!(
+    Ifnull,
+    "IFNULL",
+    Arity::Exact(2),
+    FuncKind::Scalar,
+    builder = ifnull(a, b)
+);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Type conversion functions
 // ═══════════════════════════════════════════════════════════════════════════
 
 define_func!(Typeof, "TYPEOF", Arity::Exact(1), FuncKind::Scalar);
-define_func!(ToText, "TO_TEXT", Arity::Exact(1), FuncKind::Scalar);
-define_func!(ToInt, "TO_INT", Arity::Exact(1), FuncKind::Scalar);
-define_func!(ToFloat, "TO_FLOAT", Arity::Exact(1), FuncKind::Scalar);
-define_func!(ToBool, "TO_BOOL", Arity::Exact(1), FuncKind::Scalar);
+define_func!(
+    ToText,
+    "TO_TEXT",
+    Arity::Exact(1),
+    FuncKind::Scalar,
+    builder = to_text(expr)
+);
+define_func!(
+    ToInt,
+    "TO_INT",
+    Arity::Exact(1),
+    FuncKind::Scalar,
+    builder = to_int(expr)
+);
+define_func!(
+    ToFloat,
+    "TO_FLOAT",
+    Arity::Exact(1),
+    FuncKind::Scalar,
+    builder = to_float(expr)
+);
+define_func!(
+    ToBool,
+    "TO_BOOL",
+    Arity::Exact(1),
+    FuncKind::Scalar,
+    builder = to_bool(expr)
+);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // JSON / Document functions
 // ═══════════════════════════════════════════════════════════════════════════
 
-define_func!(JsonGet, "JSON_GET", Arity::Exact(2), FuncKind::Scalar);
+define_func!(
+    JsonGet,
+    "JSON_GET",
+    Arity::Exact(2),
+    FuncKind::Scalar,
+    builder = json_get(doc, key)
+);
 define_func!(
     JsonGetText,
     "JSON_GET_TEXT",
     Arity::Exact(2),
-    FuncKind::Scalar
+    FuncKind::Scalar,
+    builder = json_get_text(doc, key)
 );
 define_func!(JsonPath, "JSON_PATH", Arity::AtLeast(2), FuncKind::Scalar);
 define_func!(
@@ -295,7 +578,8 @@ define_func!(
     JsonHasKey,
     "JSON_HAS_KEY",
     Arity::Exact(2),
-    FuncKind::Scalar
+    FuncKind::Scalar,
+    builder = json_has_key(doc, key)
 );
 define_func!(
     JsonHasAnyKey,
@@ -340,37 +624,50 @@ define_func!(JsonTypeof, "JSON_TYPEOF", Arity::Exact(1), FuncKind::Scalar);
 // Array / Collection functions
 // ═══════════════════════════════════════════════════════════════════════════
 
+// array_length has an optional dimension arg; the 1-arg builder covers the
+// common case.  Use `ArrayLength::call(vec![arr, dim])` for the 2-arg form.
 define_func!(
     ArrayLength,
     "ARRAY_LENGTH",
     Arity::Range(1, 2),
-    FuncKind::Scalar
+    FuncKind::Scalar,
+    builder = array_length(arr)
 );
 define_func!(
     ArrayPosition,
     "ARRAY_POSITION",
     Arity::Exact(2),
-    FuncKind::Scalar
+    FuncKind::Scalar,
+    builder = array_position(arr, elem)
 );
 define_func!(
     ArrayAppend,
     "ARRAY_APPEND",
     Arity::Exact(2),
-    FuncKind::Scalar
+    FuncKind::Scalar,
+    builder = array_append(arr, elem)
 );
 define_func!(
     ArrayPrepend,
     "ARRAY_PREPEND",
     Arity::Exact(2),
-    FuncKind::Scalar
+    FuncKind::Scalar,
+    builder = array_prepend(elem, arr)
 );
 define_func!(
     ArrayRemove,
     "ARRAY_REMOVE",
     Arity::Exact(2),
-    FuncKind::Scalar
+    FuncKind::Scalar,
+    builder = array_remove(arr, elem)
 );
-define_func!(ArrayCat, "ARRAY_CAT", Arity::Exact(2), FuncKind::Scalar);
+define_func!(
+    ArrayCat,
+    "ARRAY_CAT",
+    Arity::Exact(2),
+    FuncKind::Scalar,
+    builder = array_cat(a, b)
+);
 define_func!(
     ArrayDistinct,
     "ARRAY_DISTINCT",
@@ -391,7 +688,13 @@ define_func!(
     Arity::Exact(1),
     FuncKind::Scalar
 );
-define_func!(Unnest, "UNNEST", Arity::Exact(1), FuncKind::Scalar);
+define_func!(
+    Unnest,
+    "UNNEST",
+    Arity::Exact(1),
+    FuncKind::Scalar,
+    builder = unnest(arr)
+);
 define_func!(
     ArrayToString,
     "ARRAY_TO_STRING",
@@ -461,15 +764,58 @@ define_func!(
 // Window / Ranking functions
 // ═══════════════════════════════════════════════════════════════════════════
 
-define_func!(RowNumber, "ROW_NUMBER", Arity::Exact(0), FuncKind::Window);
-define_func!(Rank, "RANK", Arity::Exact(0), FuncKind::Window);
-define_func!(DenseRank, "DENSE_RANK", Arity::Exact(0), FuncKind::Window);
-define_func!(Ntile, "NTILE", Arity::Exact(1), FuncKind::Window);
+define_func!(
+    RowNumber,
+    "ROW_NUMBER",
+    Arity::Exact(0),
+    FuncKind::Window,
+    builder = row_number()
+);
+define_func!(
+    Rank,
+    "RANK",
+    Arity::Exact(0),
+    FuncKind::Window,
+    builder = rank()
+);
+define_func!(
+    DenseRank,
+    "DENSE_RANK",
+    Arity::Exact(0),
+    FuncKind::Window,
+    builder = dense_rank()
+);
+define_func!(
+    Ntile,
+    "NTILE",
+    Arity::Exact(1),
+    FuncKind::Window,
+    builder = ntile(n)
+);
+// lag / lead have optional offset + default args — see `func::lag` / `func::lead` in mod.rs.
 define_func!(Lag, "LAG", Arity::Range(1, 3), FuncKind::Window);
 define_func!(Lead, "LEAD", Arity::Range(1, 3), FuncKind::Window);
-define_func!(FirstValue, "FIRST_VALUE", Arity::Exact(1), FuncKind::Window);
-define_func!(LastValue, "LAST_VALUE", Arity::Exact(1), FuncKind::Window);
-define_func!(NthValue, "NTH_VALUE", Arity::Exact(2), FuncKind::Window);
+define_func!(
+    FirstValue,
+    "FIRST_VALUE",
+    Arity::Exact(1),
+    FuncKind::Window,
+    builder = first_value(expr)
+);
+define_func!(
+    LastValue,
+    "LAST_VALUE",
+    Arity::Exact(1),
+    FuncKind::Window,
+    builder = last_value(expr)
+);
+define_func!(
+    NthValue,
+    "NTH_VALUE",
+    Arity::Exact(2),
+    FuncKind::Window,
+    builder = nth_value(expr, n)
+);
 define_func!(CumeDist, "CUME_DIST", Arity::Exact(0), FuncKind::Window);
 define_func!(
     PercentRank,
@@ -486,24 +832,44 @@ define_func!(
     GenRandomUuid,
     "GEN_RANDOM_UUID",
     Arity::Exact(0),
-    FuncKind::Scalar
+    FuncKind::Scalar,
+    builder = gen_random_uuid()
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Geo / Spatial functions
 // ═══════════════════════════════════════════════════════════════════════════
 
-define_func!(StContains, "ST_CONTAINS", Arity::Exact(2), FuncKind::Scalar);
+define_func!(
+    StContains,
+    "ST_CONTAINS",
+    Arity::Exact(2),
+    FuncKind::Scalar,
+    builder = st_contains(a, b)
+);
 define_func!(
     StIntersects,
     "ST_INTERSECTS",
     Arity::Exact(2),
-    FuncKind::Scalar
+    FuncKind::Scalar,
+    builder = st_intersects(a, b)
 );
-define_func!(StWithin, "ST_WITHIN", Arity::Exact(2), FuncKind::Scalar);
+define_func!(
+    StWithin,
+    "ST_WITHIN",
+    Arity::Exact(2),
+    FuncKind::Scalar,
+    builder = st_within(a, b)
+);
 define_func!(StArea, "ST_AREA", Arity::Exact(1), FuncKind::Scalar);
 define_func!(StLength, "ST_LENGTH", Arity::Exact(1), FuncKind::Scalar);
-define_func!(StDistance, "ST_DISTANCE", Arity::Exact(2), FuncKind::Scalar);
+define_func!(
+    StDistance,
+    "ST_DISTANCE",
+    Arity::Exact(2),
+    FuncKind::Scalar,
+    builder = st_distance(a, b)
+);
 define_func!(StBuffer, "ST_BUFFER", Arity::Exact(2), FuncKind::Scalar);
 define_func!(StCentroid, "ST_CENTROID", Arity::Exact(1), FuncKind::Scalar);
 define_func!(StAsText, "ST_AS_TEXT", Arity::Exact(1), FuncKind::Scalar);
@@ -518,7 +884,13 @@ define_func!(
 // Hashing / Encoding functions
 // ═══════════════════════════════════════════════════════════════════════════
 
-define_func!(Hash, "HASH", Arity::Exact(1), FuncKind::Scalar);
+define_func!(
+    Hash,
+    "HASH",
+    Arity::Exact(1),
+    FuncKind::Scalar,
+    builder = hash(expr)
+);
 define_func!(Crc32, "CRC32", Arity::Exact(1), FuncKind::Scalar);
 define_func!(HexEncode, "HEX_ENCODE", Arity::Exact(1), FuncKind::Scalar);
 define_func!(HexDecode, "HEX_DECODE", Arity::Exact(1), FuncKind::Scalar);

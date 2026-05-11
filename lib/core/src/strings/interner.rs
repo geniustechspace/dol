@@ -16,7 +16,7 @@ use alloc::vec::Vec;
 use core::num::NonZeroU32;
 use hashbrown::HashMap;
 
-use crate::ids::StrId;
+use crate::strings::StrId;
 
 /// String interner with **content-addressed** [`StrId`]s.
 ///
@@ -185,12 +185,15 @@ impl Interner {
         (stored == s.as_bytes()).then_some(id)
     }
 
+    /// Return the number of distinct strings interned.
     pub fn len(&self) -> usize {
         self.slots.len()
     }
+    /// Return whether the interner is empty.
     pub fn is_empty(&self) -> bool {
         self.slots.is_empty()
     }
+    /// Clear all interned strings.
     pub fn reset(&mut self) {
         self.bytes.clear();
         self.slots.clear();
@@ -213,6 +216,7 @@ impl Interner {
         bytes_cap + slots_cap
     }
 
+    /// Return all interned strings sorted by their [`StrId`].
     #[allow(clippy::expect_used)]
     // Slot offsets/lengths were produced by `try_intern` against the same
     // `bytes` blob; `off + len <= bytes.len()` holds by construction.
@@ -246,7 +250,7 @@ impl Interner {
 // invariant rather than a runtime failure path.
 #[allow(clippy::expect_used)]
 fn strid_for(bytes: &[u8]) -> StrId {
-    let digest = dol_core::hash::hash32(bytes);
+    let digest = crate::hash::hash32(bytes);
     let h = u32::from_le_bytes(digest);
     let nz = NonZeroU32::new(if h == 0 { 1 } else { h }).expect("non-zero by construction");
     StrId::new(nz)

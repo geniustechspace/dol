@@ -11,6 +11,8 @@
 
 mod ids;
 mod interner;
+mod name;
 
 pub use ids::{StrId, StrTag};
 pub use interner::{InternError, Interner};
+pub use name::Name;
