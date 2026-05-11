@@ -1,7 +1,7 @@
 //! Zero-sized tag markers for [`Lid`](super::Lid) / [`Cid`](super::Cid) /
 //! [`Gid`](super::Gid).
 //!
-//! Tags are inhabitable-only `enum`s with no variants — they exist
+//! Tags are uninhabited `enum`s with no variants — they exist
 //! purely at the type level so different pools / arenas produce
 //! distinct handle types. Per `dol-rewrite-plan-v2.md` §7.2.
 
