@@ -157,6 +157,8 @@ name = "dol-cas"
 version = "0.2.0"
 dependencies = [
  "dol-core",
+ "hashbrown 0.15.5",
+ "serde",
 ]
 
 [[package]]

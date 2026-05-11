@@ -7,6 +7,105 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### v2 rewrite — Phase 2: `dol-cas` (`dol-rewrite-plan-v2.md` §7)
+
+**M2 ships the identity and pooling layer that sits between
+`dol-core` and the upcoming `dol-ir` (M3): handle types, generic
+arenas, the `StringPool` that replaces v1's `dol_expr::Interner`, and
+a `ContentIndex` stub.**
+
+- **Handle types** (`lib/dol-cas/src/handle/`) per plan §7.1–§7.2.
+  - `Lid<Tag>` is a re-export of `dol_core::ids::Id` — the planned
+    struct is byte-identical to the existing primitive; aliasing
+    avoids two copies of the same niche-optimised handle. `Option<Lid<Tag>>`
+    is 4 bytes.
+  - `Cid<Tag>` (`#[repr(C)] { raw: [u8; 16], _: PhantomData<fn() -> Tag> }`):
+    BLAKE3-128 cross-process stable content address. Hand-written
+    trait impls without a `Tag` bound. `Serialize` only (no
+    `Deserialize`; wire-in goes through `dol-wire::Decode`).
+  - `Gid<Tag>` (same shape with `[u8; 32]`): full BLAKE3-256 for
+    signed manifests and tamper-evident wire envelopes.
+  - Tag set: `StrTag`, `NodeTag`, `FieldTag`, `EntityTag`,
+    `LiteralTag`, `FuncTag`, `SchemaTag`, `ProgramTag`.
+  - Aliases: `StrId`, `NodeId`, `FieldId`, `EntityId`, `LiteralId`,
+    `FuncId`, `StrCid`, `SchemaCid`, `ProgramCid`, `ProgramGid`.
+
+- **Generic arenas** (`lib/dol-cas/src/pool/`) per plan §7.3.
+  - `ArenaStorage<T>` trait with `push`/`get`/`get_mut`/`len`.
+  - `DynPool<T>` (Vec-backed, std-only) and `StaticPool<T, CAP>`
+    (no-alloc, `[Option<T>; CAP]`-backed).
+  - Both expose `push_id<Tag>() -> Option<Lid<Tag>>` /
+    `get_by_id<Tag>(Lid<Tag>) -> Option<&T>` for typed access.
+
+- **`StringPool`** (`lib/dol-cas/src/string_pool/dynamic.rs`,
+  `feature = "std"`) per plan §7.4.
+  - Single-locked `RwLock<Inner>` interner (sharding deferred — see
+    note below). xxHash3 (`fast64_seeded`) for lookup with byte-confirm
+    on hash hit; lazy BLAKE3-128 (`content128`) for `to_cid()`.
+  - `intern(s) -> Result<StrId, InternError>`. `InternError` variants:
+    `HashCollision { existing }`, `CapacityExceeded`, `Poisoned`.
+  - `to_cid(id)` is lazy: first call computes and caches in the slot's
+    `Option<[u8; 16]>` cell; subsequent calls return the cached value.
+  - `get_id(s)` and `get(id)` for read-only lookup. (Note: `get`
+    returns owned `String` because bytes live behind `RwLock`; the
+    sharded rewrite in M3 will provide zero-copy borrowed access.)
+  - Cross-pool stability: two independent `StringPool`s produce the
+    same `Cid` for the same input.
+
+- **`StaticStringPool<BYTES, SLOTS>`** (`lib/dol-cas/src/string_pool/static.rs`).
+  - Fixed-capacity, single-threaded, `const fn new(seed)` so it can
+    live in `static` storage.
+  - `!Send + !Sync` via a `PhantomData<*const ()>` field.
+  - `StaticInternError { SlotsExhausted, BytesExhausted, HashCollision { existing } }`.
+  - Compiles cleanly on `thumbv7em-none-eabihf` (verified by
+    `cargo check -p dol-cas --target thumbv7em-none-eabihf --no-default-features`).
+
+- **`ContentIndex` stub** (`lib/dol-cas/src/content_index.rs`,
+  `feature = "std"`) per plan §7.6.
+  - `HashMap<NodeId, [u8; 16]>` with `get` / `insert` / `invalidate` /
+    `len` / `is_empty`. The bottom-up walker that populates this is
+    deferred to M3 when `ExprArena` exists.
+
+- **Phase 2 acceptance tests** (per plan §7.7) added inline:
+  - `Option<StrId>` is 4 bytes; `size_of::<Cid<()>>() == 16`;
+    `size_of::<Gid<_>>() == 32`.
+  - `StringPool::intern`: same string from 16 threads → same `StrId`.
+  - `to_cid()` is lazy (cache empty before first call, populated after)
+    and cross-pool stable (two pools agree on the same input).
+  - `StaticStringPool` round-trip, dedup, `SlotsExhausted` /
+    `BytesExhausted` exhaustion paths.
+  - `DynPool` and `StaticPool` typed push/get round-trip + capacity
+    exhaustion.
+  - 24 new tests; total `dol-cas` test count 24; workspace 127 → 151.
+
+- **Cargo.toml.**
+  - `dol-cas` now depends on `dol-core` with the `hash` feature
+    explicitly enabled (xxHash3 + BLAKE3 chokepoints).
+  - Adds `hashbrown` (workspace pin, default features off).
+  - New optional `serde` feature that re-exports `dol-core/serde`.
+  - `default = ["std"]` so the host build is `Send + Sync`-capable
+    out of the box; bare-metal callers opt out with
+    `--no-default-features`.
+
+### Deferred to M3
+
+- **Sharded `StringPool` interior.** The plan describes per-shard slot
+  tables, which forces shard-index bits into `StrId` and breaks the
+  simple `Lid::index() == slot_idx` contract. M3 will re-introduce
+  sharding either via upper-bit encoding or by sharding only the
+  lookup index while keeping slot/byte vectors global. The user-visible
+  API is identical.
+- **`impl PathSegment for Lid<StrTag>`** (plan §7.5). The
+  `PathSegment::resolve` lifetime contract (`&'a str` borrowed from
+  the resolver) cannot be satisfied while `StringPool` bytes live
+  behind an `RwLock` — solving it requires either reshaping the trait
+  (e.g. an associated `Resolved<'a>` type) or pulling in an
+  append-only resolver crate. Both touch dol-core and fit better
+  with the M3 lowering work where `ExprArena` will need the same
+  lifetime shape. Until then, callers can manually resolve `StrId`s
+  via `StringPool::get` and build `Path<Name>` from the resulting
+  owned strings.
+
 ### v2 rewrite — Phase 1: `dol-core` foundation (`dol-rewrite-plan-v2.md` §6)
 
 **M1 adds the new configuration / budget / hash chokepoints `dol-core`

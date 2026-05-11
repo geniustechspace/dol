@@ -4,14 +4,23 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 publish = false
-description = "DOL — content addressing system. Lid / Cid / Gid handles, pools, StringPool. M0 scaffold only."
+description = "DOL — content addressing system. Lid / Cid / Gid handles, pools, StringPool."
 
 [dependencies]
-dol-core = { workspace = true }
+# `hash` brings in dol_core::hash::{fast64, content128, ...}, which are
+# the only places the workspace is allowed to call into xxHash3 / BLAKE3.
+dol-core = { workspace = true, features = ["hash"] }
+hashbrown = { workspace = true }
+serde = { workspace = true, optional = true }
 
 [features]
-default = []
+default = ["std"]
+# `std` enables `StringPool` (sharded `std::sync::RwLock` interner).
+# Without it, `dol-cas` still ships `StaticStringPool<BYTES, SLOTS>` for
+# bare-metal targets and the handle / Cid / Gid surface that does not
+# need synchronisation.
 std = ["dol-core/std"]
+serde = ["dep:serde", "dol-core/serde"]
 
 [lints]
 workspace = true
