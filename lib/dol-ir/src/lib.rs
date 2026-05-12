@@ -3,7 +3,7 @@
 //! Per `dol-rewrite-plan-v2.md` §8. M3 is the largest milestone in
 //! the rewrite and is split across PRs **M3a–M3e**.
 //!
-//! ## What ships in M3a + M3b + M3c-α + M3c-β + M3c-γ + M3c-δ₁
+//! ## What ships in M3a + M3b + M3c-α + M3c-β + M3c-γ + M3c-δ₁ + M3c-δ₂a
 //!
 //! - [`expr::node::ExprNode`] — the 16-byte POD expression record.
 //!   `#[repr(C)]`, `bytemuck::Pod`, const-asserted to be exactly
@@ -48,12 +48,18 @@
 //!   Plus the fluent builders: [`expr::context::ContextBuilder`]
 //!   (builds `Expr::Scoped`) and [`expr::context::ConditionalBuilder`]
 //!   (builds `Expr::Match`).
+//! - [`expr::lower::lower_path`] — the **single, authorised**
+//!   `Path<Name> → Path<StrId>` site (plan §8.4 line 1389), with the
+//!   shared [`expr::lower::LowerError`] enum that the upcoming
+//!   recursive `lower(Expr)` will reuse unchanged. Charges one
+//!   `Budget::node()` per interned segment.
 //!
-//! ## What lands in M3c-δ₂ … M3e
+//! ## What lands in M3c-δ₂b … M3e
 //!
-//! - **M3c-δ₂**: lowering pipeline `Expr<'a> → ExprArena` with
-//!   `lower_path` (§8.4) — also the natural home for `impl PathSegment
-//!   for Lid<StrTag>` deferred from M2.
+//! - **M3c-δ₂b**: the recursive `lower(Expr<'a>) → ExprArena` pass
+//!   (§8.4) and `compute_hash` integration (§8.5). Blocked on a
+//!   variadic operand slab plus `LiteralPool` / `FuncRegistry` that
+//!   no carrier in M3a–c yet builds.
 //! - **M3d**: schema types — `Entity`, `Field`, `SchemaCatalog` (§8.6).
 //! - **M3e**: `Operation` / `Program` (§8.7), `Backend` trait + reference
 //!   no-op backend (§8.8), and optional `stream` / `pipeline` features

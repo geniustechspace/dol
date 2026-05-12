@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### v2 rewrite — Phase 3c-δ₂a: `dol-ir` `lower_path` + `LowerError` skeleton (`dol-rewrite-plan-v2.md` §8.4)
+
+**First half of M3c-δ₂. Ships `lower_path` (the single authorised
+`Path<Name> → Path<StrId>` site per plan §8.4 line 1389) and the
+`LowerError` enum that the upcoming recursive `lower(Expr)` will
+share. Unblocked by the M3-bridge slice that closed the two-mode
+path bridge: `Path<StrId>` now resolves zero-copy through the same
+`PathSegment` machinery as `Path<Name>`, so the lowered form is
+useful immediately.**
+
+- **New module `dol_ir::expr::lower`.**
+  - `LowerError` is the final shape from plan §8.4 line 1396:
+    `BudgetExceeded(BudgetExceeded) | InternFailed(InternError) |
+    ArenaOverflow`. `#[non_exhaustive]`, `Debug + Clone + PartialEq +
+    Eq`, `Display`, and `std::error::Error` (under `feature = "std"`).
+    `From<BudgetExceeded>` and `From<InternError>` impls so `?` works
+    in the future `lower(Expr)` body. The `ArenaOverflow` variant
+    ships now (rather than after the recursive lowering pass) so
+    callers can match exhaustively from day one.
+  - `lower_path(path: &Path<Name>, strings: &StringPool, budget: &mut
+    Budget) -> Result<Path<StrId>, LowerError>` is the **single,
+    authorised** `Path<Name>` → `Path<StrId>` site. Charges one
+    `Budget::node()` per segment (target + optional namespace + each
+    field) — paths are flat so no `Budget::depth()` charge is taken.
+    Order is preserved across the field chain.
+  - Seven tests cover: target-only path, namespace + ordered field
+    chain, content-addressed dedup (same name twice → same `StrId`),
+    exact node-charge accounting, budget exhaustion, round-trip
+    resolution through the pool's `StringResolver` impl, and
+    `Display` formatting that threads the inner cause.
+
+- **Lib head doc updated.** M3c-δ₂a moves out of "what lands later"
+  into "what ships now"; the carve-out for the recursive
+  `lower(Expr)` (M3c-δ₂b) is restated alongside the variadic operand
+  slab + `LiteralPool` / `FuncRegistry` blockers.
+
+What's still deferred from M3c-δ₂: the recursive `lower(Expr<'a>) →
+ExprArena` pass and the `compute_hash` integration in §8.5. Both are
+blocked on infrastructure that no slice in M3a–c yet builds.
+
 ### v2 rewrite — Phase 3-bridge: closing the two-mode path bridge (`dol-rewrite-plan-v2.md` §7.5)
 
 **Closes the M2 deferral that has been blocking `Path<Lid<StrTag>>`
