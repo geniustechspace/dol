@@ -22,6 +22,8 @@ use smallvec::SmallVec;
 use crate::strings::Name;
 
 pub use segment::PathSegment;
+#[cfg(feature = "hash")]
+pub use segment::StringResolver;
 
 /// A structured path to a target and optional nested field.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

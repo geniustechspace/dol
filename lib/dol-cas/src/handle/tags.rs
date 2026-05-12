@@ -6,7 +6,14 @@
 //! distinct handle types. Per `dol-rewrite-plan-v2.md` §7.2.
 
 /// Tag for interned-string handles.
-pub enum StrTag {}
+///
+/// Re-exported from [`dol_core::strings::StrTag`] so that
+/// [`super::StrId`] is structurally identical to
+/// [`dol_core::strings::StrId`]. This lets `dol-core`'s
+/// `impl PathSegment for StrId` apply directly to handles issued by
+/// `dol-cas`'s [`crate::string_pool::StringPool`] — the closing of
+/// the two-mode path bridge per `dol-rewrite-plan-v2.md` §7.5.
+pub use dol_core::strings::StrTag;
 
 /// Tag for expression-node handles.
 pub enum NodeTag {}

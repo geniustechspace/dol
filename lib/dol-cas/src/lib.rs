@@ -18,21 +18,29 @@
 //! | [`string_pool::StaticStringPool`] | fixed-size interner (no-alloc) | `iot-min` deployment |
 //! | [`content_index::ContentIndex`] | `HashMap<NodeId, [u8;16]>` (std) | lazy node → content address |
 //!
-//! ## Two-mode path bridge — partial
+//! ## Two-mode path bridge — closed
 //!
-//! M2 ships every primitive (`Lid<StrTag>`, `StringPool`, `Cid<StrTag>`)
-//! but **defers** the `impl PathSegment for Lid<StrTag>`. The
-//! `PathSegment::resolve` lifetime contract (`&'a str` borrowed from
-//! the resolver) cannot be satisfied while string bytes live behind
-//! an `RwLock`. Closing the bridge requires either reshaping the
-//! trait (e.g. adding an associated `Resolved<'a>` type) or layering
-//! an append-only resolver — both touch dol-core and fit better with
-//! M3 lowering. Until then, callers can manually resolve `StrId`s via
-//! [`string_pool::StringPool::get`] and feed the resulting owned
-//! strings into `Path<Name>`.
+//! Both segment shapes resolve through the same
+//! [`PathSegment`](dol_core::path::PathSegment) trait:
+//!
+//! ```text
+//! Path<Name>         → resolver = &()           → no pool needed
+//! Path<Lid<StrTag>>  → resolver = &StringPool   → pool-backed, compact
+//! ```
+//!
+//! `dol-cas` ships [`impl PathSegment for Lid<StrTag>`](handle::StrId)
+//! whose `Resolver` type is [`string_pool::StringPool`]. Resolution is
+//! zero-copy: [`StringPool::get`](string_pool::StringPool::get) borrows
+//! into the slot's stable per-allocation byte storage, so
+//! `PathSegment::resolve` can return `&'a str` without copying or
+//! locking the slot.
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![forbid(unsafe_code)]
+// `unsafe` is forbidden everywhere except the single, narrowly-scoped
+// lifetime extension inside `string_pool::dynamic::StringPool::get`,
+// which carries a documented safety justification grounded in the
+// per-slot `Box<[u8]>` storage. See that function's `SAFETY:` comment.
+#![deny(unsafe_code)]
 #![cfg_attr(
     test,
     allow(

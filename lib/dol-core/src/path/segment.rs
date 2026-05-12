@@ -4,8 +4,9 @@
 //! compact opaque IDs that require an external resolver.
 //!
 //! The default segment type is [`crate::strings::Name`], which resolves without
-//! context. Interner-backed IDs such as `StrId` can implement this trait in
-//! their owning crate and use the interner as the resolver.
+//! context. Interner-backed IDs such as `StrId` resolve through any
+//! pool that implements [`StringResolver`] — the legacy in-tree
+//! [`crate::strings::Interner`] and `dol-cas`'s `StringPool` both qualify.
 
 use core::{fmt, hash::Hash};
 
@@ -71,10 +72,63 @@ impl PathSegment for Name {
 
 #[cfg(feature = "hash")]
 impl PathSegment for StrId {
-    type Resolver = Interner;
+    type Resolver = dyn StringResolver + 'static;
 
     #[inline]
-    fn resolve<'a>(&'a self, resolver: &'a Interner) -> &'a str {
-        resolver.get(*self)
+    fn resolve<'a>(&'a self, resolver: &'a (dyn StringResolver + 'static)) -> &'a str {
+        // `unwrap_or("")` mirrors the plan §7.5 contract: an unknown
+        // or stale handle resolves to the empty string rather than
+        // panicking, so path resolution stays infallible.
+        resolver.resolve_str(*self).unwrap_or("")
+    }
+
+    #[inline]
+    fn content_id(&self, resolver: &(dyn StringResolver + 'static)) -> Option<[u8; 16]> {
+        resolver.content_id_for(*self)
+    }
+}
+
+/// Abstract resolver for [`StrId`] handles.
+///
+/// `dol-core` ships [`PathSegment for StrId`](PathSegment) with
+/// `Resolver = dyn StringResolver`, so any pool that issues `StrId`s
+/// (the legacy in-tree [`Interner`], `dol-cas`'s `StringPool`, or any
+/// future bare-metal pool) can be passed as the resolver of a
+/// `Path<StrId>`.
+///
+/// The trait is the **only** point at which dol-core admits an
+/// outside-issued resolver into the `PathSegment` machinery; this is
+/// what lets `dol-cas::StringPool` close the two-mode path bridge
+/// (per `dol-rewrite-plan-v2.md` §7.5) without `dol-core` ever having
+/// to know about `dol-cas`.
+#[cfg(feature = "hash")]
+pub trait StringResolver {
+    /// Resolve `id` to its interned string slice.
+    ///
+    /// Returns `None` when `id` is unknown to this resolver. The
+    /// `Path` machinery converts `None` to an empty string so that
+    /// resolution stays infallible.
+    fn resolve_str(&self, id: StrId) -> Option<&str>;
+
+    /// Returns the cross-process stable BLAKE3-128 content address of
+    /// the string referenced by `id`, when one is available.
+    ///
+    /// Default: `None` — pools without a stable identity simply
+    /// inherit the `PathSegment::content_id` default.
+    fn content_id_for(&self, _id: StrId) -> Option<[u8; 16]> {
+        None
+    }
+}
+
+/// The legacy in-tree [`Interner`] is itself a [`StringResolver`].
+/// This keeps `Path<StrId>` callers that resolve against an
+/// `Interner` source-compatible after the trait reshape.
+#[cfg(feature = "hash")]
+impl StringResolver for Interner {
+    #[inline]
+    fn resolve_str(&self, id: StrId) -> Option<&str> {
+        // `Interner::get` returns `&str` directly — empty string when
+        // the id is unknown — so we always have a slice to hand back.
+        Some(self.get(id))
     }
 }

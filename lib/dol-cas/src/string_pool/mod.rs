@@ -26,17 +26,13 @@
 //! lookup index while keeping slot/byte vectors global. The
 //! user-visible API is identical.
 //!
-//! ### `impl PathSegment for Lid<StrTag>` (deferred to M3)
+//! ### `impl PathSegment for Lid<StrTag>` — closed
 //!
-//! [`PathSegment::resolve`](dol_core::path::PathSegment::resolve)
-//! returns `&'a str`, but `StringPool::get` cannot return a borrowed
-//! slice while bytes live behind an `RwLock`. Closing that bridge
-//! requires either reshaping the trait (e.g. an associated `Resolved`
-//! type) or layering an append-only resolver crate. Both touch
-//! dol-core's public API and fit better with the M3 lowering work
-//! when `ExprArena` will need the same lifetime shape. Until then,
-//! callers can manually resolve `StrId`s via [`StringPool::get`] and
-//! build `Path<Name>` from the resulting owned strings.
+//! The trait is implemented for [`StrId`](crate::handle::StrId) with
+//! [`StringPool`] as its resolver (see [`segment_impl`]). Resolution
+//! is zero-copy: `StringPool::get` borrows directly into the slot's
+//! stable heap allocation, so a `Path<Lid<StrTag>>` can be resolved
+//! against any pool that issued its handles.
 
 mod r#static;
 
@@ -46,3 +42,6 @@ pub use r#static::{StaticInternError, StaticStringPool};
 mod dynamic;
 #[cfg(feature = "std")]
 pub use dynamic::{InternError, StringPool};
+
+#[cfg(feature = "std")]
+mod segment_impl;

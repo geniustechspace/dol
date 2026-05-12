@@ -1,16 +1,22 @@
 //! `StringPool` — content-addressed string interner.
 //!
-//! M2 ships a single-locked variant: one global `RwLock<Inner>` per
-//! pool. The plan describes a sharded scheme, but the per-shard slot
-//! tables would force shard-index bits into the [`StrId`] (which
-//! breaks the simple `Lid::index() == slot_idx` contract). M3 will
-//! revisit sharding either by encoding shard bits in the `Lid` upper
-//! word or by sharding only the lookup index while keeping the slot
-//! and byte vectors global. The user-visible API is identical.
+//! M3 ships a single-locked variant whose byte storage is a vector of
+//! per-slot heap allocations (`Vec<Box<[u8]>>`). Compared to M2's
+//! shared growable byte buffer, the per-slot boxes have **stable
+//! addresses** for the lifetime of the pool — the outer `Vec` may
+//! reallocate when growing, but each `Box<[u8]>`'s payload sits at a
+//! fixed heap address until the pool is dropped. That stability is
+//! what allows [`StringPool::get`] to return `&str` (zero-copy) and is
+//! the precondition for [`PathSegment for Lid<StrTag>`](crate::handle::StrId).
+//!
+//! Sharding remains deferred to a later milestone (see plan §7.4):
+//! per-shard slot tables would force shard-index bits into the
+//! [`StrId`], breaking the simple `Lid::index() == slot_idx` contract.
+//! The user-visible API is identical to the planned sharded variant.
 
 extern crate alloc;
 
-use alloc::string::String;
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::fmt;
 use std::sync::RwLock;
@@ -34,8 +40,7 @@ pub enum InternError {
         /// Pre-existing handle.
         existing: StrId,
     },
-    /// Pool capacity exhausted: slot count would exceed [`u32::MAX`]
-    /// or byte offset would exceed [`u32::MAX`].
+    /// Pool capacity exhausted: slot count would exceed [`u32::MAX`].
     CapacityExceeded,
     /// The pool's `RwLock` was poisoned by a panic in another thread.
     Poisoned,
@@ -55,18 +60,13 @@ impl fmt::Display for InternError {
 
 impl std::error::Error for InternError {}
 
-/// One slot in the slot table: a `(offset, len)` pair into the pool's
-/// byte buffer plus a lazy [`StrCid`] cache.
-#[derive(Debug, Clone, Copy)]
-struct Slot {
-    offset: u32,
-    len: u32,
-}
-
 #[derive(Debug, Default)]
 struct Inner {
-    bytes: Vec<u8>,
-    slots: Vec<Slot>,
+    /// Each slot owns the bytes for one interned string. `Box<[u8]>`
+    /// has a stable heap address for as long as the box is not
+    /// dropped; we never drop a box until the whole pool is dropped,
+    /// so the underlying bytes outlive any borrow against the pool.
+    slots: Vec<Box<[u8]>>,
     /// Lazy BLAKE3-128 content addresses, one per slot. `None` until
     /// the first [`StringPool::to_cid`] call for that slot.
     cids: Vec<Option<[u8; 16]>>,
@@ -92,14 +92,20 @@ pub struct StringPool {
 impl StringPool {
     /// Construct a new pool with the given [`PoolConfig`].
     ///
-    /// Only `cfg.hash_seed` and `cfg.initial_bytes` are consumed in
-    /// M2; `shard_count` is reserved for the sharded rewrite.
+    /// Only `cfg.hash_seed` and `cfg.initial_bytes` are consumed; the
+    /// latter is used as a slot-vector capacity hint (one slot per
+    /// expected interned string is the worst case).
     #[must_use]
     pub fn new(cfg: &PoolConfig) -> Self {
+        // Each slot holds one `Box<[u8]>`; reserve a slot vector
+        // capacity proportional to `initial_bytes` to avoid early
+        // reallocations of the slot vector. We use a divisor of 16
+        // (a typical short-name length) as a coarse heuristic; this is
+        // a pure capacity hint and never observable.
+        let slot_hint = (cfg.initial_bytes as usize).max(16) / 16;
         let inner = Inner {
-            bytes: Vec::with_capacity(cfg.initial_bytes as usize),
-            slots: Vec::new(),
-            cids: Vec::new(),
+            slots: Vec::with_capacity(slot_hint),
+            cids: Vec::with_capacity(slot_hint),
             index: HashMap::new(),
         };
         Self {
@@ -138,8 +144,8 @@ impl StringPool {
     /// - [`InternError::HashCollision`] when a different string already
     ///   maps to the same xxHash3 fingerprint (extraordinarily rare;
     ///   bytes are byte-confirmed against the existing slot first).
-    /// - [`InternError::CapacityExceeded`] when the slot table or byte
-    ///   buffer would overflow [`u32::MAX`].
+    /// - [`InternError::CapacityExceeded`] when the slot table would
+    ///   overflow [`u32::MAX`].
     /// - [`InternError::Poisoned`] when the underlying lock was
     ///   poisoned by another thread's panic.
     pub fn intern(&self, s: &str) -> Result<StrId, InternError> {
@@ -163,26 +169,14 @@ impl StringPool {
             return Ok(id);
         }
 
-        // Insert.
-        let offset = inner.bytes.len();
-        let len = bytes.len();
-        if offset > u32::MAX as usize || len > u32::MAX as usize {
-            return Err(InternError::CapacityExceeded);
-        }
-        inner.bytes.extend_from_slice(bytes);
-
+        // Insert. One heap allocation per interned string keeps the
+        // payload at a stable address.
         let slot_idx_u = inner.slots.len();
         if slot_idx_u >= u32::MAX as usize {
             return Err(InternError::CapacityExceeded);
         }
-        #[allow(clippy::cast_possible_truncation)]
-        let offset_u32 = offset as u32;
-        #[allow(clippy::cast_possible_truncation)]
-        let len_u32 = len as u32;
-        inner.slots.push(Slot {
-            offset: offset_u32,
-            len: len_u32,
-        });
+        let boxed: Box<[u8]> = Box::from(bytes);
+        inner.slots.push(boxed);
         inner.cids.push(None);
         #[allow(clippy::cast_possible_truncation)]
         let slot_idx = slot_idx_u as u32;
@@ -202,20 +196,52 @@ impl StringPool {
         lookup(&inner, hash, bytes).ok().flatten()
     }
 
-    /// Resolve `id` to its interned string.
+    /// Resolve `id` to its interned string slice, zero-copy.
     ///
-    /// Returns a heap-allocated `String` because the underlying bytes
-    /// live behind an `RwLock`; zero-copy resolution will land with
-    /// the sharded rewrite when slot tables are visible through a
-    /// stable guard.
+    /// The returned slice borrows from the pool's per-slot heap
+    /// allocation and is valid for the lifetime of `&self`.
+    ///
+    /// Returns `None` if `id` is out of range, the slot's bytes are
+    /// not valid UTF-8 (which cannot happen for any handle issued by
+    /// [`intern`](Self::intern)), or the lock is poisoned.
     #[must_use]
-    pub fn get(&self, id: StrId) -> Option<String> {
+    pub fn get(&self, id: StrId) -> Option<&str> {
         let inner = self.inner.read().ok()?;
-        let slot = inner.slots.get(id.index())?;
-        let bytes = inner.bytes.get(slot.offset as usize..)?;
-        let bytes = bytes.get(..slot.len as usize)?;
-        let s = core::str::from_utf8(bytes).ok()?;
-        Some(String::from(s))
+        let slot: &[u8] = inner.slots.get(id.index())?.as_ref();
+        let s = core::str::from_utf8(slot).ok()?;
+
+        // SAFETY: The byte slice we are extending was obtained from
+        // `Box<[u8]>::as_ref` against a `Box` that lives inside
+        // `Inner.slots`. Three invariants make this lifetime extension
+        // sound:
+        //
+        //   1. **Box payload stability.** A `Box<[u8]>`'s heap
+        //      allocation has a fixed address from the moment it is
+        //      created until the box is dropped. The outer
+        //      `Vec<Box<[u8]>>` may reallocate when growing, but
+        //      reallocation moves only the *box headers* (data
+        //      pointer + length pairs), never the payloads they own.
+        //      `&[u8]` is `(data_ptr, len)` — both copied out of the
+        //      header — so the slice remains valid even if the vector
+        //      reallocates.
+        //
+        //   2. **No deletion.** Slots are append-only; we never call
+        //      `Vec::remove`, `Vec::pop`, `Vec::truncate`, or
+        //      reassign an existing slot. Therefore the box backing
+        //      this slot is not dropped before the pool is dropped.
+        //
+        //   3. **Byte immutability.** Once interned, a slot's bytes
+        //      are never mutated. No `&mut [u8]` is ever produced
+        //      from `inner.slots[i]` after its initial push, so the
+        //      shared `&[u8]` does not race with any writer.
+        //
+        // The pool itself is borrowed for `'_` (the elided lifetime
+        // of `&self`), so the returned `&str` cannot outlive the
+        // pool. The read guard is dropped at the end of the function;
+        // that drop only releases the `RwLock`, not the boxed bytes.
+        #[allow(unsafe_code)]
+        let s_extended: &str = unsafe { core::mem::transmute::<&str, &str>(s) };
+        Some(s_extended)
     }
 
     /// Resolve `id` to its [`StrCid`] (BLAKE3-128 content address).
@@ -224,20 +250,16 @@ impl StringPool {
     /// it; subsequent calls return the cached value.
     pub fn to_cid(&self, id: StrId) -> Option<StrCid> {
         let idx = id.index();
-        // Fast path: read lock + check cache.
+        // Fast path: read lock + check cache. Hash outside the lock
+        // if we miss, to keep the critical section short.
         let bytes_owned;
         {
             let inner = self.inner.read().ok()?;
-            let slot = inner.slots.get(idx)?;
+            let slot: &[u8] = inner.slots.get(idx)?.as_ref();
             if let Some(Some(cached)) = inner.cids.get(idx) {
                 return Some(Cid::from_bytes(*cached));
             }
-            // Materialise the slot's bytes for hashing outside the
-            // read lock — `content128` is cheap but we keep the
-            // critical section minimal.
-            let head = inner.bytes.get(slot.offset as usize..)?;
-            let body = head.get(..slot.len as usize)?;
-            bytes_owned = body.to_vec();
+            bytes_owned = slot.to_vec();
         }
         let digest = content128(&bytes_owned);
         // Slow path: write lock to cache. If another thread cached in
@@ -271,13 +293,7 @@ fn lookup(inner: &Inner, hash: u64, bytes: &[u8]) -> Result<Option<StrId>, Inter
     let Some(slot) = inner.slots.get(slot_idx as usize) else {
         return Ok(None);
     };
-    let head = inner
-        .bytes
-        .get(slot.offset as usize..)
-        .ok_or(InternError::CapacityExceeded)?;
-    let existing = head
-        .get(..slot.len as usize)
-        .ok_or(InternError::CapacityExceeded)?;
+    let existing: &[u8] = slot.as_ref();
     if existing == bytes {
         let id = Lid::from_index(slot_idx as usize).ok_or(InternError::CapacityExceeded)?;
         Ok(Some(id))
@@ -308,8 +324,16 @@ mod tests {
         let a = pool.intern("hello").unwrap();
         let b = pool.intern("world").unwrap();
         assert_ne!(a, b);
-        assert_eq!(pool.get(a).as_deref(), Some("hello"));
-        assert_eq!(pool.get(b).as_deref(), Some("world"));
+        assert_eq!(pool.get(a), Some("hello"));
+        assert_eq!(pool.get(b), Some("world"));
+    }
+
+    #[test]
+    fn get_returns_borrowed_str() {
+        let pool = StringPool::standard();
+        let id = pool.intern("borrowed").unwrap();
+        let s: &str = pool.get(id).unwrap();
+        assert_eq!(s, "borrowed");
     }
 
     #[test]
@@ -377,5 +401,24 @@ mod tests {
         pool.intern("b").unwrap();
         pool.intern("a").unwrap(); // dup, no growth
         assert_eq!(pool.len().unwrap(), 2);
+    }
+
+    #[test]
+    fn slot_addresses_are_stable_across_growth() {
+        // Validate the property that closing the path bridge depends
+        // on: bytes obtained from `get()` keep their address even
+        // after subsequent interns force the slot vector to grow.
+        let pool = StringPool::standard();
+        let first_id = pool.intern("anchor").unwrap();
+        let first_ptr = pool.get(first_id).unwrap().as_ptr();
+        // Insert enough distinct strings to force at least one slot
+        // vector reallocation past the initial capacity hint.
+        for i in 0..256 {
+            let s = alloc::format!("filler-{i}");
+            pool.intern(&s).unwrap();
+        }
+        let again_ptr = pool.get(first_id).unwrap().as_ptr();
+        assert_eq!(first_ptr, again_ptr);
+        assert_eq!(pool.get(first_id), Some("anchor"));
     }
 }

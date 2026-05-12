@@ -22,5 +22,20 @@ default = ["std"]
 std = ["dol-core/std"]
 serde = ["dep:serde", "dol-core/serde"]
 
-[lints]
-workspace = true
+[lints.rust]
+# `dol-cas` opts out of the workspace-wide `forbid(unsafe_code)` so
+# that `string_pool::dynamic::StringPool::get` can extend the lifetime
+# of a slot's `&str` past its read guard. The unsafe block is single,
+# narrowly-scoped, and carries a documented `SAFETY:` justification
+# grounded in the per-slot `Box<[u8]>` storage. Every other crate in
+# the workspace remains under `forbid(unsafe_code)`.
+unsafe_code = "deny"
+
+[lints.clippy]
+# Mirror the workspace-wide deny set verbatim (we only need to break
+# inheritance for `unsafe_code`; the rest stays identical).
+unwrap_used             = "deny"
+expect_used             = "deny"
+panic                   = "deny"
+indexing_slicing        = "deny"
+arithmetic_side_effects = "deny"

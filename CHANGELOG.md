@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### v2 rewrite — Phase 3-bridge: closing the two-mode path bridge (`dol-rewrite-plan-v2.md` §7.5)
+
+**Closes the M2 deferral that has been blocking `Path<Lid<StrTag>>`
+since PR #4. With this slice, both `Path<Name>` and `Path<StrId>`
+resolve through the same `PathSegment` machinery, and `dol-cas`'s
+`StringPool` slots into the resolver position the plan §7.5 calls
+out for it.**
+
+Two interlocking changes — neither was workable in isolation:
+
+- **`StringPool` storage rework (`dol-cas`).** Slot bytes moved from
+  the M2 single growable `Vec<u8>` to per-slot `Box<[u8]>`. Each
+  interned string now owns its own heap allocation whose payload has
+  a stable address for the lifetime of the pool. `StringPool::get`
+  becomes zero-copy: `Option<&str>` (matching `StaticStringPool::get`)
+  instead of `Option<String>`. The lifetime extension past the read
+  guard is the workspace's only `unsafe` block; it carries a
+  multi-paragraph `SAFETY:` comment grounded in the three invariants
+  that make the per-slot box payloads stable (Box payload stability,
+  no-deletion, byte immutability). `dol-cas`'s crate-level
+  `forbid(unsafe_code)` is relaxed to `deny(unsafe_code)` purely to
+  permit that one block; every other workspace crate stays under
+  the workspace-wide `forbid`. A `slot_addresses_are_stable_across_growth`
+  test directly verifies the stability invariant by holding a `&str`
+  while interning 256 fillers.
+
+- **`StringResolver` trait + path-bridge closure (`dol-core` + `dol-cas`).**
+  The plan §7.5 calls for `impl PathSegment for Lid<StrTag>` with
+  `Resolver = StringPool` to live in `dol-cas`, but Rust's orphan rule
+  forbids it: both `PathSegment` and `Id<Tag>` are foreign there.
+  Instead, `dol-core` now defines `pub trait StringResolver` and
+  ships `impl PathSegment for StrId` with
+  `Resolver = dyn StringResolver + 'static`. `dol-cas`'s `StringPool`
+  implements `StringResolver` (a blank-fits-the-orphan-rule local-type
+  impl). The legacy in-tree `Interner` also implements
+  `StringResolver`, so `Path<StrId>` callers that resolved against
+  `Interner` stay source-compatible (modulo the `&interner as &dyn
+  StringResolver` coercion at the call site).
+
+- **`StrTag` unification.** `dol_cas::handle::tags::StrTag` now
+  re-exports `dol_core::strings::StrTag` instead of defining its own.
+  This makes `dol_cas::handle::StrId` and `dol_core::strings::StrId`
+  the same nominal type, so the new dol-core `PathSegment` impl
+  applies to handles issued by `StringPool`. A regression test pins
+  the type identity.
+
+- **Doc updates.** The "Two-mode path bridge — partial" callout in
+  `dol-cas/src/lib.rs` and the matching deferral note in
+  `string_pool/mod.rs` are rewritten to "closed", with the new
+  resolver story documented.
+
+What's still deferred from M3c-δ₂: `lower(Expr<'a> → ExprArena)` —
+unblocked on the `lower_path` axis but still blocked on the variadic
+operand slab + LiteralPool / FuncRegistry per the analysis in PR #10.
+`StringPool` sharding likewise remains a separate M3 deferral.
+
 ### v2 rewrite — Phase 3c-δ₁: `dol-ir` fluent builders — `ContextBuilder` + `ConditionalBuilder` (`dol-rewrite-plan-v2.md` §8.3)
 
 **First half of M3c-δ. Lands the two fluent builders that ship in
