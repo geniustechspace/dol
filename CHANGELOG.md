@@ -7,6 +7,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### v2 rewrite — Phase 3a: `dol-ir` foundation (`dol-rewrite-plan-v2.md` §8.1)
+
+**M3 is the largest milestone in the rewrite (10–15 days, plan §8).
+To keep PRs reviewable it is split across M3a–M3e. PR #4 ships the
+foundation everything else in M3 builds on.**
+
+- **`ExprNode`** (`lib/dol-ir/src/expr/node.rs`) — the 16-byte v2
+  expression record. `#[repr(C)]`, `bytemuck::Pod + Zeroable`. Fields
+  `op:u8 + flags:u8 + aux:u16 + a:u32 + b:u32 + c:u32`.
+  - **16-byte invariant** asserted three ways: `const _: () = assert!(...)`
+    in the source, runtime test in `node::tests`, and `xtask
+    size-check` (now wired up — see below).
+  - Raw `a` / `b` / `c` fields are private. Construction goes through
+    typed constructors (`bin`, `unary`, `lit_ref`, `field_ref`,
+    `func_ref`, `param`, `wildcard`, `count_all`); reading goes
+    through typed accessors (`as_bin`, `as_unary`, `as_lit_ref`,
+    `as_field_ref`, `as_func_ref`, `as_param`, `is_wildcard`,
+    `is_count_all`). Each constructor↔accessor pair has a round-trip
+    test.
+
+- **Opcode tables** (`lib/dol-ir/src/expr/ops.rs`) per plan §8.1:
+  - `OpFamily` (top-level discriminator, `#[repr(u8)] #[non_exhaustive]`)
+    with values `Reserved=0`, `Bin=1`, `Unary=2`, `LitRef=3`,
+    `FieldRef=4`, `FuncRef=5`, `Param=6`, `Wildcard=7`, `CountAll=8`.
+  - `BinOp` (`#[repr(u16)] #[non_exhaustive]`) — arithmetic 0–4,
+    comparison 10–15, logical 20–21, bitwise 30–34, concat 40,
+    pattern-match 50–51. Banded so future opcodes can be appended
+    inside each group without disturbing existing numbers.
+  - `UnaryOp` (`#[repr(u16)] #[non_exhaustive]`) — `Not=0`, `Neg=1`,
+    `BitNot=2`, `IsNull=10`, `IsNotNull=11`.
+  - All three have `try_from_*` decoders that return `None` for
+    unknown values (the wire-format / version-skew error).
+  - **Numeric-stability snapshot tests** lock every existing value;
+    accidentally renumbering an opcode fails CI.
+
+- **`NodeFlags`** (`lib/dol-ir/src/expr/flags.rs`) — `#[repr(transparent)]
+  u8` bitset with const builders `with_nullable` / `with_distinct` /
+  `with_negated` / `with_aggregate` and matching predicates. Custom
+  `Debug` lists active flags by name. Round-trips through
+  `from_bits` / `to_bits` preserving unused bits.
+
+- **`ExprArena`** (`lib/dol-ir/src/expr/arena.rs`, `feature = "std"`)
+  — flat `DynPool<ExprNode>`-backed store keyed by `NodeId`. Raw
+  `push(node) -> Option<NodeId>` / `get(id) -> Option<&ExprNode>` /
+  `len` / `is_empty` / `with_capacity`. Ids are dense and one-based
+  (matches the `Lid` contract). **Dedup index lands in M3b** with
+  lowering — no caller in M3a can produce duplicates worth deduping.
+
+- **xtask `size-check`** (`xtask/src/main.rs`) — replaces the M0 stub
+  with real CI-grade assertions: `size_of::<ExprNode>() == 16` and
+  `size_of::<Option<NodeId>>() == size_of::<Option<StrId>>() == 4`.
+  `xtask` now depends on `dol-ir` and `dol-cas` so the assertions
+  run against the canonical types.
+
+- **Cargo.toml** — `dol-ir` depends on `dol-core` (`hash` feature),
+  `dol-cas`, and `bytemuck`. `default = ["std"]`. No-std build of
+  `dol-ir --no-default-features` compiles cleanly on
+  `thumbv7em-none-eabihf`; only the std-gated `ExprArena` is
+  unavailable in that mode.
+
+- **30 new tests** (workspace 151 → **181 passing**). Covers:
+  16-byte / 4-byte alignment invariants, every opcode round-trip,
+  unknown-opcode rejection, numeric-stability snapshot for
+  `OpFamily` / `BinOp` / `UnaryOp`, `NodeFlags` independence and
+  unused-bit preservation, every `ExprNode::*` constructor /
+  accessor pair, `Pod` byte-cast round-trip, and `ExprArena` push /
+  get / dense-id / nested-reference scenarios.
+
+### Out of scope for M3a (covered in M3b–M3e)
+
+- Tree DSL `Expr<'a>` (§8.2), `Context<'a>` / `Frame` / `OrderByExpr`
+  (§8.3), `ContextBuilder` / `ConditionalBuilder`.
+- Lowering `Expr<'a>` → `ExprArena` and `lower_path`
+  (`Path<Name>` → `Path<Lid<StrTag>>`) per §8.4. This is also the
+  natural home for the deferred `impl PathSegment for Lid<StrTag>`
+  from M2.
+- `ContentIndex` walker `compute_hash` (§8.5).
+- Schema types `Entity`, `Field`, `SchemaCatalog` (§8.6).
+- `Operation`, `Program` (§8.7).
+- `Backend` trait, `CapabilitySet` / `Capability`, reference no-op
+  backend (§8.8).
+- Optional `stream` / `pipeline` features (§8.9–§8.10).
+
 ### v2 rewrite — Phase 2: `dol-cas` (`dol-rewrite-plan-v2.md` §7)
 
 **M2 ships the identity and pooling layer that sits between

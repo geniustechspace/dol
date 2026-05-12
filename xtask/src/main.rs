@@ -231,11 +231,40 @@ fn match_recursive_entry(line: &str) -> Option<&str> {
 // ──────────────────────────────────────────────────────────────────────────
 
 fn size_check_stub() -> bool {
-    println!(
-        "xtask size-check: M0 stub (no IR types defined yet). \
-         Real impl lands in M3 alongside `ExprNode` and `Option<Lid<_>>`."
-    );
-    true
+    use core::mem::size_of;
+
+    use dol_cas::handle::{NodeId, StrId};
+    use dol_ir::expr::node::ExprNode;
+
+    let mut ok = true;
+
+    // The 16-byte ExprNode is the cornerstone of the v2 IR. The same
+    // assertion is also `const`-asserted inside `expr/node.rs`; this
+    // run-time check is the CI signal that catches changes that
+    // accidentally bypass the const-assert (e.g. via `#[cfg]`).
+    let expr = size_of::<ExprNode>();
+    if expr == 16 {
+        println!("xtask size-check: ExprNode = {expr} bytes ✓");
+    } else {
+        eprintln!("xtask size-check: ExprNode = {expr} bytes (expected 16) ✗");
+        ok = false;
+    }
+
+    // `Option<Lid<_>>` must remain 4 bytes thanks to the NonZeroU32
+    // niche; this is what keeps our ID tables compact.
+    let opt_node = size_of::<Option<NodeId>>();
+    let opt_str = size_of::<Option<StrId>>();
+    if opt_node == 4 && opt_str == 4 {
+        println!("xtask size-check: Option<NodeId> = {opt_node}, Option<StrId> = {opt_str} ✓");
+    } else {
+        eprintln!(
+            "xtask size-check: Option<NodeId> = {opt_node}, Option<StrId> = {opt_str} \
+             (expected 4 each) ✗"
+        );
+        ok = false;
+    }
+
+    ok
 }
 
 fn dag_check_stub() -> bool {

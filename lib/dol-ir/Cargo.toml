@@ -4,15 +4,22 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 publish = false
-description = "DOL — intermediate representation: ExprArena, schema catalog, Operation, Program, Backend. M0 scaffold only."
+description = "DOL — intermediate representation: ExprNode + ExprArena, opcode tables. M3a foundation."
 
 [dependencies]
-dol-core = { workspace = true }
+# `dol-core/hash` is required: future M3b lowering will hash StringPool
+# bytes through `content128`. M3a only uses `dol-core` for `Budget` and
+# `ids::Id`; pulling the `hash` feature now keeps the dep set stable.
+dol-core = { workspace = true, features = ["hash"] }
 dol-cas  = { workspace = true }
 
+# `bytemuck` provides the `Pod`/`Zeroable` derives that make `ExprNode`
+# zero-copy castable. The 16-byte POD layout is the v2 cornerstone.
+bytemuck = { workspace = true }
+
 [features]
-default = []
-std = ["dol-core/std"]
+default = ["std"]
+std = ["dol-core/std", "dol-cas/std"]
 
 [lints]
 workspace = true
