@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### v2 rewrite — Phase 3c-δ₁: `dol-ir` fluent builders — `ContextBuilder` + `ConditionalBuilder` (`dol-rewrite-plan-v2.md` §8.3)
+
+**First half of M3c-δ. Lands the two fluent builders that ship in
+`dol_ir::expr::context` per the plan's file layout (§8.2 line 230).
+Lowering itself (`Expr<'a>` → `ExprArena` and `lower_path`) is the
+follow-up slice M3c-δ₂.**
+
+- **`ContextBuilder<'a>`** — fluent builder for `Expr::Scoped`.
+  - `new(expr)` starts the chain wrapping the to-be-scoped expression.
+  - `partitioning(keys)`, `ordering(exprs)`, `between_positional(start,
+    end)` — each idempotent (replaces, not appends — matches typical
+    fluent-builder ergonomics where the configuration is described
+    once).
+  - `between_positional` defaults the frame unit to
+    [`FrameUnit::Rows`] — the only unit the spec exposes through this
+    builder. RANGE / GROUPS frames are still reachable by setting
+    [`Context::frame`] directly with [`Frame::range`] / [`Frame::groups`].
+  - `build()` returns `Expr::Scoped { expr, context }` ready for
+    lowering.
+
+- **`ConditionalBuilder<'a>`** — fluent builder for `Expr::Match`.
+  - `new()` (and `Default`) start an empty multi-arm conditional.
+  - `when(cond, result)` appends arms in insertion order; the first
+    matching arm wins at evaluation time.
+  - `fallback(expr)` sets (replaces) the `ELSE` branch. With no
+    fallback, the backend substitutes its native null value.
+  - `build()` returns `Expr::Match { arms, fallback }`.
+
+Both builders are `Debug + Clone + PartialEq` and live next to
+`Context` per the plan's `expr/context.rs` file layout. Two doctests
+(one per builder) lock in the documented usage.
+
+- **7 new tests** + 2 doctests; `dol-ir` lib **87 → 94**, workspace
+  **238 → 247 passing**. Coverage:
+  - `ContextBuilder` minimal chain yields `Scoped` with empty
+    `Context`.
+  - Full chain populates `partition_by` / `order_by` / `frame`
+    correctly.
+  - `partitioning` / `ordering` / `between_positional` replace, not
+    append, on repeated calls.
+  - `ConditionalBuilder::default()` matches `new()`.
+  - Empty builder builds an empty `Match` (no arms, no fallback).
+  - `when()` appends arms in order; `fallback()` is carried through.
+  - `fallback()` replaces on repeated calls.
+
+- **All acceptance gates green**: build, `cargo test --workspace
+  --all-features` (247 passing), `cargo test -p dol-ir --doc` (2
+  passing), `cargo clippy --workspace --all-targets --all-features --
+  -D warnings`, `cargo fmt --check`, `cargo doc -D warnings -D
+  rustdoc::broken_intra_doc_links`, `cargo check -p dol-ir --target
+  thumbv7em-none-eabihf --no-default-features` (no_std + alloc), all
+  five `cargo xtask` subcommands.
+
+### Out of scope for M3c-δ₁ (future M3c-δ₂ + M3d/M3e)
+
+- Lowering pipeline `Expr<'a>` → `ExprArena` and `lower_path` (§8.4)
+  — the natural home for `impl PathSegment for Lid<StrTag>` deferred
+  from M2 — moves to a follow-up slice M3c-δ₂ to keep this PR small.
+- Schema (§8.6), `Operation` / `Program` (§8.7), `Backend` (§8.8),
+  stream/pipeline (§8.9–§8.10).
+
 ### v2 rewrite — Phase 3c-γ: `dol-ir` tree DSL `Expr<'a>` + `Context<'a>` + `OrderByExpr<'a>` (`dol-rewrite-plan-v2.md` §8.2 + §8.3 generic-over-`'a` parts)
 
 **Third M3c slice. Lands the user-facing tree AST: a recursive

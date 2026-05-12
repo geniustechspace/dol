@@ -3,7 +3,7 @@
 //! Per `dol-rewrite-plan-v2.md` §8. M3 is the largest milestone in
 //! the rewrite and is split across PRs **M3a–M3e**.
 //!
-//! ## What ships in M3a + M3b + M3c-α + M3c-β + M3c-γ
+//! ## What ships in M3a + M3b + M3c-α + M3c-β + M3c-γ + M3c-δ₁
 //!
 //! - [`expr::node::ExprNode`] — the 16-byte POD expression record.
 //!   `#[repr(C)]`, `bytemuck::Pod`, const-asserted to be exactly
@@ -45,13 +45,15 @@
 //! - [`expr::context`] — [`expr::context::Context`], the universal
 //!   "evaluate inside a scope" descriptor used by `Expr::Scoped`
 //!   (carries `partition_by` keys, `order_by` list, optional `frame`).
+//!   Plus the fluent builders: [`expr::context::ContextBuilder`]
+//!   (builds `Expr::Scoped`) and [`expr::context::ConditionalBuilder`]
+//!   (builds `Expr::Match`).
 //!
-//! ## What lands in M3c-δ … M3e
+//! ## What lands in M3c-δ₂ … M3e
 //!
-//! - **M3c-δ**: lowering pipeline `Expr<'a> → ExprArena` with
-//!   `lower_path` (§8.4 main body) plus the fluent `ContextBuilder`
-//!   and `ConditionalBuilder` (§8.3) — also the natural home for
-//!   `impl PathSegment for Lid<StrTag>` deferred from M2.
+//! - **M3c-δ₂**: lowering pipeline `Expr<'a> → ExprArena` with
+//!   `lower_path` (§8.4) — also the natural home for `impl PathSegment
+//!   for Lid<StrTag>` deferred from M2.
 //! - **M3d**: schema types — `Entity`, `Field`, `SchemaCatalog` (§8.6).
 //! - **M3e**: `Operation` / `Program` (§8.7), `Backend` trait + reference
 //!   no-op backend (§8.8), and optional `stream` / `pipeline` features
