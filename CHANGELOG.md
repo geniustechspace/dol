@@ -7,6 +7,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### v2 rewrite — Phase 3b: `dol-ir` arena dedup + content-hash walker (`dol-rewrite-plan-v2.md` §8.4 dedup, §8.5)
+
+**Two pure additions to the `ExprArena` surface shipped in M3a. Both
+unblock the tree-DSL lowering that lands in M3c.**
+
+- **`ExprArena::intern_node`** (`lib/dol-ir/src/expr/arena.rs`) —
+  structural-dedup constructor. Returns the existing `NodeId` for a
+  byte-identical node, otherwise pushes and records the new id.
+  - Index keyed by `dol_core::hash::fast64` (xxHash3, in-process) over
+    the 16 raw bytes of `ExprNode`. Collisions are resolved by
+    comparing the actual node bytes after a hash hit; on a true
+    collision the newcomer wins a fresh slot (panic-free).
+  - Lazy `HashMap<u64, NodeId>` built on first call.
+  - Raw `push` is unchanged and intentionally bypasses the index;
+    the two modes interoperate without surprises (documented).
+  - `dedup_len()` test/diagnostic helper exposes the index size.
+
+- **`expr::walk::content_hash`** (`lib/dol-ir/src/expr/walk.rs`) —
+  bottom-up walker that derives the BLAKE3-128 content address of any
+  subtree, memoised in `dol_cas::content_index::ContentIndex`.
+  - Hash domain: `[0x01, family, flags, aux_lo, aux_hi, ...]` then
+    either child content addresses (recursive families) or the raw
+    12-byte operand slab (leaves). The leading `0x01` is the wire
+    domain tag — bumping it invalidates every persisted digest.
+  - Threads `&mut Budget` per descent (`budget.depth()` + `budget.node()`).
+    Cache hits skip the budget entirely — they are free lookups.
+  - Returns `ContentHashError { Budget(BudgetExceeded), MissingNode,
+    UnknownOpcode }`.
+  - Cross-process stable: two arenas building the byte-identical
+    subtree (with completely different internal `NodeId`s) derive the
+    same digest. Test `structural_equality_yields_identical_hash`
+    locks this guarantee.
+
+- **`expr::walk::content_hash_bytes`** — convenience wrapper around the
+  project's `content128` chokepoint for callers that want auxiliary
+  digests in the same hash domain. Carries an explicit
+  `// budget-gate: opt-out` marker (one-shot byte hash, no recursion).
+
+- **`Cargo.toml`** — `dol-ir` now depends on `hashbrown` (workspace
+  default-features off) for the dedup map. `dol-core/hash` was already
+  pulled in M3a.
+
+- **`dol_cas::ContentIndex`** doc updated to clarify the BLAKE3-128
+  cross-process stability of stored digests and to point at the new
+  walker (without creating a cross-crate intra-doc link cycle).
+
+- **17 new tests**, workspace 181 → **198 passing**. Coverage:
+  - `intern_node` round-trip; distinct nodes get distinct ids;
+    structural-subtree sharing through `BinOp` parents; flag
+    differences create distinct dedup keys; raw `push` does not
+    populate the dedup index (mode-mixing).
+  - `content_hash` determinism, cache-hit avoids budget cost, distinct
+    leaves / opcodes / operand orders / flags all produce distinct
+    digests, structural equality across arenas yields identical digest,
+    `MissingNode` on dangling children, depth + node budget exhaustion
+    each surface the right `BudgetExceeded` variant, `content_hash_bytes`
+    matches `content128`.
+
+- **All acceptance gates green**: build, `cargo test --workspace
+  --all-features`, `cargo clippy --workspace --all-targets
+  --all-features -- -D warnings`, `cargo fmt --check`, `cargo doc -D
+  warnings -D rustdoc::broken_intra_doc_links`, `cargo check -p dol-ir
+  --target thumbv7em-none-eabihf --no-default-features`, all five
+  `cargo xtask` subcommands exit 0 (including `budget-gate` after the
+  opt-out marker on `content_hash_bytes`).
+
+### Out of scope for M3b (covered in M3c–M3e)
+
+- Tree DSL `Expr<'a>` (§8.2), `Context<'a>` / `Frame` / `OrderByExpr`
+  (§8.3), `ContextBuilder` / `ConditionalBuilder`.
+- Full lowering pipeline `Expr<'a>` → `ExprArena` and `lower_path`
+  (`Path<Name>` → `Path<Lid<StrTag>>`) per §8.4 main body. This is
+  also the natural home for the deferred `impl PathSegment for
+  Lid<StrTag>` from M2.
+- Schema types `Entity` / `Field` / `SchemaCatalog` (§8.6).
+- `Operation` / `Program` (§8.7).
+- `Backend` trait + reference no-op backend (§8.8).
+- Optional `stream` / `pipeline` features (§8.9–§8.10).
+
 ### v2 rewrite — Phase 3a: `dol-ir` foundation (`dol-rewrite-plan-v2.md` §8.1)
 
 **M3 is the largest milestone in the rewrite (10–15 days, plan §8).

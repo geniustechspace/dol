@@ -216,6 +216,7 @@ dependencies = [
  "bytemuck",
  "dol-cas",
  "dol-core",
+ "hashbrown 0.15.5",
 ]
 
 [[package]]

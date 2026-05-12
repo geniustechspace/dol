@@ -3,7 +3,7 @@
 //! Per `dol-rewrite-plan-v2.md` §8. M3 is the largest milestone in
 //! the rewrite and is split across PRs **M3a–M3e**.
 //!
-//! ## What ships in M3a (this revision)
+//! ## What ships in M3a + M3b
 //!
 //! - [`expr::node::ExprNode`] — the 16-byte POD expression record.
 //!   `#[repr(C)]`, `bytemuck::Pod`, const-asserted to be exactly
@@ -15,18 +15,24 @@
 //! - [`expr::flags::NodeFlags`] — per-node bitset (`nullable` /
 //!   `distinct` / `negated` / `aggregate`).
 //! - [`expr::arena::ExprArena`] — flat `DynPool<ExprNode>` store
-//!   addressed by [`NodeId`](dol_cas::handle::NodeId). Raw push/get
-//!   surface only; dedup index lands in M3b.
+//!   addressed by [`NodeId`](dol_cas::handle::NodeId). Two construction
+//!   modes: raw [`push`](expr::arena::ExprArena::push) (no dedup) and
+//!   [`intern_node`](expr::arena::ExprArena::intern_node) (structural
+//!   dedup keyed by `fast64` over the 16-byte node).
+//! - [`expr::walk::content_hash`] — bottom-up walker that derives the
+//!   BLAKE3-128 content address of any subtree, memoised in
+//!   [`dol_cas::content_index::ContentIndex`]. Threads `&mut Budget`
+//!   per descent; cache hits are free.
 //!
-//! ## What lands in M3b–M3e
+//! ## What lands in M3c–M3e
 //!
-//! - **M3b**: tree DSL `Expr<'a>` (§8.2), lowering `Expr<'a> →
-//!   ExprArena` with `lower_path` (§8.4), arena dedup index, and the
-//!   `ContentIndex` walker (§8.5).
-//! - **M3c**: schema types — `Entity`, `Field`, `SchemaCatalog` (§8.6).
-//! - **M3d**: `Operation` enum and `Program` (§8.7).
-//! - **M3e**: `Backend` trait + reference no-op backend (§8.8) plus
-//!   optional `stream` / `pipeline` features (§8.9–§8.10).
+//! - **M3c**: tree DSL `Expr<'a>` (§8.2), lowering `Expr<'a> →
+//!   ExprArena` with `lower_path` (§8.4 main body), and the
+//!   `Context<'a>` / `OrderByExpr` / `Frame` family (§8.3).
+//! - **M3d**: schema types — `Entity`, `Field`, `SchemaCatalog` (§8.6).
+//! - **M3e**: `Operation` / `Program` (§8.7), `Backend` trait + reference
+//!   no-op backend (§8.8), and optional `stream` / `pipeline` features
+//!   (§8.9–§8.10).
 //!
 //! ## Encapsulation rule
 //!

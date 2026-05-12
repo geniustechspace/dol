@@ -1,8 +1,10 @@
 //! `ContentIndex` — lazy node → content-address map.
 //!
-//! Per `dol-rewrite-plan-v2.md` §7.6. M2 ships the stub; the
-//! bottom-up walker that populates it is wired up in M3 when
-//! `ExprArena` exists.
+//! Per `dol-rewrite-plan-v2.md` §7.6 / §8.5. Stores the BLAKE3-128
+//! cross-process content address of each node; populated bottom-up
+//! by the `content_hash` walker in `dol-ir` (the walker needs to know
+//! `ExprNode` structure, so it lives there). Entries can be
+//! invalidated when a node is rewritten (e.g. constant folding).
 
 #[cfg(feature = "std")]
 extern crate alloc;
@@ -33,7 +35,9 @@ impl ContentIndex {
     }
 
     /// Returns the content address of `id`, if it has been computed
-    /// and not subsequently invalidated.
+    /// and not subsequently invalidated. The address is the
+    /// BLAKE3-128 digest produced by the `content_hash` walker in
+    /// `dol-ir`.
     #[must_use]
     pub fn get(&self, id: NodeId) -> Option<[u8; 16]> {
         self.node_hashes.get(&id).copied()
