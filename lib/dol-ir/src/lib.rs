@@ -3,7 +3,7 @@
 //! Per `dol-rewrite-plan-v2.md` §8. M3 is the largest milestone in
 //! the rewrite and is split across PRs **M3a–M3e**.
 //!
-//! ## What ships in M3a + M3b + M3c-α + M3c-β + M3c-γ + M3c-δ₁ + M3c-δ₂a
+//! ## What ships in M3a + M3b + M3c-α + M3c-β + M3c-γ + M3c-δ₁ + M3c-δ₂a + M3c-δ₂b prereq #1
 //!
 //! - [`expr::node::ExprNode`] — the 16-byte POD expression record.
 //!   `#[repr(C)]`, `bytemuck::Pod`, const-asserted to be exactly
@@ -53,13 +53,20 @@
 //!   shared [`expr::lower::LowerError`] enum that the upcoming
 //!   recursive `lower(Expr)` will reuse unchanged. Charges one
 //!   `Budget::node()` per interned segment.
+//! - [`expr::literals::LiteralPool`] — typed-arena carrier mapping
+//!   [`LiteralId`](dol_cas::handle::LiteralId) to
+//!   [`Literal<'static>`](dol_core::literal::Literal). The arena form
+//!   of `Expr::Lit(...)` is `ExprNode::lit_ref(LiteralId)` (plan §8.1
+//!   line 1095); this pool is its required carrier. Push-only in this
+//!   slice — content-addressed dedup needs a stable `Literal` byte
+//!   serialisation and is left to a follow-up slice.
 //!
 //! ## What lands in M3c-δ₂b … M3e
 //!
 //! - **M3c-δ₂b**: the recursive `lower(Expr<'a>) → ExprArena` pass
-//!   (§8.4) and `compute_hash` integration (§8.5). Blocked on a
-//!   variadic operand slab plus `LiteralPool` / `FuncRegistry` that
-//!   no carrier in M3a–c yet builds.
+//!   (§8.4) and `compute_hash` integration (§8.5). Still blocked on
+//!   the variadic operand slab + `FuncRegistry` carrier (the
+//!   `LiteralPool` half is now in place).
 //! - **M3d**: schema types — `Entity`, `Field`, `SchemaCatalog` (§8.6).
 //! - **M3e**: `Operation` / `Program` (§8.7), `Backend` trait + reference
 //!   no-op backend (§8.8), and optional `stream` / `pipeline` features

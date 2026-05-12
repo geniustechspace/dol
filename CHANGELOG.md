@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### v2 rewrite — Phase 3c-δ₂b prereq #1: `dol-ir` `LiteralPool` (`dol-rewrite-plan-v2.md` §3.3 "side pools", §8.1 line 1095)
+
+**Unblocks the literal half of the deferred recursive `lower(Expr)`
+pass. `ExprNode::lit_ref(LiteralId)` (already shipped in M3a) is the
+arena form of `Expr::Lit(Literal<'a>)` — but no carrier yet existed
+that turned a borrowed `Literal<'a>` into a `LiteralId`. This slice
+ships that carrier. The remaining M3c-δ₂b prerequisites are
+`FuncRegistry` (next slice) and the variadic operand slab.**
+
+- **New module `dol_ir::expr::literals`.**
+  - `LiteralPool { items: DynPool<Literal<'static>> }` — `Debug + Clone
+    + Default + Send + Sync`. Backed by the same `DynPool` that backs
+    `ExprArena`, so the typed-id contract is identical: dense
+    one-based ids, append-only, ids stable for the pool's lifetime.
+    Manual `Default` impl (deriving requires `Literal: Default`,
+    which is intentionally not provided).
+  - `LiteralPool::new()` / `with_capacity(n)` / `len()` / `is_empty()`.
+  - `intern(&mut self, lit: &Literal<'_>) -> Result<LiteralId,
+    LiteralPoolError>` — promotes the input via `Literal::into_static`
+    on every call, then `DynPool::push_id` returns the typed id.
+    Push-only in this slice; **no structural dedup yet**, so repeated
+    intern of the same value allocates distinct ids. The dedup index
+    is left to a follow-up because `Literal` does not implement
+    `Hash` (because of `f64`) and a stable byte serialisation across
+    its many feature-gated variants warrants its own slice.
+  - `get(LiteralId) -> Option<&Literal<'static>>` — typed lookup.
+  - `LiteralPoolError::CapacityExceeded` mirrors the
+    `LowerError::ArenaOverflow` shape so future composition with the
+    recursive lowerer is mechanical.
+
+- **9 tests in `expr::literals::tests`:** empty round-trip, intern
+  returns a typed id with `index == 0` for the first slot, push-only
+  invariant (same value → distinct ids — pinned so a future dedup
+  slice deliberately changes it), distinct values get distinct ids,
+  `get` round-trips an interned literal, borrowed `String` is
+  promoted to owned form (drop-the-source check), ids are dense and
+  one-based, unknown id returns `None`, `Display` for the error.
+
+- **Lib head doc updated.** M3c-δ₂b prereq #1 moves out of "later"
+  into "what ships now"; the M3c-δ₂b carve-out is restated with
+  `FuncRegistry` + the variadic operand slab as the remaining blockers.
+
 ### v2 rewrite — Phase 3c-δ₂a: `dol-ir` `lower_path` + `LowerError` skeleton (`dol-rewrite-plan-v2.md` §8.4)
 
 **First half of M3c-δ₂. Ships `lower_path` (the single authorised
