@@ -3,7 +3,7 @@
 //! Per `dol-rewrite-plan-v2.md` §8. M3 is the largest milestone in
 //! the rewrite and is split across PRs **M3a–M3e**.
 //!
-//! ## What ships in M3a + M3b + M3c-α + M3c-β
+//! ## What ships in M3a + M3b + M3c-α + M3c-β + M3c-γ
 //!
 //! - [`expr::node::ExprNode`] — the 16-byte POD expression record.
 //!   `#[repr(C)]`, `bytemuck::Pod`, const-asserted to be exactly
@@ -26,9 +26,7 @@
 //! - [`expr::meta`] — tree-DSL leaf metadata: [`expr::meta::OpDef`]
 //!   (with [`expr::meta::OpCategory`] and a wire-stable well-known
 //!   catalogue) and [`expr::meta::FuncDef`] (with [`expr::meta::Arity`],
-//!   [`expr::meta::FuncKind`], and `validate_arity`). These are the
-//!   carrier types that the forthcoming `Expr<'a>` `Binary` and
-//!   `Call` variants will hold.
+//!   [`expr::meta::FuncKind`], and `validate_arity`).
 //! - [`expr::frame`] — window / scope frame primitives:
 //!   [`expr::frame::FrameUnit`], [`expr::frame::Extent`],
 //!   [`expr::frame::Boundary`] (with `unbounded_preceding` /
@@ -37,17 +35,23 @@
 //!   `groups` constructors.
 //! - [`expr::order`] — ordering primitives: [`expr::order::SortDirection`]
 //!   (`Asc` default, `Desc`) and [`expr::order::NullsOrder`]
-//!   (`First` / `Last` / `Default`).
+//!   (`First` / `Last` / `Default`), plus [`expr::order::OrderByExpr`]
+//!   (the `Expr<'a>`-carrying member of the family).
+//! - [`expr::tree`] — the tree DSL: [`expr::tree::Expr`], the user-facing
+//!   builder enum with all 14 variants from plan §8.2 (`Ref`, `Param`,
+//!   `Lit`, `Seq`, `Map`, `Binary`, `Unary`, `Call`, `Cast`, `Match`,
+//!   `If`, `InRange`, `MemberOf`, `Label`, `Wildcard`, `CountAll`,
+//!   `Scoped`).
+//! - [`expr::context`] — [`expr::context::Context`], the universal
+//!   "evaluate inside a scope" descriptor used by `Expr::Scoped`
+//!   (carries `partition_by` keys, `order_by` list, optional `frame`).
 //!
-//! ## What lands in M3c-γ … M3e
+//! ## What lands in M3c-δ … M3e
 //!
-//! - **M3c-γ**: tree DSL `Expr<'a>` (§8.2) and the generic-over-`'a`
-//!   members of the `Context<'a>` family — `Context<'a>`,
-//!   `OrderByExpr<'a>`, `ContextBuilder`, `ConditionalBuilder` —
-//!   plus the well-known function registry.
-//! - **M3c-δ**: lowering `Expr<'a> → ExprArena` with `lower_path`
-//!   (§8.4 main body) — also the natural home for `impl PathSegment
-//!   for Lid<StrTag>` deferred from M2.
+//! - **M3c-δ**: lowering pipeline `Expr<'a> → ExprArena` with
+//!   `lower_path` (§8.4 main body) plus the fluent `ContextBuilder`
+//!   and `ConditionalBuilder` (§8.3) — also the natural home for
+//!   `impl PathSegment for Lid<StrTag>` deferred from M2.
 //! - **M3d**: schema types — `Entity`, `Field`, `SchemaCatalog` (§8.6).
 //! - **M3e**: `Operation` / `Program` (§8.7), `Backend` trait + reference
 //!   no-op backend (§8.8), and optional `stream` / `pipeline` features

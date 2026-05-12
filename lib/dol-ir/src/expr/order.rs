@@ -59,6 +59,39 @@ pub enum NullsOrder {
     Default,
 }
 
+// ─── OrderByExpr ─────────────────────────────────────────────────────
+
+/// One element of an `ORDER BY` list inside a
+/// [`Context`](crate::expr::context::Context).
+///
+/// Carries an [`Expr`](crate::expr::tree::Expr) payload and so this
+/// type lives with [`Context`](crate::expr::context::Context) in
+/// M3c-γ — both depend on `Expr<'a>` and so could not ship in the
+/// M3c-β `Expr<'a>`-independent slice.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OrderByExpr<'a> {
+    /// Expression to sort by.
+    pub expr: crate::expr::tree::Expr<'a>,
+    /// Sort direction.
+    pub dir: SortDirection,
+    /// Null ordering rule.
+    pub nulls: NullsOrder,
+}
+
+impl<'a> OrderByExpr<'a> {
+    /// Convenience: wrap `expr` with default direction (`Asc`) and
+    /// default null ordering (`Default` — defer to backend).
+    #[inline]
+    #[must_use]
+    pub const fn new(expr: crate::expr::tree::Expr<'a>) -> Self {
+        Self {
+            expr,
+            dir: SortDirection::Asc,
+            nulls: NullsOrder::Default,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -102,5 +135,27 @@ mod tests {
         fn assert_copy<T: Copy + Eq + core::hash::Hash + Default>() {}
         assert_copy::<SortDirection>();
         assert_copy::<NullsOrder>();
+    }
+
+    #[test]
+    fn order_by_expr_new_uses_defaults() {
+        use crate::expr::tree::Expr;
+        use dol_core::path::Path;
+        let o = OrderByExpr::new(Expr::Ref(Path::new("ts")));
+        assert_eq!(o.dir, SortDirection::Asc);
+        assert_eq!(o.nulls, NullsOrder::Default);
+    }
+
+    #[test]
+    fn order_by_expr_clones_and_compares() {
+        use crate::expr::tree::Expr;
+        use dol_core::path::Path;
+        let o = OrderByExpr {
+            expr: Expr::Ref(Path::new("ts")),
+            dir: SortDirection::Desc,
+            nulls: NullsOrder::Last,
+        };
+        let c = o.clone();
+        assert_eq!(o, c);
     }
 }

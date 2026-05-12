@@ -7,6 +7,94 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### v2 rewrite — Phase 3c-γ: `dol-ir` tree DSL `Expr<'a>` + `Context<'a>` + `OrderByExpr<'a>` (`dol-rewrite-plan-v2.md` §8.2 + §8.3 generic-over-`'a` parts)
+
+**Third M3c slice. Lands the user-facing tree AST: a recursive
+`Expr<'a>` enum with all 14 variants from plan §8.2, plus the two
+`Expr<'a>`-carrying members of the `Context<'a>` family
+(`Context<'a>` and `OrderByExpr<'a>`) that could not ship in M3c-β.**
+
+These three types form a mutual cycle through `Expr::Scoped { context:
+Context<'a> }` → `Context::order_by: Vec<OrderByExpr<'a>>` →
+`OrderByExpr::expr: Expr<'a>`, so they ship together.
+
+- **New module `dol_ir::expr::tree`** (`lib/dol-ir/src/expr/tree.rs`):
+  - `Expr<'a>` — `#[non_exhaustive]` enum, `Debug + Clone + PartialEq`.
+  - All 14 variants from plan §8.2:
+    - References: `Ref(Path)`.
+    - Values: `Param`, `Lit(Literal<'a>)`, `Seq(Vec<Expr<'a>>)`,
+      `Map(Vec<(Name, Expr<'a>)>)`.
+    - Operations: `Binary { left, op: OpDef, right }`, `Unary { op:
+      UnaryOp, expr }`.
+    - Calls: `Call { func: FuncDef, args }`.
+    - Structural: `Cast { expr, target_type: DataType }`, `Match {
+      arms, fallback }`, `If { cond, then_expr, else_expr }`, `InRange
+      { expr, low, high }`, `MemberOf { expr, set }`.
+    - Projection decorators: `Label { expr, name: Name }`, `Wildcard`,
+      `CountAll`.
+    - Scoping: `Scoped { expr, context: Context<'a> }`.
+  - Negated binary forms (`NOT LIKE`, `NOT IN`, `NOT BETWEEN`) compose
+    via `Expr::Unary { op: UnaryOp::Not, … }` per plan rationale —
+    binary-op table stays minimal and the wire format does not duplicate
+    opcodes.
+
+- **New module `dol_ir::expr::context`** (`lib/dol-ir/src/expr/context.rs`):
+  - `Context<'a> { partition_by: Vec<Expr<'a>>, order_by:
+    Vec<OrderByExpr<'a>>, frame: Option<Frame> }` — public POD fields.
+  - `Context::empty()` const constructor; `is_empty()` helper;
+    `Default` impl matching `empty()`.
+  - Validity rules (e.g. frame-without-order, empty-partition-by) are
+    **not** enforced at construction — those are the lowering layer's
+    job per plan §8.3 so a proper diagnostic with span context can be
+    produced.
+
+- **`dol_ir::expr::order`** extended with **`OrderByExpr<'a> { expr:
+  Expr<'a>, dir: SortDirection, nulls: NullsOrder }`**. Convenience
+  `OrderByExpr::new(expr)` defaults to `Asc` / `Default`. The
+  `'a`-independent `SortDirection` and `NullsOrder` types from M3c-β
+  are unchanged.
+
+- **No serde derive** on `Expr<'a>` / `Context<'a>` / `OrderByExpr<'a>`
+  — `dol-ir` has no serde feature yet, matching prior slices. Will be
+  wired alongside the wire-format work in a later PR.
+
+- **No fluent builders, no lowering, no function registry**. Plan items
+  `ContextBuilder`, `ConditionalBuilder`, `lower_path`, and the
+  well-known-function registry remain deferred to M3c-δ.
+
+- **13 new tests** (6 in `tree`, 4 in `context`, 2 in `order`,
+  1 misc); `dol-ir` lib **74 → 87 passing**, workspace **225 → 238
+  passing**. Coverage: leaf-variant construction; `Expr::Binary` round-
+  trips through `Clone` + `PartialEq`; `Expr::Unary` correctly wraps
+  inner expressions; `Expr::Call` carries `FuncDef` + args;
+  `Expr::Cast` / `Match` (with and without fallback) / `If` / `InRange`
+  / `MemberOf` round-trip; projection decorators (`Label` / `Wildcard`
+  / `CountAll`) are distinct; `Expr::Scoped` correctly nests a
+  populated `Context`; `Context::empty()` / `is_empty()` / `Default`
+  are mutually consistent; populated `Context` clones equal;
+  `OrderByExpr::new` uses `Asc` + `Default`; `OrderByExpr` clones
+  equal.
+
+- **All acceptance gates green**: build, `cargo test --workspace
+  --all-features` (238 passing), `cargo clippy --workspace
+  --all-targets --all-features -- -D warnings`, `cargo fmt --check`,
+  `cargo doc -D warnings -D rustdoc::broken_intra_doc_links`,
+  `cargo check -p dol-ir --target thumbv7em-none-eabihf
+  --no-default-features` (no_std + alloc), all five `cargo xtask`
+  subcommands.
+
+### Out of scope for M3c-γ (future M3c-δ + M3d/M3e)
+
+- `ContextBuilder` and `ConditionalBuilder` fluent builders for
+  `Expr::Scoped` and `Expr::Match` (§8.3).
+- Lowering pipeline `Expr<'a>` → `ExprArena` and `lower_path` (§8.4
+  main body) — also the natural home for `impl PathSegment for
+  Lid<StrTag>` deferred from M2.
+- Well-known function catalogue beyond the existing leaf metadata
+  (`OpDef::well_known()` already ships).
+- Schema (§8.6), `Operation` / `Program` (§8.7), `Backend` (§8.8),
+  stream/pipeline (§8.9–§8.10).
+
 ### v2 rewrite — Phase 3c-β: `dol-ir` frame primitives (`dol-rewrite-plan-v2.md` §8.3 — `Expr<'a>`-independent slice)
 
 **Second M3c slice. Adds the parts of §8.3 that carry no `Expr<'a>`

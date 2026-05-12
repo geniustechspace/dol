@@ -14,10 +14,12 @@
 //!   without dedup (lands in M3b alongside lowering).
 
 pub mod arena;
+pub mod context;
 pub mod flags;
 pub mod frame;
 pub mod meta;
 pub mod node;
 pub mod ops;
 pub mod order;
+pub mod tree;
 pub mod walk;
