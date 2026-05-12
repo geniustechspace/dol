@@ -7,6 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### v2 rewrite — Phase 3c-β: `dol-ir` frame primitives (`dol-rewrite-plan-v2.md` §8.3 — `Expr<'a>`-independent slice)
+
+**Second M3c slice. Adds the parts of §8.3 that carry no `Expr<'a>`
+operands — pure POD value types describing window/scope frames and
+ordering — so they can be reviewed in isolation ahead of the tree
+DSL itself (M3c-γ).**
+
+- **New module `dol_ir::expr::frame`** (`lib/dol-ir/src/expr/frame.rs`):
+  - `FrameUnit` — `#[non_exhaustive]` Rows / Range / Groups.
+  - `Extent` — Unbounded / Offset(u64).
+  - `Boundary` — Current / Before(Extent) / After(Extent), with
+    `unbounded_preceding` / `unbounded_following` / `preceding(n)` /
+    `following(n)` const helpers.
+  - `Frame { unit, start, end }` with `rows` / `range` / `groups`
+    const constructors. Public fields by design — pure POD.
+  - All types are `Copy + Eq + Hash`; no `'a` lifetime, no
+    allocation, no dependence on `Expr<'a>`.
+
+- **New module `dol_ir::expr::order`** (`lib/dol-ir/src/expr/order.rs`):
+  - `SortDirection` — Asc (default) / Desc, with `is_ascending` and
+    `reversed` helpers (involutive).
+  - `NullsOrder` — First / Last / Default (default — defers to the
+    backend's native rule).
+  - Both `Copy + Eq + Hash + Default`.
+
+- **v2 conventions honoured**:
+  - Growable enums (`FrameUnit`) are `#[non_exhaustive]`. `Boundary`
+    / `Extent` / `SortDirection` / `NullsOrder` are intentionally
+    closed — their variant set is dictated by the SQL-92 frame
+    grammar and would not grow without a wire-format change.
+  - All public fns are `#[must_use]` where appropriate; constructors
+    are `const fn`.
+  - No serde — `dol-ir` has no serde feature yet.
+
+- **12 new tests** (6 in `frame`, 6 in `order`); `dol-ir` lib **62 → 74 passing**, workspace **213 → 225 passing**. Coverage: variant equality and inequality
+  across all `Boundary` / `Extent` / `FrameUnit` / `SortDirection` /
+  `NullsOrder` shapes; `Boundary` helpers match explicit
+  construction; `Frame::rows`/`range`/`groups` set the right unit;
+  `Boundary::Current` is distinct from `preceding(0)` / `following(0)`;
+  every type is `Copy + Eq + Hash`; `SortDirection::default() ==
+  Asc`, `NullsOrder::default() == Default`; `reversed()` is
+  involutive.
+
+- **All acceptance gates green**: build, `cargo test --workspace
+  --all-features` (225 passing), `cargo clippy --workspace
+  --all-targets --all-features -- -D warnings`, `cargo fmt --check`,
+  `cargo doc -D warnings -D rustdoc::broken_intra_doc_links`,
+  `cargo check -p dol-ir --target thumbv7em-none-eabihf
+  --no-default-features` (no_std + alloc), all five `cargo xtask`
+  subcommands.
+
+### Out of scope for M3c-β (future M3c-γ … M3c-δ + M3d/M3e)
+
+- `Expr<'a>` enum (§8.2) with all 14 variants.
+- `Context<'a>` and `OrderByExpr<'a>` (§8.3) — both carry `Expr<'a>`
+  operands, so they ride with the tree DSL.
+- `ContextBuilder` / `ConditionalBuilder` (fluent builders for
+  `Expr::Scoped` and `Expr::Match`).
+- Well-known function registry (`LENGTH` / `UPPER` / `COUNT` /
+  `SUM` / …) plus `DolFunc` / `DolOp` trait scaffolding and
+  `define_func!` / `define_op!` macros.
+- Lowering pipeline `Expr<'a>` → `ExprArena` and `lower_path` (§8.4
+  main body) — also the natural home for `impl PathSegment for
+  Lid<StrTag>` deferred from M2.
+- Schema (§8.6), `Operation` / `Program` (§8.7), `Backend` (§8.8),
+  stream/pipeline (§8.9–§8.10).
+
 ### v2 rewrite — Phase 3c-α: `dol-ir` tree-DSL leaf metadata (`dol-rewrite-plan-v2.md` §8.2 — first slice)
 
 **First M3c slice. Adds the leaf metadata types that the forthcoming

@@ -15,7 +15,9 @@
 
 pub mod arena;
 pub mod flags;
+pub mod frame;
 pub mod meta;
 pub mod node;
 pub mod ops;
+pub mod order;
 pub mod walk;
