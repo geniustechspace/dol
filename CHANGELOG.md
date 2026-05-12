@@ -7,6 +7,94 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### v2 rewrite — Phase 3c-α: `dol-ir` tree-DSL leaf metadata (`dol-rewrite-plan-v2.md` §8.2 — first slice)
+
+**First M3c slice. Adds the leaf metadata types that the forthcoming
+`Expr<'a>` enum and lowering pipeline will both depend on, with no
+`Expr<'a>` itself yet so the metadata can be reviewed in isolation.**
+
+- **New module `dol_ir::expr::meta`** (`lib/dol-ir/src/expr/meta.rs`):
+  - `OpCategory` — 7-variant `#[non_exhaustive]` enum classifying
+    binary operators (Comparison / NullSafe / Arithmetic / Logical /
+    Pattern / StringOp / Bitwise). One-to-one with the high-level
+    bands of the wire-side `BinOp` (M3a).
+  - `OpDef { name: Name, kind: OpCategory }` — tree-side operator
+    carrier with `new_static` (zero-alloc) / `custom` constructors,
+    `Display` and `PartialEq<&str>` impls. Stores names as
+    `dol_core::strings::Name` (Static `&'static str` or Owned
+    `Box<str>`).
+  - **Well-known operator constants**: 21 `pub const &'static str`
+    names spanning Comparison (EQ/NE/LT/GT/LE/GE), Arithmetic
+    (ADD/SUB/MUL/DIV/MOD), Logical (AND/OR), Bitwise (BIT_AND/
+    BIT_OR/BIT_XOR/SHIFT_LEFT/SHIFT_RIGHT), String (CONCAT), Pattern
+    (LIKE/ILIKE).
+  - `OpDef::well_known() -> &'static [(&'static str, OpCategory)]` —
+    tabulated catalogue, **wire-format-stable**. A snapshot test
+    locks both length (21) and per-band boundary entries; adding /
+    removing / reordering an entry is a wire-format change, not a
+    casual edit.
+  - `Arity { Exact(u8), AtLeast(u8), Range(u8, u8), Any }` and
+    `ArityError { func_name, expected, actual }` with a `Display`
+    that names the function and reports the constraint shape.
+  - `FuncKind` — `#[non_exhaustive]` Scalar / Aggregate / Window.
+  - `FuncDef { name: Name, arity: Arity, kind: FuncKind }` with
+    `new_static` / `custom` (Scalar + Any defaults) / `custom_with`,
+    plus `validate_arity(arg_count) -> Result<(), ArityError>` that
+    correctly handles all four `Arity` shapes.
+
+- **v2 conventions honoured**:
+  - `Serialize`-only — no `Deserialize` derive in this slice (and
+    `dol-ir` has no serde feature yet; one will be added when wire
+    support arrives in a later phase).
+  - All new public enums that may grow are `#[non_exhaustive]`.
+  - All public fns are `#[must_use]` where appropriate; constructors
+    are `const fn` where they take only `&'static str` / primitive
+    inputs.
+
+- **15 new tests**, workspace **198 → 213 passing**. Coverage:
+  - `OpDef`: static / custom round-trip; equality across storage
+    variants; inequality across name and category fields; `Display`
+    matches `name()`; symmetric `PartialEq<&str>`; well-known
+    catalogue locked at 21 entries with explicit boundary checks;
+    well-known names are unique; hash is value-equal across Static /
+    Owned representations.
+  - `FuncDef`: static const construction; `custom` defaults; explicit
+    arity + kind override; inequality across all three fields.
+  - `validate_arity`: every `Arity` shape (Exact / AtLeast / Range /
+    Any) including the boundary cases (`Range(1,2)` rejects 0 and 3,
+    `Any` accepts 0..=255).
+  - `ArityError::Display` includes the function name, the constraint
+    shape ("exactly 1" / "at least 2" / "1..=2"), and the actual
+    count.
+  - `FuncKind` variants are distinct under `Debug`.
+
+- **All acceptance gates green**: build, `cargo test --workspace
+  --all-features` (213 passing), `cargo clippy --workspace
+  --all-targets --all-features -- -D warnings`, `cargo fmt --check`,
+  `cargo doc -D warnings -D rustdoc::broken_intra_doc_links`,
+  `cargo check -p dol-ir --target thumbv7em-none-eabihf
+  --no-default-features` (no_std + alloc), all five `cargo xtask`
+  subcommands.
+
+### Out of scope for M3c-α (future M3c-β … M3c-δ + M3d/M3e)
+
+- `Expr<'a>` enum (§8.2) with all 14 variants and the `Context<'a>` /
+  `Frame` / `Boundary` / `Extent` / `OrderByExpr` / `SortDirection` /
+  `NullsOrder` family (§8.3) — including `ContextBuilder` and
+  `ConditionalBuilder`.
+- Well-known function registry (`LENGTH` / `UPPER` / `LOWER` /
+  `COUNT` / `SUM` / `AVG` / `ROW_NUMBER` / …) plus the `DolFunc` /
+  `DolOp` trait scaffolding and `define_func!` / `define_op!`
+  macros (legacy carried these as zero-sized marker types — porting
+  is a bigger surface that earns its own PR).
+- Lowering pipeline `Expr<'a>` → `ExprArena` and `lower_path` (§8.4
+  main body) — also the natural home for `impl PathSegment for
+  Lid<StrTag>` deferred from M2.
+- Schema types `Entity` / `Field` / `SchemaCatalog` (§8.6).
+- `Operation` / `Program` (§8.7).
+- `Backend` trait + reference no-op backend (§8.8).
+- Optional `stream` / `pipeline` features (§8.9–§8.10).
+
 ### v2 rewrite — Phase 3b: `dol-ir` arena dedup + content-hash walker (`dol-rewrite-plan-v2.md` §8.4 dedup, §8.5)
 
 **Two pure additions to the `ExprArena` surface shipped in M3a. Both

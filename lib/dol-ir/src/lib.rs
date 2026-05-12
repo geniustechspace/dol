@@ -3,7 +3,7 @@
 //! Per `dol-rewrite-plan-v2.md` §8. M3 is the largest milestone in
 //! the rewrite and is split across PRs **M3a–M3e**.
 //!
-//! ## What ships in M3a + M3b
+//! ## What ships in M3a + M3b + M3c-α
 //!
 //! - [`expr::node::ExprNode`] — the 16-byte POD expression record.
 //!   `#[repr(C)]`, `bytemuck::Pod`, const-asserted to be exactly
@@ -23,12 +23,21 @@
 //!   BLAKE3-128 content address of any subtree, memoised in
 //!   [`dol_cas::content_index::ContentIndex`]. Threads `&mut Budget`
 //!   per descent; cache hits are free.
+//! - [`expr::meta`] — tree-DSL leaf metadata: [`expr::meta::OpDef`]
+//!   (with [`expr::meta::OpCategory`] and a wire-stable well-known
+//!   catalogue) and [`expr::meta::FuncDef`] (with [`expr::meta::Arity`],
+//!   [`expr::meta::FuncKind`], and `validate_arity`). These are the
+//!   carrier types that the forthcoming `Expr<'a>` `Binary` and
+//!   `Call` variants will hold.
 //!
-//! ## What lands in M3c–M3e
+//! ## What lands in M3c-β … M3e
 //!
-//! - **M3c**: tree DSL `Expr<'a>` (§8.2), lowering `Expr<'a> →
-//!   ExprArena` with `lower_path` (§8.4 main body), and the
-//!   `Context<'a>` / `OrderByExpr` / `Frame` family (§8.3).
+//! - **M3c-β**: tree DSL `Expr<'a>` (§8.2) and the `Context<'a>` /
+//!   `OrderByExpr` / `Frame` family (§8.3) plus the well-known
+//!   function registry.
+//! - **M3c-γ**: lowering `Expr<'a> → ExprArena` with `lower_path`
+//!   (§8.4 main body) — also the natural home for `impl PathSegment
+//!   for Lid<StrTag>` deferred from M2.
 //! - **M3d**: schema types — `Entity`, `Field`, `SchemaCatalog` (§8.6).
 //! - **M3e**: `Operation` / `Program` (§8.7), `Backend` trait + reference
 //!   no-op backend (§8.8), and optional `stream` / `pipeline` features
