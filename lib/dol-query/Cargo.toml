@@ -1,0 +1,19 @@
+[package]
+name = "dol-query"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+description = "DOL — fluent query builder DSL → Program. M0 scaffold only."
+
+[dependencies]
+dol-core = { workspace = true }
+dol-cas  = { workspace = true }
+dol-ir   = { workspace = true }
+
+[features]
+default = []
+std = ["dol-core/std", "dol-ir/std"]
+
+[lints]
+workspace = true

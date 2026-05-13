@@ -133,7 +133,6 @@ cargo run -p xtask -- readme
 | `dol-command` reference       | [`docs/IR.md`](docs/IR.md)                        |
 | `dol-command` design RFC      | [`docs/rfcs/0001-ir.md`](docs/rfcs/0001-ir.md)    |
 | Expression / arena layer      | [`docs/expr.md`](docs/expr.md)                    |
-| Release notes                 | [`CHANGELOG.md`](CHANGELOG.md)                    |
 
 ## License
 

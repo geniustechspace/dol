@@ -1,0 +1,41 @@
+[package]
+name = "dol-cas"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+description = "DOL — content addressing system. Lid / Cid / Gid handles, pools, StringPool."
+
+[dependencies]
+# `hash` brings in dol_core::hash::{fast64, content128, ...}, which are
+# the only places the workspace is allowed to call into xxHash3 / BLAKE3.
+dol-core = { workspace = true, features = ["hash"] }
+hashbrown = { workspace = true }
+serde = { workspace = true, optional = true }
+
+[features]
+default = ["std"]
+# `std` enables `StringPool` (sharded `std::sync::RwLock` interner).
+# Without it, `dol-cas` still ships `StaticStringPool<BYTES, SLOTS>` for
+# bare-metal targets and the handle / Cid / Gid surface that does not
+# need synchronisation.
+std = ["dol-core/std"]
+serde = ["dep:serde", "dol-core/serde"]
+
+[lints.rust]
+# `dol-cas` opts out of the workspace-wide `forbid(unsafe_code)` so
+# that `string_pool::dynamic::StringPool::get` can extend the lifetime
+# of a slot's `&str` past its read guard. The unsafe block is single,
+# narrowly-scoped, and carries a documented `SAFETY:` justification
+# grounded in the per-slot `Box<[u8]>` storage. Every other crate in
+# the workspace remains under `forbid(unsafe_code)`.
+unsafe_code = "deny"
+
+[lints.clippy]
+# Mirror the workspace-wide deny set verbatim (we only need to break
+# inheritance for `unsafe_code`; the rest stays identical).
+unwrap_used             = "deny"
+expect_used             = "deny"
+panic                   = "deny"
+indexing_slicing        = "deny"
+arithmetic_side_effects = "deny"

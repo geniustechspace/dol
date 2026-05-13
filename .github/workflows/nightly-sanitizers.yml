@@ -53,17 +53,12 @@ jobs:
       - name: Miri setup
         run: cargo +nightly miri setup
 
-      # Targeted: `dol-core` (`policy`, `id`, `storage`), `dol-expr`
-      # (`packed`, `interner`, iterative walkers), and `dol-wire`
-      # (`Decode`, `Signed`) are the layers most likely to hide UB.
+      # Targeted: `dol-core` (`policy`, `id`, `storage`) is the layer
+      # most likely to hide UB during the M0 scaffold. `dol-expr` and
+      # `dol-wire` rejoin this gate as their v2 shapes land under
+      # `lib/dol-cas`, `lib/dol-ir`, and `lib/dol-wire` during M2–M4.
       - name: Miri test dol-core
         run: cargo +nightly miri test -p dol-core --lib
-
-      - name: Miri test dol-expr
-        run: cargo +nightly miri test -p dol-expr --lib
-
-      - name: Miri test dol-wire (no codecs)
-        run: cargo +nightly miri test -p dol-wire --lib
 
   asan:
     name: AddressSanitizer

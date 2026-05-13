@@ -1,0 +1,84 @@
+//! Zero-sized tag markers for [`Lid`](super::Lid) / [`Cid`](super::Cid) /
+//! [`Gid`](super::Gid).
+//!
+//! Tags are uninhabited `enum`s with no variants — they exist
+//! purely at the type level so different pools / arenas produce
+//! distinct handle types. Per `dol-rewrite-plan-v2.md` §7.2.
+
+/// Tag for interned-string handles.
+///
+/// Re-exported from [`dol_core::strings::StrTag`] so that
+/// [`super::StrId`] is structurally identical to
+/// [`dol_core::strings::StrId`]. This lets `dol-core`'s
+/// `impl PathSegment for StrId` apply directly to handles issued by
+/// `dol-cas`'s [`crate::string_pool::StringPool`] — the closing of
+/// the two-mode path bridge per `dol-rewrite-plan-v2.md` §7.5.
+pub use dol_core::strings::StrTag;
+
+/// Tag for expression-node handles.
+pub enum NodeTag {}
+
+/// Tag for field-chain handles.
+pub enum FieldTag {}
+
+/// Tag for entity-table handles.
+pub enum EntityTag {}
+
+/// Tag for interned-literal handles.
+pub enum LiteralTag {}
+
+/// Tag for function / opcode handles.
+pub enum FuncTag {}
+
+/// Tag for interned [`Path<StrId>`](dol_core::path::Path) handles.
+///
+/// Issued by `dol_ir::expr::paths::PathPool`. `Path<StrId>` cannot be
+/// inlined into the 16-byte `ExprNode`, so the lowering pipeline parks
+/// it in a side pool and stores a `PathId` in the node's `a` slot.
+pub enum PathTag {}
+
+/// Tag for interned [`DataType`](dol_core::data_type::DataType) handles.
+///
+/// Issued by `dol_ir::expr::types::TypePool`. `DataType` is recursive
+/// (composite variants own `Box<DataType>` / `Vec<DataType>`) and so
+/// cannot be inlined into the 16-byte `ExprNode`. `Expr::Cast` lowers
+/// to an `ExprNode::cast(NodeId, TypeId)` whose `b` slot holds a
+/// `TypeId` into the side pool.
+pub enum TypeTag {}
+
+/// Tag for lowered scope-context handles.
+///
+/// Issued by `dol_ir::expr::contexts::ContextPool`. The lowered
+/// scope-context — the arena form of
+/// [`Context`](crate::handle) — bundles a partition-by node-id list,
+/// an order-by `(NodeId, SortDirection, NullsOrder)` list, and an
+/// optional `Frame`. None of those fits inline in the 16-byte
+/// `ExprNode`; the lowering pipeline parks the lowered context in a
+/// side pool and stores a `ContextId` in the `Scoped` node's `b` slot.
+pub enum ContextTag {}
+
+/// Tag for relation handles.
+///
+/// Issued by `dol_ir::schema::SchemaCatalog`. Relations model
+/// directed edges between [`super::EntityId`] endpoints.
+pub enum RelationTag {}
+
+/// Tag for lookup handles.
+///
+/// Issued by `dol_ir::schema::SchemaCatalog`. Lookups define
+/// indexed access paths into an entity's field set.
+pub enum LookupTag {}
+
+/// Tag for policy handles.
+///
+/// Issued by `dol_ir::schema::SchemaCatalog`. Policies attach
+/// access-control rules to entities.
+pub enum PolicyTag {}
+
+/// Tag for schema handles. No `Lid` alias — schemas are addressed by
+/// content (see [`super::SchemaCid`]).
+pub enum SchemaTag {}
+
+/// Tag for program handles. No `Lid` alias — programs are addressed by
+/// content (see [`super::ProgramCid`] / [`super::ProgramGid`]).
+pub enum ProgramTag {}

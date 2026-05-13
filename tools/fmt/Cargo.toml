@@ -4,23 +4,10 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 publish = false
-description = "DOL — canonical pretty-printer for IR programs."
-readme = "README.md"
+description = "DOL — canonical pretty-printer. M0 scaffold only; rebuilds atop dol-ir during M3+."
 
 [dependencies]
-dol-command     = { workspace = true }
-dol-schema = { workspace = true }
-dol-core   = { workspace = true }
-dol-expr   = { workspace = true }
-
-[features]
-default = []
-serde   = [
-    "dol-command/serde",
-    "dol-schema/serde",
-    "dol-core/serde",
-    "dol-expr/serde",
-]
+dol-core = { workspace = true }
 
 [lints]
 workspace = true

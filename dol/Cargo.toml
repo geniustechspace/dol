@@ -1,0 +1,47 @@
+[package]
+name = "dol"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+description = "DOL — umbrella facade. M0 scaffold: re-exports dol-core only; layers wire up during M3–M6."
+readme = "README.md"
+
+[dependencies]
+dol-core  = { workspace = true }
+dol-cas   = { workspace = true, optional = true }
+dol-ir    = { workspace = true, optional = true }
+dol-wire  = { workspace = true, optional = true }
+dol-query = { workspace = true, optional = true }
+dol-check = { workspace = true, optional = true }
+dol-fmt   = { workspace = true, optional = true }
+
+[features]
+default = []
+
+# Forwards `std` to every active sub-crate.
+std = [
+    "dol-core/std",
+    "dol-cas?/std",
+    "dol-ir?/std",
+    "dol-wire?/std",
+    "dol-query?/std",
+]
+
+# ── Individual layers (most are empty M0 scaffolds) ──────────────────────────
+cas      = ["dep:dol-cas"]
+ir       = ["dep:dol-ir", "cas"]
+wire     = ["dep:dol-wire", "ir"]
+query    = ["dep:dol-query", "ir"]
+check    = ["dep:dol-check"]
+fmt      = ["dep:dol-fmt"]
+
+# ── Curated presets ──────────────────────────────────────────────────────────
+# Per `dol-rewrite-plan-v2.md` §3.6. The `core` and `full` presets settle
+# during M1–M6 as content lands in each layer; M0 just declares them.
+core    = ["cas"]
+full    = ["cas", "ir", "wire", "query", "check", "fmt"]
+iot-min = ["cas", "ir"]
+
+[lints]
+workspace = true

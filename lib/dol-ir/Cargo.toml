@@ -1,0 +1,31 @@
+[package]
+name = "dol-ir"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+description = "DOL — intermediate representation: ExprNode + ExprArena, opcode tables, dedup, content-hash walker."
+
+[dependencies]
+# `dol-core/hash` is required by the M3b content-hash walker
+# (`ExprArena::content_hash`) which feeds node bytes through
+# `content128` (BLAKE3) and uses `fast64` (xxHash3) to key the dedup
+# index.
+dol-core = { workspace = true, features = ["hash"] }
+dol-cas  = { workspace = true }
+
+# `bytemuck` provides the `Pod`/`Zeroable` derives that make `ExprNode`
+# zero-copy castable. The 16-byte POD layout is the v2 cornerstone.
+bytemuck = { workspace = true }
+
+# `hashbrown` powers the std-feature dedup index keyed by `fast64`
+# digests of the 16-byte `ExprNode`. Default features off to keep us
+# `no_std`-friendly elsewhere.
+hashbrown = { workspace = true }
+
+[features]
+default = ["std"]
+std = ["dol-core/std", "dol-cas/std"]
+
+[lints]
+workspace = true
