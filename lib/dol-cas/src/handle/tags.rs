@@ -57,6 +57,24 @@ pub enum TypeTag {}
 /// side pool and stores a `ContextId` in the `Scoped` node's `b` slot.
 pub enum ContextTag {}
 
+/// Tag for relation handles.
+///
+/// Issued by `dol_ir::schema::SchemaCatalog`. Relations model
+/// directed edges between [`super::EntityId`] endpoints.
+pub enum RelationTag {}
+
+/// Tag for lookup handles.
+///
+/// Issued by `dol_ir::schema::SchemaCatalog`. Lookups define
+/// indexed access paths into an entity's field set.
+pub enum LookupTag {}
+
+/// Tag for policy handles.
+///
+/// Issued by `dol_ir::schema::SchemaCatalog`. Policies attach
+/// access-control rules to entities.
+pub enum PolicyTag {}
+
 /// Tag for schema handles. No `Lid` alias — schemas are addressed by
 /// content (see [`super::SchemaCid`]).
 pub enum SchemaTag {}

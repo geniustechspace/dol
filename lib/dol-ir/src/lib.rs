@@ -66,9 +66,25 @@
 //!   Path/Func pools dedup structurally; the others are push-only
 //!   pending a stable canonical-byte hash.
 //!
-//! ## What lands in M3d + M3e
+//! ## What ships in M3d-α (this milestone)
 //!
-//! - **M3d**: schema types — `Entity`, `Field`, `SchemaCatalog` (§8.6).
+//! - [`schema::Entity`] — entity (table / collection) definition.
+//! - [`schema::Field`] / [`schema::FieldType`] — field definitions with
+//!   scalar, relation, or computed types.
+//! - [`schema::Relation`] / [`schema::RelationKind`] — directed edges
+//!   between entities (one-to-one, one-to-many, many-to-many).
+//! - [`schema::Lookup`] — indexed access paths (PK, secondary indexes).
+//! - [`schema::Policy`] / [`schema::PolicyKind`] — access-control rules.
+//! - [`schema::Constraint`] / [`schema::ConstraintKind`] — integrity
+//!   constraints (NOT NULL, UNIQUE, PK, FK, CHECK).
+//! - `RelationTag`, `LookupTag`, `PolicyTag` in [`dol_cas::handle::tags`]
+//!   plus the corresponding `RelationId`, `LookupId`, `PolicyId` type
+//!   aliases in [`dol_cas::handle`].
+//!
+//! ## What lands in M3d-β + M3e (still pending)
+//!
+//! - **M3d-β**: `SchemaCatalog` (§8.6 catalog struct), constraint
+//!   validation passes.
 //! - **M3e**: `Operation` / `Program` (§8.7), `Backend` trait + reference
 //!   no-op backend (§8.8), and optional `stream` / `pipeline` features
 //!   (§8.9–§8.10).
@@ -96,3 +112,4 @@
 #![warn(missing_docs)]
 
 pub mod expr;
+pub mod schema;

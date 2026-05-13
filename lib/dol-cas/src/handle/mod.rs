@@ -62,6 +62,12 @@ pub type TypeId = Lid<tags::TypeTag>;
 /// `Expr::Scoped` payload (partition-by node-ids, order-by entries,
 /// optional `Frame`).
 pub type ContextId = Lid<tags::ContextTag>;
+/// Relation handle. Issued by `dol_ir::schema::SchemaCatalog`.
+pub type RelationId = Lid<tags::RelationTag>;
+/// Lookup handle. Issued by `dol_ir::schema::SchemaCatalog`.
+pub type LookupId = Lid<tags::LookupTag>;
+/// Policy handle. Issued by `dol_ir::schema::SchemaCatalog`.
+pub type PolicyId = Lid<tags::PolicyTag>;
 
 /// BLAKE3-128 content address of an interned string.
 pub type StrCid = Cid<tags::StrTag>;
@@ -85,6 +91,9 @@ mod tests {
         assert_eq!(size_of::<Option<PathId>>(), 4);
         assert_eq!(size_of::<Option<TypeId>>(), 4);
         assert_eq!(size_of::<Option<ContextId>>(), 4);
+        assert_eq!(size_of::<Option<RelationId>>(), 4);
+        assert_eq!(size_of::<Option<LookupId>>(), 4);
+        assert_eq!(size_of::<Option<PolicyId>>(), 4);
     }
 
     #[test]
