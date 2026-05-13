@@ -3,107 +3,71 @@
 //! Per `dol-rewrite-plan-v2.md` §8. M3 is the largest milestone in
 //! the rewrite and is split across PRs **M3a–M3e**.
 //!
-//! ## What ships in M3a + M3b + M3c-α + M3c-β + M3c-γ + M3c-δ₁ + M3c-δ₂a + M3c-δ₂b prereq #1 + M3c-δ₂b prereq #2 + M3c-δ₂b prereq #3 + M3c-δ₂b prereq #4 + M3c-δ₂b prereq #5
+//! ## What ships in M3a + M3b + M3c (complete: α + β + γ + δ₁ + δ₂)
+//!
+//! `M3c` — the entire `expr::*` slice — is now feature-complete: the
+//! recursive `lower(Expr<'a>) → ExprArena` pass and its `compute_hash`
+//! integration are wired in alongside the supporting side pools.
 //!
 //! - [`expr::node::ExprNode`] — the 16-byte POD expression record.
 //!   `#[repr(C)]`, `bytemuck::Pod`, const-asserted to be exactly
-//!   16 bytes. This is the cornerstone of the v2 IR.
-//! - [`expr::ops`] — opcode tables: [`expr::ops::OpFamily`] (top-level
-//!   discriminator), [`expr::ops::BinOp`], [`expr::ops::UnaryOp`].
-//!   All `#[non_exhaustive]` with `try_from_*` decoders. Numeric
-//!   stability is locked by the snapshot tests in `expr::ops::tests`.
-//! - [`expr::flags::NodeFlags`] — per-node bitset (`nullable` /
-//!   `distinct` / `negated` / `aggregate`).
+//!   16 bytes.
+//! - [`expr::ops`] — opcode tables: [`expr::ops::OpFamily`] (now 20
+//!   variants `Reserved`/`Bin`/`Unary`/`LitRef`/`FieldRef`/`FuncRef`/
+//!   `Param`/`Wildcard`/`CountAll`/`PathRef`/`Seq`/`Map`/`Call`/
+//!   `Cast`/`Match`/`If`/`InRange`/`MemberOf`/`Label`/`Scoped`,
+//!   numerically locked by snapshot tests),
+//!   [`expr::ops::BinOp`], [`expr::ops::UnaryOp`].
+//! - [`expr::flags::NodeFlags`] — per-node bitset.
 //! - [`expr::arena::ExprArena`] — flat `DynPool<ExprNode>` store
-//!   addressed by [`NodeId`](dol_cas::handle::NodeId), now bundling
-//!   the four side pools ([`literals`](expr::arena::ExprArena::literals)
-//!   / [`funcs`](expr::arena::ExprArena::funcs) /
+//!   addressed by [`NodeId`](dol_cas::handle::NodeId), bundling **six**
+//!   side pools — [`literals`](expr::arena::ExprArena::literals) /
+//!   [`funcs`](expr::arena::ExprArena::funcs) /
 //!   [`operands`](expr::arena::ExprArena::operands) /
-//!   [`paths`](expr::arena::ExprArena::paths)) so the upcoming
-//!   `lower(expr, arena, strings, budget)` keeps a four-argument
-//!   signature (plan §8.4 line 1376). Two construction modes survive
-//!   unchanged: raw [`push`](expr::arena::ExprArena::push) (no dedup)
-//!   and [`intern_node`](expr::arena::ExprArena::intern_node)
-//!   (structural dedup keyed by `fast64` over the 16-byte node).
+//!   [`paths`](expr::arena::ExprArena::paths) /
+//!   [`types`](expr::arena::ExprArena::types) /
+//!   [`contexts`](expr::arena::ExprArena::contexts) — so the
+//!   recursive lowerer keeps the documented four-argument signature
+//!   `lower(expr, arena, strings, budget)` (plan §8.4 line 1376).
+//!   Two construction modes survive unchanged: raw
+//!   [`push`](expr::arena::ExprArena::push) (no dedup) and
+//!   [`intern_node`](expr::arena::ExprArena::intern_node) (structural
+//!   dedup keyed by `fast64` over the 16-byte node).
 //! - [`expr::walk::content_hash`] — bottom-up walker that derives the
 //!   BLAKE3-128 content address of any subtree, memoised in
-//!   [`dol_cas::content_index::ContentIndex`]. Threads `&mut Budget`
-//!   per descent; cache hits are free.
+//!   [`dol_cas::content_index::ContentIndex`]. Now covers every
+//!   `OpFamily` family: variadic spans (Seq/Map/Call/Match/MemberOf)
+//!   recurse into operand-slab slots, `Scoped` folds in the lowered
+//!   context (partition_by + order_by + frame), and `Cast` mixes in
+//!   the type id. Cross-arena structural equivalence yields identical
+//!   digests (locked by tests).
 //! - [`expr::meta`] — tree-DSL leaf metadata: [`expr::meta::OpDef`]
-//!   (with [`expr::meta::OpCategory`] and a wire-stable well-known
-//!   catalogue) and [`expr::meta::FuncDef`] (with [`expr::meta::Arity`],
-//!   [`expr::meta::FuncKind`], and `validate_arity`).
-//! - [`expr::frame`] — window / scope frame primitives:
-//!   [`expr::frame::FrameUnit`], [`expr::frame::Extent`],
-//!   [`expr::frame::Boundary`] (with `unbounded_preceding` /
-//!   `unbounded_following` / `preceding(n)` / `following(n)`
-//!   helpers), and [`expr::frame::Frame`] with `rows` / `range` /
-//!   `groups` constructors.
-//! - [`expr::order`] — ordering primitives: [`expr::order::SortDirection`]
-//!   (`Asc` default, `Desc`) and [`expr::order::NullsOrder`]
-//!   (`First` / `Last` / `Default`), plus [`expr::order::OrderByExpr`]
-//!   (the `Expr<'a>`-carrying member of the family).
-//! - [`expr::tree`] — the tree DSL: [`expr::tree::Expr`], the user-facing
-//!   builder enum with all 14 variants from plan §8.2 (`Ref`, `Param`,
-//!   `Lit`, `Seq`, `Map`, `Binary`, `Unary`, `Call`, `Cast`, `Match`,
-//!   `If`, `InRange`, `MemberOf`, `Label`, `Wildcard`, `CountAll`,
-//!   `Scoped`).
-//! - [`expr::context`] — [`expr::context::Context`], the universal
-//!   "evaluate inside a scope" descriptor used by `Expr::Scoped`
-//!   (carries `partition_by` keys, `order_by` list, optional `frame`).
-//!   Plus the fluent builders: [`expr::context::ContextBuilder`]
-//!   (builds `Expr::Scoped`) and [`expr::context::ConditionalBuilder`]
-//!   (builds `Expr::Match`).
-//! - [`expr::lower::lower_path`] — the **single, authorised**
-//!   `Path<Name> → Path<StrId>` site (plan §8.4 line 1389), with the
-//!   shared [`expr::lower::LowerError`] enum that the upcoming
-//!   recursive `lower(Expr)` will reuse unchanged. Charges one
-//!   `Budget::node()` per interned segment.
-//! - [`expr::literals::LiteralPool`] — typed-arena carrier mapping
-//!   [`LiteralId`](dol_cas::handle::LiteralId) to
-//!   [`Literal<'static>`](dol_core::literal::Literal). The arena form
-//!   of `Expr::Lit(...)` is `ExprNode::lit_ref(LiteralId)` (plan §8.1
-//!   line 1095); this pool is its required carrier. Push-only in this
-//!   slice — content-addressed dedup needs a stable `Literal` byte
-//!   serialisation and is left to a follow-up slice.
-//! - [`expr::funcs::FuncRegistry`] — typed-arena carrier mapping
-//!   [`FuncId`](dol_cas::handle::FuncId) to
-//!   [`FuncDef`](expr::meta::FuncDef). The arena form of
-//!   `Expr::Call { func, args }` is `ExprNode::func_ref(FuncId)`
-//!   (plan §8.1 line 1097); this registry is its required carrier.
-//!   **Name-keyed dedup** — same-named [`FuncDef`]s collapse to a
-//!   single id so the surrounding `ExprArena` dedup stays sound.
-//!   First-registration-wins on arity/kind conflicts.
-//! - [`expr::slab::OperandSlab`] — flat side pool for variadic-arity
-//!   operand sequences. `Expr::Seq` / `Expr::Map` / `Expr::Call` /
-//!   `Expr::Match` cannot inline their operand lists in the 16-byte
-//!   [`ExprNode`](expr::node::ExprNode); the recursive lowerer parks
-//!   each sequence here and stores an [`OperandSpan`](expr::slab::OperandSpan)
-//!   `(offset, len)` handle in two of the node's `u32` slots. Append-
-//!   only, push-only (no interior dedup in this slice — span-level
-//!   dedup belongs in `ExprArena::intern_node`).
-//! - [`expr::paths::PathPool`] — typed-arena carrier mapping
-//!   [`PathId`](dol_cas::handle::PathId) to
-//!   [`Path<StrId>`](dol_core::path::Path). The arena form of
-//!   `Expr::Ref(Path<Name>)` interns the lowered `Path<StrId>` here
-//!   and writes a `PathId` into the node, because variable-length
-//!   paths cannot be inlined into the 16-byte
-//!   [`ExprNode`](expr::node::ExprNode). **Structurally deduped** —
-//!   `Path<StrId>` is `Hash + Eq`, unlike `Literal` (which lacks
-//!   `Hash` due to `f64`), so two interns of the same path collapse
-//!   to a single id and the surrounding `ExprArena` dedup stays sound.
+//!   and [`expr::meta::FuncDef`].
+//! - [`expr::frame`] — window / scope frame primitives.
+//! - [`expr::order`] — ordering primitives plus
+//!   [`expr::order::OrderByExpr`].
+//! - [`expr::tree`] — the user-facing builder enum
+//!   [`expr::tree::Expr`] with all 14 variants from plan §8.2.
+//! - [`expr::context`] — [`expr::context::Context`] descriptor plus
+//!   the fluent [`expr::context::ContextBuilder`] /
+//!   [`expr::context::ConditionalBuilder`].
+//! - [`expr::lower`] — the **single, authorised** lowering site.
+//!   [`expr::lower::lower`] is the recursive `Expr<'a> → NodeId`
+//!   pass; [`expr::lower::lower_path`] is the only `Path<Name> →
+//!   Path<StrId>` conversion in the workspace (plan §8.4 line 1389).
+//!   Charges one `Budget::depth()` per recursive descent and one
+//!   `Budget::node()` per allocated arena node;
+//!   [`expr::lower::LowerError`] composes budget / intern / arena /
+//!   side-pool / unknown-op errors with `?`.
+//! - [`expr::literals::LiteralPool`] / [`expr::funcs::FuncRegistry`] /
+//!   [`expr::slab::OperandSlab`] / [`expr::paths::PathPool`] /
+//!   [`expr::types::TypePool`] / [`expr::contexts::ContextPool`] —
+//!   the six side-pool carriers consumed by the recursive lowerer.
+//!   Path/Func pools dedup structurally; the others are push-only
+//!   pending a stable canonical-byte hash.
 //!
-//! ## What lands in M3c-δ₂b … M3e
+//! ## What lands in M3d + M3e
 //!
-//! - **M3c-δ₂b**: the recursive `lower(Expr<'a>) → ExprArena` pass
-//!   (§8.4) and `compute_hash` integration (§8.5). All four side-pool
-//!   carriers (`LiteralPool` / `FuncRegistry` / `OperandSlab` /
-//!   `PathPool`) are now embedded directly in
-//!   [`expr::arena::ExprArena`]; the next slice wires them into a
-//!   recursive lowerer plus the new `OpFamily` variants (`Seq` /
-//!   `Map` / `Call` / `Match` / `If` / `InRange` / `MemberOf` /
-//!   `Label` / `Cast` / `Scoped` / path-carrying `Ref`) that consume
-//!   their handles.
 //! - **M3d**: schema types — `Entity`, `Field`, `SchemaCatalog` (§8.6).
 //! - **M3e**: `Operation` / `Program` (§8.7), `Backend` trait + reference
 //!   no-op backend (§8.8), and optional `stream` / `pipeline` features
