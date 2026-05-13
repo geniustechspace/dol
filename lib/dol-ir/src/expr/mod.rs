@@ -17,6 +17,7 @@ pub mod arena;
 pub mod context;
 pub mod flags;
 pub mod frame;
+pub mod funcs;
 pub mod literals;
 pub mod lower;
 pub mod meta;

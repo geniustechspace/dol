@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### v2 rewrite — Phase 3c-δ₂b prereq #2: `dol-ir` `FuncRegistry` (`dol-rewrite-plan-v2.md` §3.3 "side pools", §8.1 line 1097)
+
+**Unblocks the function-call half of the deferred recursive
+`lower(Expr)` pass. `ExprNode::func_ref(FuncId)` (already shipped in
+M3a) is the arena form of `Expr::Call { func: FuncDef, args }` — but
+no carrier yet existed that turned a `FuncDef` into a `FuncId`. This
+slice ships that carrier. With both `LiteralPool` (prereq #1) and
+`FuncRegistry` (this slice) in place, only the variadic operand slab
+remains before the recursive `lower(Expr)` pass can land.**
+
+- **New module `dol_ir::expr::funcs`.**
+  - `FuncRegistry { items: DynPool<FuncDef>, index: HashMap<Box<str>, FuncId> }`
+    — `Debug + Clone + Default + Send + Sync`. Same `DynPool` backing
+    as `ExprArena` / `LiteralPool`, so the typed-id contract is
+    identical: dense one-based ids, append-only, ids stable for the
+    registry's lifetime.
+  - `FuncRegistry::new()` / `with_capacity(n)` / `len()` / `is_empty()`.
+  - `intern(&mut self, func: &FuncDef) -> Result<FuncId, FuncRegistryError>`
+    — **dedups by function name**. Two interns of `FuncDef::new_static
+    ("COUNT", …)` (or any same-named pair) return the same `FuncId`;
+    the first registration of a name wins on arity/kind conflicts so
+    the original entry is preserved unchanged. Name dedup is essential
+    here (unlike `LiteralPool`'s push-only design) because a function
+    is identified by its name and the surrounding `ExprArena` dedup
+    breaks if two `Expr::Call("LENGTH", …)` calls receive different
+    `FuncId`s.
+  - `get(FuncId) -> Option<&FuncDef>` — typed lookup.
+  - `get_by_name(&str) -> Option<FuncId>` — name lookup without
+    inserting; uses `Box<str>` keys so `&str` borrow lookups are O(1).
+  - `FuncRegistryError::CapacityExceeded` mirrors the
+    `LiteralPoolError::CapacityExceeded` and `LowerError::ArenaOverflow`
+    shapes for clean `?` composition by the recursive lowerer.
+
+- **Dedup keying.** The `index` HashMap is keyed on `Box<str>` rather
+  than `dol_core::strings::Name`. `Name` impls `Hash + Eq` with
+  content equality, but `HashMap<Name, _>::get` cannot take a `&str`
+  borrow directly (no `Borrow<str> for Name` impl). Using `Box<str>`
+  preserves the property that `Name::Static("UPPER")` and
+  `Name::Owned("UPPER".into())` map to the same registry slot
+  (verified by `static_and_owned_name_dedup_together`).
+
+- **10 tests in `expr::funcs::tests`:** empty round-trip, intern
+  dedups by name, distinct names get distinct ids, first-registration-
+  wins-on-conflict (pinned policy), `get` round-trips an interned
+  def, `get_by_name` returns existing id, static + owned dedup
+  together, dense one-based ids, unknown id returns `None`, `Display`
+  for the error.
+
+- **Lib head doc updated.** M3c-δ₂b prereq #2 moves into "what ships
+  now"; the M3c-δ₂b carve-out is restated with the variadic operand
+  slab as the only remaining blocker.
+
 ### v2 rewrite — Phase 3c-δ₂b prereq #1: `dol-ir` `LiteralPool` (`dol-rewrite-plan-v2.md` §3.3 "side pools", §8.1 line 1095)
 
 **Unblocks the literal half of the deferred recursive `lower(Expr)`

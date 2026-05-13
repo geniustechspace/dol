@@ -3,7 +3,7 @@
 //! Per `dol-rewrite-plan-v2.md` §8. M3 is the largest milestone in
 //! the rewrite and is split across PRs **M3a–M3e**.
 //!
-//! ## What ships in M3a + M3b + M3c-α + M3c-β + M3c-γ + M3c-δ₁ + M3c-δ₂a + M3c-δ₂b prereq #1
+//! ## What ships in M3a + M3b + M3c-α + M3c-β + M3c-γ + M3c-δ₁ + M3c-δ₂a + M3c-δ₂b prereq #1 + M3c-δ₂b prereq #2
 //!
 //! - [`expr::node::ExprNode`] — the 16-byte POD expression record.
 //!   `#[repr(C)]`, `bytemuck::Pod`, const-asserted to be exactly
@@ -60,13 +60,21 @@
 //!   line 1095); this pool is its required carrier. Push-only in this
 //!   slice — content-addressed dedup needs a stable `Literal` byte
 //!   serialisation and is left to a follow-up slice.
+//! - [`expr::funcs::FuncRegistry`] — typed-arena carrier mapping
+//!   [`FuncId`](dol_cas::handle::FuncId) to
+//!   [`FuncDef`](expr::meta::FuncDef). The arena form of
+//!   `Expr::Call { func, args }` is `ExprNode::func_ref(FuncId)`
+//!   (plan §8.1 line 1097); this registry is its required carrier.
+//!   **Name-keyed dedup** — same-named [`FuncDef`]s collapse to a
+//!   single id so the surrounding `ExprArena` dedup stays sound.
+//!   First-registration-wins on arity/kind conflicts.
 //!
 //! ## What lands in M3c-δ₂b … M3e
 //!
 //! - **M3c-δ₂b**: the recursive `lower(Expr<'a>) → ExprArena` pass
 //!   (§8.4) and `compute_hash` integration (§8.5). Still blocked on
-//!   the variadic operand slab + `FuncRegistry` carrier (the
-//!   `LiteralPool` half is now in place).
+//!   the variadic operand slab (both `LiteralPool` and `FuncRegistry`
+//!   carriers are now in place).
 //! - **M3d**: schema types — `Entity`, `Field`, `SchemaCatalog` (§8.6).
 //! - **M3e**: `Operation` / `Program` (§8.7), `Backend` trait + reference
 //!   no-op backend (§8.8), and optional `stream` / `pipeline` features
