@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### v2 rewrite — Phase 3c-δ₂b prereq #3: `dol-ir` `OperandSlab` (`dol-rewrite-plan-v2.md` §3.3 "side pools", §8.1 lines 1080–1082 + risk-register line 1994)
+
+**Unblocks the variadic-arity branches of the deferred recursive
+`lower(Expr)` pass. `Expr::Seq` / `Expr::Map` / `Expr::Call` /
+`Expr::Match` cannot inline their operand lists in the 16-byte
+`ExprNode`; this slice ships the side pool that stores those lists.
+With `LiteralPool` (prereq #1), `FuncRegistry` (prereq #2), and
+`OperandSlab` (this slice) all in place, the next slice can wire
+them into a recursive lowerer + the new `OpFamily` variants that
+consume their handles.**
+
+- **New module `dol_ir::expr::slab`.**
+  - `OperandSlab { data: Vec<u32> }` — `Debug + Clone + Default +
+    Send + Sync`. Flat append-only `u32` storage. `new()` is `const fn`.
+  - `OperandSpan { offset: u32, len: u32 }` — `Copy + Eq + Hash`
+    opaque handle that fits in two `ExprNode` `u32` slots
+    (`ExprNode::b` / `ExprNode::c`). Public `EMPTY` sentinel,
+    `offset()` / `len()` / `is_empty()` accessors.
+  - `OperandSlab::push_span(&[u32]) -> Result<OperandSpan,
+    OperandSlabError>` copies the slice to the tail; empty input
+    returns `OperandSpan::EMPTY` without growing storage.
+  - `OperandSlab::get(OperandSpan) -> Option<&[u32]>` — zero-copy
+    borrow. Returns `None` for spans pointing past the slab end
+    (so cross-slab handle misuse is caught instead of panicking).
+  - `OperandSlabError::CapacityExceeded` mirrors the
+    `LiteralPoolError::CapacityExceeded` and
+    `FuncRegistryError::CapacityExceeded` shapes for clean `?`
+    composition by the recursive lowerer. The capacity bound is
+    `u32::MAX` total slots (so spans fit in single-`u32`
+    `offset` + single-`u32` `len`).
+
+- **Uninterpreted `u32` storage.** Operands are raw `u32`s; the
+  surrounding `ExprNode` opcode determines how each slot is decoded
+  (`NodeId` for `Seq`/`Call`-args, paired `StrId`+`NodeId` for `Map`,
+  etc.). Keeping the slab opcode-agnostic means a single side pool
+  serves every variadic family — no per-opcode pools to manage.
+
+- **Push-only, no interior dedup.** A `Seq([1, 2, 3])` lowered twice
+  produces two distinct `OperandSpan`s (pinned by
+  `push_span_does_not_dedup_identical_runs`). Span-level structural
+  dedup belongs in `ExprArena::intern_node` (which already keys on
+  the raw 16 bytes of `ExprNode`); the trade-off matches
+  `LiteralPool`'s policy.
+
+- **11 tests in `expr::slab::tests`:** empty round-trip, push returns
+  correct view, multi-span independence, push-only policy pinned,
+  empty input sentinel without growth, empty sentinel resolves in any
+  slab, unknown-span returns `None`, span addressing stable across
+  growth, `with_capacity` round-trip, span helpers, error `Display`.
+
+- **Lib head doc updated.** M3c-δ₂b prereq #3 moves into "what ships
+  now"; the M3c-δ₂b carve-out is restated — all three carriers
+  (`LiteralPool` / `FuncRegistry` / `OperandSlab`) are now in place
+  so the next slice can land the recursive lowerer with no remaining
+  prereqs.
+
 ### v2 rewrite — Phase 3c-δ₂b prereq #2: `dol-ir` `FuncRegistry` (`dol-rewrite-plan-v2.md` §3.3 "side pools", §8.1 line 1097)
 
 **Unblocks the function-call half of the deferred recursive
