@@ -15,6 +15,7 @@
 
 pub mod arena;
 pub mod context;
+pub mod contexts;
 pub mod flags;
 pub mod frame;
 pub mod funcs;
@@ -27,4 +28,5 @@ pub mod order;
 pub mod paths;
 pub mod slab;
 pub mod tree;
+pub mod types;
 pub mod walk;

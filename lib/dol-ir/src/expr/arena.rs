@@ -35,6 +35,8 @@ use dol_cas::pool::{ArenaStorage, DynPool};
 use hashbrown::HashMap;
 
 #[cfg(feature = "std")]
+use super::contexts::ContextPool;
+#[cfg(feature = "std")]
 use super::funcs::FuncRegistry;
 #[cfg(feature = "std")]
 use super::literals::LiteralPool;
@@ -44,6 +46,8 @@ use super::node::ExprNode;
 use super::paths::PathPool;
 #[cfg(feature = "std")]
 use super::slab::OperandSlab;
+#[cfg(feature = "std")]
+use super::types::TypePool;
 
 /// Flat arena of [`ExprNode`]s addressed by [`NodeId`], plus the four
 /// **side pools** that carry payloads too large to inline in the
@@ -108,11 +112,19 @@ pub struct ExprArena {
     /// Carrier for lowered `Expr::Ref` paths
     /// (`Path<StrId>` keyed by [`PathId`](dol_cas::handle::PathId)).
     paths: PathPool,
+    /// Carrier for lowered `Expr::Cast` target types
+    /// ([`DataType`](dol_core::data_type::DataType) keyed by
+    /// [`TypeId`](dol_cas::handle::TypeId)).
+    types: TypePool,
+    /// Carrier for lowered `Expr::Scoped` contexts
+    /// ([`LoweredContext`](super::contexts::LoweredContext) keyed by
+    /// [`ContextId`](dol_cas::handle::ContextId)).
+    contexts: ContextPool,
 }
 
 #[cfg(feature = "std")]
 impl ExprArena {
-    /// Construct an empty arena (and four empty side pools).
+    /// Construct an empty arena (and six empty side pools).
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -122,6 +134,8 @@ impl ExprArena {
             funcs: FuncRegistry::new(),
             operands: OperandSlab::new(),
             paths: PathPool::new(),
+            types: TypePool::new(),
+            contexts: ContextPool::new(),
         }
     }
 
@@ -139,6 +153,8 @@ impl ExprArena {
             funcs: FuncRegistry::new(),
             operands: OperandSlab::new(),
             paths: PathPool::new(),
+            types: TypePool::new(),
+            contexts: ContextPool::new(),
         }
     }
 
@@ -195,6 +211,32 @@ impl ExprArena {
     #[inline]
     pub fn paths_mut(&mut self) -> &mut PathPool {
         &mut self.paths
+    }
+
+    /// Borrow the type pool (`Expr::Cast` target types).
+    #[must_use]
+    #[inline]
+    pub fn types(&self) -> &TypePool {
+        &self.types
+    }
+
+    /// Mutably borrow the type pool.
+    #[inline]
+    pub fn types_mut(&mut self) -> &mut TypePool {
+        &mut self.types
+    }
+
+    /// Borrow the context pool (`Expr::Scoped` payloads).
+    #[must_use]
+    #[inline]
+    pub fn contexts(&self) -> &ContextPool {
+        &self.contexts
+    }
+
+    /// Mutably borrow the context pool.
+    #[inline]
+    pub fn contexts_mut(&mut self) -> &mut ContextPool {
+        &mut self.contexts
     }
 
     /// Push a node and return its [`NodeId`].
@@ -411,6 +453,8 @@ mod tests {
         assert!(a.funcs().is_empty());
         assert!(a.operands().is_empty());
         assert!(a.paths().is_empty());
+        assert!(a.types().is_empty());
+        assert!(a.contexts().is_empty());
     }
 
     #[test]
@@ -420,6 +464,8 @@ mod tests {
         assert!(a.funcs().is_empty());
         assert!(a.operands().is_empty());
         assert!(a.paths().is_empty());
+        assert!(a.types().is_empty());
+        assert!(a.contexts().is_empty());
     }
 
     #[test]
@@ -505,5 +551,32 @@ mod tests {
         assert!(a.funcs().is_empty() && b.funcs().is_empty());
         assert!(a.operands().is_empty() && b.operands().is_empty());
         assert!(a.paths().is_empty() && b.paths().is_empty());
+        assert!(a.types().is_empty() && b.types().is_empty());
+        assert!(a.contexts().is_empty() && b.contexts().is_empty());
+    }
+
+    #[test]
+    fn type_pool_mutation_visible_through_accessors() {
+        use dol_core::data_type::DataType;
+        let mut a = ExprArena::new();
+        let id = a.types_mut().intern(&DataType::Int32).unwrap();
+        assert_eq!(a.types().len(), 1);
+        assert_eq!(a.types().get(id), Some(&DataType::Int32));
+    }
+
+    #[test]
+    fn context_pool_mutation_visible_through_accessors() {
+        extern crate alloc;
+        use crate::expr::contexts::{LoweredContext, LoweredOrderByExpr};
+        let mut a = ExprArena::new();
+        let leaf = a.intern_node(ExprNode::param(1)).unwrap();
+        let ctx = LoweredContext {
+            partition_by: alloc::vec![leaf],
+            order_by: alloc::vec![LoweredOrderByExpr::new(leaf)],
+            frame: None,
+        };
+        let id = a.contexts_mut().intern(&ctx).unwrap();
+        assert_eq!(a.contexts().len(), 1);
+        assert_eq!(a.contexts().get(id), Some(&ctx));
     }
 }

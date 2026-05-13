@@ -27,10 +27,11 @@
 
 use bytemuck::{Pod, Zeroable};
 
-use dol_cas::handle::{FieldId, FuncId, Lid, LiteralId, NodeId};
+use dol_cas::handle::{ContextId, FieldId, FuncId, Lid, LiteralId, NodeId, PathId, StrId, TypeId};
 
 use super::flags::NodeFlags;
 use super::ops::{BinOp, OpFamily, UnaryOp};
+use super::slab::OperandSpan;
 
 /// 16-byte expression record. Members are private so that the
 /// constructor / accessor pairs in this module are the only way to
@@ -194,6 +195,182 @@ impl ExprNode {
         }
     }
 
+    /// Reference an interned [`Path<StrId>`](dol_core::path::Path) via
+    /// [`PathId`]. The arena form of `Expr::Ref(Path<Name>)`.
+    #[must_use]
+    #[inline]
+    pub fn path_ref(id: PathId) -> Self {
+        Self {
+            op: OpFamily::PathRef.as_u8(),
+            flags: 0,
+            aux: 0,
+            a: id.get(),
+            b: 0,
+            c: 0,
+        }
+    }
+
+    /// Variadic ordered sequence (`Expr::Seq` lowering). `span`
+    /// addresses a contiguous run of [`NodeId`] slots in the arena's
+    /// [`OperandSlab`](super::slab::OperandSlab).
+    #[must_use]
+    #[inline]
+    pub fn seq(span: OperandSpan) -> Self {
+        Self {
+            op: OpFamily::Seq.as_u8(),
+            flags: 0,
+            aux: 0,
+            a: 0,
+            b: span.offset(),
+            c: span.len(),
+        }
+    }
+
+    /// Variadic key-value mapping (`Expr::Map` lowering). `span`
+    /// addresses an alternating `[StrId, NodeId, …]` run with even
+    /// length.
+    #[must_use]
+    #[inline]
+    pub fn map(span: OperandSpan) -> Self {
+        Self {
+            op: OpFamily::Map.as_u8(),
+            flags: 0,
+            aux: 0,
+            a: 0,
+            b: span.offset(),
+            c: span.len(),
+        }
+    }
+
+    /// Function / aggregate call (`Expr::Call` lowering). `func` is
+    /// the callee's [`FuncId`] and `args` addresses the argument
+    /// [`NodeId`] slots in the operand slab.
+    #[must_use]
+    #[inline]
+    pub fn call(func: FuncId, args: OperandSpan) -> Self {
+        Self {
+            op: OpFamily::Call.as_u8(),
+            flags: 0,
+            aux: 0,
+            a: func.get(),
+            b: args.offset(),
+            c: args.len(),
+        }
+    }
+
+    /// Type coercion (`Expr::Cast` lowering). `expr` is the operand
+    /// node and `target` is a [`TypeId`] into the
+    /// [`TypePool`](super::types::TypePool).
+    #[must_use]
+    #[inline]
+    pub fn cast(expr: NodeId, target: TypeId) -> Self {
+        Self {
+            op: OpFamily::Cast.as_u8(),
+            flags: 0,
+            aux: 0,
+            a: expr.get(),
+            b: target.get(),
+            c: 0,
+        }
+    }
+
+    /// Multi-arm conditional (`Expr::Match` lowering). `arms`
+    /// addresses an alternating `[cond, result, …]` run with even
+    /// length; `fallback` is `None` when the arm without a result
+    /// should fall through to the backend's null.
+    #[must_use]
+    #[inline]
+    pub fn match_arms(arms: OperandSpan, fallback: Option<NodeId>) -> Self {
+        // Use `0` as the "no fallback" sentinel — `NodeId` is
+        // `NonZeroU32` so genuine ids never collide with it.
+        let a = match fallback {
+            Some(id) => id.get(),
+            None => 0,
+        };
+        Self {
+            op: OpFamily::Match.as_u8(),
+            flags: 0,
+            aux: 0,
+            a,
+            b: arms.offset(),
+            c: arms.len(),
+        }
+    }
+
+    /// Two-branch conditional (`Expr::If` lowering).
+    #[must_use]
+    #[inline]
+    pub fn if_then_else(cond: NodeId, then_expr: NodeId, else_expr: NodeId) -> Self {
+        Self {
+            op: OpFamily::If.as_u8(),
+            flags: 0,
+            aux: 0,
+            a: cond.get(),
+            b: then_expr.get(),
+            c: else_expr.get(),
+        }
+    }
+
+    /// Inclusive range containment (`Expr::InRange` lowering).
+    #[must_use]
+    #[inline]
+    pub fn in_range(expr: NodeId, low: NodeId, high: NodeId) -> Self {
+        Self {
+            op: OpFamily::InRange.as_u8(),
+            flags: 0,
+            aux: 0,
+            a: expr.get(),
+            b: low.get(),
+            c: high.get(),
+        }
+    }
+
+    /// Set membership (`Expr::MemberOf` lowering). `set` addresses
+    /// the candidate [`NodeId`] slots in the operand slab.
+    #[must_use]
+    #[inline]
+    pub fn member_of(expr: NodeId, set: OperandSpan) -> Self {
+        Self {
+            op: OpFamily::MemberOf.as_u8(),
+            flags: 0,
+            aux: 0,
+            a: expr.get(),
+            b: set.offset(),
+            c: set.len(),
+        }
+    }
+
+    /// Output-label decorator (`Expr::Label` lowering).
+    #[must_use]
+    #[inline]
+    pub fn label(expr: NodeId, name: StrId) -> Self {
+        Self {
+            op: OpFamily::Label.as_u8(),
+            flags: 0,
+            aux: 0,
+            a: expr.get(),
+            b: name.get(),
+            c: 0,
+        }
+    }
+
+    /// Scoped evaluation (`Expr::Scoped` lowering). `expr` is the
+    /// expression evaluated in the scope and `context` is a
+    /// [`ContextId`] into the
+    /// [`ContextPool`](super::contexts::ContextPool).
+    #[must_use]
+    #[inline]
+    pub fn scoped(expr: NodeId, context: ContextId) -> Self {
+        Self {
+            op: OpFamily::Scoped.as_u8(),
+            flags: 0,
+            aux: 0,
+            a: expr.get(),
+            b: context.get(),
+            c: 0,
+        }
+    }
+
     // ─── Accessors ──────────────────────────────────────────────────
     //
     // Each accessor first matches the family, then decodes `aux` /
@@ -270,6 +447,131 @@ impl ExprNode {
     #[must_use]
     pub fn is_count_all(&self) -> bool {
         self.family() == Some(OpFamily::CountAll)
+    }
+
+    /// Decode as a path reference.
+    #[must_use]
+    pub fn as_path_ref(&self) -> Option<PathId> {
+        if self.family()? != OpFamily::PathRef {
+            return None;
+        }
+        Lid::from_u32(self.a)
+    }
+
+    /// Decode as a variadic [`OpFamily::Seq`] node — returns the
+    /// operand-slab span addressing the [`NodeId`] elements.
+    #[must_use]
+    pub fn as_seq(&self) -> Option<OperandSpan> {
+        if self.family()? != OpFamily::Seq {
+            return None;
+        }
+        Some(OperandSpan::from_parts(self.b, self.c))
+    }
+
+    /// Decode as a variadic [`OpFamily::Map`] node — returns the
+    /// operand-slab span addressing the alternating
+    /// `[StrId, NodeId, …]` slots.
+    #[must_use]
+    pub fn as_map(&self) -> Option<OperandSpan> {
+        if self.family()? != OpFamily::Map {
+            return None;
+        }
+        Some(OperandSpan::from_parts(self.b, self.c))
+    }
+
+    /// Decode as an [`OpFamily::Call`] node — returns
+    /// `(callee, args_span)`.
+    #[must_use]
+    pub fn as_call(&self) -> Option<(FuncId, OperandSpan)> {
+        if self.family()? != OpFamily::Call {
+            return None;
+        }
+        let func = Lid::from_u32(self.a)?;
+        Some((func, OperandSpan::from_parts(self.b, self.c)))
+    }
+
+    /// Decode as an [`OpFamily::Cast`] node — returns
+    /// `(operand, target_type)`.
+    #[must_use]
+    pub fn as_cast(&self) -> Option<(NodeId, TypeId)> {
+        if self.family()? != OpFamily::Cast {
+            return None;
+        }
+        let expr = Lid::from_u32(self.a)?;
+        let target = Lid::from_u32(self.b)?;
+        Some((expr, target))
+    }
+
+    /// Decode as a multi-arm [`OpFamily::Match`] node — returns
+    /// `(arms_span, fallback)` where `fallback` is `None` when no
+    /// fallback was lowered.
+    #[must_use]
+    pub fn as_match(&self) -> Option<(OperandSpan, Option<NodeId>)> {
+        if self.family()? != OpFamily::Match {
+            return None;
+        }
+        let fallback = Lid::from_u32(self.a);
+        Some((OperandSpan::from_parts(self.b, self.c), fallback))
+    }
+
+    /// Decode as a two-branch [`OpFamily::If`] node — returns
+    /// `(cond, then_branch, else_branch)`.
+    #[must_use]
+    pub fn as_if(&self) -> Option<(NodeId, NodeId, NodeId)> {
+        if self.family()? != OpFamily::If {
+            return None;
+        }
+        let cond = Lid::from_u32(self.a)?;
+        let then_expr = Lid::from_u32(self.b)?;
+        let else_expr = Lid::from_u32(self.c)?;
+        Some((cond, then_expr, else_expr))
+    }
+
+    /// Decode as an inclusive [`OpFamily::InRange`] node — returns
+    /// `(expr, low, high)`.
+    #[must_use]
+    pub fn as_in_range(&self) -> Option<(NodeId, NodeId, NodeId)> {
+        if self.family()? != OpFamily::InRange {
+            return None;
+        }
+        let expr = Lid::from_u32(self.a)?;
+        let low = Lid::from_u32(self.b)?;
+        let high = Lid::from_u32(self.c)?;
+        Some((expr, low, high))
+    }
+
+    /// Decode as an [`OpFamily::MemberOf`] node — returns
+    /// `(expr, set_span)`.
+    #[must_use]
+    pub fn as_member_of(&self) -> Option<(NodeId, OperandSpan)> {
+        if self.family()? != OpFamily::MemberOf {
+            return None;
+        }
+        let expr = Lid::from_u32(self.a)?;
+        Some((expr, OperandSpan::from_parts(self.b, self.c)))
+    }
+
+    /// Decode as an [`OpFamily::Label`] node — returns `(expr, name)`.
+    #[must_use]
+    pub fn as_label(&self) -> Option<(NodeId, StrId)> {
+        if self.family()? != OpFamily::Label {
+            return None;
+        }
+        let expr = Lid::from_u32(self.a)?;
+        let name = Lid::from_u32(self.b)?;
+        Some((expr, name))
+    }
+
+    /// Decode as an [`OpFamily::Scoped`] node — returns
+    /// `(expr, context)`.
+    #[must_use]
+    pub fn as_scoped(&self) -> Option<(NodeId, ContextId)> {
+        if self.family()? != OpFamily::Scoped {
+            return None;
+        }
+        let expr = Lid::from_u32(self.a)?;
+        let context = Lid::from_u32(self.b)?;
+        Some((expr, context))
     }
 }
 

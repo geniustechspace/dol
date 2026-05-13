@@ -51,6 +51,17 @@ pub type FuncId = Lid<tags::FuncTag>;
 /// `dol_ir::expr::paths::PathPool`. Required because `Path<StrId>`
 /// (variable-length) cannot be inlined into the 16-byte `ExprNode`.
 pub type PathId = Lid<tags::PathTag>;
+/// Interned-[`DataType`](dol_core::data_type::DataType) handle.
+/// Issued by `dol_ir::expr::types::TypePool`. Required because
+/// `DataType` is recursive (composite variants own
+/// `Box<DataType>` / `Vec<DataType>`) and so cannot be inlined into
+/// the 16-byte `ExprNode`.
+pub type TypeId = Lid<tags::TypeTag>;
+/// Lowered scope-context handle. Issued by
+/// `dol_ir::expr::contexts::ContextPool`. Carrier for the lowered
+/// `Expr::Scoped` payload (partition-by node-ids, order-by entries,
+/// optional `Frame`).
+pub type ContextId = Lid<tags::ContextTag>;
 
 /// BLAKE3-128 content address of an interned string.
 pub type StrCid = Cid<tags::StrTag>;
@@ -72,6 +83,8 @@ mod tests {
         assert_eq!(size_of::<Option<StrId>>(), 4);
         assert_eq!(size_of::<Option<NodeId>>(), 4);
         assert_eq!(size_of::<Option<PathId>>(), 4);
+        assert_eq!(size_of::<Option<TypeId>>(), 4);
+        assert_eq!(size_of::<Option<ContextId>>(), 4);
     }
 
     #[test]

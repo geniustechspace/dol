@@ -37,6 +37,26 @@ pub enum FuncTag {}
 /// it in a side pool and stores a `PathId` in the node's `a` slot.
 pub enum PathTag {}
 
+/// Tag for interned [`DataType`](dol_core::data_type::DataType) handles.
+///
+/// Issued by `dol_ir::expr::types::TypePool`. `DataType` is recursive
+/// (composite variants own `Box<DataType>` / `Vec<DataType>`) and so
+/// cannot be inlined into the 16-byte `ExprNode`. `Expr::Cast` lowers
+/// to an `ExprNode::cast(NodeId, TypeId)` whose `b` slot holds a
+/// `TypeId` into the side pool.
+pub enum TypeTag {}
+
+/// Tag for lowered scope-context handles.
+///
+/// Issued by `dol_ir::expr::contexts::ContextPool`. The lowered
+/// scope-context — the arena form of
+/// [`Context`](crate::handle) — bundles a partition-by node-id list,
+/// an order-by `(NodeId, SortDirection, NullsOrder)` list, and an
+/// optional `Frame`. None of those fits inline in the 16-byte
+/// `ExprNode`; the lowering pipeline parks the lowered context in a
+/// side pool and stores a `ContextId` in the `Scoped` node's `b` slot.
+pub enum ContextTag {}
+
 /// Tag for schema handles. No `Lid` alias — schemas are addressed by
 /// content (see [`super::SchemaCid`]).
 pub enum SchemaTag {}

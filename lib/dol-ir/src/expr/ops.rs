@@ -45,6 +45,55 @@ pub enum OpFamily {
     Wildcard = 7,
     /// `COUNT(*)` aggregate. No operands.
     CountAll = 8,
+    /// Reference to an interned [`Path<StrId>`](dol_core::path::Path)
+    /// via [`PathId`](dol_cas::handle::PathId). Carries the lowered
+    /// form of `Expr::Ref(Path<Name>)`. `a` is the [`PathId`].
+    PathRef = 9,
+    /// Variadic ordered sequence (`Expr::Seq` lowering). `b`/`c`
+    /// encode an [`OperandSpan`](super::slab::OperandSpan) into the
+    /// arena's [`OperandSlab`](super::slab::OperandSlab) — each `u32`
+    /// slot is a [`NodeId`](dol_cas::handle::NodeId).
+    Seq = 10,
+    /// Variadic key-value mapping (`Expr::Map` lowering). `b`/`c`
+    /// encode an [`OperandSpan`](super::slab::OperandSpan); slots
+    /// alternate `[StrId, NodeId, StrId, NodeId, …]` with even total
+    /// length.
+    Map = 11,
+    /// Function / aggregate call (`Expr::Call` lowering). `a` is a
+    /// [`FuncId`](dol_cas::handle::FuncId); `b`/`c` encode an
+    /// [`OperandSpan`](super::slab::OperandSpan) of [`NodeId`] argument slots.
+    Call = 12,
+    /// Type coercion (`Expr::Cast` lowering). `a` is the operand
+    /// [`NodeId`](dol_cas::handle::NodeId); `b` is a
+    /// [`TypeId`](dol_cas::handle::TypeId) into the
+    /// [`TypePool`](super::types::TypePool).
+    Cast = 13,
+    /// Multi-arm conditional (`Expr::Match` lowering). `a` is the
+    /// fallback [`NodeId`](dol_cas::handle::NodeId) when present
+    /// (zero when absent); `b`/`c` encode an
+    /// [`OperandSpan`](super::slab::OperandSpan) over alternating
+    /// `[cond, result, cond, result, …]` arms with even length.
+    Match = 14,
+    /// Two-branch conditional (`Expr::If` lowering). `a` is the
+    /// condition, `b` the then-branch, `c` the else-branch.
+    If = 15,
+    /// Inclusive range containment (`Expr::InRange` lowering).
+    /// `a` is the expression, `b` the lower bound, `c` the upper bound.
+    InRange = 16,
+    /// Set membership (`Expr::MemberOf` lowering). `a` is the
+    /// expression; `b`/`c` encode an
+    /// [`OperandSpan`](super::slab::OperandSpan) of candidate-set
+    /// [`NodeId`] slots.
+    MemberOf = 17,
+    /// Output-label decorator (`Expr::Label` lowering). `a` is the
+    /// expression [`NodeId`](dol_cas::handle::NodeId), `b` is the
+    /// label [`StrId`](dol_cas::handle::StrId).
+    Label = 18,
+    /// Scoped evaluation (`Expr::Scoped` lowering). `a` is the
+    /// expression [`NodeId`](dol_cas::handle::NodeId), `b` is a
+    /// [`ContextId`](dol_cas::handle::ContextId) into the
+    /// [`ContextPool`](super::contexts::ContextPool).
+    Scoped = 19,
     // Append new families here. Never renumber. Never reuse.
 }
 
@@ -64,6 +113,17 @@ impl OpFamily {
             6 => Self::Param,
             7 => Self::Wildcard,
             8 => Self::CountAll,
+            9 => Self::PathRef,
+            10 => Self::Seq,
+            11 => Self::Map,
+            12 => Self::Call,
+            13 => Self::Cast,
+            14 => Self::Match,
+            15 => Self::If,
+            16 => Self::InRange,
+            17 => Self::MemberOf,
+            18 => Self::Label,
+            19 => Self::Scoped,
             _ => return None,
         })
     }
@@ -277,6 +337,17 @@ mod tests {
         assert_eq!(OpFamily::Param as u8, 6);
         assert_eq!(OpFamily::Wildcard as u8, 7);
         assert_eq!(OpFamily::CountAll as u8, 8);
+        assert_eq!(OpFamily::PathRef as u8, 9);
+        assert_eq!(OpFamily::Seq as u8, 10);
+        assert_eq!(OpFamily::Map as u8, 11);
+        assert_eq!(OpFamily::Call as u8, 12);
+        assert_eq!(OpFamily::Cast as u8, 13);
+        assert_eq!(OpFamily::Match as u8, 14);
+        assert_eq!(OpFamily::If as u8, 15);
+        assert_eq!(OpFamily::InRange as u8, 16);
+        assert_eq!(OpFamily::MemberOf as u8, 17);
+        assert_eq!(OpFamily::Label as u8, 18);
+        assert_eq!(OpFamily::Scoped as u8, 19);
     }
 
     #[test]
@@ -314,11 +385,11 @@ mod tests {
 
     #[test]
     fn opfamily_round_trip() {
-        for v in 0..=8u8 {
+        for v in 0..=19u8 {
             let f = OpFamily::try_from_u8(v).expect("known");
             assert_eq!(f.as_u8(), v);
         }
-        assert!(OpFamily::try_from_u8(9).is_none());
+        assert!(OpFamily::try_from_u8(20).is_none());
         assert!(OpFamily::try_from_u8(255).is_none());
     }
 }

@@ -65,6 +65,17 @@ impl OperandSpan {
     /// in every [`OperandSlab`].
     pub const EMPTY: Self = Self { offset: 0, len: 0 };
 
+    /// Construct a span from raw `(offset, len)` pair. Used by
+    /// [`ExprNode`](super::node::ExprNode) accessors that re-hydrate
+    /// the handle from the node's `b`/`c` slots; callers outside the
+    /// node module should obtain a span via
+    /// [`OperandSlab::push_span`] instead.
+    #[must_use]
+    #[inline]
+    pub const fn from_parts(offset: u32, len: u32) -> Self {
+        Self { offset, len }
+    }
+
     /// The offset into the slab's `u32` storage.
     #[must_use]
     #[inline]

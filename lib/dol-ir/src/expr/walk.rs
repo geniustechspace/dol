@@ -133,12 +133,218 @@ fn hash_node(
             let oh = content_hash(arena, operand, index, budget)?;
             h.update(&oh);
         }
-        // Leaf families: feed the raw 32-bit operand a/b/c slab. b/c
-        // are zero for every leaf today, but feeding all 12 bytes
-        // future-proofs against opcodes that grow secondary operand
-        // payloads (the family + flags + aux above already discriminate
-        // every current leaf shape).
-        OpFamily::LitRef
+        OpFamily::Cast => {
+            // Hash domain: [common header || operand digest || target type id bytes].
+            // The TypePool is push-only (no structural dedup), so two
+            // `Cast(_, Int32)` calls receive distinct `TypeId`s and
+            // therefore distinct digests — sound but slightly less
+            // sharing than the underlying type identity allows. Using
+            // the id bytes (rather than recursing into `DataType`)
+            // keeps the walker arena-local and budget-bounded.
+            let (operand, _ty) = node.as_cast().ok_or(ContentHashError::UnknownOpcode)?;
+            let oh = content_hash(arena, operand, index, budget)?;
+            h.update(&oh);
+            // Folded the type id into the header via bytes[4..8] below
+            // would have aliased with operand bytes for other families.
+            // Append it separately so the type id participates in the
+            // digest in a position the other families never write to.
+            h.update(&bytes[8..12]);
+        }
+        OpFamily::If => {
+            let (cond, t, e) = node.as_if().ok_or(ContentHashError::UnknownOpcode)?;
+            let ch = content_hash(arena, cond, index, budget)?;
+            let th = content_hash(arena, t, index, budget)?;
+            let eh = content_hash(arena, e, index, budget)?;
+            h.update(&ch);
+            h.update(&th);
+            h.update(&eh);
+        }
+        OpFamily::InRange => {
+            let (e, lo, hi) = node.as_in_range().ok_or(ContentHashError::UnknownOpcode)?;
+            let eh = content_hash(arena, e, index, budget)?;
+            let lh = content_hash(arena, lo, index, budget)?;
+            let hh = content_hash(arena, hi, index, budget)?;
+            h.update(&eh);
+            h.update(&lh);
+            h.update(&hh);
+        }
+        OpFamily::Seq => {
+            let span = node.as_seq().ok_or(ContentHashError::UnknownOpcode)?;
+            let slots = arena
+                .operands()
+                .get(span)
+                .ok_or(ContentHashError::MissingNode)?;
+            // Length participates in the digest so `[a]` ≠ `[a, a]` etc.
+            h.update(&u32::try_from(slots.len()).unwrap_or(u32::MAX).to_le_bytes());
+            for slot in slots {
+                let child = dol_cas::handle::Lid::from_u32(*slot)
+                    .ok_or(ContentHashError::MissingNode)?;
+                let ch = content_hash(arena, child, index, budget)?;
+                h.update(&ch);
+            }
+        }
+        OpFamily::Map => {
+            let span = node.as_map().ok_or(ContentHashError::UnknownOpcode)?;
+            let slots = arena
+                .operands()
+                .get(span)
+                .ok_or(ContentHashError::MissingNode)?;
+            // Map slabs alternate `[StrId, NodeId, …]` and require an
+            // even length. Pair count goes into the digest so empty
+            // maps and single-pair maps don't alias.
+            let pair_count = slots.len() / 2;
+            h.update(
+                &u32::try_from(pair_count)
+                    .unwrap_or(u32::MAX)
+                    .to_le_bytes(),
+            );
+            // Iterate in pairs. We deliberately don't sort by key —
+            // the lowering pass preserves the source insertion order
+            // and the digest must reflect it.
+            let mut i = 0usize;
+            while i < slots.len() {
+                let key_slot = slots.get(i).copied().ok_or(ContentHashError::MissingNode)?;
+                // Key contributes its raw `StrId` u32 — strings are
+                // already content-deduped through `StringPool`, so
+                // equal source names share a `StrId` and therefore
+                // contribute identical bytes.
+                h.update(&key_slot.to_le_bytes());
+                let val_slot = slots
+                    .get(i.saturating_add(1))
+                    .copied()
+                    .ok_or(ContentHashError::MissingNode)?;
+                let val_id = dol_cas::handle::Lid::from_u32(val_slot)
+                    .ok_or(ContentHashError::MissingNode)?;
+                let vh = content_hash(arena, val_id, index, budget)?;
+                h.update(&vh);
+                i = i.saturating_add(2);
+            }
+        }
+        OpFamily::Call => {
+            let (_, span) = node.as_call().ok_or(ContentHashError::UnknownOpcode)?;
+            // Function id is in bytes[4..8] (already covered) but for
+            // clarity feed it explicitly so leaf-only families that
+            // don't recurse into the operand slab still produce
+            // distinct digests when the callee differs.
+            h.update(&bytes[4..8]);
+            let slots = arena
+                .operands()
+                .get(span)
+                .ok_or(ContentHashError::MissingNode)?;
+            h.update(&u32::try_from(slots.len()).unwrap_or(u32::MAX).to_le_bytes());
+            for slot in slots {
+                let child = dol_cas::handle::Lid::from_u32(*slot)
+                    .ok_or(ContentHashError::MissingNode)?;
+                let ch = content_hash(arena, child, index, budget)?;
+                h.update(&ch);
+            }
+        }
+        OpFamily::Match => {
+            let (span, fallback) =
+                node.as_match().ok_or(ContentHashError::UnknownOpcode)?;
+            let slots = arena
+                .operands()
+                .get(span)
+                .ok_or(ContentHashError::MissingNode)?;
+            h.update(&u32::try_from(slots.len()).unwrap_or(u32::MAX).to_le_bytes());
+            for slot in slots {
+                let child = dol_cas::handle::Lid::from_u32(*slot)
+                    .ok_or(ContentHashError::MissingNode)?;
+                let ch = content_hash(arena, child, index, budget)?;
+                h.update(&ch);
+            }
+            // Fallback: feed a presence byte then either the digest of
+            // the fallback expression or zero-padding of equal length.
+            match fallback {
+                Some(id) => {
+                    h.update(&[1u8]);
+                    let fh = content_hash(arena, id, index, budget)?;
+                    h.update(&fh);
+                }
+                None => {
+                    h.update(&[0u8]);
+                    h.update(&[0u8; 16]);
+                }
+            }
+        }
+        OpFamily::MemberOf => {
+            let (e, span) =
+                node.as_member_of().ok_or(ContentHashError::UnknownOpcode)?;
+            let eh = content_hash(arena, e, index, budget)?;
+            h.update(&eh);
+            let slots = arena
+                .operands()
+                .get(span)
+                .ok_or(ContentHashError::MissingNode)?;
+            h.update(&u32::try_from(slots.len()).unwrap_or(u32::MAX).to_le_bytes());
+            for slot in slots {
+                let child = dol_cas::handle::Lid::from_u32(*slot)
+                    .ok_or(ContentHashError::MissingNode)?;
+                let ch = content_hash(arena, child, index, budget)?;
+                h.update(&ch);
+            }
+        }
+        OpFamily::Label => {
+            let (e, name) = node.as_label().ok_or(ContentHashError::UnknownOpcode)?;
+            let eh = content_hash(arena, e, index, budget)?;
+            h.update(&eh);
+            // Label name is a `StrId`; strings are content-deduped so
+            // equal labels collapse to identical bytes naturally.
+            h.update(&name.get().to_le_bytes());
+        }
+        OpFamily::Scoped => {
+            let (e, ctx_id) = node.as_scoped().ok_or(ContentHashError::UnknownOpcode)?;
+            let eh = content_hash(arena, e, index, budget)?;
+            h.update(&eh);
+            // Recurse into the lowered context: hash partition_by and
+            // order_by entries (children + sort metadata) and fold the
+            // optional Frame in.
+            let ctx = arena
+                .contexts()
+                .get(ctx_id)
+                .ok_or(ContentHashError::MissingNode)?;
+            h.update(
+                &u32::try_from(ctx.partition_by.len())
+                    .unwrap_or(u32::MAX)
+                    .to_le_bytes(),
+            );
+            for &child in &ctx.partition_by {
+                let ch = content_hash(arena, child, index, budget)?;
+                h.update(&ch);
+            }
+            h.update(
+                &u32::try_from(ctx.order_by.len())
+                    .unwrap_or(u32::MAX)
+                    .to_le_bytes(),
+            );
+            for entry in &ctx.order_by {
+                let ch = content_hash(arena, entry.expr, index, budget)?;
+                h.update(&ch);
+                h.update(&[
+                    if entry.dir.is_ascending() { 0 } else { 1 },
+                    match entry.nulls {
+                        crate::expr::order::NullsOrder::First => 1,
+                        crate::expr::order::NullsOrder::Last => 2,
+                        crate::expr::order::NullsOrder::Default => 0,
+                    },
+                ]);
+            }
+            // Frame: presence byte + canonical bytes if present.
+            match ctx.frame {
+                None => {
+                    h.update(&[0u8]);
+                }
+                Some(frame) => {
+                    h.update(&[1u8]);
+                    h.update(&frame_bytes(frame));
+                }
+            }
+        }
+        // Pure leaf families: feed the raw 32-bit operand a/b/c slab.
+        // For PathRef the path id is in `a` and is content-stable
+        // through the structurally-deduped `PathPool`.
+        OpFamily::PathRef
+        | OpFamily::LitRef
         | OpFamily::FieldRef
         | OpFamily::FuncRef
         | OpFamily::Param
@@ -167,6 +373,42 @@ fn hash_node(
 #[must_use]
 pub fn content_hash_bytes(bytes: &[u8]) -> [u8; 16] {
     content128(bytes)
+}
+
+/// Canonical 19-byte serialisation of a [`Frame`]: 1 byte unit + 9
+/// bytes for `start` + 9 bytes for `end`. Used by [`content_hash`] so
+/// `Scoped` digests fold the frame in canonically without recursing.
+#[cfg(feature = "std")]
+fn frame_bytes(frame: super::frame::Frame) -> [u8; 19] {
+    use super::frame::{Boundary, Extent, FrameUnit};
+    fn boundary(b: Boundary) -> [u8; 9] {
+        // Tag + 8-byte little-endian payload (zero when unused).
+        let (tag, ext_tag, off): (u8, u8, u64) = match b {
+            Boundary::Current => (0, 0, 0),
+            Boundary::Before(Extent::Unbounded) => (1, 0, 0),
+            Boundary::Before(Extent::Offset(n)) => (1, 1, n),
+            Boundary::After(Extent::Unbounded) => (2, 0, 0),
+            Boundary::After(Extent::Offset(n)) => (2, 1, n),
+        };
+        let mut out = [0u8; 9];
+        out[0] = tag;
+        out[1..9].copy_from_slice(&off.to_le_bytes());
+        // Squeeze the extent tag into the high byte of the offset
+        // slot (offsets above 2^56 are vanishingly unlikely; the tag
+        // bit also distinguishes `Unbounded` from `Offset(0)`).
+        out[8] = ext_tag;
+        out
+    }
+    let unit_byte: u8 = match frame.unit {
+        FrameUnit::Rows => 0,
+        FrameUnit::Range => 1,
+        FrameUnit::Groups => 2,
+    };
+    let mut out = [0u8; 19];
+    out[0] = unit_byte;
+    out[1..10].copy_from_slice(&boundary(frame.start));
+    out[10..19].copy_from_slice(&boundary(frame.end));
+    out
 }
 
 #[cfg(all(test, feature = "std"))]
