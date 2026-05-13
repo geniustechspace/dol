@@ -66,25 +66,33 @@
 //!   Path/Func pools dedup structurally; the others are push-only
 //!   pending a stable canonical-byte hash.
 //!
-//! ## What ships in M3d-α (this milestone)
+//! ## What ships in M3d-α + M3d-β (this milestone)
 //!
-//! - [`schema::Entity`] — entity (table / collection) definition.
+//! - [`schema::Entity`] — entity (table / collection / document type)
+//!   definition.
 //! - [`schema::Field`] / [`schema::FieldType`] — field definitions with
 //!   scalar, relation, or computed types.
 //! - [`schema::Relation`] / [`schema::RelationKind`] — directed edges
 //!   between entities (one-to-one, one-to-many, many-to-many).
-//! - [`schema::Lookup`] — indexed access paths (PK, secondary indexes).
+//! - [`schema::Lookup`] — indexed access paths (primary identity,
+//!   secondary access patterns).
 //! - [`schema::Policy`] / [`schema::PolicyKind`] — access-control rules.
 //! - [`schema::Constraint`] / [`schema::ConstraintKind`] — integrity
-//!   constraints (NOT NULL, UNIQUE, PK, FK, CHECK).
+//!   constraints (required / unique / identity / reference / check).
+//! - [`schema::SchemaCatalog`] — the container owning every record
+//!   pool plus the interner that backs every record name (plan §8.6
+//!   line 1452). Comes with `define_*` constructors that intern
+//!   names and `*_by_name` linear-scan lookups, all surfacing the
+//!   same [`schema::CatalogError`] enum.
 //! - `RelationTag`, `LookupTag`, `PolicyTag` in [`dol_cas::handle::tags`]
 //!   plus the corresponding `RelationId`, `LookupId`, `PolicyId` type
 //!   aliases in [`dol_cas::handle`].
 //!
-//! ## What lands in M3d-β + M3e (still pending)
+//! ## What lands in M3d-γ + M3e (still pending)
 //!
-//! - **M3d-β**: `SchemaCatalog` (§8.6 catalog struct), constraint
-//!   validation passes.
+//! - **M3d-γ**: schema validation passes — referential integrity for
+//!   `ForeignKey` constraints, `Lookup` field-existence checks, and
+//!   `Computed` field expression budgeting.
 //! - **M3e**: `Operation` / `Program` (§8.7), `Backend` trait + reference
 //!   no-op backend (§8.8), and optional `stream` / `pipeline` features
 //!   (§8.9–§8.10).
