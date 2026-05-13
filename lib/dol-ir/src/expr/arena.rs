@@ -35,14 +35,53 @@ use dol_cas::pool::{ArenaStorage, DynPool};
 use hashbrown::HashMap;
 
 #[cfg(feature = "std")]
+use super::funcs::FuncRegistry;
+#[cfg(feature = "std")]
+use super::literals::LiteralPool;
+#[cfg(feature = "std")]
 use super::node::ExprNode;
+#[cfg(feature = "std")]
+use super::paths::PathPool;
+#[cfg(feature = "std")]
+use super::slab::OperandSlab;
 
-/// Flat arena of [`ExprNode`]s addressed by [`NodeId`].
+/// Flat arena of [`ExprNode`]s addressed by [`NodeId`], plus the four
+/// **side pools** that carry payloads too large to inline in the
+/// 16-byte node record.
 ///
 /// Backed by [`DynPool<ExprNode>`](dol_cas::pool::DynPool); `Send +
 /// Sync` since `ExprNode` is `Pod`. The arena is **monotonically
 /// growing** — once a node is pushed its [`NodeId`] is stable for
 /// the lifetime of the arena.
+///
+/// ## Embedded side pools (M3c-δ₂b prereq #5)
+///
+/// The recursive `lower(Expr<'a>)` pass (plan §8.4) needs handles
+/// into four side pools whenever it lowers a non-trivial variant:
+///
+/// - [`literals`](Self::literals): `Expr::Lit` → `ExprNode::lit_ref(LiteralId)`
+///   (plan §8.1 line 1095).
+/// - [`funcs`](Self::funcs): `Expr::Call` → `ExprNode::func_ref(FuncId)`
+///   (plan §8.1 line 1097).
+/// - [`operands`](Self::operands): `Expr::Seq` / `Map` / `Call` /
+///   `Match` argument lists park here as
+///   [`OperandSpan`](super::slab::OperandSpan) `(offset, len)` pairs.
+/// - [`paths`](Self::paths): `Expr::Ref(Path<Name>)` lowers to a
+///   [`PathId`](dol_cas::handle::PathId) into the path pool, since the
+///   variable-length path cannot be inlined into the 16-byte node.
+///
+/// Embedding the four pools means `lower` can keep the documented
+/// signature
+///
+/// ```text
+/// fn lower(&Expr<'_>, &mut ExprArena, &StringPool, &mut Budget)
+///     -> Result<NodeId, LowerError>
+/// ```
+///
+/// without growing into a five- or six-argument function (plan §8.4
+/// line 1376). Each pool is exposed through a `&self` and `&mut self`
+/// accessor so callers may pre-populate or inspect them outside the
+/// `lower` pipeline as well.
 #[cfg(feature = "std")]
 #[derive(Debug, Default, Clone)]
 pub struct ExprArena {
@@ -58,27 +97,104 @@ pub struct ExprArena {
     /// `fast64` collisions on identical 16-byte inputs are vanishingly
     /// rare; this strategy is the simple, panic-free choice.)
     dedup: HashMap<u64, NodeId>,
+    /// Carrier for `Expr::Lit` payloads (push-only in this slice).
+    literals: LiteralPool,
+    /// Carrier for `Expr::Call` function definitions (name-keyed
+    /// dedup; first-registration-wins on conflicts).
+    funcs: FuncRegistry,
+    /// Carrier for variadic operand sequences (`Expr::Seq` /
+    /// `Expr::Map` / `Expr::Call::args` / `Expr::Match::arms`).
+    operands: OperandSlab,
+    /// Carrier for lowered `Expr::Ref` paths
+    /// (`Path<StrId>` keyed by [`PathId`](dol_cas::handle::PathId)).
+    paths: PathPool,
 }
 
 #[cfg(feature = "std")]
 impl ExprArena {
-    /// Construct an empty arena.
+    /// Construct an empty arena (and four empty side pools).
     #[must_use]
     pub fn new() -> Self {
         Self {
             pool: DynPool::new(),
             dedup: HashMap::new(),
+            literals: LiteralPool::new(),
+            funcs: FuncRegistry::new(),
+            operands: OperandSlab::new(),
+            paths: PathPool::new(),
         }
     }
 
     /// Pre-allocate capacity for `cap` nodes (and the same capacity
     /// in the dedup index — the upper bound on distinct entries).
+    ///
+    /// Side pools start empty; reserve their capacity on demand via
+    /// the dedicated `*_mut()` accessors when known up front.
     #[must_use]
     pub fn with_capacity(cap: usize) -> Self {
         Self {
             pool: DynPool::with_capacity(cap),
             dedup: HashMap::with_capacity(cap),
+            literals: LiteralPool::new(),
+            funcs: FuncRegistry::new(),
+            operands: OperandSlab::new(),
+            paths: PathPool::new(),
         }
+    }
+
+    // ─── Side-pool accessors ────────────────────────────────────────
+
+    /// Borrow the literal carrier (`Expr::Lit` payloads).
+    #[must_use]
+    #[inline]
+    pub fn literals(&self) -> &LiteralPool {
+        &self.literals
+    }
+
+    /// Mutably borrow the literal carrier — used by `lower` to intern
+    /// `Expr::Lit` and by tests/builders to seed payloads.
+    #[inline]
+    pub fn literals_mut(&mut self) -> &mut LiteralPool {
+        &mut self.literals
+    }
+
+    /// Borrow the function registry (`Expr::Call` definitions).
+    #[must_use]
+    #[inline]
+    pub fn funcs(&self) -> &FuncRegistry {
+        &self.funcs
+    }
+
+    /// Mutably borrow the function registry.
+    #[inline]
+    pub fn funcs_mut(&mut self) -> &mut FuncRegistry {
+        &mut self.funcs
+    }
+
+    /// Borrow the variadic operand slab.
+    #[must_use]
+    #[inline]
+    pub fn operands(&self) -> &OperandSlab {
+        &self.operands
+    }
+
+    /// Mutably borrow the variadic operand slab.
+    #[inline]
+    pub fn operands_mut(&mut self) -> &mut OperandSlab {
+        &mut self.operands
+    }
+
+    /// Borrow the path pool (`Expr::Ref` payloads).
+    #[must_use]
+    #[inline]
+    pub fn paths(&self) -> &PathPool {
+        &self.paths
+    }
+
+    /// Mutably borrow the path pool.
+    #[inline]
+    pub fn paths_mut(&mut self) -> &mut PathPool {
+        &mut self.paths
     }
 
     /// Push a node and return its [`NodeId`].
@@ -284,5 +400,110 @@ mod tests {
         // But re-interning hits the cache.
         let again = a.intern_node(n).unwrap();
         assert_eq!(again, interned);
+    }
+
+    // ─── Embedded side pools (M3c-δ₂b prereq #5) ─────────────────────
+
+    #[test]
+    fn fresh_arena_has_empty_side_pools() {
+        let a = ExprArena::new();
+        assert!(a.literals().is_empty());
+        assert!(a.funcs().is_empty());
+        assert!(a.operands().is_empty());
+        assert!(a.paths().is_empty());
+    }
+
+    #[test]
+    fn with_capacity_does_not_pre_populate_side_pools() {
+        let a = ExprArena::with_capacity(64);
+        assert!(a.literals().is_empty());
+        assert!(a.funcs().is_empty());
+        assert!(a.operands().is_empty());
+        assert!(a.paths().is_empty());
+    }
+
+    #[test]
+    fn literal_pool_mutation_visible_through_accessors() {
+        use dol_core::literal::Literal;
+        let mut a = ExprArena::new();
+        let id = a.literals_mut().intern(&Literal::Int64(42)).unwrap();
+        // Read-only accessor sees the same id and payload.
+        assert_eq!(a.literals().len(), 1);
+        assert_eq!(a.literals().get(id), Some(&Literal::Int64(42)));
+    }
+
+    #[test]
+    fn func_registry_mutation_visible_through_accessors() {
+        use crate::expr::meta::{Arity, FuncDef, FuncKind};
+        let mut a = ExprArena::new();
+        let def = FuncDef::new_static("LENGTH", Arity::Exact(1), FuncKind::Scalar);
+        let id = a.funcs_mut().intern(&def).unwrap();
+        assert_eq!(a.funcs().len(), 1);
+        assert_eq!(a.funcs().get(id), Some(&def));
+        // Re-intern by name dedups (FuncRegistry contract).
+        let id2 = a.funcs_mut().intern(&def).unwrap();
+        assert_eq!(id, id2);
+        assert_eq!(a.funcs().len(), 1);
+    }
+
+    #[test]
+    fn operand_slab_mutation_visible_through_accessors() {
+        let mut a = ExprArena::new();
+        let span = a.operands_mut().push_span(&[1, 2, 3]).unwrap();
+        assert_eq!(a.operands().get(span), Some(&[1u32, 2, 3][..]));
+    }
+
+    #[test]
+    fn path_pool_mutation_visible_through_accessors() {
+        use dol_cas::string_pool::StringPool;
+        use dol_core::budget::Budget;
+        use dol_core::config::BudgetConfig;
+        use dol_core::path::Path;
+        use dol_core::strings::Name;
+
+        let mut a = ExprArena::new();
+        let strings = StringPool::standard();
+        let mut budget = Budget::from_config(&BudgetConfig::standard());
+        let lowered =
+            crate::expr::lower::lower_path(&Path::<Name>::new("users"), &strings, &mut budget)
+                .unwrap();
+
+        let id = a.paths_mut().intern(&lowered).unwrap();
+        assert_eq!(a.paths().len(), 1);
+        assert_eq!(a.paths().get(id), Some(&lowered));
+        // PathPool is structurally deduped — same path → same id.
+        let id2 = a.paths_mut().intern(&lowered).unwrap();
+        assert_eq!(id, id2);
+        assert_eq!(a.paths().len(), 1);
+    }
+
+    #[test]
+    fn clone_deep_copies_side_pools() {
+        use dol_core::literal::Literal;
+        let mut a = ExprArena::new();
+        let lit_id = a.literals_mut().intern(&Literal::Bool(true)).unwrap();
+        let span = a.operands_mut().push_span(&[7, 8]).unwrap();
+
+        let b = a.clone();
+        assert_eq!(b.literals().len(), 1);
+        assert_eq!(b.literals().get(lit_id), Some(&Literal::Bool(true)));
+        assert_eq!(b.operands().get(span), Some(&[7u32, 8][..]));
+
+        // Mutating the clone must not affect the original.
+        let mut b = b;
+        let _extra = b.literals_mut().intern(&Literal::Bool(false)).unwrap();
+        assert_eq!(a.literals().len(), 1);
+        assert_eq!(b.literals().len(), 2);
+    }
+
+    #[test]
+    fn default_constructor_matches_new() {
+        let a = ExprArena::new();
+        let b = ExprArena::default();
+        assert_eq!(a.len(), b.len());
+        assert!(a.literals().is_empty() && b.literals().is_empty());
+        assert!(a.funcs().is_empty() && b.funcs().is_empty());
+        assert!(a.operands().is_empty() && b.operands().is_empty());
+        assert!(a.paths().is_empty() && b.paths().is_empty());
     }
 }

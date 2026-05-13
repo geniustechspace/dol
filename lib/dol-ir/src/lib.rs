@@ -3,7 +3,7 @@
 //! Per `dol-rewrite-plan-v2.md` §8. M3 is the largest milestone in
 //! the rewrite and is split across PRs **M3a–M3e**.
 //!
-//! ## What ships in M3a + M3b + M3c-α + M3c-β + M3c-γ + M3c-δ₁ + M3c-δ₂a + M3c-δ₂b prereq #1 + M3c-δ₂b prereq #2 + M3c-δ₂b prereq #3 + M3c-δ₂b prereq #4
+//! ## What ships in M3a + M3b + M3c-α + M3c-β + M3c-γ + M3c-δ₁ + M3c-δ₂a + M3c-δ₂b prereq #1 + M3c-δ₂b prereq #2 + M3c-δ₂b prereq #3 + M3c-δ₂b prereq #4 + M3c-δ₂b prereq #5
 //!
 //! - [`expr::node::ExprNode`] — the 16-byte POD expression record.
 //!   `#[repr(C)]`, `bytemuck::Pod`, const-asserted to be exactly
@@ -15,10 +15,16 @@
 //! - [`expr::flags::NodeFlags`] — per-node bitset (`nullable` /
 //!   `distinct` / `negated` / `aggregate`).
 //! - [`expr::arena::ExprArena`] — flat `DynPool<ExprNode>` store
-//!   addressed by [`NodeId`](dol_cas::handle::NodeId). Two construction
-//!   modes: raw [`push`](expr::arena::ExprArena::push) (no dedup) and
-//!   [`intern_node`](expr::arena::ExprArena::intern_node) (structural
-//!   dedup keyed by `fast64` over the 16-byte node).
+//!   addressed by [`NodeId`](dol_cas::handle::NodeId), now bundling
+//!   the four side pools ([`literals`](expr::arena::ExprArena::literals)
+//!   / [`funcs`](expr::arena::ExprArena::funcs) /
+//!   [`operands`](expr::arena::ExprArena::operands) /
+//!   [`paths`](expr::arena::ExprArena::paths)) so the upcoming
+//!   `lower(expr, arena, strings, budget)` keeps a four-argument
+//!   signature (plan §8.4 line 1376). Two construction modes survive
+//!   unchanged: raw [`push`](expr::arena::ExprArena::push) (no dedup)
+//!   and [`intern_node`](expr::arena::ExprArena::intern_node)
+//!   (structural dedup keyed by `fast64` over the 16-byte node).
 //! - [`expr::walk::content_hash`] — bottom-up walker that derives the
 //!   BLAKE3-128 content address of any subtree, memoised in
 //!   [`dol_cas::content_index::ContentIndex`]. Threads `&mut Budget`
@@ -92,7 +98,8 @@
 //! - **M3c-δ₂b**: the recursive `lower(Expr<'a>) → ExprArena` pass
 //!   (§8.4) and `compute_hash` integration (§8.5). All four side-pool
 //!   carriers (`LiteralPool` / `FuncRegistry` / `OperandSlab` /
-//!   `PathPool`) are now in place; the next slice wires them into a
+//!   `PathPool`) are now embedded directly in
+//!   [`expr::arena::ExprArena`]; the next slice wires them into a
 //!   recursive lowerer plus the new `OpFamily` variants (`Seq` /
 //!   `Map` / `Call` / `Match` / `If` / `InRange` / `MemberOf` /
 //!   `Label` / `Cast` / `Scoped` / path-carrying `Ref`) that consume
