@@ -47,6 +47,10 @@ pub type EntityId = Lid<tags::EntityTag>;
 pub type LiteralId = Lid<tags::LiteralTag>;
 /// Function / opcode handle.
 pub type FuncId = Lid<tags::FuncTag>;
+/// Interned-[`Path<StrId>`](dol_core::path::Path) handle. Issued by
+/// `dol_ir::expr::paths::PathPool`. Required because `Path<StrId>`
+/// (variable-length) cannot be inlined into the 16-byte `ExprNode`.
+pub type PathId = Lid<tags::PathTag>;
 
 /// BLAKE3-128 content address of an interned string.
 pub type StrCid = Cid<tags::StrTag>;
@@ -67,6 +71,7 @@ mod tests {
         // The whole point of the NonZeroU32 niche.
         assert_eq!(size_of::<Option<StrId>>(), 4);
         assert_eq!(size_of::<Option<NodeId>>(), 4);
+        assert_eq!(size_of::<Option<PathId>>(), 4);
     }
 
     #[test]

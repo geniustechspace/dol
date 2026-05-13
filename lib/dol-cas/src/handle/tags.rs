@@ -30,6 +30,13 @@ pub enum LiteralTag {}
 /// Tag for function / opcode handles.
 pub enum FuncTag {}
 
+/// Tag for interned [`Path<StrId>`](dol_core::path::Path) handles.
+///
+/// Issued by `dol_ir::expr::paths::PathPool`. `Path<StrId>` cannot be
+/// inlined into the 16-byte `ExprNode`, so the lowering pipeline parks
+/// it in a side pool and stores a `PathId` in the node's `a` slot.
+pub enum PathTag {}
+
 /// Tag for schema handles. No `Lid` alias — schemas are addressed by
 /// content (see [`super::SchemaCid`]).
 pub enum SchemaTag {}

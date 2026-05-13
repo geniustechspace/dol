@@ -3,7 +3,7 @@
 //! Per `dol-rewrite-plan-v2.md` §8. M3 is the largest milestone in
 //! the rewrite and is split across PRs **M3a–M3e**.
 //!
-//! ## What ships in M3a + M3b + M3c-α + M3c-β + M3c-γ + M3c-δ₁ + M3c-δ₂a + M3c-δ₂b prereq #1 + M3c-δ₂b prereq #2 + M3c-δ₂b prereq #3
+//! ## What ships in M3a + M3b + M3c-α + M3c-β + M3c-γ + M3c-δ₁ + M3c-δ₂a + M3c-δ₂b prereq #1 + M3c-δ₂b prereq #2 + M3c-δ₂b prereq #3 + M3c-δ₂b prereq #4
 //!
 //! - [`expr::node::ExprNode`] — the 16-byte POD expression record.
 //!   `#[repr(C)]`, `bytemuck::Pod`, const-asserted to be exactly
@@ -76,15 +76,27 @@
 //!   `(offset, len)` handle in two of the node's `u32` slots. Append-
 //!   only, push-only (no interior dedup in this slice — span-level
 //!   dedup belongs in `ExprArena::intern_node`).
+//! - [`expr::paths::PathPool`] — typed-arena carrier mapping
+//!   [`PathId`](dol_cas::handle::PathId) to
+//!   [`Path<StrId>`](dol_core::path::Path). The arena form of
+//!   `Expr::Ref(Path<Name>)` interns the lowered `Path<StrId>` here
+//!   and writes a `PathId` into the node, because variable-length
+//!   paths cannot be inlined into the 16-byte
+//!   [`ExprNode`](expr::node::ExprNode). **Structurally deduped** —
+//!   `Path<StrId>` is `Hash + Eq`, unlike `Literal` (which lacks
+//!   `Hash` due to `f64`), so two interns of the same path collapse
+//!   to a single id and the surrounding `ExprArena` dedup stays sound.
 //!
 //! ## What lands in M3c-δ₂b … M3e
 //!
 //! - **M3c-δ₂b**: the recursive `lower(Expr<'a>) → ExprArena` pass
-//!   (§8.4) and `compute_hash` integration (§8.5). All three side-pool
-//!   carriers (`LiteralPool` / `FuncRegistry` / `OperandSlab`) are
-//!   now in place; the next slice wires them into a recursive lowerer
-//!   plus the new `OpFamily` variants (`Seq` / `Map` / `Call` /
-//!   `Match`) that consume their handles.
+//!   (§8.4) and `compute_hash` integration (§8.5). All four side-pool
+//!   carriers (`LiteralPool` / `FuncRegistry` / `OperandSlab` /
+//!   `PathPool`) are now in place; the next slice wires them into a
+//!   recursive lowerer plus the new `OpFamily` variants (`Seq` /
+//!   `Map` / `Call` / `Match` / `If` / `InRange` / `MemberOf` /
+//!   `Label` / `Cast` / `Scoped` / path-carrying `Ref`) that consume
+//!   their handles.
 //! - **M3d**: schema types — `Entity`, `Field`, `SchemaCatalog` (§8.6).
 //! - **M3e**: `Operation` / `Program` (§8.7), `Backend` trait + reference
 //!   no-op backend (§8.8), and optional `stream` / `pipeline` features

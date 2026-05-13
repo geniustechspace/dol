@@ -24,6 +24,7 @@ pub mod meta;
 pub mod node;
 pub mod ops;
 pub mod order;
+pub mod paths;
 pub mod slab;
 pub mod tree;
 pub mod walk;
